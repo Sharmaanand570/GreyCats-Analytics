@@ -23,6 +23,8 @@ function App() {
         </Route>
         <Route path="/login" element={<AuthPage />} />
         <Route path="/signup" element={<AuthPage />} />
+        
+         <Route path="/data-sources" element={<Integrations />} />
 
         {/* <Route path="clients" >
           <Route index element={<Clients/>} />
@@ -37,7 +39,7 @@ function App() {
         <Route path="goals" element={<Goals />} />
         <Route path="alerts" element={<AlertsPage />} />
         <Route path="tasks" element={<TasksPage />} />
-        <Route path="integrations" element={<Integrations />} />
+       
         <Route path="account-setup" element={<Settings />} />
       </Route>
     </Routes>

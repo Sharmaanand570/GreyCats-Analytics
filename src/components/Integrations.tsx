@@ -1,21 +1,19 @@
-import { FiBell, FiSearch } from "react-icons/fi"
-import { Button } from "./ui/button"
-import { Input } from "./ui/input"
-import DropDownFilter from "./DropDownFilter"
-import TableComponent from "./TableComponent"
-import { FaFacebook, FaInstagram } from "react-icons/fa6"
-import { SiGoogleads, SiGoogleanalytics } from "react-icons/si"
-
+import { FiBell, FiSearch } from "react-icons/fi";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import DropDownFilter from "./DropDownFilter";
+import TableComponent from "./TableComponent";
+import { FaFacebook, FaInstagram } from "react-icons/fa6";
+import { SiGoogleads, SiGoogleanalytics } from "react-icons/si";
+import ConnectDataSource from "./ConnectDataSource";
 
 function Integrations() {
   return (
     <div className="w-full  h-[2000vh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 ">
       <div className="w-full  rounded-l-2xl overflow-hidden h-full   my-4 bg-[#fdfdfd] ">
         <div className="w-full h-full flex flex-col">
-
-          
           <div className="w-full h-[4.8em] bg-white border-b flex justify-between items-center px-5 ">
-            <span className="font-medium text-xl">Integrations</span>
+            <span className="font-medium text-xl">Data Sources</span>
             <div className="flex items-center">
               <span className="mx-2 text-lg text-gray-500">
                 <FiSearch />
@@ -25,7 +23,11 @@ function Integrations() {
                 <FiBell />
               </span>
               <span className="ml-4">
-                <Button className="rounded-[0.4rem]">Edit Dashboard</Button>
+                <ConnectDataSource>
+                  <Button className="rounded-[0.4rem]">
+                    Connect Data Source
+                  </Button>
+                </ConnectDataSource>
               </span>
             </div>
           </div>
@@ -100,7 +102,7 @@ function Integrations() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default Integrations
+export default Integrations;

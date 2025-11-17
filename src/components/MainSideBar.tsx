@@ -78,7 +78,7 @@ function MainSideBar(): React.JSX.Element {
       label: "Main",
       items: [
         { label: "Dashboard", path: "/", icon: <LayoutDashboard /> },
-        { label: "Integrations", path: "/integrations", icon: <Layers /> },
+        { label: "Data Sources", path: "/data-sources", icon: <Layers /> },
       ],
     },
     {

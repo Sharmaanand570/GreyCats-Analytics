@@ -7,7 +7,7 @@ import { Link } from "react-router-dom";
 
 function Dashboard() {
   return (
-    <div className="w-full  h-[2000vh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 ">
+    <div className="w-full h-[2000vh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 ">
       <div className="w-full  rounded-l-2xl overflow-hidden h-full   my-4 bg-[#fdfdfd] ">
         {/* Header */}
         <div className="w-full h-[4.8em] bg-white border-b flex justify-between items-center px-4 sm:px-5">
