@@ -4,6 +4,7 @@ import { ChartLineMultiple } from "./ChartLineMultiple";
 import { ChartPieInteractive } from "./ChartPieInteractive";
 import { getChangeIndicatorClass } from "../utils/statusColors";
 import { Link } from "react-router-dom";
+import ToolTipComponenet from "./ToolTipComponenet";
 
 function Dashboard() {
   return (
@@ -15,9 +16,17 @@ function Dashboard() {
           <div className="flex items-center gap-3 sm:gap-4">
             <FiSearch className="text-lg text-gray-500 cursor-pointer" />
             <FiBell className="text-lg text-gray-500 cursor-pointer" />
-            <Link to={"/edit-dashboard"}><Button className="rounded-md text-xs sm:text-sm md:text-base">
-              Edit Dashboard
-            </Button></Link>
+            <ToolTipComponenet
+              content="Edit Dashboard lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, quos."
+              side="left"
+              align="center"
+            >
+              <Link to={"/edit-dashboard"}>
+                <Button className="rounded-md text-xs sm:text-sm md:text-base">
+                  Edit Dashboard
+                </Button>
+              </Link>
+            </ToolTipComponenet>
           </div>
         </div>
         {/* edit-dashobard */}

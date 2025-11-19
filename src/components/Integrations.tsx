@@ -3,11 +3,41 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import DropDownFilter from "./DropDownFilter";
 import TableComponent from "./TableComponent";
-import { FaFacebook, FaInstagram } from "react-icons/fa6";
-import { SiGoogleads, SiGoogleanalytics } from "react-icons/si";
 import ConnectDataSource from "./ConnectDataSource";
+import { useIntegrations } from "@/features/DataSources/hooks/useIntegrations";
+import { getPlatformConfig, capitalizeStatus } from "@/utils/platformMapping";
+import { useMemo } from "react";
+import { Skeleton } from "./ui/skeleton";
 
 function Integrations() {
+  const {
+    data: integrationsData,
+    isLoading,
+    error,
+  } = useIntegrations();
+
+  console.log(integrationsData,error)
+
+  const tableData = useMemo(() => {
+    if (!integrationsData?.integrations) {
+      return [];
+    }
+
+    return integrationsData.integrations.map((integration) => {
+      const platformConfig = getPlatformConfig(integration.platform);
+      
+      return {
+        name: platformConfig?.name || integration.platform,
+        icon: platformConfig?.icon,
+        link: platformConfig?.link || `/integrations/${integration.platform}`,
+        label: integration.accountName,
+        identifier: integration.accountId,
+        clientsConnected: 1, // Default value, can be updated if API provides this
+        status: capitalizeStatus(integration.status),
+      };
+    });
+  }, [integrationsData]);
+
   return (
     <div className="w-full  h-[2000vh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 ">
       <div className="w-full  rounded-l-2xl overflow-hidden h-full   my-4 bg-[#fdfdfd] ">
@@ -51,53 +81,35 @@ function Integrations() {
             </div>
           </div>
           <div className="w-full px-5">
-            <TableComponent
-              header={[
-                "Integration",
-                "Label",
-                "Identifier",
-                "Clients Connected",
-                "Status",
-              ]}
-              bodyData={[
-                {
-                  name: "Facebook",
-                  icon: FaFacebook,
-                  link: "/integrations/facebook",
-                  label: "Abhishek Waghmare",
-                  identifier: "122125436060189474",
-                  clientsConnected: 6,
-                  status: "Connected",
-                },
-                {
-                  name: "Instagram",
-                  icon: FaInstagram,
-                  link: "/integrations/instagram",
-                  label: "Abhishek Waghmare",
-                  identifier: "122125436060189474",
-                  clientsConnected: 6,
-                  status: "Connected",
-                },
-                {
-                  name: "Google Ads",
-                  icon: SiGoogleads,
-                  link: "/integrations/google-ads",
-                  label: "Team",
-                  identifier: "104147153338746995797",
-                  clientsConnected: 1,
-                  status: "Connected",
-                },
-                {
-                  name: "Google Analytics 4",
-                  icon: SiGoogleanalytics,
-                  link: "/integrations/google-analytics",
-                  label: "Team Antagon",
-                  identifier: "104147153338746995797",
-                  clientsConnected: 1,
-                  status: "Connected",
-                },
-              ]}
-            />
+            {isLoading ? (
+              <div className="border w-full rounded-[0.7rem] overflow-hidden p-6 space-y-4">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ) : error ? (
+              <div className="border w-full rounded-[0.7rem] overflow-hidden p-6">
+                <div className="text-destructive">
+                  <p className="font-medium">Failed to load integrations</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {error instanceof Error
+                      ? error.message
+                      : "An error occurred while fetching integrations"}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <TableComponent
+                header={[
+                  "Integration",
+                  "Label",
+                  "Identifier",
+                  "Clients Connected",
+                  "Status",
+                ]}
+                bodyData={tableData}
+              />
+            )}
           </div>
         </div>
       </div>

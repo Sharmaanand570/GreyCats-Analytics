@@ -1,0 +1,56 @@
+// axiosConfig.ts
+import axios, {
+  AxiosError,
+  type AxiosInstance,
+  type InternalAxiosRequestConfig,
+} from "axios";
+import { getAuthToken, removeAuthToken, StorageKey } from "./utils/storage";
+
+const apiBaseURL = import.meta.env.VITE_API_BASE_URL;
+const apiTimeout = Number(import.meta.env.VITE_API_TIMEOUT) || 10000;
+
+export const api: AxiosInstance = axios.create({
+  baseURL: apiBaseURL,
+  timeout: apiTimeout,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+console.log("ENV BASE URL:", import.meta.env.VITE_API_BASE_URL);
+console.log(import.meta.env.VITE_NGROK_URL,"grock")
+
+// ---------------------
+// REQUEST INTERCEPTOR
+// ---------------------
+api.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    const token = getAuthToken(StorageKey.ANALYTICS_TOKEN);
+    console.log("ENV BASE URL:", import.meta.env.VITE_API_BASE_URL);
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error: AxiosError) => Promise.reject(error)
+);
+
+// ---------------------
+// RESPONSE INTERCEPTOR
+// ---------------------
+api.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      console.warn("Unauthorized — redirecting to login…");
+
+      removeAuthToken(StorageKey.ANALYTICS_TOKEN);
+      window.location.href = "/login";
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+export default api;

@@ -144,10 +144,8 @@ function EditDashboard() {
             </div>
           </div>
 
-         
-           <div>
-
-           <DataSourcesSidebar
+          <div>
+            <DataSourcesSidebar
               searchQuery={searchQuery}
               onSearchChange={handleSearchChange}
               filteredCategories={filteredCategories}
@@ -155,8 +153,7 @@ function EditDashboard() {
               onValueChange={handleAccordionValueChange}
               isMobile={false}
             />
-           </div>
-         
+          </div>
         </div>
       </div>
     </div>

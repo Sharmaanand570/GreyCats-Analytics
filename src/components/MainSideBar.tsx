@@ -33,16 +33,18 @@ import { Button } from "./ui/button";
 function MainSideBar(): React.JSX.Element {
   const location = useLocation();
   const [activeTab, setActive] = useState(location.pathname);
-  
+
   // Initialize collapse state based on current route
   const getInitialCollapseState = () => {
     const isReportBuilder = /^\/reports\/.+/.test(location.pathname);
     const isClientDetails = /^\/clients\/.+/.test(location.pathname);
-    const isEditDashboard = location.pathname.startsWith('/edit-dashboard');
+    const isEditDashboard = location.pathname.startsWith("/edit-dashboard");
     return isReportBuilder || isClientDetails || isEditDashboard;
   };
-  
-  const [collabsState, setcollabsState] = useState<boolean>(getInitialCollapseState());
+
+  const [collabsState, setcollabsState] = useState<boolean>(
+    getInitialCollapseState()
+  );
 
   const navigate = useNavigate();
 
@@ -59,13 +61,17 @@ function MainSideBar(): React.JSX.Element {
       location.pathname
     );
 
-    const isUserOnEditDashboard = location.pathname.startsWith('/edit-dashboard');
+    const isUserOnEditDashboard =
+      location.pathname.startsWith("/edit-dashboard");
 
-    const shouldCollapse = isSideBarOnReportBuilderPage || isSideBarOnClientDetailsPage || isUserOnEditDashboard;
+    const shouldCollapse =
+      isSideBarOnReportBuilderPage ||
+      isSideBarOnClientDetailsPage ||
+      isUserOnEditDashboard;
     setcollabsState(shouldCollapse);
   }, [location.pathname]);
+  const isAuthPage = /^\/auth\/(login|signup)$/.test(location.pathname);
 
-  const isAuthPage = /^\/(login|signup)$/.test(location.pathname);
   if (isAuthPage)
     return (
       <main className="flex-1 bg-[#F9FAFB] w-full h-full">
@@ -122,8 +128,7 @@ function MainSideBar(): React.JSX.Element {
               collabsState ? "px-0" : "px-2"
             }`}
           >
-
-{/* className="bg-black" */}
+            {/* className="bg-black" */}
             {/* Header */}
             <SidebarGroup>
               <SidebarGroupLabel className="p-0 w-full relative justify-between px-2 py-8 pb-9 border-b border-zinc-700">
@@ -154,7 +159,7 @@ function MainSideBar(): React.JSX.Element {
               <SidebarGroup key={group.label}>
                 {!collabsState && (
                   <SidebarGroupLabel
-                    className={`text-xs uppercase tracking-wider text-zinc-400 px-2 pt-6 pb-2 transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                    className={`text-xs mb-2 uppercase tracking-wider text-zinc-400 px-2 pt-6 pb-2 transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${
                       collabsState
                         ? "opacity-0 max-h-0 overflow-hidden"
                         : "opacity-100 max-h-20"
@@ -169,7 +174,7 @@ function MainSideBar(): React.JSX.Element {
                       <SidebarMenuItem key={item.path}>
                         <SidebarMenuButton
                           onClick={() => handleChangeURL(item.path)}
-                          className={`group text-[1rem] rounded-[0.5rem] font-normal h-11 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:text-zinc-100 ${
+                          className={`group  text-[1rem] rounded-[0.5rem] font-normal h-11 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:text-zinc-100 ${
                             !collabsState
                               ? "px-4"
                               : "flex justify-center items-center"

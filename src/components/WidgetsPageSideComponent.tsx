@@ -3,10 +3,10 @@ import React from "react";
 
 const pages = [
   {
-    label: "Google Ads",
+    label: "google Analytics",
     pages: [
       {
-        innerlabel: "Google Ads clicks",
+        innerlabel: "google Analytics clicks",
         sublabel: "total clicks",
       },
       {

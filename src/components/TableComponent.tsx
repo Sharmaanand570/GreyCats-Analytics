@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { IconType } from "react-icons";
+import { FiInbox } from "react-icons/fi";
 import { getStatusBadgeClass } from "../utils/statusColors";
 
 type ClientRow = {
@@ -101,6 +102,24 @@ function TableComponent({ header, bodyData }: TableType) {
       </span>
     );
   };
+
+  if (!bodyData || bodyData.length === 0) {
+    return (
+      <div className="border w-full rounded-[0.7rem] overflow-hidden">
+        <div className="h-[78vh] flex items-center justify-center bg-white">
+          <div className="text-center py-12">
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+                <FiInbox className="w-8 h-8 text-gray-400" />
+              </div>
+            </div>
+            <p className="text-gray-700 text-lg font-semibold mb-1">No data available</p>
+            <p className="text-gray-500 text-sm">There are no items to display at this time</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="border w-full rounded-[0.7rem] overflow-hidden">
@@ -210,13 +229,18 @@ function TableComponent({ header, bodyData }: TableType) {
                     <td className="pl-6 pr-6 text-sm font-medium text-gray-700 whitespace-nowrap">
                       {row.id ? (
                         <Link
-                          to={`/reports/${row.id}`}
+                        to={`/clients/${row.id}`}
                           className="text-accent-foreground hover:underline"
                         >
                           {row.name}
                         </Link>
                       ) : (
-                        row.name
+                        <Link
+                        to={`/reports/1`}
+                          className="text-accent-foreground hover:underline"
+                        >
+                          {row.name}
+                        </Link>
                       )}
                     </td>
                     <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
@@ -247,6 +271,9 @@ function TableComponent({ header, bodyData }: TableType) {
                     <td>{renderStatusChip(row.lastSentStatus)}</td>
                   </>
                 )}
+
+
+
 
                 {/* 🔹 Alert Table */}
                 {isAlertRow(row) && (

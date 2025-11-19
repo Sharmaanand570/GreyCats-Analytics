@@ -8,7 +8,6 @@
 @tailwind components;
 @tailwind utilities;
 
-
 /* --- react-grid-layout height fix --- */
 /* 🧱 React Grid Layout auto height fix */
 /* .react-grid-layout {
@@ -54,7 +53,7 @@
   --ring: rgb(180 180 180) !important;
   --sidebar: rgb(251 251 251) !important;
   --sidebar-foreground: rgb(36 36 36) !important;
-  
+
   /* Grey palette - converted from oklch() to RGB */
   --grey-50: rgb(250 250 250) !important;
   --grey-100: rgb(242 242 242) !important;
@@ -69,11 +68,11 @@
   --grey-foreground-light: rgb(38 38 38) !important;
   --grey-foreground-dark: rgb(242 242 242) !important;
   --color-gray-400: rgb(179 179 179) !important;
-  
+
   /* Card colors */
   --card: rgb(255 255 255) !important;
   --card-foreground: rgb(0 0 0) !important;
-  
+
   color-scheme: light !important;
 }
 
@@ -92,9 +91,6 @@
   --primary-foreground: rgb(54 54 54) !important;
   --border: rgb(255 255 255 / 0.1) !important;
 }
-
-
-
 
 /* Optional plugin imports */
 /* @import "tw-animate-css"; */
@@ -194,7 +190,7 @@
   --chart-3: #585858; /* Amber */
   --chart-4: #a7a7a7; /* Red */
   --chart-5: #dfdfdf; /* Purple */
-  
+
   /* Status Color Tints - Very light, muted tints that blend with grey theme */
   /* Orange tints (for Pending/In Review) */
   --orange-tint-40: #ffb266;
@@ -203,7 +199,7 @@
   --orange-tint-70: #ffd8b2;
   --orange-tint-80: #ffe5cc;
   --orange-tint-90: #fff2e5;
-  
+
   /* Green tints (for Active/Delivered) */
   --green-tint-40: #7dd3a0;
   --green-tint-50: #8fd9b0;
@@ -211,7 +207,7 @@
   --green-tint-70: #c8f0e0;
   --green-tint-80: #d9f5ea;
   --green-tint-90: #eafaf4;
-  
+
   /* Blue tints (for Delivered/Scheduled) */
   --blue-tint-40: #7db8d0;
   --blue-tint-50: #8fc4d9;
@@ -219,7 +215,7 @@
   --blue-tint-70: #c8e5ef;
   --blue-tint-80: #d9ecf4;
   --blue-tint-90: #eaf2f8;
-  
+
   /* Amber/Yellow tints (for Paused) */
   --amber-tint-40: #fcd97a;
   --amber-tint-50: #fcdf91;
@@ -227,13 +223,13 @@
   --amber-tint-70: #fdecc8;
   --amber-tint-80: #fef2d9;
   --amber-tint-90: #fff8ea;
-  
+
   /* Text colors for tints - darker versions for contrast */
   --orange-tint-text: #b8651a;
   --green-tint-text: #166534;
   --blue-tint-text: #1e40af;
   --amber-tint-text: #92400e;
-  
+
   /* ReportBuilder layout sizing */
   --rb-header: 4.6em;
   --rb-subheader: 4.2em;
@@ -279,4 +275,42 @@ body {
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none;  /* Chrome, Safari and Opera */
+}
+
+@layer base {
+  .theme {
+    --animate-shimmer-slide: shimmer-slide var(--speed) ease-in-out infinite alternate;
+    --animate-spin-around: spin-around calc(var(--speed) * 2) infinite linear;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@theme inline {
+  @keyframes shimmer-slide {
+  to {
+    transform: translate(calc(100cqw - 100%), 0);
+    }
+  }
+  @keyframes spin-around {
+  0% {
+    transform: translateZ(0) rotate(0);
+    }
+  15%, 35% {
+    transform: translateZ(0) rotate(90deg);
+    }
+  65%, 85% {
+    transform: translateZ(0) rotate(270deg);
+    }
+  100% {
+    transform: translateZ(0) rotate(360deg);
+    }
+  }
 }

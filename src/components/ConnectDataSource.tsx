@@ -10,66 +10,47 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { CheckBoxInput } from "./CheckBoxInput";
 import type { IconType } from "react-icons";
-import { FaFacebook, FaGoogle, FaInstagram } from "react-icons/fa6";
-import { data } from "react-router-dom";
+import { FaFacebook, FaGoogle, FaYoutube } from "react-icons/fa6";
 import React from "react";
+import { useYouTubeConnect } from "@/features/YouTube/hooks/useYouTubeConnect";
+import { toast } from "sonner";
+import { useGoogleConnect } from "@/features/YouTube/hooks/google/useGoogleConnect";
+import { useGoogleConsoleConnect } from "@/features/YouTube/hooks/google/useGoogleConsoleConnect";
 
 type ConnectDataSourceType = {
   children: React.ReactNode;
 };
 
 type DataSourceOption = {
-  id: string;
-  name: string;
-  icon: IconType;
+  id: string | number;
+  name: string | string;
+  icon: IconType | string;
 };
 
 const dataSourceOptions: DataSourceOption[] = [
-  { id: "google-ads", name: "Google Ads", icon: FaGoogle },
+  { id: "google-analytics", name: "google Analytics", icon: FaGoogle },
+  { id: "google-console", name: "Google Console", icon: FaGoogle },
   { id: "facebook", name: "Facebook", icon: FaFacebook },
-  { id: "instagram", name: "Instagram", icon: FaInstagram },
-  { id: "google-ads", name: "Google Ads", icon: FaGoogle },
-  { id: "facebook", name: "Facebook", icon: FaFacebook },
-  { id: "instagram", name: "Instagram", icon: FaInstagram },
-  { id: "google-ads", name: "Google Ads", icon: FaGoogle },
-  { id: "facebook", name: "Facebook", icon: FaFacebook },
-  { id: "instagram", name: "Instagram", icon: FaInstagram },
-  { id: "google-ads", name: "Google Ads", icon: FaGoogle },
-  { id: "facebook", name: "Facebook", icon: FaFacebook },
-  { id: "instagram", name: "Instagram", icon: FaInstagram },
-  { id: "google-ads", name: "Google Ads", icon: FaGoogle },
-  { id: "facebook", name: "Facebook", icon: FaFacebook },
-  { id: "instagram", name: "Instagram", icon: FaInstagram },
-  { id: "google-ads", name: "Google Ads", icon: FaGoogle },
-  { id: "facebook", name: "Facebook", icon: FaFacebook },
-  { id: "instagram", name: "Instagram", icon: FaInstagram },
-  { id: "google-ads", name: "Google Ads", icon: FaGoogle },
-  { id: "facebook", name: "Facebook", icon: FaFacebook },
-  { id: "instagram", name: "Instagram", icon: FaInstagram },
-  { id: "google-ads", name: "Google Ads", icon: FaGoogle },
-  { id: "facebook", name: "Facebook", icon: FaFacebook },
-  { id: "instagram", name: "Instagram", icon: FaInstagram },
-  { id: "google-ads", name: "Google Ads", icon: FaGoogle },
-  { id: "facebook", name: "Facebook", icon: FaFacebook },
-  { id: "instagram", name: "Instagram", icon: FaInstagram },
-  { id: "google-ads", name: "Google Ads", icon: FaGoogle },
-  { id: "facebook", name: "Facebook", icon: FaFacebook },
-  { id: "instagram", name: "Instagram", icon: FaInstagram },
-  { id: "google-ads", name: "Google Ads", icon: FaGoogle },
-  { id: "facebook", name: "Facebook", icon: FaFacebook },
-  { id: "instagram", name: "Instagram", icon: FaInstagram },
-  { id: "google-ads", name: "Google Ads", icon: FaGoogle },
-  { id: "facebook", name: "Facebook", icon: FaFacebook },
-  { id: "instagram", name: "Instagram", icon: FaInstagram },
+  { id: "youtube", name: "YouTube", icon: FaYoutube },
 ];
 
 function ConnectDataSource({
   children,
 }: ConnectDataSourceType): React.JSX.Element {
   const [Next, setNext] = React.useState(false);
+  const [SelectedSource, setSelectedSource] = React.useState<DataSourceOption>({
+    id: 0,
+    name: "",
+    icon: "",
+  });
+  const { mutateAsync: connectYouTube, isPending: isConnecting } =
+    useYouTubeConnect();
+  const { mutateAsync: connectGoogle, isPending: isConnectingGoogle } =
+    useGoogleConnect();
+  const { mutateAsync: connectGoogleConsole, isPending: isConnectingGoogleConsole } =
+    useGoogleConsoleConnect();
 
   return (
     <div>
@@ -109,10 +90,14 @@ function ConnectDataSource({
                 <div className="grid grid-cols-3 gap-3">
                   {dataSourceOptions.map((option) => (
                     <div
-                    onClick={()=> setNext(true)}
-                      id={option.id}
-                      key={option.id}
-                      className="flex items-center p-4 rounded-md border hover:bg-slate-100 cursor-pointer"
+                      onClick={() => setSelectedSource(option)}
+                      id={String(option.id)}
+                      key={String(option.id)}
+                      className={`flex items-center p-4 rounded-md border hover:bg-slate-100 cursor-pointer ${
+                        String(SelectedSource.id) === String(option.id)
+                          ? "bg-slate-100 border-slate-300"
+                          : ""
+                      }`}
                     >
                       <option.icon className="mr-2 h-6 w-6 text-slate-800" />
                       {option.name}
@@ -126,8 +111,66 @@ function ConnectDataSource({
                 <DialogClose asChild>
                   <Button variant="outline">Cancel</Button>
                 </DialogClose>
-                <Button onClick={() => setNext((prev) => !prev)} type="submit">
-                  Save changes
+                <Button
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    if (!SelectedSource.name) {
+                      toast.error("Please select a data source");
+                      return;
+                    }
+                    // If YouTube is selected, initiate OAuth flow
+                    if (SelectedSource.id === "youtube") {
+                      try {
+                        const response = await connectYouTube();
+                        if (response.success && response.url) {
+                          window.location.href = response.url;
+                        }
+                      } catch (error) {
+                        const errorMessage =
+                          error instanceof Error
+                            ? error.message
+                            : "Failed to connect YouTube";
+                        toast.error(errorMessage);
+                      }
+                    } else if (SelectedSource.id === "google-analytics") {
+                      try {
+                        const response = await connectGoogle();
+                        if (response.success && response.url) {
+                          window.location.href = response.url;
+                        }
+                      } catch (error) {
+                        const errorMessage =
+                          error instanceof Error
+                            ? error.message
+                            : "Failed to connect Google Analytics";
+                        toast.error(errorMessage);
+                      }
+                    } else if (SelectedSource.id === "google-console") {
+                      try {
+                        const response = await connectGoogleConsole();
+                        if (response.success && response.url) {
+                          window.location.href = response.url;
+                        }
+                      } catch (error) {
+                        const errorMessage =
+                          error instanceof Error
+                            ? error.message
+                            : "Failed to connect Google Console";
+                        toast.error(errorMessage);
+                      }
+                    } else {
+                      // For other sources, just go to next step
+                      setNext((prev) => !prev);
+                    }
+                  }}
+                  disabled={
+                    isConnecting || !SelectedSource.name || isConnectingGoogle || isConnectingGoogleConsole
+                  }
+                  type="button"
+                >
+                  {isConnecting || isConnectingGoogle || isConnectingGoogleConsole
+                    ? "Connecting..."
+                    : "Next"}
                 </Button>
               </DialogFooter>
             </form>
@@ -136,8 +179,11 @@ function ConnectDataSource({
               <div>
                 <div className="w-full flex justify-center flex-col items-center ">
                   <div className="flex items-center gap-2 py-6">
-                    <FaInstagram className="text-5xl" />
-                    <span className="text-4xl">Instagram</span>
+                    {SelectedSource.icon &&
+                      typeof SelectedSource.icon !== "string" && (
+                        <SelectedSource.icon className="text-5xl" />
+                      )}
+                    <span className="text-4xl">{SelectedSource.name}</span>
                   </div>
 
                   <div className="w-full h-[350px] bg-accent overflow-y-scroll"></div>
@@ -152,9 +198,13 @@ function ConnectDataSource({
 
               {/* Footer */}
               <DialogFooter className="mt-4  flex justify-between w-full ">
-              
-                  <Button onClick={() => setNext((prev)=> !prev)} variant="outline">Back</Button>
-               
+                <Button
+                  onClick={() => setNext((prev) => !prev)}
+                  variant="outline"
+                >
+                  Back
+                </Button>
+
                 <Button className="flex-1" type="submit">
                   Connect
                 </Button>
