@@ -19,6 +19,7 @@ type ClientRow = {
 type IntegrationRow = {
   name: string;
   icon?: string | IconType;
+  iconColor?: string;
   link: string;
   label: string;
   identifier: string;
@@ -76,7 +77,7 @@ function TableComponent({ header, bodyData }: TableType) {
   const isClientDetailRow = (row: any): row is ClientDetailRow =>
     "metric" in row && "currentValue" in row && "triggerValue" in row && "interval" in row && "lastTriggered" in row && "client" in row;
 
-  const renderIcon = (icon: string | IconType | undefined, name: string) => {
+  const renderIcon = (icon: string | IconType | undefined, name: string, color?: string) => {
     if (!icon) return null;
     if (typeof icon === "string") {
       return (
@@ -88,7 +89,13 @@ function TableComponent({ header, bodyData }: TableType) {
       );
     }
     const IconComponent = icon as IconType;
-    return <IconComponent className="w-5 h-5 text-gray-700" />;
+    const iconColor = color || "text-gray-700";
+    return (
+      <IconComponent 
+        className="w-5 h-5" 
+        style={color ? { color } : undefined}
+      />
+    );
   };
 
   const renderStatusChip = (status: string) => {
@@ -154,7 +161,7 @@ function TableComponent({ header, bodyData }: TableType) {
                         to={row.link}
                         className="flex items-center gap-2 text-accent-foreground hover:underline"
                       >
-                        {renderIcon(row.icon, row.name)}
+                        {renderIcon(row.icon, row.name, row.iconColor)}
                         <span>{row.name}</span>
                       </Link>
                     </td>

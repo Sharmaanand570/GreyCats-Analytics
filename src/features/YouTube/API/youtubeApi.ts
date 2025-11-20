@@ -106,8 +106,6 @@ export const connectYouTube = async (): Promise<YouTubeConnectResponse> => {
       baseURL:import.meta.env.VITE_NGROK_URL,
       headers: { "ngrok-skip-browser-warning": "true" },
     });
-    console.log(response)
-    console.log("REQUEST URL:", api.getUri({ url:"/youtube/connect" }));
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
@@ -137,10 +135,8 @@ export const handleYouTubeCallback = async (
       }
     );
 
-    console.log(response)
     return response.data;
   } catch (error) {
-    console.log(error)
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||

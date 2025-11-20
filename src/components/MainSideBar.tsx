@@ -34,6 +34,10 @@ function MainSideBar(): React.JSX.Element {
   const location = useLocation();
   const [activeTab, setActive] = useState(location.pathname);
 
+  useEffect(() => {
+    setActive(location.pathname);
+  }, [location.pathname]);
+
   // Initialize collapse state based on current route
   const getInitialCollapseState = () => {
     const isReportBuilder = /^\/reports\/.+/.test(location.pathname);
@@ -179,7 +183,7 @@ function MainSideBar(): React.JSX.Element {
                               ? "px-4"
                               : "flex justify-center items-center"
                           } ${
-                            activeTab === item.path
+                            item.path !== "/" && activeTab.startsWith(item.path) || item.path === activeTab
                               ? "bg-zinc-800 text-white"
                               : "text-zinc-300"
                           }`}

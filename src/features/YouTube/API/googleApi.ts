@@ -16,12 +16,10 @@ export type GoogleCallbackParams = {
 };
 
 export const connectGoogle = async (): Promise<connectGoogleTypeResponse> => {
-  console.log(import.meta.env.VITE_NGROK_URL);
   const response = await api.get<connectGoogleTypeResponse>("/google/connect", {
     baseURL: import.meta.env.VITE_NGROK_URL,
     headers: { "ngrok-skip-browser-warning": "true" },
   });
-  console.log(response);
   return response.data;
 };
 

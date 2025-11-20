@@ -1,20 +1,36 @@
-import { getAuthToken, StorageKey } from "@/utils/storage";
-import { useEffect } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { isAuthenticated, StorageKey } from "@/utils/storage";
+import { useEffect, useState } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
-function AuthParentComp() {
+function AuthParentComp(): React.JSX.Element | null {
+  const location = useLocation();
   const navigate = useNavigate();
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
   useEffect(() => {
-    const token = getAuthToken(StorageKey.ANALYTICS_TOKEN);
-    if (token !== null) navigate("/");
-  }, [navigate, getAuthToken]);
+    const authed = isAuthenticated(StorageKey.ANALYTICS_TOKEN);
 
-  return (
-    <div>
-      <Outlet />
-    </div>
-  );
+    const publicPaths = ["/auth/login", "/auth/signup"];
+    const isPublic = publicPaths.includes(location.pathname);
+
+   
+
+    if (!authed && !isPublic) {
+      navigate("/auth/login");
+      return;
+    }
+
+    if (authed && isPublic) {
+      navigate("/");
+      return;
+    }
+
+    setCheckingAuth(false);
+  }, [location.pathname, navigate]);
+
+  if (checkingAuth) return null; // prevents flicker
+
+  return <Outlet />;
 }
 
 export default AuthParentComp;

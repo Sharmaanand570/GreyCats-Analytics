@@ -11,7 +11,7 @@ function YouTubeCallbackHandler() {
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(true);
   const { mutateAsync: handleCallback } = useYouTubeCallback();
-console.log(searchParams)
+
   useEffect(() => {
     const processCallback = async () => {
       const code = searchParams.get("code");

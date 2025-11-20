@@ -11,7 +11,6 @@ function GoogleCallbackHandler() {
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(true);
   const { mutateAsync: handleCallback } = useGoogleCallback();
-  console.log(searchParams);
 
   useEffect(() => {
     const processCallback = async () => {

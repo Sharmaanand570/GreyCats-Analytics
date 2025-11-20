@@ -148,7 +148,7 @@ export function ChartLineMultiple() {
         </div>
       </div>
       <div className="p-4">
-        <div className="w-full md:h-50 h-64">
+        <div className="w-full h-64 md:h-80 min-h-[256px] min-w-0">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={chartData}

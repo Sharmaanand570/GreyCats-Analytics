@@ -15,13 +15,13 @@ function DropDownFilter(): React.JSX.Element {
         <Button className="rounded-[0.5rem] p-4 py-5 font-normal" variant="outline"> <LiaFilterSolid /> Filter</Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="p-2 bg-background border">
-        <DropdownMenuItem onClick={() => console.log("Filter by Date")}>
+        <DropdownMenuItem>
           Date
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => console.log("Filter by Status")}>
+        <DropdownMenuItem>
           Status
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => console.log("Filter by Category")}>
+        <DropdownMenuItem>
           Category
         </DropdownMenuItem>
       </DropdownMenuContent>

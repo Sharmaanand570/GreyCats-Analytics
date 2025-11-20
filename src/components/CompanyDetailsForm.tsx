@@ -65,7 +65,6 @@ export default function CompanyDetailsForm() {
   });
 
   const onSubmit: SubmitHandler<CompanyFormValues> = (data) => {
-    console.log("Company details submitted:", data);
     alert("Saved — check console for submitted payload");
   };
 

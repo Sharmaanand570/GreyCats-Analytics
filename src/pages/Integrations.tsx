@@ -1,34 +1,30 @@
 import { FiBell, FiSearch } from "react-icons/fi";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import DropDownFilter from "./DropDownFilter";
-import TableComponent from "./TableComponent";
-import ConnectDataSource from "./ConnectDataSource";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import DropDownFilter from "../components/DropDownFilter";
+import TableComponent from "../components/TableComponent";
+import ConnectDataSource from "../components/ConnectDataSource";
 import { useIntegrations } from "@/features/DataSources/hooks/useIntegrations";
 import { getPlatformConfig, capitalizeStatus } from "@/utils/platformMapping";
 import { useMemo } from "react";
-import { Skeleton } from "./ui/skeleton";
+import { Skeleton } from "../components/ui/skeleton";
 
 function Integrations() {
-  const {
-    data: integrationsData,
-    isLoading,
-    error,
-  } = useIntegrations();
-
-  console.log(integrationsData,error)
+  const { data: integrationsData, isLoading, error } = useIntegrations();
 
   const tableData = useMemo(() => {
     if (!integrationsData?.integrations) {
       return [];
     }
 
+    console.log("Integrations Data:", integrationsData);
     return integrationsData.integrations.map((integration) => {
       const platformConfig = getPlatformConfig(integration.platform);
-      
+
       return {
         name: platformConfig?.name || integration.platform,
         icon: platformConfig?.icon,
+        iconColor: platformConfig?.color,
         link: platformConfig?.link || `/integrations/${integration.platform}`,
         label: integration.accountName,
         identifier: integration.accountId,

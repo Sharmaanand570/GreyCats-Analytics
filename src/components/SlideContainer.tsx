@@ -13,14 +13,14 @@ export default function SlideContainer({ title, containerRef, children, id, date
     <div
       id={id}
       ref={containerRef}
-      className="w-[90%] bg-white h-auto my-10 shadow pb-10 rounded-2xl"
+      className="w-full md:w-[95%] lg:w-[90%] bg-white h-auto my-4 md:my-6 lg:my-10 shadow pb-6 md:pb-8 lg:pb-10 rounded-xl md:rounded-2xl"
     >
-      <div className="p-4 mb-4">
-        <h1 className="text-lg font-semibold text-gray-800">
+      <div className="p-3 md:p-4 mb-3 md:mb-4">
+        <h1 className="text-base md:text-lg font-semibold text-gray-800">
           {title}
         </h1>
         {dateRange && (
-          <p className="text-sm text-gray-400 mt-1">
+          <p className="text-xs md:text-sm text-gray-400 mt-1">
             {dateRange}
           </p>
         )}

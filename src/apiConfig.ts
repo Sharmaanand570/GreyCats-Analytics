@@ -17,16 +17,12 @@ export const api: AxiosInstance = axios.create({
   },
 });
 
-console.log("ENV BASE URL:", import.meta.env.VITE_API_BASE_URL);
-console.log(import.meta.env.VITE_NGROK_URL,"grock")
-
 // ---------------------
 // REQUEST INTERCEPTOR
 // ---------------------
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = getAuthToken(StorageKey.ANALYTICS_TOKEN);
-    console.log("ENV BASE URL:", import.meta.env.VITE_API_BASE_URL);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -44,9 +40,8 @@ api.interceptors.response.use(
   (error: AxiosError) => {
     if (error.response?.status === 401) {
       console.warn("Unauthorized — redirecting to login…");
-
       removeAuthToken(StorageKey.ANALYTICS_TOKEN);
-      window.location.href = "/login";
+      // window.location.href = "/auth/login";
     }
 
     return Promise.reject(error);

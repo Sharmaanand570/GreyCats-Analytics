@@ -64,7 +64,7 @@ function ReportElements({ setRightPanelTitle, setWidgetFormState }: ReportElemen
 
 
   return (
-    <div className="w-24 h-full border-l ">
+    <div className="w-16 md:w-20 lg:w-24 h-full border-l">
       {reportElements.map(({ id, label, icon: Icon, widgetType }) => (
         <div
           onKeyDown={(e) => {
@@ -95,10 +95,10 @@ function ReportElements({ setRightPanelTitle, setWidgetFormState }: ReportElemen
           role="button"
           tabIndex={0}
           aria-label={`Drag ${label} widget to dashboard`}
-          className="flex flex-col text-xs items-center justify-center text-center p-2 my-4 text-wrap gap-1 cursor-pointer active:cursor-grabbing text-gray-600 hover:bg-gray-50 "
+          className="flex flex-col text-xs items-center justify-center text-center p-1.5 md:p-2 my-2 md:my-4 text-wrap gap-0.5 md:gap-1 cursor-pointer active:cursor-grabbing text-gray-600 hover:bg-gray-50 transition-colors"
         >
-          <Icon className="text-xl" aria-hidden="true" />
-          <span className="text-xs text-gray-500">{label}</span>
+          <Icon className="text-lg md:text-xl" aria-hidden="true" />
+          <span className="text-[10px] md:text-xs text-gray-500 leading-tight">{label}</span>
         </div>
       ))}
     </div>

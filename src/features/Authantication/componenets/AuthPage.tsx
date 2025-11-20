@@ -94,14 +94,12 @@ export default function AuthPage() {
     setAuthError(null);
 
     try {
-      console.log("FORM DATA:", data);
       if (isLogin) {
         const loginPayload: LoginRequest = {
           email: data.email,
           password: data.password,
         };
-        const response = await mutateLogin(loginPayload);
-        console.log("Login successful:", response);
+        await mutateLogin(loginPayload);
       } else {
         const signupData = data as SignupFormValues;
         const registerPayload: RegisterRequest = {
@@ -109,27 +107,19 @@ export default function AuthPage() {
           password: signupData.password,
           fullName: signupData.fullName,
         };
-        const response = await mutateSignup(registerPayload);
-        console.log("Signup successful:", response);
+        await mutateSignup(registerPayload);
       }
       navigate("/");
     } catch (error) {
       const message = getErrorMessage(error);
       setAuthError(message);
-      console.error("Login failed:", error);
-    }
-
-    if (isLogin) {
-      console.log("Login Request");
-    } else {
-      console.log("Signup Request");
     }
   };
 
   const handleToggle = () => {
     setIsLogin((prev) => !prev);
     setAuthError(null);
-    navigate(isLogin ? "/signup" : "/login");
+    navigate(isLogin ? "/auth/signup" : "/auth/login");
   };
 
   return (

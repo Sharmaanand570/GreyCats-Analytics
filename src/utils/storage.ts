@@ -7,7 +7,13 @@ export enum StorageKey {
 
 export const setAuthToken = (key:StorageKey.ANALYTICS_TOKEN, value: string): void => {
   localStorage.setItem(key, value);
-};  
+}; 
+
+
+export const isAuthenticated = (key: StorageKey.ANALYTICS_TOKEN): boolean => {
+  const token = localStorage.getItem(key);
+  return token !== null;
+}
 
 
 export const getAuthToken = (key: StorageKey.ANALYTICS_TOKEN): string | null => {

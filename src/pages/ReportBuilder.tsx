@@ -1,14 +1,14 @@
 import { FiBell, FiSearch } from "react-icons/fi";
-import { Button } from "./ui/button";
-import { RadioButtonGroup } from "./RadioButtonGroup";
-import WidgetsPageSideComponent from "./WidgetsPageSideComponent";
-import ReportElements from "./ReportElements";
-import TitleWidgetForm from "./TitleWidgetForm";
-import ChartWidgetForm from "./ChartWidgetForm";
-import TableWidgetForm from "./TableWidgetForm";
-import ImageWidgetForm from "./ImageWidgetForm";
-import EmbedWidgetForm from "./EmbedWidgetForm";
-import { DateRangePicker } from "./DateRangePicker";
+import { Button } from "../components/ui/button";
+import { RadioButtonGroup } from "../components/RadioButtonGroup";
+import WidgetsPageSideComponent from "../components/WidgetsPageSideComponent";
+import ReportElements from "../components/ReportElements";
+import TitleWidgetForm from "../components/TitleWidgetForm";
+import ChartWidgetForm from "../components/ChartWidgetForm";
+import TableWidgetForm from "../components/TableWidgetForm";
+import ImageWidgetForm from "../components/ImageWidgetForm";
+import EmbedWidgetForm from "../components/EmbedWidgetForm";
+import { DateRangePicker } from "../components/DateRangePicker";
 import { type DateRange } from "react-day-picker";
 import { format } from "date-fns";
 
@@ -18,8 +18,8 @@ import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
 // UI Components
-import { ChartPieInteractive } from "./ChartPieInteractive";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { ChartPieInteractive } from "../components/ChartPieInteractive";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import {
   Table,
   TableBody,
@@ -28,20 +28,20 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "./ui/table";
+} from "../components/ui/table";
 // App constants
 import {
   reportTableRows,
   WIDGET_SIZE_MAP,
   generateWidgetId,
-} from "./reportConstants";
+} from "../components/reportConstants";
 import { getReportStatusBadgeClass } from "../utils/statusColors";
-import { type ReportWidgetType } from "./reportTypes";
+import { type ReportWidgetType } from "../components/reportTypes";
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
-import { MdDragIndicator } from "react-icons/md";
-import SlideContainer from "./SlideContainer";
-import WidgetCard from "./WidgetCard";
-import WidgetDragItem from "./WidgetDragItem";
+
+import SlideContainer from "../components/SlideContainer";
+import WidgetCard from "../components/WidgetCard";
+import WidgetDragItem from "../components/WidgetDragItem";
 
 // Widget Data Types - imported from widgetTypes.ts to avoid circular dependencies
 import type {
@@ -54,8 +54,8 @@ import type {
   EmbedWidgetData,
   CustomWidgetData,
   WidgetData,
-} from "./widgetTypes";
-import { exportAllSlidesToPDF } from "./functions/reportfunctions";
+} from "../components/widgetTypes";
+import { exportAllSlidesToPDF } from "../components/functions/reportfunctions";
 
 // Re-export for external use
 export type {
@@ -68,7 +68,7 @@ export type {
   EmbedWidgetData,
   CustomWidgetData,
   WidgetData,
-} from "./widgetTypes";
+} from "../components/widgetTypes";
 
 // Types
 export interface DashboardLayout extends Layout {
@@ -84,6 +84,13 @@ const GRID_CONFIG = {
   rowHeight: 100,
   width: 1200,
   margin: [20, 20] as [number, number],
+} as const;
+
+// Tablet grid config
+const TABLET_GRID_CONFIG = {
+  cols: 8,
+  rowHeight: 80,
+  margin: [12, 12] as [number, number],
 } as const;
 
 const DEFAULT_WIDGET_SIZE = {
@@ -233,15 +240,15 @@ const renderWidgetContent = (widget: DashboardLayout) => {
 
   switch (widget.widgetType) {
     case "chart": {
-      const chartData = widgetData as ChartWidgetData | undefined;
+    
       return <ChartPieInteractive />;
     }
 
     case "map": {
       const mapData = widgetData as MapWidgetData | undefined;
       return (
-        <div className="h-full flex items-center justify-center text-sm text-gray-500">
-          <span>
+        <div className="h-full flex items-center justify-center text-xs md:text-sm text-gray-500 px-2">
+          <span className="text-center">
             {mapData?.location ? `Map: ${mapData.location}` : "Map Placeholder"}
           </span>
         </div>
@@ -262,20 +269,20 @@ const renderWidgetContent = (widget: DashboardLayout) => {
       ];
 
       return (
-        <Card className="h-full bg-white flex flex-col rounded-2xl overflow-hidden">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-base">{title}</CardTitle>
+        <Card className="h-full bg-white flex flex-col rounded-lg md:rounded-2xl overflow-hidden">
+          <CardHeader className="pb-2 md:pb-4 px-3 md:px-6 pt-3 md:pt-6">
+            <CardTitle className="text-sm md:text-base">{title}</CardTitle>
           </CardHeader>
           <CardContent className="flex-1 p-0 overflow-visible">
             <div className="w-full h-full overflow-x-auto">
-              <Table className="w-full table-fixed text-sm">
-                <TableCaption>{caption}</TableCaption>
+              <Table className="w-full table-fixed text-xs md:text-sm">
+                <TableCaption className="text-[10px] md:text-xs">{caption}</TableCaption>
                 <TableHeader>
                   <TableRow>
                     {columns.map((col) => (
                       <TableHead
                         key={col.name}
-                        className="truncate"
+                        className="truncate px-2 md:px-4"
                         style={col.width ? { width: col.width } : undefined}
                       >
                         {col.name}
@@ -305,9 +312,9 @@ const renderWidgetContent = (widget: DashboardLayout) => {
 
                         if (col.name === "Status") {
                           return (
-                            <TableCell key={colIndex} className="truncate">
+                            <TableCell key={colIndex} className="truncate px-2 md:px-4">
                               <span
-                                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${getStatusBadgeClass(
+                                className={`inline-flex items-center rounded-full border px-1.5 md:px-2 py-0.5 text-[10px] md:text-xs font-medium ${getStatusBadgeClass(
                                   row.status
                                 )}`}
                               >
@@ -320,11 +327,11 @@ const renderWidgetContent = (widget: DashboardLayout) => {
                         return (
                           <TableCell
                             key={colIndex}
-                            className={
+                            className={`px-2 md:px-4 ${
                               colIndex === 0
                                 ? "font-medium truncate"
                                 : "truncate"
-                            }
+                            }`}
                           >
                             {String(cellValue)}
                           </TableCell>
@@ -375,7 +382,7 @@ const renderWidgetContent = (widget: DashboardLayout) => {
 
       return (
         <div
-          className={`h-full w-full  flex items-center ${alignClass} hover:border bg-white text-sm text-gray-900`}
+          className={`h-full w-full flex items-center ${alignClass} hover:border bg-white text-xs md:text-sm text-gray-900 px-2`}
           style={
             titleData?.backgroundColor
               ? { backgroundColor: titleData.backgroundColor }
@@ -383,7 +390,7 @@ const renderWidgetContent = (widget: DashboardLayout) => {
           }
         >
           <span
-            className={`${fontSizeClass} place-self-center font-semibold`}
+            className={`${fontSizeClass} place-self-center font-semibold break-words text-center`}
             style={titleData?.color ? { color: titleData.color } : undefined}
           >
             {text}
@@ -395,17 +402,17 @@ const renderWidgetContent = (widget: DashboardLayout) => {
     case "metric": {
       const metricData = widgetData as MetricWidgetData | undefined;
       return (
-        <div className="h-full flex flex-col items-center justify-center text-sm">
-          <span className="text-3xl font-bold text-gray-900">
+        <div className="h-full flex flex-col items-center justify-center text-xs md:text-sm px-2">
+          <span className="text-2xl md:text-3xl font-bold text-gray-900">
             {metricData?.value ?? 0}
             {metricData?.unit && (
-              <span className="text-lg text-gray-600 ml-1">
+              <span className="text-base md:text-lg text-gray-600 ml-1">
                 {metricData.unit}
               </span>
             )}
           </span>
           {metricData?.label && (
-            <span className="text-gray-600 mt-2">{metricData.label}</span>
+            <span className="text-gray-600 mt-1 md:mt-2 text-xs md:text-sm">{metricData.label}</span>
           )}
         </div>
       );
@@ -416,7 +423,7 @@ const renderWidgetContent = (widget: DashboardLayout) => {
       const imageFit = imageData?.imageFit || "contain";
       return (
         <div
-          className="h-full flex items-center justify-center text-sm text-gray-500"
+          className="h-full flex items-center justify-center text-xs md:text-sm text-gray-500 p-1 md:p-2"
           style={
             imageData?.backgroundColor
               ? { backgroundColor: imageData.backgroundColor }
@@ -427,11 +434,11 @@ const renderWidgetContent = (widget: DashboardLayout) => {
             <img
               src={imageData.src}
               alt={imageData.alt ?? "Image"}
-              className="max-w-full max-h-full"
+              className="max-w-full max-h-full rounded"
               style={{ objectFit: imageFit }}
             />
           ) : (
-            <span>Image Placeholder</span>
+            <span className="text-center">Image Placeholder</span>
           )}
         </div>
       );
@@ -441,7 +448,7 @@ const renderWidgetContent = (widget: DashboardLayout) => {
       const embedData = widgetData as EmbedWidgetData | undefined;
       return (
         <div
-          className="h-full flex items-center justify-center text-sm text-gray-500"
+          className="h-full flex items-center justify-center text-xs md:text-sm text-gray-500 p-1 md:p-2"
           style={
             embedData?.backgroundColor
               ? { backgroundColor: embedData.backgroundColor }
@@ -451,11 +458,11 @@ const renderWidgetContent = (widget: DashboardLayout) => {
           {embedData?.url ? (
             <iframe
               src={embedData.url}
-              className="w-full h-full border-0"
+              className="w-full h-full border-0 rounded"
               title={embedData.title || "Embedded content"}
             />
           ) : (
-            <span>Embed Placeholder</span>
+            <span className="text-center">Embed Placeholder</span>
           )}
         </div>
       );
@@ -464,18 +471,22 @@ const renderWidgetContent = (widget: DashboardLayout) => {
     case "custom": {
       const customData = widgetData as CustomWidgetData | undefined;
       return (
-        <div className="h-full flex items-center justify-center text-sm text-gray-500">
-          {customData?.content ?? "Custom Placeholder"}
+        <div className="h-full flex items-center justify-center text-xs md:text-sm text-gray-500 px-2">
+          <span className="text-center break-words">
+            {customData?.content ?? "Custom Placeholder"}
+          </span>
         </div>
       );
     }
 
     default:
       return (
-        <div className="h-full flex items-center justify-center text-sm text-gray-500">
-          {String(widget.widgetType).charAt(0).toUpperCase() +
-            String(widget.widgetType).slice(1)}{" "}
-          Placeholder
+        <div className="h-full flex items-center justify-center text-xs md:text-sm text-gray-500 px-2">
+          <span className="text-center">
+            {String(widget.widgetType).charAt(0).toUpperCase() +
+              String(widget.widgetType).slice(1)}{" "}
+            Placeholder
+          </span>
         </div>
       );
   }
@@ -770,7 +781,7 @@ function ReportBuilder() {
   const rightPanelContent = useMemo(() => {
     if (rightPanelTitle === "Content Blocks") {
       return (
-        <div className="w-full h-full overflow-y-scroll">
+        <div className="w-full h-full overflow-y-auto p-2 md:p-4">
           {widgetItems.map((item, index) => (
             <WidgetDragItem
               key={index}
@@ -785,7 +796,7 @@ function ReportBuilder() {
     }
     if (rightPanelTitle === "Images") {
       return (
-        <div className="w-full h-full overflow-y-scroll">
+        <div className="w-full h-full overflow-y-auto p-2 md:p-4">
           {imageWidgetItems.map((item, index) => (
             <WidgetDragItem
               key={index}
@@ -800,7 +811,7 @@ function ReportBuilder() {
     }
     if (rightPanelTitle === "Embeds") {
       return (
-        <div className="w-full h-full overflow-y-scroll">
+        <div className="w-full h-full overflow-y-auto p-2 md:p-4">
           {embedWidgetItems.map((item, index) => (
             <WidgetDragItem
               key={index}
@@ -815,57 +826,79 @@ function ReportBuilder() {
     }
     return null;
   }, [rightPanelTitle, handleDragStart]);
+  // Detect if we're on tablet (using window width)
+  const [isTablet, setIsTablet] = useState(false);
+
+  useEffect(() => {
+    const checkTablet = () => {
+      const width = window.innerWidth;
+      setIsTablet(width >= 768 && width < 1024);
+    };
+    
+    checkTablet();
+    window.addEventListener('resize', checkTablet);
+    return () => window.removeEventListener('resize', checkTablet);
+  }, []);
+
+  // Use appropriate grid config based on screen size
+  const currentGridConfig = isTablet ? TABLET_GRID_CONFIG : GRID_CONFIG;
+
   return (
     <div className="w-full h-screen flex flex-col bg-gray-50 overflow-hidden">
       {/* Top Bar */}
-      <div className="sticky z-50 top-0 py-[1.3em] bg-white border-b flex justify-between items-center px-5">
-        <span className="font-medium  text-xl">Report Builder</span>
-        <div className="flex items-center">
-          <span className="mx-2 text-lg text-gray-500">
+      <div className="sticky z-50 top-0 py-3 md:py-[1.3em] bg-white border-b flex justify-between items-center px-3 md:px-5">
+        <span className="font-medium text-lg md:text-xl">Report Builder</span>
+        <div className="flex items-center gap-1 md:gap-2">
+          <span className="mx-1 md:mx-2 text-base md:text-lg text-gray-500 cursor-pointer">
             <FiSearch />
           </span>
-          <span className="mx-2 text-lg text-gray-500">
+          <span className="mx-1 md:mx-2 text-base md:text-lg text-gray-500 cursor-pointer">
             <FiBell />
           </span>
-          <span className="ml-4">
-            <Button className="rounded-[0.4rem]">Edit Dashboard</Button>
+          <span className="ml-2 md:ml-4">
+            <Button className="rounded-[0.4rem] text-xs md:text-sm px-2 md:px-4 py-1.5 md:py-2">
+              <span className="hidden md:inline">Edit Dashboard</span>
+              <span className="md:hidden">Edit</span>
+            </Button>
           </span>
         </div>
       </div>
 
       {/* Sub Header */}
-      <div className="sticky z-40 top-[var(--rb-header)] py-[1.2em] bg-white border-b flex justify-between items-center px-5">
-        <div className="flex items-center gap-4">
-       
+      <div className="sticky z-40 top-[var(--rb-header)] py-2 md:py-[1.2em] bg-white border-b flex flex-col md:flex-row justify-between items-stretch md:items-center gap-2 md:gap-0 px-3 md:px-5">
+        <div className="flex items-center gap-2 md:gap-4 min-w-0">
           <RadioButtonGroup />
         </div>
-     <div className="flex gap-2">
-    <div >
-    <DateRangePicker
-            value={dateRange}
-            onChange={(range) => {
-              setDateRange(range);
-            }}
-          />
-    </div>
-        <button
-          onClick={handleExportPDF}
-          className="bg-accent-foreground text-white py-2 px-4 rounded-[0.6rem] text-sm hover:cursor-pointer"
-        >
-          Download PDF
-        </button>
-     </div>
+        <div className="flex gap-2 items-center">
+          <div className="flex-1 md:flex-none">
+            <DateRangePicker
+              value={dateRange}
+              onChange={(range) => {
+                setDateRange(range);
+              }}
+            />
+          </div>
+          <button
+            onClick={handleExportPDF}
+            className="bg-accent-foreground text-white py-1.5 md:py-2 px-3 md:px-4 rounded-[0.6rem] text-xs md:text-sm hover:cursor-pointer whitespace-nowrap"
+          >
+            <span className="hidden md:inline">Download PDF</span>
+            <span className="md:hidden">PDF</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 relative">
         {/* Left Sidebar */}
-        <div className="sticky top-[calc(var(--rb-header)+var(--rb-subheader))] left-0 w-[15.5rem] bg-white border-r h-[calc(100vh-(var(--rb-header)+var(--rb-subheader)))] overflow-y-auto">
-          <WidgetsPageSideComponent reftype={slidesRef} />
+        <div className="sticky top-[calc(var(--rb-header)+var(--rb-subheader))] left-0 w-48 md:w-52 lg:w-[15.5rem] bg-white border-r h-[calc(100vh-(var(--rb-header)+var(--rb-subheader)))] overflow-y-auto transition-all duration-300 z-30">
+          <div className="w-full h-full">
+            <WidgetsPageSideComponent reftype={slidesRef} />
+          </div>
         </div>
 
         {/* Grid Area */}
-        <div className="flex-1 overflow-y-auto bg-gray-100 flex flex-col items-center h-[calc(100vh-(var(--rb-header)+var(--rb-subheader)))]">
+        <div className="flex-1 overflow-y-auto bg-gray-100 flex flex-col items-center h-[calc(100vh-(var(--rb-header)+var(--rb-subheader)))] px-2 md:px-0">
           {dashboardIds.map((id, i) => {
             const layout = dashboards.get(id);
             if (!layout) return null;
@@ -900,11 +933,11 @@ function ReportBuilder() {
                 <AutoWidthGrid
                   className="layout"
                   layout={layout}
-                  cols={GRID_CONFIG.cols}
-                  rowHeight={GRID_CONFIG.rowHeight}
+                  cols={currentGridConfig.cols}
+                  rowHeight={currentGridConfig.rowHeight}
                   autoSize={true}
-                  margin={GRID_CONFIG.margin}
-                  containerPadding={[14, 14]}
+                  margin={currentGridConfig.margin}
+                  containerPadding={isTablet ? [8, 8] : [14, 14]}
                   isDroppable={true}
                   isDraggable={true}
                   compactType={null}
@@ -935,13 +968,15 @@ function ReportBuilder() {
         </div>
 
         {/* Right Sidebar */}
-        <div className="sticky top-[calc(var(--rb-header)+var(--rb-subheader))] right-0 flex  bg-white border-l h-[calc(100vh-(var(--rb-header)+var(--rb-subheader)))] overflow-y-visible">
+        <div className="sticky top-[calc(var(--rb-header)+var(--rb-subheader))] right-0 flex bg-white border-l h-[calc(100vh-(var(--rb-header)+var(--rb-subheader)))] overflow-y-visible z-20">
           <div
             className={`${
-              rightPanelTitle !== "" ? "w-[16.25rem]" : "w-0 overflow-hidden"
-            } h-full`}
+              rightPanelTitle !== "" 
+                ? "w-48 md:w-56 lg:w-[16.25rem]" 
+                : "w-0 overflow-hidden"
+            } h-full transition-all duration-300`}
           >
-            <div className="w-full p-4 border-b font-semibold text-accent-foreground">
+            <div className="w-full p-3 md:p-4 border-b font-semibold text-sm md:text-base text-accent-foreground">
               {rightPanelTitle}
             </div>
 
@@ -951,9 +986,9 @@ function ReportBuilder() {
           <div
             className={`${
               widgetFormState.widgetType !== ""
-                ? "w-[16.25rem]"
+                ? "w-48 md:w-56 lg:w-[16.25rem]"
                 : "w-0 overflow-hidden"
-            } h-full`}
+            } h-full transition-all duration-300`}
           >
             {widgetFormSections}
           </div>
