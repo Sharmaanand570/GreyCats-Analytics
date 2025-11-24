@@ -17,15 +17,20 @@ function Integrations() {
       return [];
     }
 
-    console.log("Integrations Data:", integrationsData);
     return integrationsData.integrations.map((integration) => {
       const platformConfig = getPlatformConfig(integration.platform);
+      let link = platformConfig?.link || `/integrations/${integration.platform}`;
+      
+      // Append accountId for WooCommerce
+      // if (integration.platform.toLowerCase() === "woo" && integration.accountId) {
+      //   link = `${link}?accountId=${integration.accountId}`;
+      // }
 
       return {
         name: platformConfig?.name || integration.platform,
         icon: platformConfig?.icon,
         iconColor: platformConfig?.color,
-        link: platformConfig?.link || `/integrations/${integration.platform}`,
+        link,
         label: integration.accountName,
         identifier: integration.accountId,
         clientsConnected: 1, // Default value, can be updated if API provides this

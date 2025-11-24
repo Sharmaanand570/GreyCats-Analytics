@@ -1,6 +1,6 @@
 import type { IconType } from "react-icons";
 import { FaFacebook, FaInstagram, FaYoutube, FaGoogle, FaCartShopping } from "react-icons/fa6";
-import { SiGoogleanalytics, SiShopify } from "react-icons/si";
+import { SiGoogleanalytics, SiShopify, SiMeta, SiQuora } from "react-icons/si";
 
 export type PlatformConfig = {
   name: string;
@@ -43,7 +43,7 @@ const platformMap: Record<string, PlatformConfig> = {
   woo: {
     name: "WooCommerce",
     icon: FaCartShopping,
-    link: "/integrations/woo",
+    link: "/data-sources/woocommerce",
     color: "#96588A", // WooCommerce purple
   },
   shopify: {
@@ -51,6 +51,18 @@ const platformMap: Record<string, PlatformConfig> = {
     icon: SiShopify,
     link: "/integrations/shopify",
     color: "#96BF48", // Shopify green
+  },
+  "meta-ads": {
+    name: "Meta Ads",
+    icon: SiMeta,
+    link: "/data-sources/meta-ads",
+    color: "#0081FB", // Meta blue
+  },
+  quora: {
+    name: "Quora",
+    icon: SiQuora,
+    link: "/data-sources/quora",
+    color: "#B92B27", // Quora red
   },
 };
 

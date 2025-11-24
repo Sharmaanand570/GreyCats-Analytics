@@ -101,6 +101,7 @@ export type ApiErrorResponse = {
  * GET /youtube/connect
  */
 export const connectYouTube = async (): Promise<YouTubeConnectResponse> => {
+  console.log("connectYouTube",import.meta.env.VITE_NGROK_URL);
   try {
     const response = await api.get<YouTubeConnectResponse>("/youtube/connect",{
       baseURL:import.meta.env.VITE_NGROK_URL,

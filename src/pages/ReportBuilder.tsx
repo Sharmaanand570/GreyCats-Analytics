@@ -19,7 +19,12 @@ import "react-resizable/css/styles.css";
 
 // UI Components
 import { ChartPieInteractive } from "../components/ChartPieInteractive";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
 import {
   Table,
   TableBody,
@@ -240,7 +245,6 @@ const renderWidgetContent = (widget: DashboardLayout) => {
 
   switch (widget.widgetType) {
     case "chart": {
-    
       return <ChartPieInteractive />;
     }
 
@@ -276,7 +280,9 @@ const renderWidgetContent = (widget: DashboardLayout) => {
           <CardContent className="flex-1 p-0 overflow-visible">
             <div className="w-full h-full overflow-x-auto">
               <Table className="w-full table-fixed text-xs md:text-sm">
-                <TableCaption className="text-[10px] md:text-xs">{caption}</TableCaption>
+                <TableCaption className="text-[10px] md:text-xs">
+                  {caption}
+                </TableCaption>
                 <TableHeader>
                   <TableRow>
                     {columns.map((col) => (
@@ -312,7 +318,10 @@ const renderWidgetContent = (widget: DashboardLayout) => {
 
                         if (col.name === "Status") {
                           return (
-                            <TableCell key={colIndex} className="truncate px-2 md:px-4">
+                            <TableCell
+                              key={colIndex}
+                              className="truncate px-2 md:px-4"
+                            >
                               <span
                                 className={`inline-flex items-center rounded-full border px-1.5 md:px-2 py-0.5 text-[10px] md:text-xs font-medium ${getStatusBadgeClass(
                                   row.status
@@ -412,7 +421,9 @@ const renderWidgetContent = (widget: DashboardLayout) => {
             )}
           </span>
           {metricData?.label && (
-            <span className="text-gray-600 mt-1 md:mt-2 text-xs md:text-sm">{metricData.label}</span>
+            <span className="text-gray-600 mt-1 md:mt-2 text-xs md:text-sm">
+              {metricData.label}
+            </span>
           )}
         </div>
       );
@@ -834,10 +845,10 @@ function ReportBuilder() {
       const width = window.innerWidth;
       setIsTablet(width >= 768 && width < 1024);
     };
-    
+
     checkTablet();
-    window.addEventListener('resize', checkTablet);
-    return () => window.removeEventListener('resize', checkTablet);
+    window.addEventListener("resize", checkTablet);
+    return () => window.removeEventListener("resize", checkTablet);
   }, []);
 
   // Use appropriate grid config based on screen size
@@ -909,7 +920,10 @@ function ReportBuilder() {
                 return undefined;
               }
               if (dateRange.from && dateRange.to) {
-                return `${format(dateRange.from, "MMM d, yyyy")} - ${format(dateRange.to, "MMM d, yyyy")}`;
+                return `${format(dateRange.from, "MMM d, yyyy")} - ${format(
+                  dateRange.to,
+                  "MMM d, yyyy"
+                )}`;
               }
               if (dateRange.from) {
                 return `From ${format(dateRange.from, "MMM d, yyyy")}`;
@@ -971,8 +985,8 @@ function ReportBuilder() {
         <div className="sticky top-[calc(var(--rb-header)+var(--rb-subheader))] right-0 flex bg-white border-l h-[calc(100vh-(var(--rb-header)+var(--rb-subheader)))] overflow-y-visible z-20">
           <div
             className={`${
-              rightPanelTitle !== "" 
-                ? "w-48 md:w-56 lg:w-[16.25rem]" 
+              rightPanelTitle !== ""
+                ? "w-48 md:w-56 lg:w-[16.25rem]"
                 : "w-0 overflow-hidden"
             } h-full transition-all duration-300`}
           >

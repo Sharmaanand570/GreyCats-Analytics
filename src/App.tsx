@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import MainSideBar from "./components/MainSideBar";
 import AuthParentComp from "./features/Authantication/componenets/AuthParentComp";
 import ShopifyCallbackHandler from "./features/shopify/componenets/ShopifyCallbackHandler";
+import MetaCallbackHandler from "./features/meta/components/MetaCallbackHandler";
 
 // Lazy load components for code splitting
 const Dashboard = lazy(() => import("./components/Dashboard"));
@@ -12,6 +13,7 @@ const AuthPage = lazy(
 );
 const Integrations = lazy(() => import("./pages/Integrations"));
 const YouTubeDetailPage = lazy(() => import("./pages/YouTubeDetailPage"));
+const WooCommerceDetailPage = lazy(() => import("./pages/WooCommerceDetailPage"));
 const Reports = lazy(() => import("./components/Reports"));
 const ReportBuilder = lazy(() => import("./pages/ReportBuilder"));
 const Goals = lazy(() => import("./pages/GoalsPage"));
@@ -54,6 +56,7 @@ function App() {
             <Route path="data-sources">
               <Route index element={<Integrations />} />
               <Route path="youtube" element={<YouTubeDetailPage />} />
+              <Route path="woocommerce" element={<WooCommerceDetailPage />} />
             </Route>
 
             <Route path="reports">
@@ -75,6 +78,7 @@ function App() {
             element={<GoogleConsoleCallbackHandler />}
           />
           <Route path="shopify/callback" element={<ShopifyCallbackHandler />} />
+          <Route path="meta/callback" element={<MetaCallbackHandler />} />
         </Route>
       </Routes>
     </Suspense>

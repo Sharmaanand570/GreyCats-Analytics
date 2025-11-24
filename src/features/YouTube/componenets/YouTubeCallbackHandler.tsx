@@ -28,6 +28,8 @@ function YouTubeCallbackHandler() {
 
       try {
         const response = await handleCallback({ code, state });
+console.log("response",response);
+
         if (response.success && response.channel) {
           toast.success(
             `Successfully connected to ${response.channel.title}!`

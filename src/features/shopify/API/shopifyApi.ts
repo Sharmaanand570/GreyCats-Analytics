@@ -19,12 +19,10 @@ export type ShopifyConnectParams = {
 };
 
 export type ShopifyCallbackParams = {
-  code: string;
-  hmac: string;
-  host: string;
+ 
   shop: string;
-  state: string;
-  timestamp: string;
+  status: string;
+ 
 };
 
 export type ApiErrorResponse = {
@@ -73,12 +71,10 @@ export const handleShopifyCallback = async (
       {
         baseURL: import.meta.env.VITE_NGROK_URL,
         params: {
-          code: params.code,
-          hmac: params.hmac,
-          host: params.host,
+        
           shop: params.shop,
-          state: params.state,
-          timestamp: params.timestamp,
+          status: params.status,
+       
         },
         headers: { "ngrok-skip-browser-warning": "true" },
       }
