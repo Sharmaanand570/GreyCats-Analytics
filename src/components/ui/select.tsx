@@ -7,9 +7,10 @@ interface SelectProps {
   defaultValue?: string
   onValueChange?: (value: string) => void
   className?: string
+  disabled?: boolean
 }
 
-const Select = ({ children, value, defaultValue, onValueChange, className }: SelectProps) => {
+const Select = ({ children, value, defaultValue, onValueChange, className, disabled }: SelectProps) => {
   const [internalValue, setInternalValue] = React.useState(defaultValue || value || "")
   
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -63,6 +64,7 @@ const Select = ({ children, value, defaultValue, onValueChange, className }: Sel
         trigger?.props?.className,
         className
       )}
+      disabled={disabled}
     >
       {placeholder && !currentValue && (
         <option value="" disabled>

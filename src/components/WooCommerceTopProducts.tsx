@@ -24,7 +24,7 @@ export function WooCommerceTopProducts({
 
   if (isLoading) {
     return (
-      <Card className="bg-white border rounded-2xl">
+      <Card className=" border rounded-2xl">
         <CardHeader>
           <CardTitle>Top Performing Products</CardTitle>
         </CardHeader>
@@ -45,7 +45,7 @@ export function WooCommerceTopProducts({
     : Array(3).fill(null);
 
   return (
-    <Card className="bg-white border rounded-2xl">
+    <Card className=" border rounded-2xl">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold">Top Performing Products</CardTitle>

@@ -71,7 +71,25 @@ function ImageWidgetForm({ data, onChange }: ImageWidgetFormProps): React.JSX.El
         {/* Image */}
         <div className="mb-5">
           <Label className="block text-xs text-gray-600 mb-2">Image</Label>
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-gray-400 transition-colors">
+          <div
+            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-gray-400 transition-colors"
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const file = e.dataTransfer.files?.[0];
+              if (file && file.type.startsWith("image/")) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                  const src = event.target?.result as string;
+                  handleChange({ src });
+                };
+                reader.readAsDataURL(file);
+              }
+            }}
+          >
             {data?.src ? (
               <div className="space-y-2">
                 <img

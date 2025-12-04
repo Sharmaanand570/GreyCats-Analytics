@@ -40,6 +40,8 @@ type ReportRow = {
   nextSendDate: string;
   awaitingApproval: boolean;
   lastSentStatus: string;
+  // Optional action handler for deleting a report/template (used on Reports page)
+  onDelete?: () => void;
 };
 
 type AlertRow = {
@@ -89,7 +91,6 @@ function TableComponent({ header, bodyData }: TableType) {
       );
     }
     const IconComponent = icon as IconType;
-    const iconColor = color || "text-gray-700";
     return (
       <IconComponent 
         className="w-5 h-5" 
@@ -113,7 +114,7 @@ function TableComponent({ header, bodyData }: TableType) {
   if (!bodyData || bodyData.length === 0) {
     return (
       <div className="border w-full rounded-[0.7rem] overflow-hidden">
-        <div className="h-[78vh] flex items-center justify-center bg-white">
+        <div className="h-[78vh] flex items-center justify-center ">
           <div className="text-center py-12">
             <div className="flex justify-center mb-4">
               <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
@@ -147,7 +148,7 @@ function TableComponent({ header, bodyData }: TableType) {
             </tr>
           </thead>
 
-          <tbody className="bg-white">
+          <tbody className="">
             {bodyData.map((row, index) => (
               <tr
                 key={index}
@@ -236,18 +237,15 @@ function TableComponent({ header, bodyData }: TableType) {
                     <td className="pl-6 pr-6 text-sm font-medium text-gray-700 whitespace-nowrap">
                       {row.id ? (
                         <Link
-                        to={`/clients/${row.id}`}
+                        to={`/reports/${row.id}`}
                           className="text-accent-foreground hover:underline"
                         >
                           {row.name}
                         </Link>
                       ) : (
-                        <Link
-                        to={`/reports/1`}
-                          className="text-accent-foreground hover:underline"
-                        >
+                        <span className="text-sm font-medium">
                           {row.name}
-                        </Link>
+                        </span>
                       )}
                     </td>
                     <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
@@ -269,13 +267,27 @@ function TableComponent({ header, bodyData }: TableType) {
                     <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
                       {row.lastSent}
                     </td>
-                    <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
-                      {row.nextSendDate}
-                    </td>
-                    <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
-                      {row.awaitingApproval ? "Yes" : "No"}
-                    </td>
-                    <td>{renderStatusChip(row.lastSentStatus)}</td>
+                <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
+                  {row.nextSendDate}
+                </td>
+                <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
+                  {row.awaitingApproval ? "Yes" : "No"}
+                </td>
+                <td>{renderStatusChip(row.lastSentStatus)}</td>
+                {row.onDelete && (
+                  <td className="pl-2 pr-6 text-sm text-right whitespace-nowrap">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        row.onDelete?.();
+                      }}
+                      className="text-red-500 hover:text-red-700 text-sm font-medium"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                )}
                   </>
                 )}
 

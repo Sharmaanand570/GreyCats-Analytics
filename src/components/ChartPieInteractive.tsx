@@ -73,7 +73,7 @@ export function ChartPieInteractive({ onReady }: ChartPieInteractiveProps = {}) 
   }, [onReady])
 
   return (
-    <div className="flex flex-col h-full  border bg-white rounded-2xl ">
+    <div className="flex flex-col h-full  border  rounded-2xl ">
       <div className="flex-row items-start space-y-0 pb-0 p-4 flex justify-between">
         <div className="grid gap-1">
           <div className="text-base md:text-sm font-semibold">Pie Chart - Interactive</div>

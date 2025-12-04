@@ -1,5 +1,5 @@
 import type { IconType } from "react-icons";
-import { FaFacebook, FaInstagram, FaYoutube, FaGoogle, FaCartShopping } from "react-icons/fa6";
+import { FaYoutube, FaGoogle, FaCartShopping } from "react-icons/fa6";
 import { SiGoogleanalytics, SiShopify, SiMeta, SiQuora } from "react-icons/si";
 
 export type PlatformConfig = {
@@ -10,18 +10,19 @@ export type PlatformConfig = {
 };
 
 const platformMap: Record<string, PlatformConfig> = {
-  facebook: {
-    name: "Facebook",
-    icon: FaFacebook,
-    link: "/integrations/facebook",
-    color: "#1877F2", // Facebook blue
+  "meta-social": {
+    name: "Meta Social",
+    icon: SiMeta,   // or any Meta-style icon you prefer
+    link: "/data-sources/meta-social",
+    color: "#1877F2",    // Meta blue
   },
-  instagram: {
-    name: "Instagram",
-    icon: FaInstagram,
-    link: "/integrations/instagram",
-    color: "#E4405F", // Instagram pink/red
+  "meta-business": {
+    name: "Meta Business",
+    icon: SiMeta,
+    link: "/data-sources/meta-business",
+    color: "#1877F2", // Meta blue
   },
+  
   youtube: {
     name: "YouTube",
     icon: FaYoutube,
@@ -31,13 +32,13 @@ const platformMap: Record<string, PlatformConfig> = {
   google: {
     name: "Google Analytics",
     icon: SiGoogleanalytics,
-    link: "/integrations/google-analytics",
+    link: "/data-sources/google-analytics",
     color: "#F4B400", // Google Analytics yellow/orange
   },
   "google-console": {
     name: "Google Search Console",
     icon: FaGoogle,
-    link: "/integrations/google-console",
+    link: "/data-sources/google-console",
     color: "#4285F4", // Google blue
   },
   woo: {
@@ -49,7 +50,7 @@ const platformMap: Record<string, PlatformConfig> = {
   shopify: {
     name: "Shopify",
     icon: SiShopify,
-    link: "/integrations/shopify",
+    link: "/data-sources/shopify",
     color: "#96BF48", // Shopify green
   },
   "meta-ads": {

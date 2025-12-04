@@ -3,6 +3,14 @@ import { FaCartShopping } from "react-icons/fa6";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { WooCommerceKPICards } from "@/components/WooCommerceKPICards";
 import { WooCommerceRevenueChart } from "@/components/WooCommerceRevenueChart";
 import { WooCommerceTopProducts } from "@/components/WooCommerceTopProducts";
@@ -318,7 +326,7 @@ function WooCommerceDetailPage() {
       <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
         <div className="w-full h-full flex flex-col">
           {/* Header */}
-          <div className="w-full h-[4.8em] bg-white border-b flex justify-between items-center px-5">
+          <div className="w-full h-[4.8em]  border-b flex justify-between items-center px-5">
             <div className="flex items-center gap-3">
               <FaCartShopping
                 className="text-2xl"
@@ -356,14 +364,7 @@ function WooCommerceDetailPage() {
                   </Select>
                 </div>
               )}
-              <div className="relative">
-                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Search stores, products..."
-                  className="pl-10 w-64 rounded-md border-gray-300"
-                />
-              </div>
+         
               <button className="relative">
                 <FiBell className="text-xl text-gray-500" />
                 <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -371,11 +372,25 @@ function WooCommerceDetailPage() {
             </div>
           </div>
 
+          <div className="w-full px-5 pt-4">
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink to="/data-sources">Data Sources</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>WooCommerce</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
+
           {/* Content */}
           <div className="w-full px-5 py-6 space-y-6">
             {/* Account Info & Actions Card */}
             {accountId && (
-              <Card className="bg-white border rounded-2xl">
+              <Card className=" border rounded-2xl">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
@@ -540,7 +555,7 @@ function WooCommerceDetailPage() {
               <>
                 {/* Error States */}
                 {analyticsError && (
-                  <Card className="bg-white border border-destructive/20 rounded-2xl">
+                  <Card className=" border border-destructive/20 rounded-2xl">
                     <CardContent className="p-4">
                       <p className="text-sm text-destructive">
                         Failed to load analytics:{" "}
@@ -552,7 +567,7 @@ function WooCommerceDetailPage() {
                   </Card>
                 )}
                 {productsAnalyticsError && (
-                  <Card className="bg-white border border-destructive/20 rounded-2xl">
+                  <Card className=" border border-destructive/20 rounded-2xl">
                     <CardContent className="p-4">
                       <p className="text-sm text-destructive">
                         Failed to load product analytics:{" "}
@@ -564,7 +579,7 @@ function WooCommerceDetailPage() {
                   </Card>
                 )}
                 {productsCatalogError && (
-                  <Card className="bg-white border border-destructive/20 rounded-2xl">
+                  <Card className=" border border-destructive/20 rounded-2xl">
                     <CardContent className="p-4">
                       <p className="text-sm text-destructive">
                         Failed to load products:{" "}
@@ -609,7 +624,7 @@ function WooCommerceDetailPage() {
                   {/* Top Products - Show top 3 from per-product analytics */}
                   <div>
                     {productsAnalyticsError ? (
-                      <Card className="bg-white border border-destructive/20 rounded-2xl">
+                      <Card className=" border border-destructive/20 rounded-2xl">
                         <CardHeader>
                           <CardTitle>Top Performing Products</CardTitle>
                         </CardHeader>
@@ -644,7 +659,7 @@ function WooCommerceDetailPage() {
                 {accountId && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Products Catalog Table */}
-                    <div className="bg-white border rounded-2xl overflow-hidden">
+                    <div className=" border rounded-2xl overflow-hidden">
                 <div className="p-4 border-b">
                   <div className="flex items-center justify-between mb-4">
                     <div>
@@ -791,7 +806,7 @@ function WooCommerceDetailPage() {
                     </div>
 
                     {/* Orders Table */}
-                    <div className="bg-white border rounded-2xl overflow-hidden">
+                    <div className=" border rounded-2xl overflow-hidden">
                 <div className="p-4 border-b flex items-center justify-between">
                   <div>
                     <h3 className="text-lg font-semibold">Orders</h3>
@@ -916,7 +931,7 @@ function WooCommerceDetailPage() {
                 )}
 
                 {/* Active Stores Performance Table */}
-                <div className="bg-white border rounded-2xl overflow-hidden">
+                <div className=" border rounded-2xl overflow-hidden">
               <div className="p-4 border-b flex items-center justify-between">
                 <h3 className="text-lg font-semibold">
                   Active Stores Performance
@@ -1025,7 +1040,7 @@ function WooCommerceDetailPage() {
             </div>
               </>
             ) : accountId ? (
-              <Card className="bg-white border border-yellow-200 rounded-2xl">
+              <Card className=" border border-yellow-200 rounded-2xl">
                 <CardContent className="p-6">
                   <div className="text-center">
                     <p className="text-sm text-gray-600 mb-2">

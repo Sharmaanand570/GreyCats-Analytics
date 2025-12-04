@@ -84,7 +84,7 @@ export default function CompanyDetailsForm() {
             <div>
               <Label className="">Company</Label>
               <div className="mt-2">
-                <Input {...register("company")} />
+                <Input  {...register("company")} />
                 {errors.company && (
                   <p className="text-sm text-red-500 mt-1">
                     {errors.company.message}

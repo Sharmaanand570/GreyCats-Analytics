@@ -41,7 +41,10 @@ export function CheckBoxInput() {
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent className="lg:w-[300px] p-0 bg-white">
+      <PopoverContent
+        align="end"
+        className="w-full sm:w-56 md:w-64 lg:w-[300px] max-w-[calc(100vw-3rem)] p-0 "
+      >
         <Command>
           <CommandGroup>
             {OPTIONS.map((option) => {

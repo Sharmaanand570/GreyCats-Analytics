@@ -94,12 +94,14 @@ export default function AuthPage() {
     setAuthError(null);
 
     try {
+      console.log("FORM DATA:", data);
       if (isLogin) {
         const loginPayload: LoginRequest = {
           email: data.email,
           password: data.password,
         };
-        await mutateLogin(loginPayload);
+        const response = await mutateLogin(loginPayload);
+        console.log("Login successful:", response);
       } else {
         const signupData = data as SignupFormValues;
         const registerPayload: RegisterRequest = {
@@ -107,12 +109,20 @@ export default function AuthPage() {
           password: signupData.password,
           fullName: signupData.fullName,
         };
-        await mutateSignup(registerPayload);
+        const response = await mutateSignup(registerPayload);
+        console.log("Signup successful:", response);
       }
       navigate("/");
     } catch (error) {
       const message = getErrorMessage(error);
       setAuthError(message);
+      console.error("Login failed:", error);
+    }
+
+    if (isLogin) {
+      console.log("Login Request");
+    } else {
+      console.log("Signup Request");
     }
   };
 
@@ -123,7 +133,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="flex flex-col md:flex-row w-full min-h-screen overflow-hidden bg-background">
+    <div className="flex flex-col py-4 md:flex-row w-full min-h-screen overflow-hidden bg-background">
       {/* ------------- LEFT AUTH SECTION ------------- */}
       <div className="relative flex flex-col items-center justify-center w-full md:w-1/2 px-6 md:px-16 py-12">
         {/* Logo */}
@@ -297,7 +307,7 @@ export default function AuthPage() {
       </div>
 
       {/* ------------- RIGHT SECTION (DESKTOP ONLY) ------------- */}
-      <div className="hidden md:flex relative flex-col justify-between w-1/2 p-10 rounded-l-2xl text-muted-foreground bg-gradient-to-bl from-black via-zinc-900 to-zinc-700 overflow-hidden">
+      <div className="hidden md:flex relative flex-col justify-between  w-1/2 p-10 rounded-l-2xl text-muted-foreground bg-gradient-to-bl from-black via-zinc-900 to-zinc-700 overflow-hidden">
         <img
           ref={imgRef}
           src={Screenshot}

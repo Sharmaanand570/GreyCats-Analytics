@@ -89,7 +89,7 @@ export function DateRangePicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className="w-auto p-0 bg-white max-w-[calc(100vw-2rem)]" 
+        className="w-auto p-0  max-w-[calc(100vw-2rem)]" 
         align="start"
       >
         <div className="p-3 sm:p-4">

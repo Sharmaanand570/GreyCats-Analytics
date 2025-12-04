@@ -6,14 +6,25 @@ type WidgetDragItemProps = {
   title: string;
   description: string;
   type: ReportWidgetType;
-  onDragStart: (e: React.DragEvent<HTMLDivElement>, type: ReportWidgetType) => void;
+  customKind?: string;
+  onDragStart: (
+    e: React.DragEvent<HTMLDivElement>,
+    type: ReportWidgetType,
+    customKind?: string
+  ) => void;
 };
 
-export default function WidgetDragItem({ title, description, type, onDragStart }: WidgetDragItemProps) {
+export default function WidgetDragItem({
+  title,
+  description,
+  type,
+  customKind,
+  onDragStart,
+}: WidgetDragItemProps) {
   return (
     <div
       draggable
-      onDragStart={(e) => onDragStart(e, type)}
+      onDragStart={(e) => onDragStart(e, type, customKind)}
       role="button"
       tabIndex={0}
       aria-label={`Drag ${title} widget`}

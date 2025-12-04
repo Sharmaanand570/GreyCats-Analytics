@@ -148,7 +148,8 @@
 /* 3️⃣ Light / Dark Theme Colors */
 /* -------------------------------------- */
 
-:root {  --color-gray-400:oklch(0.21 0.106 285.885)
+:root {  
+  --color-gray-400: oklch(0.21 0.106 285.885);
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
@@ -236,11 +237,44 @@
 }
 
 .dark {
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.985 0 0);
-  --primary: oklch(0.92 0.004 286.32);
-  --primary-foreground: oklch(0.21 0.006 285.885);
-  --border: oklch(1 0 0 / 10%);
+  /* Core surfaces */
+  --background: oklch(0.17 0.004 285.8);            /* main app bg */
+  --foreground: oklch(0.97 0.002 285.8);            /* primary text */
+
+  --card: oklch(0.20 0.004 285.8);
+  --card-foreground: oklch(0.97 0.002 285.8);
+
+  --popover: oklch(0.20 0.004 285.8);
+  --popover-foreground: oklch(0.97 0.002 285.8);
+
+  /* Brand / primary */
+  --primary: oklch(0.85 0.01 285.9);                /* light button / accent */
+  --primary-foreground: oklch(0.18 0.01 285.9);     /* text on primary */
+
+  /* Secondary / subtle surfaces */
+  --secondary: oklch(0.22 0.004 285.9);
+  --secondary-foreground: oklch(0.90 0.004 285.9);
+
+  /* Muted / subdued UI (borders, inputs, chips) */
+  --muted: oklch(0.22 0.004 285.9);
+  --muted-foreground: oklch(0.75 0.01 285.9);
+
+  /* Accents (hover states, subtle highlights) */
+  --accent: oklch(0.26 0.004 285.9);
+  --accent-foreground: oklch(0.95 0.002 285.9);
+
+  /* Danger */
+  --destructive: oklch(0.58 0.23 25);
+  --destructive-foreground: oklch(0.98 0.01 25);
+
+  /* Borders / inputs / ring */
+  --border: oklch(0.26 0.004 285.9);
+  --input: oklch(0.26 0.004 285.9);
+  --ring: oklch(0.72 0.02 285.9);
+
+  /* Sidebar */
+  --sidebar: oklch(0.16 0.004 285.8);
+  --sidebar-foreground: oklch(0.96 0.002 285.8);
 }
 
 /* -------------------------------------- */

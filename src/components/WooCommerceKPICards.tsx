@@ -11,7 +11,7 @@ type KPICardProps = {
 
 function KPICard({ title, value, growth, icon, subtitle }: KPICardProps) {
   return (
-    <Card className="bg-white border rounded-2xl">
+    <Card className=" border rounded-2xl">
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="flex-1">

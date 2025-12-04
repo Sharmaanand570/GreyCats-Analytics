@@ -29,6 +29,51 @@ export type MetaCallbackParams = {
   metaUserId?: string;
 };
 
+export type MetaReconnectResponse = {
+  success: boolean;
+  url: string;
+};
+
+export type MetaDisconnectResponse = {
+  success: boolean;
+  message: string;
+};
+
+export type MetaAccount = {
+  id: string;
+  account_id: string;
+  name: string;
+};
+
+export type MetaAccountsResponse = {
+  success: boolean;
+  accounts: MetaAccount[];
+};
+
+export type MetaCampaign = {
+  id: string;
+  name: string;
+  status: string;
+};
+
+export type MetaCampaignsResponse = {
+  success: boolean;
+  campaigns: MetaCampaign[];
+};
+
+export type MetaCampaignInsight = {
+  impressions: string;
+  clicks: string;
+  spend: string;
+  cpc: string;
+  date_start: string;
+};
+
+export type MetaCampaignInsightsResponse = {
+  success: boolean;
+  insights: MetaCampaignInsight[];
+};
+
 export type ApiErrorResponse = {
   message?: string;
   error?: string;
@@ -88,6 +133,100 @@ export const handleMetaCallback = async (
       axiosError.response?.data?.message ||
         axiosError.response?.data?.error ||
         "Failed to complete Meta connection"
+    );
+  }
+};
+
+/**
+ * GET /meta/reconnect
+ */
+export const reconnectMeta = async (): Promise<MetaReconnectResponse> => {
+  try {
+    const response = await api.get<MetaReconnectResponse>("/meta/reconnect");
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+        axiosError.response?.data?.error ||
+        "Failed to generate Meta reconnect URL"
+    );
+  }
+};
+
+/**
+ * POST /meta/disconnect
+ */
+export const disconnectMeta = async (): Promise<MetaDisconnectResponse> => {
+  try {
+    const response = await api.post<MetaDisconnectResponse>("/meta/disconnect");
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+        axiosError.response?.data?.error ||
+        "Failed to disconnect Meta"
+    );
+  }
+};
+
+/**
+ * GET /meta/accounts
+ */
+export const getMetaAccounts = async (): Promise<MetaAccountsResponse> => {
+  try {
+    const response = await api.get<MetaAccountsResponse>("/meta/accounts");
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+        axiosError.response?.data?.error ||
+        "Failed to load Meta ad accounts"
+    );
+  }
+};
+
+/**
+ * GET /meta/campaigns?accountId=xxx
+ */
+export const getMetaCampaigns = async (
+  accountId: string
+): Promise<MetaCampaignsResponse> => {
+  try {
+    const response = await api.get<MetaCampaignsResponse>("/meta/campaigns", {
+      params: { accountId },
+    });
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+        axiosError.response?.data?.error ||
+        "Failed to load Meta campaigns"
+    );
+  }
+};
+
+/**
+ * GET /meta/insights?campaignId=xxx
+ */
+export const getMetaInsights = async (
+  campaignId: string
+): Promise<MetaCampaignInsightsResponse> => {
+  try {
+    const response = await api.get<MetaCampaignInsightsResponse>(
+      "/meta/insights",
+      { params: { campaignId } }
+    );
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+        axiosError.response?.data?.error ||
+        "Failed to load Meta campaign insights"
     );
   }
 };

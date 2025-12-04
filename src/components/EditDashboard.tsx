@@ -28,7 +28,7 @@ const DataSourcesSidebar = memo(
   }) => {
     const sidebarContent = (
       <>
-        <div className="p-3 sm:p-4 border-b sticky top-0 bg-white z-10">
+        <div className="p-3 sm:p-4 border-b sticky top-0  z-10">
           <Input
             type="text"
             placeholder="Search data sources..."
@@ -82,7 +82,7 @@ const DataSourcesSidebar = memo(
     }
 
     return (
-      <div className="w-full sm:w-[14rem] md:w-[15.5rem] bg-white border-r flex flex-col sticky top-[calc(4.8em+3.5em)] h-[calc(100vh-8.3em)] overflow-y-auto z-30">
+      <div className="w-full sm:w-[14rem] md:w-[15.5rem]  border-r flex flex-col sticky top-[calc(4.8em+3.5em)] h-[calc(100vh-8.3em)] overflow-y-auto z-30">
         {sidebarContent}
       </div>
     );
@@ -128,7 +128,7 @@ function EditDashboard() {
     <div className="w-full  h-[2000vh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 ">
       <div className="w-full  rounded-l-2xl overflow-hidden h-full   my-4 bg-[#fdfdfd] ">
         <div className="w-full h-full relative flex flex-col">
-          <div className="w-full h-[4.8em] bg-white border-b flex justify-between items-center px-5 ">
+          <div className="w-full h-[4.8em]  border-b flex justify-between items-center px-5 ">
             <span className="font-medium text-xl">Edit Dashboard</span>
             <div className="flex items-center">
               <span className="mx-2 text-lg text-gray-500">

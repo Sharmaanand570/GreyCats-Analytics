@@ -70,7 +70,7 @@ const ClientHeader = memo(
     onMenuClick?: () => void;
     showMenuButton?: boolean;
   }) => (
-    <div className="w-full h-auto min-h-[4.8em] sm:h-[4.8em] bg-white border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 px-3 sm:px-4 md:px-5 py-3 sm:py-0 sticky top-0 z-50">
+    <div className="w-full h-auto min-h-[4.8em] sm:h-[4.8em]  border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 px-3 sm:px-4 md:px-5 py-3 sm:py-0 sticky top-0 z-50">
       <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
         {showMenuButton && (
           <Button
@@ -162,7 +162,7 @@ const TabNavigation = memo(
     onTabKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>, tab: TabName, index: number) => void;
     tabRefs: React.MutableRefObject<{ [key: string]: HTMLButtonElement | null }>;
   }) => (
-    <div className="w-full h-auto min-h-[3.5em] sm:h-[3.5em] bg-white border-b flex items-center px-2 sm:px-3 md:px-5 overflow-x-auto sticky top-[4.8em] z-40 scrollbar-hide">
+    <div className="w-full h-auto min-h-[3.5em] sm:h-[3.5em]  border-b flex items-center px-2 sm:px-3 md:px-5 overflow-x-auto sticky top-[4.8em] z-40 scrollbar-hide">
       <div className="flex items-center gap-1 sm:gap-2 min-w-max" role="tablist" aria-label="Client navigation tabs">
         {TAB_NAMES.map((tab, index) => (
           <TabButton
@@ -237,7 +237,7 @@ const DataSourcesSidebar = memo(
   }) => {
     const sidebarContent = (
       <>
-        <div className="p-3 sm:p-4 border-b sticky top-0 bg-white z-10">
+        <div className="p-3 sm:p-4 border-b sticky top-0  z-10">
           <Input
             type="text"
             placeholder="Search data sources..."
@@ -274,7 +274,7 @@ const DataSourcesSidebar = memo(
     }
 
     return (
-      <div className="w-full sm:w-[14rem] md:w-[15.5rem] bg-white border-r flex flex-col sticky top-[calc(4.8em+3.5em)] h-[calc(100vh-8.3em)] overflow-y-auto z-30">
+      <div className="w-full sm:w-[14rem] md:w-[15.5rem]  border-r flex flex-col sticky top-[calc(4.8em+3.5em)] h-[calc(100vh-8.3em)] overflow-y-auto z-30">
         {sidebarContent}
       </div>
     );

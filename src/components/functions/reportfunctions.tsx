@@ -74,11 +74,11 @@ function convertOklchInClonedDom(clonedDoc: Document) {
 }
 
 export async function exportAllSlidesToPDF(
-  slideRefs: (HTMLDivElement | null)[]
+  slideRefs: (HTMLDivElement | null | undefined)[]
 ) {
-  // Filter only valid DOM elements
-  const validSlides = slideRefs.filter(
-    (ref): ref is HTMLDivElement => ref !== null
+  // Filter only valid DOM elements; guard against undefined holes in the array.
+  const validSlides = (slideRefs || []).filter(
+    (ref): ref is HTMLDivElement => ref instanceof HTMLDivElement
   );
 
   if (validSlides.length === 0) return;
@@ -135,6 +135,30 @@ export async function exportAllSlidesToPDF(
       onclone: (clonedDoc) => {
         // Convert all oklch() colors to RGB in the cloned document
         convertOklchInClonedDom(clonedDoc);
+
+        // Replace iframe-based embed widgets with a static card so they render in PDF
+        const embeds = clonedDoc.querySelectorAll(".embed-widget");
+        embeds.forEach((container) => {
+          const el = container as HTMLElement;
+          const title = el.getAttribute("data-embed-title") || "Embedded content";
+          const url = el.getAttribute("data-embed-url") || "";
+
+          const iframe = el.querySelector("iframe");
+          if (iframe) {
+            iframe.remove();
+          }
+
+          el.innerHTML = `
+            <div style="width: 100%; border-radius: 8px; border: 1px solid #d4d4d8; background: #f9fafb; padding: 8px 10px; box-sizing: border-box; text-align: left;">
+              <div style="font-size: 12px; font-weight: 600; color: #111827; margin-bottom: 4px;">
+                ${title}
+              </div>
+              <div style="font-size: 11px; color: #4b5563; word-break: break-all;">
+                ${url}
+              </div>
+            </div>
+          `;
+        });
       },
     });
 

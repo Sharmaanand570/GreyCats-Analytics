@@ -13,50 +13,99 @@ export type YouTubeCallbackParams = {
   state: string;
 };
 
-export type YouTubeChannel = {
-  channelId: string;
-  title: string;
-  handle: string;
+export type YouTubeReconnectResponse = {
+  success: boolean;
+  message?: string;
+  url: string;
 };
 
-export type YouTubeCallbackResponse = {
+export type YouTubeDisconnectResponse = {
   success: boolean;
-  channel: YouTubeChannel;
+  message: string;
+};
+
+export type YouTubeThumbnail = {
+  url: string;
+  width: number;
+  height: number;
 };
 
 export type YouTubeChannelResponse = {
   success: boolean;
-  channel: YouTubeChannel;
+  channel: {
+    kind: string;
+    etag: string;
+    id: string;
+    title?: string;
+    customUrl?: string;
+    description?: string;
+    publishedAt?: string;
+    snippet?: {
+      title: string;
+      description: string;
+      customUrl?: string;
+      publishedAt: string;
+      thumbnails: {
+        default?: YouTubeThumbnail;
+        medium?: YouTubeThumbnail;
+        high?: YouTubeThumbnail;
+      };
+      localized?: {
+        title: string;
+        description: string;
+      };
+    };
+    contentDetails?: {
+      relatedPlaylists?: Record<string, string>;
+    };
+    statistics?: {
+      viewCount?: string;
+      subscriberCount?: string;
+      hiddenSubscriberCount?: boolean;
+      videoCount?: string;
+    };
+  };
 };
+
+export type YouTubeCallbackResponse = YouTubeChannelResponse;
 
 export type YouTubeSyncResponse = {
   success: boolean;
   message?: string;
 };
 
-export type YouTubeVideo = {
+export type YouTubeVideosParams = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+};
+
+export type YouTubeVideoThumbnails = {
+  default?: YouTubeThumbnail;
+  medium?: YouTubeThumbnail;
+  high?: YouTubeThumbnail;
+  [key: string]: YouTubeThumbnail | undefined;
+};
+
+export type YouTubeVideoItem = {
   videoId: string;
   title: string;
   description?: string;
-  thumbnail?: string;
+  thumbnails?: YouTubeVideoThumbnails;
   publishedAt: string;
   viewCount?: number;
   likeCount?: number;
   commentCount?: number;
-};
-
-export type YouTubeVideosParams = {
-  page?: number;
-  pageSize?: number;
-  q?: string;
+  durationISO?: string;
 };
 
 export type YouTubeVideosResponse = {
   success: boolean;
-  items: YouTubeVideo[];
-  total?: number;
-  page?: number;
-  pageSize?: number;
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  items: YouTubeVideoItem[];
 };
 
 export type YouTubeAnalyticsDataPoint = {
@@ -68,24 +117,33 @@ export type YouTubeAnalyticsDataPoint = {
   [key: string]: string | number | undefined;
 };
 
-export type YouTubeAnalyticsSummaryParams = {
+export type YouTubeAnalyticsParams = {
   from: string;
   to: string;
 };
 
-export type YouTubeAnalyticsSummaryResponse = {
+export type YouTubeAnalyticsResponse = {
   success: boolean;
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
   series: YouTubeAnalyticsDataPoint[];
 };
 
-export type YouTubeVideoAnalyticsParams = {
+export type YouTubePerVideoAnalyticsParams = {
   videoId: string;
-  from?: string;
-  to?: string;
+  from: string;
+  to: string;
 };
 
-export type YouTubeVideoAnalyticsResponse = {
+export type YouTubePerVideoAnalyticsResponse = {
   success: boolean;
+  videoId: string;
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
   series: YouTubeAnalyticsDataPoint[];
 };
 
@@ -101,7 +159,6 @@ export type ApiErrorResponse = {
  * GET /youtube/connect
  */
 export const connectYouTube = async (): Promise<YouTubeConnectResponse> => {
-  console.log("connectYouTube",import.meta.env.VITE_NGROK_URL);
   try {
     const response = await api.get<YouTubeConnectResponse>("/youtube/connect",{
       baseURL:import.meta.env.VITE_NGROK_URL,
@@ -195,7 +252,7 @@ export const getYouTubeVideos = async (
       params: {
         page: params?.page || 1,
         pageSize: params?.pageSize || 20,
-        q: params?.q || "",
+        search: params?.search || "",
       },
     });
     return response.data;
@@ -211,14 +268,14 @@ export const getYouTubeVideos = async (
 
 /**
  * STEP 6: Get analytics summary
- * GET /youtube/analytics/summary?from=2024-01-01&to=2024-02-20
+ * GET /youtube/analytics?from=2024-01-01&to=2024-02-20
  */
-export const getYouTubeAnalyticsSummary = async (
-  params: YouTubeAnalyticsSummaryParams
-): Promise<YouTubeAnalyticsSummaryResponse> => {
+export const getYouTubeAnalytics = async (
+  params: YouTubeAnalyticsParams
+): Promise<YouTubeAnalyticsResponse> => {
   try {
-    const response = await api.get<YouTubeAnalyticsSummaryResponse>(
-      "/youtube/analytics/summary",
+    const response = await api.get<YouTubeAnalyticsResponse>(
+      "/youtube/analytics",
       {
         params: {
           from: params.from,
@@ -239,14 +296,14 @@ export const getYouTubeAnalyticsSummary = async (
 
 /**
  * STEP 7: Get per-video analytics
- * GET /youtube/analytics/video?videoId=xxx&from=...&to=...
+ * GET /youtube/analytics/per-video?videoId=xxx&from=...&to=...
  */
-export const getYouTubeVideoAnalytics = async (
-  params: YouTubeVideoAnalyticsParams
-): Promise<YouTubeVideoAnalyticsResponse> => {
+export const getYouTubePerVideoAnalytics = async (
+  params: YouTubePerVideoAnalyticsParams
+): Promise<YouTubePerVideoAnalyticsResponse> => {
   try {
-    const response = await api.get<YouTubeVideoAnalyticsResponse>(
-      "/youtube/analytics/video",
+    const response = await api.get<YouTubePerVideoAnalyticsResponse>(
+      "/youtube/analytics/per-video",
       {
         params: {
           videoId: params.videoId,
@@ -262,6 +319,46 @@ export const getYouTubeVideoAnalytics = async (
       axiosError.response?.data?.message ||
         axiosError.response?.data?.error ||
         "Failed to fetch video analytics"
+    );
+  }
+};
+
+/**
+ * STEP 8: Generate reconnect URL
+ * GET /youtube/reconnect
+ */
+export const reconnectYouTube = async (): Promise<YouTubeReconnectResponse> => {
+  try {
+    const response = await api.get<YouTubeReconnectResponse>(
+      "/youtube/reconnect"
+    );
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+        axiosError.response?.data?.error ||
+        "Failed to generate YouTube reconnect URL"
+    );
+  }
+};
+
+/**
+ * STEP 9: Disconnect YouTube integration
+ * POST /youtube/disconnect
+ */
+export const disconnectYouTube = async (): Promise<YouTubeDisconnectResponse> => {
+  try {
+    const response = await api.post<YouTubeDisconnectResponse>(
+      "/youtube/disconnect"
+    );
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+        axiosError.response?.data?.error ||
+        "Failed to disconnect YouTube"
     );
   }
 };

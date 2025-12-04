@@ -32,7 +32,7 @@ export function WooCommerceRevenueChart({
 
   if (isLoading) {
     return (
-      <Card className="bg-white border rounded-2xl">
+      <Card className=" border rounded-2xl">
         <CardHeader>
           <CardTitle>Revenue Growth Trend</CardTitle>
           <CardDescription>Financial trajectory over time</CardDescription>
@@ -45,7 +45,7 @@ export function WooCommerceRevenueChart({
   }
 
   return (
-    <Card className="bg-white border rounded-2xl">
+    <Card className=" border rounded-2xl">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div>

@@ -123,8 +123,8 @@ function MetaCallbackHandler() {
                 </span>
               </div>
               <div className="space-y-2">
-                <Skeleton className="h-4 w-full bg-white/5" />
-                <Skeleton className="h-4 w-3/4 bg-white/5" />
+                <Skeleton className="h-4 w-full /5" />
+                <Skeleton className="h-4 w-3/4 /5" />
               </div>
             </div>
           ) : (

@@ -4,7 +4,7 @@ import axios, {
   type AxiosInstance,
   type InternalAxiosRequestConfig,
 } from "axios";
-import { getAuthToken, removeAuthToken, StorageKey } from "./utils/storage";
+import { getAuthToken, StorageKey } from "./utils/storage";
 
 const apiBaseURL = import.meta.env.VITE_API_BASE_URL;
 const apiTimeout = Number(import.meta.env.VITE_API_TIMEOUT) || 10000;
@@ -40,7 +40,7 @@ api.interceptors.response.use(
   (error: AxiosError) => {
     if (error.response?.status === 401) {
       console.warn("Unauthorized — redirecting to login…");
-      removeAuthToken(StorageKey.ANALYTICS_TOKEN);
+      // removeAuthToken(StorageKey.ANALYTICS_TOKEN);
       // window.location.href = "/auth/login";
     }
 

@@ -123,7 +123,7 @@ export function ChartLineMultiple() {
   )
 
   return (
-    <div className=" border bg-white rounded-2xl">
+    <div className=" border  rounded-2xl">
       <div className="p-4  border-b">
         <div className="flex flex-col sm:flex-row sm:items-stretch">
           <div className="flex-1 px-0 sm:px-2 pb-3  sm:pb-0">
