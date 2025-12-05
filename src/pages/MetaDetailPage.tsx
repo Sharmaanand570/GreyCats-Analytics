@@ -37,6 +37,11 @@ import {
   useMetaReconnect,
   useMetaSavedInsights,
 } from "@/features/meta/hooks/useMetaData";
+import type { MetaAccount, MetaCampaign } from "@/features/meta/API/metaApi";
+import type {
+  MetaDailyHistoryItem,
+  MetaSavedInsight,
+} from "@/features/meta/API/metaInsightsApi";
 import { Loader2 } from "lucide-react";
 
 function MetaDetailPage() {
@@ -280,7 +285,7 @@ function MetaDetailPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {accounts.map((account) => (
+                          {accounts.map((account: MetaAccount) => (
                             <TableRow
                               key={account.id}
                               className={
@@ -383,7 +388,7 @@ function MetaDetailPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {campaigns.map((campaign) => (
+                          {campaigns.map((campaign: MetaCampaign) => (
                             <TableRow
                               key={campaign.id}
                               className={
@@ -480,27 +485,29 @@ function MetaDetailPage() {
                     <Skeleton className="h-6 w-full" />
                     <Skeleton className="h-6 w-full" />
                   </div>
-                ) : savedInsights.length === 0 ? (
+                    ) : savedInsights.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     No saved insights available yet.
                   </p>
-                ) : (
-                  <div className="space-y-2 text-sm">
-                    {savedInsights.slice(0, 4).map((item, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between border rounded-lg px-3 py-2"
-                      >
-                        <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                          {item.platform}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          Insights object
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                  ) : (
+                    <div className="space-y-2 text-sm">
+                      {savedInsights
+                        .slice(0, 4)
+                        .map((item: MetaSavedInsight, index: number) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between border rounded-lg px-3 py-2"
+                          >
+                            <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                              {item.platform}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              Insights object
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  )}
               </CardContent>
             </Card>
 
@@ -531,21 +538,23 @@ function MetaDetailPage() {
                           <TableHead>Metrics</TableHead>
                         </TableRow>
                       </TableHeader>
-                      <TableBody>
-                        {dailyHistory.slice(0, 10).map((item, index) => (
-                          <TableRow key={`${item.platform}-${index}`}>
-                            <TableCell className="text-xs">
-                              {new Date(item.date).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell className="text-xs capitalize">
-                              {item.platform}
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
-                              {Object.keys(item.metrics || {}).length} fields
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
+                        <TableBody>
+                          {dailyHistory
+                            .slice(0, 10)
+                            .map((item: MetaDailyHistoryItem, index: number) => (
+                              <TableRow key={`${item.platform}-${index}`}>
+                                <TableCell className="text-xs">
+                                  {new Date(item.date).toLocaleDateString()}
+                                </TableCell>
+                                <TableCell className="text-xs capitalize">
+                                  {item.platform}
+                                </TableCell>
+                                <TableCell className="text-xs text-muted-foreground">
+                                  {Object.keys(item.metrics || {}).length} fields
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
                     </Table>
                   </div>
                 )}

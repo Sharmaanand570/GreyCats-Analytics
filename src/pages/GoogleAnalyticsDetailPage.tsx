@@ -32,6 +32,8 @@ import {
   useGoogleAnalyticsMeta,
   useGoogleDisconnect,
   useGoogleReconnect,
+  useGoogleProperties,
+  useGoogleSelectProperty,
 } from "@/features/YouTube/hooks/google/useGoogleAnalyticsData";
 import { Loader2 } from "lucide-react";
 import {
@@ -45,6 +47,16 @@ import {
 } from "recharts";
 
 function GoogleAnalyticsDetailPage() {
+  const {
+    data: propertiesData,
+    isLoading: isLoadingProperties,
+    error: propertiesError,
+  } = useGoogleProperties();
+  const {
+    mutate: selectProperty,
+    isPending: isSelectingProperty,
+  } = useGoogleSelectProperty();
+
   const {
     data: summaryData,
     isLoading: isLoadingSummary,
@@ -115,6 +127,9 @@ function GoogleAnalyticsDetailPage() {
   );
 
   const isConnected = !metaError && !!metaData?.property;
+  const noPropertySelected =
+    !!metaError &&
+    metaError.message.toLowerCase().includes("no ga4 property selected");
 
   return (
     <div className="w-full h-full flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
@@ -264,6 +279,61 @@ function GoogleAnalyticsDetailPage() {
                   </CardContent>
                 </Card>
               </div>
+            ) : noPropertySelected ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">
+                    Select a GA4 property
+                  </CardTitle>
+                  <CardDescription>
+                    Choose which GA4 property this connection should use for reports.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {isLoadingProperties ? (
+                    <Skeleton className="h-10 w-full" />
+                  ) : propertiesError ? (
+                    <p className="text-sm text-destructive">
+                      Failed to load GA4 properties: {propertiesError.message}
+                    </p>
+                  ) : (propertiesData?.properties?.length ?? 0) === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No GA4 properties found for this Google account.
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <select
+                        className="border rounded px-3 py-2 text-sm"
+                        onChange={(e) => {
+                          const property = propertiesData!.properties.find(
+                            (p) => p.id === e.target.value
+                          );
+                          if (!property) return;
+                          selectProperty({
+                            propertyId: property.id,
+                            propertyName: property.displayName,
+                          });
+                        }}
+                        defaultValue=""
+                        disabled={isSelectingProperty}
+                      >
+                        <option value="" disabled>
+                          Select a GA4 property...
+                        </option>
+                        {propertiesData!.properties.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.displayName} ({p.accountName})
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-muted-foreground">
+                        After selecting a property, the summary and trends sections
+                        will refresh with data.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             ) : (
               <Card>
                 <CardContent className="py-4 text-sm text-muted-foreground">
@@ -272,8 +342,6 @@ function GoogleAnalyticsDetailPage() {
                 </CardContent>
               </Card>
             )}
-
-            {/* GA4 Properties UI intentionally omitted per latest requirements */}
 
             {isConnected && (
               <>

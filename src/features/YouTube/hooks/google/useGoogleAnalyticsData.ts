@@ -70,7 +70,13 @@ export const useGoogleSelectProperty = () => {
     mutationFn: (body) => selectGoogleProperty(body),
     onSuccess: (data) => {
       toast.success(data.message || "Property saved successfully");
+      // Refresh GA4 properties and all analytics views that depend on the
+      // selected property.
       queryClient.invalidateQueries({ queryKey: ["google-analytics", "properties"] });
+      queryClient.invalidateQueries({ queryKey: ["google-analytics", "meta"] });
+      queryClient.invalidateQueries({ queryKey: ["google-analytics", "summary"] });
+      queryClient.invalidateQueries({ queryKey: ["google-analytics", "trends"] });
+      queryClient.invalidateQueries({ queryKey: ["google-analytics", "top-pages"] });
     },
     onError: (error) => {
       toast.error(error.message || "Failed to save GA4 property");

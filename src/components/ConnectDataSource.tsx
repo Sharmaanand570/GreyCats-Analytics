@@ -51,22 +51,16 @@ const dataSourceOptions: DataSourceOption[] = [
     color: getPlatformConfig("google")?.color,
   },
   {
-    id: "google-console",
-    name: "Google Console",
-    icon: FaGoogle,
-    color: getPlatformConfig("google-console")?.color,
-  },
-  {
-    id: "facebook",
-    name: "Facebook",
-    icon: FaFacebook,
-    color: getPlatformConfig("facebook")?.color,
-  },
-  {
     id: "youtube",
     name: "YouTube",
     icon: FaYoutube,
     color: getPlatformConfig("youtube")?.color,
+  },
+  {
+    id: "google-console",
+    name: "Google Console",
+    icon: FaGoogle,
+    color: getPlatformConfig("google-console")?.color,
   },
   {
     id: "woocommerce",
@@ -85,12 +79,6 @@ const dataSourceOptions: DataSourceOption[] = [
     name: "Meta Ads",
     icon: SiMeta,
     color: getPlatformConfig("meta-ads")?.color,
-  },
-  {
-    id: "meta-social",
-    name: "Meta Social",
-    icon: SiMeta,
-    color: getPlatformConfig("meta-social")?.color,
   },
   {
     id: "meta-business",

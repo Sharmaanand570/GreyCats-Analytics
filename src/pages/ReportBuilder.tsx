@@ -100,7 +100,21 @@ import type {
 } from "@/features/reports/api/types";
 import { useIntegrations } from "@/features/DataSources/hooks/useIntegrations";
 import { getPlatformConfig } from "@/utils/platformMapping";
-import { useAvailableMetrics } from "@/features/reports/hooks/useAvailableMetrics";
+import {
+  useGoogleAnalyticsSummary,
+  useGoogleAnalyticsTopPages,
+  useGoogleAnalyticsTrends,
+  useGoogleAnalyticsMeta,
+} from "@/features/YouTube/hooks/google/useGoogleAnalyticsData";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { exportAllSlidesToPDF } from "../components/functions/reportfunctions";
 
 // Re-export for external use
@@ -157,9 +171,9 @@ const getDefaultWidgetData = (
       return { text: "performance title", fontSize: "2xl", align: "center" };
     case "table":
       return {
-        title: "Scheduled Reports",
-        caption: "Queue of report deliveries.",
-        rows: reportTableRows,
+        title: "",
+        caption: "",
+        rows: [],
         columns: [
           { name: "Report", width: "35%" },
           { name: "Audience" },
@@ -431,16 +445,46 @@ const renderWidgetContent = (
 
     case "table": {
       const tableData = widgetData as TableWidgetData | undefined;
-      const rows = tableData?.rows ?? reportTableRows;
-      const title = tableData?.title ?? "Scheduled Reports";
-      const caption = tableData?.caption ?? "Queue of report deliveries.";
-      const columns = tableData?.columns ?? [
-        { name: "Report", width: "35%" },
-        { name: "Audience" },
-        { name: "Status" },
-        { name: "Last Run" },
-        { name: "Next Send" },
-      ];
+
+      const isGaTopPagesTable =
+        metricConfig?.metricKey === "ga.top_pages_views" &&
+        !!metricConfig?.integration;
+
+      const gaRows =
+        isGaTopPagesTable &&
+        resolvedData &&
+        Array.isArray((resolvedData as any).rows)
+          ? ((resolvedData as any).rows as unknown[])
+          : null;
+
+      const rows = (gaRows as any[]) ?? tableData?.rows ?? reportTableRows;
+
+      const title =
+        tableData?.title ??
+        (isGaTopPagesTable ? "Top Pages by Views" : "Scheduled Reports");
+
+      const caption =
+        tableData?.caption ??
+        (isGaTopPagesTable
+          ? "Pages with the highest number of views."
+          : "Queue of report deliveries.");
+
+      const columns =
+        tableData?.columns ??
+        (isGaTopPagesTable
+          ? [
+              { name: "Page Path", width: "45%" },
+              { name: "Title", width: "35%" },
+              { name: "Views" },
+            ]
+          : [
+              { name: "Report", width: "35%" },
+              { name: "Audience" },
+              { name: "Status" },
+              { name: "Last Run" },
+              { name: "Next Send" },
+            ]);
+
       const rawCount =
         typeof resolvedData?.rawCount === "number" ? resolvedData.rawCount : 0;
       const rowCount = Array.isArray(rows) ? rows.length : 0;
@@ -475,22 +519,36 @@ const renderWidgetContent = (
                     <TableRow key={row.name || index}>
                       {columns.map((col, colIndex) => {
                         // For dynamic columns, we need to map column names to row properties
-                        const cellValue =
-                          col.name === "Report"
-                            ? row.name
-                            : col.name === "Audience"
-                            ? row.audience
-                            : col.name === "Status"
-                            ? row.status
-                            : col.name === "Last Run"
-                            ? row.lastRun
-                            : col.name === "Next Send"
-                            ? row.nextSend
-                            : (row as Record<string, unknown>)[
-                                col.name.toLowerCase().replace(/\s+/g, "")
-                              ] ?? "";
+                        let cellValue: unknown;
 
-                        if (col.name === "Status") {
+                        if (isGaTopPagesTable && gaRows) {
+                          const gaRow = row as any;
+                          cellValue =
+                            col.name === "Page Path"
+                              ? gaRow.pagePath
+                              : col.name === "Title"
+                              ? gaRow.pageTitle || "Untitled"
+                              : col.name === "Views"
+                              ? gaRow.views
+                              : "";
+                        } else {
+                          cellValue =
+                            col.name === "Report"
+                              ? (row as any).name
+                              : col.name === "Audience"
+                              ? (row as any).audience
+                              : col.name === "Status"
+                              ? (row as any).status
+                              : col.name === "Last Run"
+                              ? (row as any).lastRun
+                              : col.name === "Next Send"
+                              ? (row as any).nextSend
+                              : (row as Record<string, unknown>)[
+                                  col.name.toLowerCase().replace(/\s+/g, "")
+                                ] ?? "";
+                        }
+
+                        if (!isGaTopPagesTable && col.name === "Status") {
                           return (
                             <TableCell
                               key={colIndex}
@@ -516,7 +574,9 @@ const renderWidgetContent = (
                                 : "truncate"
                             }`}
                           >
-                            {String(cellValue)}
+                            {col.name === "Views" && isGaTopPagesTable
+                              ? Number(cellValue ?? 0).toLocaleString()
+                              : String(cellValue ?? "")}
                           </TableCell>
                         );
                       })}
@@ -725,7 +785,54 @@ const renderWidgetContent = (
         );
       }
 
-      // Generic custom text block (e.g. AI summary, TOC)
+      // Table-of-contents style custom block
+      if (customData?.type === "toc") {
+        const lines =
+          (customData.content ?? "")
+            .split("\n")
+            .map((t) => t.trim())
+            .filter(Boolean) || [];
+
+        return (
+          <div className="h-full flex flex-col items-stretch justify-start text-xs md:text-sm text-gray-800 px-3 py-2">
+            <div className="font-semibold mb-2">Table of Contents</div>
+            {lines.length === 0 ? (
+              <span className="text-[11px] text-gray-400">
+                Add one entry per line in the editor to build the table of contents.
+              </span>
+            ) : (
+              <div className="w-full overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="py-1 pr-2 w-8 text-[11px] text-gray-500">
+                        #
+                      </th>
+                      <th className="py-1 text-[11px] text-gray-500">
+                        Section
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lines.map((line, idx) => (
+                      <tr key={idx} className="border-b last:border-b-0">
+                        <td className="py-1 pr-2 align-top text-gray-500">
+                          {idx + 1}
+                        </td>
+                        <td className="py-1 align-top break-words">
+                          {line}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // Generic custom text block (e.g. AI summary)
       return (
         <div className="h-full flex items-center justify-center text-xs md:text-sm text-gray-500 px-2">
           <span className="text-center break-words">
@@ -840,6 +947,70 @@ function ReportBuilder() {
   const [scheduleTimeOfDay, setScheduleTimeOfDay] =
     useState<string>("09:00");
   const [scheduleSendEmail, setScheduleSendEmail] = useState(false);
+  const { data: integrationsData } = useIntegrations();
+
+  // Google Analytics data used for the Integrations metrics panel
+  const {
+    data: gaSummaryData,
+    isLoading: isLoadingGaSummary,
+    error: gaSummaryError,
+  } = useGoogleAnalyticsSummary();
+
+  const {
+    data: gaTrendsData,
+    isLoading: isLoadingGaTrends,
+    error: gaTrendsError,
+  } = useGoogleAnalyticsTrends();
+
+  const {
+    data: gaTopPagesData,
+    isLoading: isLoadingGaTopPages,
+    error: gaTopPagesError,
+  } = useGoogleAnalyticsTopPages();
+
+  const { data: gaMetaData, error: gaMetaError } = useGoogleAnalyticsMeta();
+
+  const gaTrends = gaTrendsData?.trends ?? [];
+  const gaTopPages = gaTopPagesData?.topPages ?? [];
+  const gaSummary = gaSummaryData?.summary;
+
+  const gaTrendsChartData = useMemo(
+    () =>
+      gaTrends.map((point) => {
+        const date = point.date;
+        const label =
+          date && date.length === 8
+            ? `${date.slice(6, 8)}/${date.slice(4, 6)}`
+            : date;
+        return {
+          label,
+          sessions: point.sessions,
+        };
+      }),
+    [gaTrends]
+  );
+
+  const gaIsConnected = !gaMetaError && !!gaMetaData?.property;
+
+  // Find the connected Google Analytics integration (if any) so that drag-and-drop
+  // widgets can be preconfigured with the correct integration + accountId.
+  const googleIntegration = useMemo(() => {
+    if (!integrationsData?.integrations) return null;
+
+    return (
+      integrationsData.integrations.find((integration) => {
+        const normalized = integration.platform
+          .toLowerCase()
+          .replace(/_/g, "-");
+        // Support both "google" and "google-analytics" style platform keys
+        return (
+          normalized === "google" ||
+          normalized === "google-analytics" ||
+          normalized.includes("google-analytics")
+        );
+      }) ?? null
+    );
+  }, [integrationsData]);
 
   const handleCancelNewReport = useCallback(() => {
     templateBootstrapRef.current = false;
@@ -855,6 +1026,16 @@ function ReportBuilder() {
       return;
     }
 
+    // Prevent creating a report if there are no connected integrations
+    const integrationCount =
+      (integrationsData?.integrations?.length ?? 0);
+    if (integrationCount === 0) {
+      toast.error(
+        "You need to connect at least one data source before creating a report."
+      );
+      return;
+    }
+
     const payload: CreateTemplatePayload = {
       ...defaultTemplatePayload,
       name: trimmedName,
@@ -862,11 +1043,8 @@ function ReportBuilder() {
 
     createTemplate(payload);
     setIsNameDialogOpen(false);
-  }, [createTemplate, defaultTemplatePayload, newReportName]);
+  }, [createTemplate, defaultTemplatePayload, newReportName, integrationsData]);
 
-  const { data: integrationsData, isLoading: isLoadingIntegrations } =
-    useIntegrations();
-  const { groupedMetrics, isLoading: isLoadingMetrics } = useAvailableMetrics();
   const templateQuery = useQuery({
     queryKey: ["report-template", templateId],
     queryFn: async () => {
@@ -1127,6 +1305,96 @@ function ReportBuilder() {
   const resolvedWidgets = reportDataQuery.data ?? {};
   const isResolvingWidgets = reportDataQuery.isFetching;
   const { refetch: refetchReportData } = reportDataQuery;
+
+  // For Google Analytics-based widgets that use the special GA metric keys
+  // we expose in the Integrations panel, build a client-side resolved data
+  // map from the GA detail APIs so that newly dropped widgets immediately
+  // show real values (similar to the right-hand Integrations section).
+  const gaResolvedWidgets = useMemo(() => {
+    const overrides: Record<string, ResolvedWidgetData> = {};
+
+    if (!googleIntegration) {
+      return overrides;
+    }
+
+    dashboards.forEach((layout) => {
+      layout.forEach((widget) => {
+        const metric = widget.metricConfig;
+        if (!metric?.metricKey || !metric.integration) return;
+
+        const integrationKey = metric.integration
+          .toLowerCase()
+          .replace(/_/g, "-");
+        const isGoogleAnalyticsIntegration =
+          integrationKey === "google" ||
+          integrationKey === "google-analytics" ||
+          integrationKey.includes("google-analytics");
+        if (!isGoogleAnalyticsIntegration) return;
+
+        const dataKey = metric.id ?? widget.i;
+        if (!dataKey) return;
+
+        switch (metric.metricKey) {
+          case "ga.total_sessions":
+            if (gaSummary) {
+              overrides[dataKey] = {
+                value: gaSummary.totalSessions,
+                rawCount: gaSummary.totalSessions,
+              };
+            }
+            break;
+          case "ga.total_users":
+            if (gaSummary) {
+              overrides[dataKey] = {
+                value: gaSummary.totalUsers,
+                rawCount: gaSummary.totalUsers,
+              };
+            }
+            break;
+          case "ga.total_views":
+            if (gaSummary) {
+              overrides[dataKey] = {
+                value: gaSummary.totalViews,
+                rawCount: gaSummary.totalViews,
+              };
+            }
+            break;
+          case "ga.avg_bounce_rate":
+            if (gaSummary) {
+              overrides[dataKey] = {
+                value: gaSummary.avgBounceRate,
+                rawCount: gaSummary.totalSessions,
+              };
+            }
+            break;
+          case "ga.sessions_trend":
+            if (gaTrendsChartData.length > 0) {
+              overrides[dataKey] = {
+                series: gaTrendsChartData.map((point) => ({
+                  x: point.label,
+                  y: point.sessions,
+                })),
+                rawCount: gaTrendsChartData.length,
+              } as ResolvedWidgetData;
+            }
+            break;
+          case "ga.top_pages_views":
+            if (gaTopPages.length > 0) {
+              overrides[dataKey] = {
+                // Store GA top pages rows so table widgets can render them.
+                rows: gaTopPages as unknown[],
+                rawCount: gaTopPages.length,
+              } as ResolvedWidgetData;
+            }
+            break;
+          default:
+            break;
+        }
+      });
+    });
+
+    return overrides;
+  }, [dashboards, googleIntegration, gaSummary, gaTrendsChartData, gaTopPages]);
 
   const buildTemplatePayloadFromDashboards =
     useCallback((): CreateTemplatePayload => {
@@ -1903,345 +2171,384 @@ function ReportBuilder() {
     createWidgetFormChangeHandler,
   ]);
 
-  // State for expanded integrations
-  const [expandedIntegrations, setExpandedIntegrations] = useState<Set<number>>(
-    new Set()
-  );
-
-  const toggleIntegration = useCallback((integrationId: number) => {
-    setExpandedIntegrations((prev) => {
-      const next = new Set(prev);
-      if (next.has(integrationId)) {
-        next.delete(integrationId);
-      } else {
-        next.add(integrationId);
-      }
-      return next;
-    });
-  }, []);
-
-  // Get metrics for a specific integration and accountId from API data
-  const getMetricsForIntegration = useCallback(
-    (integration: string, accountId: string) => {
-      // Try exact match first
-      let platformMetrics = groupedMetrics[integration];
-
-      // Try lowercase match
-      if (!platformMetrics) {
-        platformMetrics = groupedMetrics[integration.toLowerCase()];
-      }
-
-      // Try to match by partial name (e.g., "google" matches "google-analytics")
-      if (!platformMetrics) {
-        const integrationLower = integration.toLowerCase();
-        const matchingKey = Object.keys(groupedMetrics).find(
-          (key) =>
-            key.toLowerCase().includes(integrationLower) ||
-            integrationLower.includes(key.toLowerCase())
-        );
-        if (matchingKey) {
-          platformMetrics = groupedMetrics[matchingKey];
-        }
-      }
-
-      if (!platformMetrics) {
-        return [];
-      }
-
-      const accountMetrics = platformMetrics[accountId];
-      return accountMetrics || [];
-    },
-    [groupedMetrics]
-  );
-
   // Memoize right panel content
   const rightPanelContent = useMemo(() => {
     if (rightPanelTitle === "Integrations") {
       return (
         <div className="w-full h-full overflow-y-auto">
-          {isLoadingIntegrations || isLoadingMetrics ? (
-            <div className="text-center text-sm text-gray-500 py-4 px-2">
-              Loading integrations...
-            </div>
-          ) : integrationsData?.integrations &&
-            integrationsData.integrations.length > 0 ? (
-            <div>
-              {integrationsData.integrations.map((integration) => {
-                const platformConfig = getPlatformConfig(integration.platform);
-                const isExpanded = expandedIntegrations.has(integration.id);
-                const metrics = getMetricsForIntegration(
-                  integration.platform,
-                  integration.accountId
-                );
+          {/* Error state using Google Analytics APIs */}
+          {(gaSummaryError ||
+            gaTrendsError ||
+            gaTopPagesError ||
+            gaMetaError) && (
+            <Card className="border border-destructive/40 bg-destructive/5 m-3">
+              <CardContent className="py-3 text-xs text-destructive space-y-1">
+                {gaSummaryError && (
+                  <p>Failed to load summary: {gaSummaryError.message}</p>
+                )}
+                {gaTrendsError && (
+                  <p>Failed to load trends: {gaTrendsError.message}</p>
+                )}
+                {gaTopPagesError && (
+                  <p>Failed to load top pages: {gaTopPagesError.message}</p>
+                )}
+                {gaMetaError && (
+                  <p>Failed to load analytics meta: {gaMetaError.message}</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
-                if (!platformConfig) return null;
-
-                return (
-                  <div
-                    key={integration.id}
-                    className="border-b last:border-b-0"
-                  >
-                    {/* Integration Header */}
+          {gaIsConnected ? (
+            <div className="w-full h-full overflow-y-auto p-3 space-y-4">
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 gap-3">
+                <Card>
+                  <CardHeader className="py-2 flex items-center justify-between gap-2">
+                    <CardTitle className="text-xs font-medium">
+                      Total Sessions
+                    </CardTitle>
                     <div
-                      onClick={() => toggleIntegration(integration.id)}
-                      className="flex items-center gap-2 p-3 hover:bg-gray-50 cursor-pointer transition-colors"
+                      draggable={!!googleIntegration}
+                      onDragStart={
+                        googleIntegration
+                          ? (e) =>
+                              handleDragStart(e, "metric", {
+                                metricKey: "ga.total_sessions",
+                                integration: googleIntegration.platform,
+                                accountId: googleIntegration.accountId,
+                              })
+                          : undefined
+                      }
+                      className={`flex items-center justify-center w-6 h-6 rounded border text-[10px] ${
+                        googleIntegration
+                          ? "border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing"
+                          : "border-gray-200 text-gray-300 cursor-not-allowed"
+                      }`}
+                      title={
+                        googleIntegration
+                          ? "Drag to add a Total Sessions metric card"
+                          : "Connect Google Analytics to add this metric"
+                      }
                     >
-                      <platformConfig.icon
-                        className="w-5 h-5 flex-shrink-0"
-                        style={{ color: platformConfig.color }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm text-gray-900 truncate">
-                          {platformConfig?.name || integration.platform}
-                        </div>
-                        <div className="text-xs text-gray-500 truncate">
-                          {isLoadingMetrics
-                            ? "Loading metrics..."
-                            : metrics.length === 0
-                            ? "No metrics synced yet"
-                            : `${metrics.length} ${
-                                metrics.length === 1 ? "metric" : "metrics"
-                              }`}
-                        </div>
-                      </div>
-                      <svg
-                        className={`w-4 h-4 text-gray-400 transition-transform ${
-                          isExpanded ? "rotate-90" : ""
-                        }`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
+                      M
                     </div>
-
-                    {/* Expanded Metrics */}
-                    {isExpanded && (
-                      <div className="bg-gray-50">
-                        {metrics.length === 0 ? (
-                          <div className="p-4 text-center text-xs text-gray-500 space-y-2">
-                            <p className="font-medium">
-                              No metrics available yet
-                            </p>
-                            <p className="text-[10px]">
-                              Metrics will appear here after data is synced from{" "}
-                              {platformConfig?.name || integration.platform}.
-                              This usually takes a few minutes after connecting.
-                            </p>
-                          </div>
-                        ) : (
-                          metrics.map((metric) => (
-                            <div key={metric.metricKey} className="border-t">
-                              {/* Metric Info - Not draggable, just displays the metric */}
-                              <div className="flex items-start gap-2 p-3 pl-8 bg-white">
-                                <platformConfig.icon
-                                  className="w-4 h-4 flex-shrink-0 mt-0.5"
-                                  style={{ color: platformConfig.color }}
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-medium text-sm text-gray-900 truncate">
-                                    {metric.displayName}
-                                  </div>
-                                  <div className="text-xs text-gray-500 mt-0.5 truncate">
-                                    {metric.category}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Widget Type Options - Each is draggable */}
-                              <div className="flex items-center gap-1 px-3 pb-3 pl-12 bg-white">
-                                {/* Metric Card */}
-                                <div
-                                  draggable
-                                  onDragStart={(e) =>
-                                    handleDragStart(e, "chart", {
-                                      metricKey: metric.metricKey,
-                                      integration: metric.integration,
-                                      accountId: metric.accountId,
-                                    })
-                                  }
-                                  className="flex items-center justify-center w-8 h-8 rounded border border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing transition-all"
-                                  title="Metric Card"
-                                >
-                                  <svg
-                                    className="w-4 h-4 text-gray-600"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M7 20h10M7 16h10M7 12h10M12 4v4"
-                                    />
-                                  </svg>
-                                </div>
-
-                                {/* Line Chart */}
-                                <div
-                                  draggable
-                                  onDragStart={(e) =>
-                                    handleDragStart(e, "line_chart", {
-                                      metricKey: metric.metricKey,
-                                      integration: metric.integration,
-                                      accountId: metric.accountId,
-                                    })
-                                  }
-                                  className="flex items-center justify-center w-8 h-8 rounded border border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing transition-all"
-                                  title="Line Chart"
-                                >
-                                  <svg
-                                    className="w-4 h-4 text-gray-600"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M7 12l3-3 3 3 4-4"
-                                    />
-                                  </svg>
-                                </div>
-
-                                {/* Area Chart */}
-                                <div
-                                  draggable
-                                  onDragStart={(e) =>
-                                    handleDragStart(e, "area_chart", {
-                                      metricKey: metric.metricKey,
-                                      integration: metric.integration,
-                                      accountId: metric.accountId,
-                                    })
-                                  }
-                                  className="flex items-center justify-center w-8 h-8 rounded border border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing transition-all"
-                                  title="Area Chart"
-                                >
-                                  <svg
-                                    className="w-4 h-4 text-gray-600"
-                                    fill="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path d="M3 20h18v-2H3v2zm0-4h18v-2l-4-4-4 4-4-4-6 6v0z" />
-                                  </svg>
-                                </div>
-
-                                {/* Bar Chart */}
-                                <div
-                                  draggable
-                                  onDragStart={(e) =>
-                                    handleDragStart(e, "bar_chart", {
-                                      metricKey: metric.metricKey,
-                                      integration: metric.integration,
-                                      accountId: metric.accountId,
-                                    })
-                                  }
-                                  className="flex items-center justify-center w-8 h-8 rounded border border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing transition-all"
-                                  title="Bar Chart"
-                                >
-                                  <svg
-                                    className="w-4 h-4 text-gray-600"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                                    />
-                                  </svg>
-                                </div>
-
-                                {/* Pie Chart */}
-                                <div
-                                  draggable
-                                  onDragStart={(e) =>
-                                    handleDragStart(e, "pie_chart", {
-                                      metricKey: metric.metricKey,
-                                      integration: metric.integration,
-                                      accountId: metric.accountId,
-                                    })
-                                  }
-                                  className="flex items-center justify-center w-8 h-8 rounded border border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing transition-all"
-                                  title="Pie Chart"
-                                >
-                                  <svg
-                                    className="w-4 h-4 text-gray-600"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"
-                                    />
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"
-                                    />
-                                  </svg>
-                                </div>
-
-                                {/* Table */}
-                                <div
-                                  draggable
-                                  onDragStart={(e) =>
-                                    handleDragStart(e, "table", {
-                                      metricKey: metric.metricKey,
-                                      integration: metric.integration,
-                                      accountId: metric.accountId,
-                                    })
-                                  }
-                                  className="flex items-center justify-center w-8 h-8 rounded border border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing transition-all"
-                                  title="Table"
-                                >
-                                  <svg
-                                    className="w-4 h-4 text-gray-600"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                                    />
-                                  </svg>
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
+                  </CardHeader>
+                  <CardContent className="py-2">
+                    {isLoadingGaSummary ? (
+                      <div className="h-5 w-16 bg-gray-200 animate-pulse rounded" />
+                    ) : (
+                      <p className="text-lg font-semibold">
+                        {gaSummary?.totalSessions?.toLocaleString() ?? 0}
+                      </p>
                     )}
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="py-2 flex items-center justify-between gap-2">
+                    <CardTitle className="text-xs font-medium">
+                      Total Users
+                    </CardTitle>
+                    <div
+                      draggable={!!googleIntegration}
+                      onDragStart={
+                        googleIntegration
+                          ? (e) =>
+                              handleDragStart(e, "metric", {
+                                metricKey: "ga.total_users",
+                                integration: googleIntegration.platform,
+                                accountId: googleIntegration.accountId,
+                              })
+                          : undefined
+                      }
+                      className={`flex items-center justify-center w-6 h-6 rounded border text-[10px] ${
+                        googleIntegration
+                          ? "border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing"
+                          : "border-gray-200 text-gray-300 cursor-not-allowed"
+                      }`}
+                      title={
+                        googleIntegration
+                          ? "Drag to add a Total Users metric card"
+                          : "Connect Google Analytics to add this metric"
+                      }
+                    >
+                      M
+                    </div>
+                  </CardHeader>
+                  <CardContent className="py-2">
+                    {isLoadingGaSummary ? (
+                      <div className="h-5 w-16 bg-gray-200 animate-pulse rounded" />
+                    ) : (
+                      <p className="text-lg font-semibold">
+                        {gaSummary?.totalUsers?.toLocaleString() ?? 0}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="py-2 flex items-center justify-between gap-2">
+                    <CardTitle className="text-xs font-medium">
+                      Total Views
+                    </CardTitle>
+                    <div
+                      draggable={!!googleIntegration}
+                      onDragStart={
+                        googleIntegration
+                          ? (e) =>
+                              handleDragStart(e, "metric", {
+                                metricKey: "ga.total_views",
+                                integration: googleIntegration.platform,
+                                accountId: googleIntegration.accountId,
+                              })
+                          : undefined
+                      }
+                      className={`flex items-center justify-center w-6 h-6 rounded border text-[10px] ${
+                        googleIntegration
+                          ? "border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing"
+                          : "border-gray-200 text-gray-300 cursor-not-allowed"
+                      }`}
+                      title={
+                        googleIntegration
+                          ? "Drag to add a Total Views metric card"
+                          : "Connect Google Analytics to add this metric"
+                      }
+                    >
+                      M
+                    </div>
+                  </CardHeader>
+                  <CardContent className="py-2">
+                    {isLoadingGaSummary ? (
+                      <div className="h-5 w-16 bg-gray-200 animate-pulse rounded" />
+                    ) : (
+                      <p className="text-lg font-semibold">
+                        {gaSummary?.totalViews?.toLocaleString() ?? 0}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="py-2 flex items-center justify-between gap-2">
+                    <CardTitle className="text-xs font-medium">
+                      Avg. Bounce Rate
+                    </CardTitle>
+                    <div
+                      draggable={!!googleIntegration}
+                      onDragStart={
+                        googleIntegration
+                          ? (e) =>
+                              handleDragStart(e, "metric", {
+                                metricKey: "ga.avg_bounce_rate",
+                                integration: googleIntegration.platform,
+                                accountId: googleIntegration.accountId,
+                              })
+                          : undefined
+                      }
+                      className={`flex items-center justify-center w-6 h-6 rounded border text-[10px] ${
+                        googleIntegration
+                          ? "border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing"
+                          : "border-gray-200 text-gray-300 cursor-not-allowed"
+                      }`}
+                      title={
+                        googleIntegration
+                          ? "Drag to add an Avg. Bounce Rate metric card"
+                          : "Connect Google Analytics to add this metric"
+                      }
+                    >
+                      M
+                    </div>
+                  </CardHeader>
+                  <CardContent className="py-2">
+                    {isLoadingGaSummary ? (
+                      <div className="h-5 w-20 bg-gray-200 animate-pulse rounded" />
+                    ) : (
+                      <p className="text-lg font-semibold">
+                        {gaSummary
+                          ? `${gaSummary.avgBounceRate.toFixed(1)}%`
+                          : "0.0%"}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Trends chart */}
+              <Card>
+                <CardHeader className="py-3 flex items-center justify-between gap-2">
+                  <CardTitle className="text-sm">
+                    Traffic Trends (Sessions)
+                  </CardTitle>
+                  <div
+                    draggable={!!googleIntegration}
+                    onDragStart={
+                      googleIntegration
+                        ? (e) =>
+                            handleDragStart(e, "line_chart", {
+                              metricKey: "ga.sessions_trend",
+                              integration: googleIntegration.platform,
+                              accountId: googleIntegration.accountId,
+                            })
+                        : undefined
+                    }
+                    className={`flex items-center justify-center w-7 h-7 rounded border text-[10px] ${
+                      googleIntegration
+                        ? "border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing"
+                        : "border-gray-200 text-gray-300 cursor-not-allowed"
+                    }`}
+                    title={
+                      googleIntegration
+                        ? "Drag to add a Traffic Trends line chart"
+                        : "Connect Google Analytics to add this chart"
+                    }
+                  >
+                    ↗
                   </div>
-                );
-              })}
+                </CardHeader>
+                <CardContent className="py-2">
+                  {isLoadingGaTrends ? (
+                    <div className="h-40 w-full bg-gray-100 animate-pulse rounded" />
+                  ) : gaTrendsChartData.length === 0 ? (
+                    <div className="h-40 flex items-center justify-center text-xs text-gray-500">
+                      No trend data available.
+                    </div>
+                  ) : (
+                    <div className="w-full h-40">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={gaTrendsChartData}>
+                          <defs>
+                            <linearGradient
+                              id="gaSessions"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="5%"
+                                stopColor="#2563EB"
+                                stopOpacity={0.35}
+                              />
+                              <stop
+                                offset="95%"
+                                stopColor="#2563EB"
+                                stopOpacity={0}
+                              />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                          <YAxis tick={{ fontSize: 10 }} />
+                          <Tooltip
+                            formatter={(value: number) => [
+                              value.toLocaleString(),
+                              "Sessions",
+                            ]}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="sessions"
+                            stroke="#2563EB"
+                            strokeWidth={2}
+                            fill="url(#gaSessions)"
+                            dot={false}
+                            activeDot={{ r: 3, fill: "#2563EB" }}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Top pages table */}
+              <Card>
+                <CardHeader className="py-3 flex items-center justify-between gap-2">
+                  <CardTitle className="text-sm">Top Pages by Views</CardTitle>
+                  <div
+                    draggable={!!googleIntegration}
+                    onDragStart={
+                      googleIntegration
+                        ? (e) =>
+                            handleDragStart(e, "table", {
+                              metricKey: "ga.top_pages_views",
+                              integration: googleIntegration.platform,
+                              accountId: googleIntegration.accountId,
+                            })
+                        : undefined
+                    }
+                    className={`flex items-center justify-center w-7 h-7 rounded border text-[10px] ${
+                      googleIntegration
+                        ? "border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing"
+                        : "border-gray-200 text-gray-300 cursor-not-allowed"
+                    }`}
+                    title={
+                      googleIntegration
+                        ? "Drag to add a Top Pages table"
+                        : "Connect Google Analytics to add this table"
+                    }
+                  >
+                    T
+                  </div>
+                </CardHeader>
+                <CardContent className="py-2">
+                  {isLoadingGaTopPages ? (
+                    <div className="space-y-2">
+                      <div className="h-8 w-full bg-gray-100 animate-pulse rounded" />
+                      <div className="h-8 w-full bg-gray-100 animate-pulse rounded" />
+                      <div className="h-8 w-full bg-gray-100 animate-pulse rounded" />
+                    </div>
+                  ) : gaTopPagesError ? (
+                    <p className="text-xs text-destructive">
+                      Failed to load top pages: {gaTopPagesError.message}
+                    </p>
+                  ) : gaTopPages.length === 0 ? (
+                    <p className="text-xs text-gray-500">
+                      No top page data available.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs">Page Path</TableHead>
+                            <TableHead className="text-xs">Title</TableHead>
+                            <TableHead className="text-xs text-right">
+                              Views
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {gaTopPages.map((page) => (
+                            <TableRow key={page.pagePath}>
+                              <TableCell className="text-xs">
+                                {page.pagePath}
+                              </TableCell>
+                              <TableCell className="text-xs">
+                                {page.pageTitle || "Untitled"}
+                              </TableCell>
+                              <TableCell className="text-xs text-right">
+                                {page.views.toLocaleString()}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           ) : (
             <div className="text-center text-sm text-gray-500 py-8 px-4">
-              <p className="font-medium mb-2">No integrations connected</p>
-              <p className="text-xs mb-4">
-                Connect an integration to add metric widgets
+              <p className="font-medium mb-2">
+                Google Analytics is not connected or has no active property.
               </p>
-              <Link to="/data-sources">
+              <p className="text-xs mb-4">
+                Connect Google Analytics from the Data Sources page to see
+                metrics here.
+              </p>
+              <Link to="/data-sources/google-analytics">
                 <Button variant="outline" size="sm">
-                  Connect Integration
+                  Open Google Analytics
                 </Button>
               </Link>
             </div>
@@ -2299,12 +2606,18 @@ function ReportBuilder() {
   }, [
     rightPanelTitle,
     handleDragStart,
-    integrationsData,
-    isLoadingIntegrations,
-    isLoadingMetrics,
-    expandedIntegrations,
-    toggleIntegration,
-    getMetricsForIntegration,
+    gaSummaryError,
+    gaTrendsError,
+    gaTopPagesError,
+    gaMetaError,
+    gaIsConnected,
+    isLoadingGaSummary,
+    isLoadingGaTrends,
+    isLoadingGaTopPages,
+    gaSummary,
+    gaTrendsChartData,
+    gaTopPages,
+    gaTopPagesError,
   ]);
   // Detect if we're on tablet (using window width)
   const [isTablet, setIsTablet] = useState(false);
@@ -2736,7 +3049,7 @@ function ReportBuilder() {
                     {layout.map((widget) => {
                       const dataKey = widget.metricConfig?.id ?? widget.i;
                       const widgetResolvedData: ResolvedWidgetData | undefined =
-                        resolvedWidgets[dataKey];
+                        gaResolvedWidgets[dataKey] ?? resolvedWidgets[dataKey];
                       return (
                         <div
                           key={widget.i}

@@ -186,6 +186,7 @@ export const fetchDebugMetrics = (limit?: number) =>
         params: limit ? { limit } : undefined,
       }
     );
+    console.log("response fetchDebugMetrics", response.data);
     return response.data;
   });
 

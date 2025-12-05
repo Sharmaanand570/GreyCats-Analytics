@@ -1,14 +1,18 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { FiBell, FiSearch } from "react-icons/fi";
 import { Button } from "./ui/button";
 import TableComponent from "./TableComponent";
 import { Input } from "./ui/input";
 import DropDownFilter from "./DropDownFilter";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { deleteReportTemplate, listReportTemplates } from "@/features/reports/api/reportingApi";
+import {
+  deleteReportTemplate,
+  listReportTemplates,
+} from "@/features/reports/api/reportingApi";
 import type { ReportTemplateSummary } from "@/features/reports/api/types";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useIntegrations } from "@/features/DataSources/hooks/useIntegrations";
 
 const TABLE_HEADERS = [
   "Name",
@@ -50,6 +54,8 @@ function mapTemplateToRow(template: ReportTemplateSummary) {
 }
 
 function Reports() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const navigate = useNavigate();
   const {
     data: rawTemplates,
     isLoading,
@@ -63,8 +69,42 @@ function Reports() {
     },
   });
 
+  const {
+    data: integrationsData,
+    isLoading: isLoadingIntegrations,
+  } = useIntegrations();
+
+  const hasIntegrations =
+    (integrationsData?.integrations?.length ?? 0) > 0;
+
+  const handleCreateReportClick = () => {
+    if (isLoadingIntegrations) {
+      return;
+    }
+
+    if (!hasIntegrations) {
+      toast.error(
+        "Please connect at least one data source before creating a report."
+      );
+      return;
+    }
+
+    navigate("/reports/new");
+  };
+
 
   const templates = (rawTemplates ?? []) as ReportTemplateSummary[];
+
+  // Simple client-side search by name (and optional description if added later)
+  const filteredTemplates = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return templates;
+    return templates.filter((template) =>
+      [template.name]
+        .filter(Boolean)
+        .some((value) => value?.toLowerCase().includes(term))
+    );
+  }, [templates, searchTerm]);
 
   const { mutate: deleteTemplate } = useMutation({
     mutationFn: async (id: number) => {
@@ -81,12 +121,12 @@ function Reports() {
   });
 
   const tableRows = useMemo(() => {
-    if (!templates.length) return [];
-    return templates.map((template) => ({
+    if (!filteredTemplates.length) return [];
+    return filteredTemplates.map((template) => ({
       ...mapTemplateToRow(template),
       onDelete: () => deleteTemplate(template.id),
     }));
-  }, [templates, deleteTemplate]);
+  }, [filteredTemplates, deleteTemplate]);
 
   const showTable = tableRows.length > 0;
 
@@ -105,9 +145,13 @@ function Reports() {
                 <FiBell />
               </span>
               <span className="ml-4">
-                <Link to="/reports/new">
-                  <Button className="rounded-[0.4rem]">Create Report</Button>
-                </Link>
+                <Button
+                  className="rounded-[0.4rem]"
+                  onClick={handleCreateReportClick}
+                  disabled={isLoadingIntegrations}
+                >
+                  Create Report
+                </Button>
               </span>
             </div>
           </div>
@@ -117,8 +161,10 @@ function Reports() {
               <div className="w-[60%]">
                 <Input
                   className="w-full rounded-[0.5rem] p-4 py-5"
-                  type="email"
-                  placeholder="Email"
+                  type="text"
+                  placeholder="Search reports"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
 
@@ -154,14 +200,17 @@ function Reports() {
                     No reports yet
                   </p>
                   <p className="text-sm text-gray-500">
-                    Create a template in the builder or connect an integration to
-                    start generating reports.
+                    Create a template in the builder or connect an integration
+                    to start generating reports.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center justify-center gap-3">
-                  <Link to="/reports/new">
-                    <Button>Create Report</Button>
-                  </Link>
+                  <Button
+                    onClick={handleCreateReportClick}
+                    disabled={isLoadingIntegrations}
+                  >
+                    Create Report
+                  </Button>
                   <Button variant="outline" onClick={() => refetch()}>
                     Refresh
                   </Button>

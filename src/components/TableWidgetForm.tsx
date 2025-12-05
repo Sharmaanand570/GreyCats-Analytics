@@ -21,7 +21,7 @@ function TableWidgetForm({
   onChange,
 }: TableWidgetFormProps): React.JSX.Element {
   const [activeTab, setActiveTab] =
-    useState<"general" | "data">("data");
+    useState<"general" | "data">("general");
 
   const handleChange = (updates: Partial<TableWidgetData>) => {
     if (onChange) {
@@ -30,6 +30,7 @@ function TableWidgetForm({
   };
 
   const rows: ReportTableRow[] = data?.rows ?? [];
+  const columns = data?.columns ?? [];
 
   const updateRow = (index: number, updates: Partial<ReportTableRow>) => {
     const nextRows = rows.map((row, i) =>
@@ -54,6 +55,29 @@ function TableWidgetForm({
     handleChange({ rows: nextRows });
   };
 
+  const updateColumn = (
+    index: number,
+    updates: Partial<NonNullable<TableWidgetData["columns"]>[number]>
+  ) => {
+    const nextColumns = columns.map((col, i) =>
+      i === index ? { ...col, ...updates } : col
+    );
+    handleChange({ columns: nextColumns });
+  };
+
+  const addColumn = () => {
+    const newColumn = {
+      name: `Column ${columns.length + 1}`,
+      width: "",
+    };
+    handleChange({ columns: [...columns, newColumn] });
+  };
+
+  const removeColumn = (index: number) => {
+    const nextColumns = columns.filter((_, i) => i !== index);
+    handleChange({ columns: nextColumns });
+  };
+
   return (
     <div className="w-full h-full overflow-y-auto">
       <div className="w-full p-4 border-b font-semibold text-accent-foreground">
@@ -62,32 +86,38 @@ function TableWidgetForm({
 
       <div className="w-full px-4">
         {/* Tabs */}
-        <div className="flex gap-4 text-sm mt-4 mb-6">
+        <div className="flex gap-2 text-xs mt-4 mb-4 bg-gray-100 rounded-full p-1 w-max">
           <button
+            type="button"
             onClick={() => setActiveTab("general")}
-            className={`pb-1 font-medium ${
+            className={`px-3 py-1 rounded-full font-medium transition-colors ${
               activeTab === "general"
-                ? "border-b-2 border-blue-500 text-gray-900"
-                : "text-gray-500"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 hover:text-gray-800"
             }`}
           >
-            General
+            Settings
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab("data")}
-            className={`pb-1 font-medium ${
+            className={`px-3 py-1 rounded-full font-medium transition-colors ${
               activeTab === "data"
-                ? "border-b-2 border-blue-500 text-gray-900"
-                : "text-gray-500"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 hover:text-gray-800"
             }`}
           >
-            Data
+            Rows
           </button>
         </div>
 
         {/* General Tab */}
         {activeTab === "general" && (
           <div className="pb-8 space-y-5">
+            <p className="text-[11px] text-gray-500">
+              Give your table a clear title, optional caption, and define the
+              column headers it should use.
+            </p>
             <div>
               <Label className="block text-xs text-gray-600 mb-2">
                 Title
@@ -109,12 +139,86 @@ function TableWidgetForm({
                 className="placeholder:text-gray-400"
               />
             </div>
+
+            <div className="border-t pt-4 mt-2 space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-gray-600">Columns</Label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={addColumn}
+                  className="text-xs"
+                >
+                  Add Column
+                </Button>
+              </div>
+
+              {columns.length === 0 && (
+                <p className="text-[11px] text-gray-500">
+                  No custom columns yet. Click &quot;Add Column&quot; to define
+                  table headers.
+                </p>
+              )}
+
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {columns.map((col, index) => (
+                  <div
+                    key={index}
+                    className="border rounded-md p-2 flex flex-col gap-2 bg-gray-50"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-gray-700">
+                        Column {index + 1}
+                      </span>
+                      <button
+                        type="button"
+                        className="text-[11px] text-red-500 hover:text-red-700"
+                        onClick={() => removeColumn(index)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="block text-[11px] text-gray-600 mb-1">
+                          Header
+                        </Label>
+                        <Input
+                          value={col.name}
+                          onChange={(e) =>
+                            updateColumn(index, { name: e.target.value })
+                          }
+                          placeholder="e.g. Report"
+                        />
+                      </div>
+                      <div>
+                        <Label className="block text-[11px] text-gray-600 mb-1">
+                          Width (optional)
+                        </Label>
+                        <Input
+                          value={col.width ?? ""}
+                          onChange={(e) =>
+                            updateColumn(index, { width: e.target.value })
+                          }
+                          placeholder="e.g. 35% or 200px"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
         {/* Data Tab */}
         {activeTab === "data" && (
           <div className="pb-8 space-y-4">
+            <p className="text-[11px] text-gray-500">
+              Add rows of data for this table. Each row uses the columns you
+              defined under <span className="font-medium">Settings</span>.
+            </p>
             <div className="flex items-center justify-between mb-2">
               <Label className="text-xs text-gray-600">Rows</Label>
               <Button
