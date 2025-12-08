@@ -317,6 +317,7 @@ export type DashboardWidget = {
   id: string;
   metricKey: string;
   integration: string;
+  accountId?: string;
   groupBy: string;
   aggregation: string;
   type?: string;

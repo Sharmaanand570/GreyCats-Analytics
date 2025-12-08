@@ -41,6 +41,13 @@ const platformMap: Record<string, PlatformConfig> = {
     link: "/data-sources/google-console",
     color: "#4285F4", // Google blue
   },
+  // Alias for backend platform name "google-search-console"
+  "google-search-console": {
+    name: "Google Search Console",
+    icon: FaGoogle,
+    link: "/data-sources/google-console",
+    color: "#4285F4",
+  },
   woo: {
     name: "WooCommerce",
     icon: FaCartShopping,

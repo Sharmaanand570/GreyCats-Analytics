@@ -15,6 +15,7 @@ export const validRoutes = [
   "/data-sources/woocommerce",
   "/data-sources/shopify",
   "/data-sources/google-analytics",
+  "/data-sources/google-analytics/:accountId",
   "/data-sources/google-console",
   "/data-sources/meta-ads",
   "/data-sources/meta-facebook",
@@ -31,6 +32,7 @@ export const validRoutes = [
   "/youtube/callback",
   "/google/callback",
   "/google-console/callback",
+  "/google-seo/callback",
   "/shopify/callback",
   "/meta/callback",
 ];

@@ -1,16 +1,11 @@
 import api from "@/apiConfig";
 import type { AxiosError } from "axios";
 
-// ==================== TYPES ====================
+// ==================== TYPES (GOOGLE SEARCH CONSOLE / SEO) ====================
 
 export type ConnectGoogleConsoleResponse = {
   success: boolean;
   url: string;
-};
-
-export type GoogleConsoleCallbackResponse = {
-  success: boolean;
-  message: string;
 };
 
 export type GoogleConsoleReconnectResponse = {
@@ -23,41 +18,118 @@ export type GoogleConsoleDisconnectResponse = {
   message: string;
 };
 
-export type GoogleConsoleProjectsResponse = {
+export type GoogleConsoleProperty = {
+  id: number;
+  siteUrl: string;
+  permissionLevel: string;
+  isSelected: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GoogleConsolePropertiesResponse = {
   success: boolean;
-  message: string;
   count: number;
-  skipped: number;
+  properties: GoogleConsoleProperty[];
 };
 
-export type GoogleConsoleBillingWindow = {
-  start: string;
-  end: string;
+export type GoogleConsoleSelectPropertyBody = {
+  siteUrl: string;
 };
 
-export type GoogleConsoleBillingResponse = {
+export type GoogleConsoleSelectPropertyResponse = {
   success: boolean;
   message: string;
-  inserted: number;
-  skipped: number;
-  window: GoogleConsoleBillingWindow;
+  selected: string;
 };
 
-export type GoogleConsoleBillingAccount = {
-  billingAccountId: string;
-  name: string;
-  open: boolean;
+export type GoogleConsolePerformanceRequest = {
+  siteUrl: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  dimension: string; // "date" | "query" | "page" | "country" | "device" | ...
 };
 
-export type GoogleConsoleBillingAccountsResponse = {
+export type GoogleConsolePerformanceRow = {
+  keys: string[];
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+};
+
+export type GoogleConsolePerformanceResponse = {
   success: boolean;
-  accounts: GoogleConsoleBillingAccount[];
+  rows: GoogleConsolePerformanceRow[];
+};
+
+export type GoogleConsoleUnifiedMetricRow = {
+  id: number;
+  userId: number;
+  integration: string;
+  accountId: string;
+  metricKey: string;
+  dimensionType: string | null;
+  dimensionValue: string | null;
+  date: string;
+  value: number;
+  extra: unknown;
+  recordedAt: string;
+};
+
+export type GoogleConsoleUnifiedMetricsResponse = {
+  success: boolean;
+  rows: GoogleConsoleUnifiedMetricRow[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+export type GoogleConsoleUnifiedMetricsParams = {
+  integration?: string;
+  metricKey?: string;
+  /**
+   * Supports either a single dimension or multiple dimensions (array).
+   * Example: "query" or ["query", "date"]
+   */
+  dimensionType?: string | string[];
+  startDate?: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD
+  accountId?: string;
+  page?: number;
+  limit?: number;
 };
 
 export type GoogleConsoleApiErrorResponse = {
   message?: string;
   error?: string;
 };
+
+const buildGoogleSeoBaseUrl = (): string => {
+  const rawBase = import.meta.env.VITE_NGROK_URL || api.defaults.baseURL || "";
+  if (!rawBase) return "";
+
+  // Normalize to avoid accidental double "/api/google-seo" when the env already
+  // contains it (common when pointing directly to the SEO service).
+  const base = rawBase.endsWith("/")
+    ? rawBase.slice(0, -1)
+    : rawBase;
+
+  if (base.includes("/google-seo")) {
+    return base;
+  }
+
+  if (base.endsWith("/api")) {
+    return `${base}/google-seo`;
+  }
+
+  return `${base}/api/google-seo`;
+};
+
+const seoHeaders = { "ngrok-skip-browser-warning": "true" };
 
 const handleGoogleConsoleApiError = (
   error: unknown,
@@ -73,108 +145,180 @@ const handleGoogleConsoleApiError = (
 
 // ==================== API FUNCTIONS ====================
 
-export const connectGoogleConsole = async (): Promise<ConnectGoogleConsoleResponse> => {
-  try {
-    const response = await api.get<ConnectGoogleConsoleResponse>(
-      "/google-console/connect",
+/**
+ * 1) CONNECT GOOGLE SEARCH CONSOLE
+ * POST /api/google-seo/connect
+ */
+export const connectGoogleConsole =
+  async (): Promise<ConnectGoogleConsoleResponse> => {
+    try {
+      const response = await api.post<ConnectGoogleConsoleResponse>(
+        "/connect",
+        {},
+        {
+          baseURL: buildGoogleSeoBaseUrl(),
+        headers: seoHeaders,
+        }
+      );
+      return response.data;
+    } catch (error) {
+      return handleGoogleConsoleApiError(
+        error,
+        "Failed to initiate Google Search Console connection"
+      );
+    }
+  };
+
+/**
+ * 2) RECONNECT GOOGLE SEARCH CONSOLE
+ * POST /api/google-seo/reconnect
+ */
+export const reconnectGoogleConsole =
+  async (): Promise<GoogleConsoleReconnectResponse> => {
+    try {
+      const response = await api.post<GoogleConsoleReconnectResponse>(
+        "/reconnect",
+        {},
+        {
+          baseURL: buildGoogleSeoBaseUrl(),
+        headers: seoHeaders,
+        }
+      );
+      return response.data;
+    } catch (error) {
+      return handleGoogleConsoleApiError(
+        error,
+        "Failed to generate Google Search Console reconnect URL"
+      );
+    }
+  };
+
+/**
+ * 3) DISCONNECT GOOGLE SEARCH CONSOLE
+ * POST /api/google-seo/disconnect
+ */
+export const disconnectGoogleConsole =
+  async (): Promise<GoogleConsoleDisconnectResponse> => {
+    try {
+      const response = await api.post<GoogleConsoleDisconnectResponse>(
+        "/disconnect",
+        {},
+        {
+          baseURL: buildGoogleSeoBaseUrl(),
+        headers: seoHeaders,
+        }
+      );
+      return response.data;
+    } catch (error) {
+      return handleGoogleConsoleApiError(
+        error,
+        "Failed to disconnect Google Search Console"
+      );
+    }
+  };
+
+/**
+ * 4) LIST SEARCH CONSOLE PROPERTIES
+ * GET /api/google-seo/properties
+ */
+export const getGoogleConsoleProperties =
+  async (): Promise<GoogleConsolePropertiesResponse> => {
+    try {
+    const response = await api.get<GoogleConsolePropertiesResponse>(
+      "/properties",
       {
-        baseURL: import.meta.env.VITE_NGROK_URL,
-        headers: { "ngrok-skip-browser-warning": "true" },
+        baseURL: buildGoogleSeoBaseUrl(),
+        headers: seoHeaders,
+      }
+    );
+    console.log("response-----------------------------", response.data);
+      return response.data;
+    } catch (error) {
+      return handleGoogleConsoleApiError(
+        error,
+        "Failed to load Google Search Console properties"
+      );
+    }
+  };
+
+/**
+ * 5) SELECT A PROPERTY
+ * POST /api/google-seo/properties/select
+ */
+export const selectGoogleConsoleProperty = async (
+  body: GoogleConsoleSelectPropertyBody
+): Promise<GoogleConsoleSelectPropertyResponse> => {
+  try {
+    const response = await api.post<GoogleConsoleSelectPropertyResponse>(
+      "/properties/select",
+      body,
+      {
+        baseURL: buildGoogleSeoBaseUrl(),
+        headers: seoHeaders,
       }
     );
     return response.data;
   } catch (error) {
     return handleGoogleConsoleApiError(
       error,
-      "Failed to initiate Google Console connection"
+      "Failed to select Google Search Console property"
     );
   }
 };
 
-export const handleGoogleConsoleCallback = async (
-  status: string,
-  reason?: string
-): Promise<GoogleConsoleCallbackResponse> => {
-  if (status === "error") {
-    throw new Error(reason || "Google Console connection failed");
-  }
-
-  return {
-    success: true,
-    message: "Successfully connected to Google Console!",
-  };
-};
-
-export const reconnectGoogleConsole = async (): Promise<GoogleConsoleReconnectResponse> => {
+/**
+ * 6) MANUAL PERFORMANCE FETCH
+ * POST /api/google-seo/performance
+ */
+export const fetchGoogleConsolePerformance = async (
+  payload: GoogleConsolePerformanceRequest
+): Promise<GoogleConsolePerformanceResponse> => {
   try {
-    const response = await api.get<GoogleConsoleReconnectResponse>(
-      "/google-console/reconnect"
+    const response = await api.post<GoogleConsolePerformanceResponse>(
+      "/performance",
+      payload,
+      {
+        baseURL: buildGoogleSeoBaseUrl(),
+        headers: seoHeaders,
+      }
     );
     return response.data;
   } catch (error) {
     return handleGoogleConsoleApiError(
       error,
-      "Failed to generate Google Console reconnect URL"
+      "Failed to fetch Google Search Console performance data"
     );
   }
 };
 
-export const disconnectGoogleConsole = async (): Promise<GoogleConsoleDisconnectResponse> => {
+/**
+ * 7) VERIFY CRON OUTPUT (UnifiedMetric)
+ * GET /api/unified-metrics?integration=google-search-console&metricKey=google_seo.clicks
+ */
+export const getGoogleConsoleUnifiedMetrics = async (
+  params: GoogleConsoleUnifiedMetricsParams = {}
+): Promise<GoogleConsoleUnifiedMetricsResponse> => {
   try {
-    const response = await api.post<GoogleConsoleDisconnectResponse>(
-      "/google-console/disconnect"
+    const response = await api.get<GoogleConsoleUnifiedMetricsResponse>(
+      "/unified-metrics",
+      {
+        params: {
+          integration: "google-search-console",
+          metricKey: "google_seo.clicks",
+          ...params,
+        },
+        headers: seoHeaders,
+      }
     );
+
+    console.log("unified metrics", response);
     return response.data;
   } catch (error) {
     return handleGoogleConsoleApiError(
       error,
-      "Failed to disconnect Google Console"
+      "Failed to load Google Search Console unified metrics"
     );
   }
 };
 
-export const getGoogleConsoleProjects = async (): Promise<GoogleConsoleProjectsResponse> => {
-  try {
-    const response = await api.get<GoogleConsoleProjectsResponse>(
-      "/google-console/projects"
-    );
-    return response.data;
-  } catch (error) {
-    return handleGoogleConsoleApiError(
-      error,
-      "Failed to fetch Google Cloud projects"
-    );
-  }
-};
-
-export const getGoogleConsoleBilling = async (
-  days: number
-): Promise<GoogleConsoleBillingResponse> => {
-  try {
-    const response = await api.get<GoogleConsoleBillingResponse>(
-      "/google-console/billing",
-      { params: { days } }
-    );
-    return response.data;
-  } catch (error) {
-    return handleGoogleConsoleApiError(
-      error,
-      "Failed to fetch Google Cloud billing data"
-    );
-  }
-};
-
-export const getGoogleConsoleBillingAccounts = async (): Promise<GoogleConsoleBillingAccountsResponse> => {
-  try {
-    const response = await api.get<GoogleConsoleBillingAccountsResponse>(
-      "/google-console/billing-accounts"
-    );
-    return response.data;
-  } catch (error) {
-    return handleGoogleConsoleApiError(
-      error,
-      "Failed to fetch billing accounts"
-    );
-  }
-};
-
+ 

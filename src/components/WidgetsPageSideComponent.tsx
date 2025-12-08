@@ -55,11 +55,15 @@ function WidgetsPageSideComponent({
   const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = React.useState<number | null>(null);
   const { data: integrationsData, isLoading } = useIntegrations();
-  const [editingSlideId, setEditingSlideId] = React.useState<number | null>(null);
+  const [editingSlideId, setEditingSlideId] = React.useState<number | null>(
+    null
+  );
   const [editingName, setEditingName] = React.useState<string>("");
 
   React.useEffect(() => {
-    const slideEls = reftype.current?.filter(Boolean) as HTMLDivElement[] | undefined;
+    const slideEls = reftype.current?.filter(Boolean) as
+      | HTMLDivElement[]
+      | undefined;
     if (!slideEls || slideEls.length === 0) {
       return;
     }
@@ -69,7 +73,9 @@ function WidgetsPageSideComponent({
         // pick the entry with greatest intersection ratio
         const visible = entries
           .filter((e) => e.isIntersecting)
-          .sort((a, b) => (b.intersectionRatio ?? 0) - (a.intersectionRatio ?? 0))[0];
+          .sort(
+            (a, b) => (b.intersectionRatio ?? 0) - (a.intersectionRatio ?? 0)
+          )[0];
         if (visible?.target) {
           const element = visible.target as HTMLDivElement;
           // Extract slide ID from the element's id attribute (e.g., "slide-0" -> 0)
@@ -109,11 +115,11 @@ function WidgetsPageSideComponent({
 
   const handleAddPage = () => {
     if (!pageName.trim()) return;
-    
+
     if (onAddPage) {
       onAddPage(pageName.trim(), pageSubtitle.trim() || undefined);
     }
-    
+
     // Reset form
     setPageName("");
     setPageSubtitle("");
@@ -122,13 +128,13 @@ function WidgetsPageSideComponent({
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', String(index));
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(index));
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    e.dataTransfer.dropEffect = "move";
     setDragOverIndex(index);
   };
 
@@ -138,7 +144,7 @@ function WidgetsPageSideComponent({
 
   const handleDrop = (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
-    
+
     if (draggedIndex === null || draggedIndex === dropIndex) {
       setDraggedIndex(null);
       setDragOverIndex(null);
@@ -185,11 +191,10 @@ function WidgetsPageSideComponent({
           : undefined;
 
         combined.push({
-          label:
-            platformConfig?.name ||
-            integration?.platform ||
-            "Integration",
-          integrationId: integration ? integration.id : `integration-${slide.id}`,
+          label: platformConfig?.name || integration?.platform || "Integration",
+          integrationId: integration
+            ? integration.id
+            : `integration-${slide.id}`,
           slideIndex: slide.id,
           isCustom: false,
           pages: [
@@ -261,15 +266,21 @@ function WidgetsPageSideComponent({
     // don't have slide metadata from the template.
     const integrationPages = integrations.map((integration, idx) => {
       const platformConfig = getPlatformConfig(integration.platform);
+      const baseName = platformConfig?.name || integration.platform;
+      const fullTitle = integration.accountName
+        ? `${baseName} - ${integration.accountName}`
+        : baseName;
+
       return {
-        label: platformConfig?.name || integration.platform,
+        label: baseName,
         integrationId: integration.id,
         slideIndex: idx,
         isCustom: false,
         pages: [
           {
-            innerlabel: `${platformConfig?.name || integration.platform} Overview`,
-            sublabel: integration.accountName,
+            // Make the Pages sidebar label match the slide header title
+            innerlabel: fullTitle,
+            sublabel: integration.accountName || "",
           },
         ],
       };
@@ -355,7 +366,8 @@ function WidgetsPageSideComponent({
             <DialogHeader>
               <DialogTitle>Add New Page</DialogTitle>
               <DialogDescription>
-                Create a custom page for your report. You can add widgets to it later.
+                Create a custom page for your report. You can add widgets to it
+                later.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -399,10 +411,7 @@ function WidgetsPageSideComponent({
               >
                 Cancel
               </Button>
-              <Button
-                onClick={handleAddPage}
-                disabled={!pageName.trim()}
-              >
+              <Button onClick={handleAddPage} disabled={!pageName.trim()}>
                 Add Page
               </Button>
             </DialogFooter>
@@ -419,7 +428,9 @@ function WidgetsPageSideComponent({
           pages.map((p, groupIndex) => (
             <div
               key={p.integrationId}
-              className={`flex flex-col gap-1.5 md:gap-2 ${groupIndex === 0 ? "" : "my-3 md:my-4"}`}
+              className={`flex flex-col gap-1.5 md:gap-2 ${
+                groupIndex === 0 ? "" : "my-3 md:my-4"
+              }`}
             >
               <div>
                 <span className="text-[10px] md:text-xs text-gray-500 font-medium w-full">
@@ -452,7 +463,9 @@ function WidgetsPageSideComponent({
                     } ${
                       isDragOver ? "border-blue-500 border-2 bg-blue-50" : ""
                     } ${
-                      activeIndex === slideIdx ? "bg-gray-100 border-gray-400" : "hover:bg-gray-50"
+                      activeIndex === slideIdx
+                        ? "bg-gray-100 border-gray-400"
+                        : "hover:bg-gray-50"
                     }`}
                     role="button"
                     tabIndex={0}

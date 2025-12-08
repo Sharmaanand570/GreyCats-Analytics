@@ -9,6 +9,8 @@ export interface AvailableMetric {
   accountId: string;
   displayName: string;
   category: string;
+  filters?: Record<string, unknown>;
+  value?: number;
 }
 
 export interface MetricsByIntegration {

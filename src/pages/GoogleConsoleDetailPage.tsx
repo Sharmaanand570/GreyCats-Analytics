@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { format, subDays } from "date-fns";
 import { FaGoogle } from "react-icons/fa6";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,33 +27,60 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  useGoogleConsoleBilling,
-  useGoogleConsoleBillingAccounts,
   useGoogleConsoleDisconnect,
-  useGoogleConsoleProjects,
+  useGoogleConsolePerformance,
+  useGoogleConsoleProperties,
   useGoogleConsoleReconnect,
+  useGoogleConsoleSelectProperty,
+  useGoogleConsoleUnifiedMetrics,
 } from "@/features/YouTube/hooks/google/useGoogleConsoleData";
 import { Loader2 } from "lucide-react";
-import { format } from "date-fns";
 
 function GoogleConsoleDetailPage() {
   const {
-    data: projectsData,
-    isLoading: isLoadingProjects,
-    error: projectsError,
-  } = useGoogleConsoleProjects();
+    data: propertiesData,
+    isLoading: isLoadingProperties,
+    error: propertiesError,
+  } = useGoogleConsoleProperties();
+
+  console.log("propertiesData", propertiesData);
+
+  const [selectedSiteUrl, setSelectedSiteUrl] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>(
+    format(subDays(new Date(), 6), "yyyy-MM-dd")
+  );
+  const [endDate, setEndDate] = useState<string>(
+    format(new Date(), "yyyy-MM-dd")
+  );
+  const [dimension, setDimension] = useState<string>("date");
+  const [performanceRows, setPerformanceRows] = useState<
+    { keys: string[]; clicks: number; impressions: number; ctr: number; position: number }[]
+  >([]);
+  const [performanceError, setPerformanceError] = useState<string | null>(null);
+
+  const unifiedMetricsParams = useMemo(
+    () => ({
+      integration: "google-search-console",
+      metricKey: "google_seo.clicks",
+      dimensionType: dimension ? [dimension] : undefined,
+      startDate,
+      endDate,
+    }),
+    [dimension, startDate, endDate]
+  );
 
   const {
-    data: billingData,
-    isLoading: isLoadingBilling,
-    error: billingError,
-  } = useGoogleConsoleBilling(1);
+    data: unifiedMetricsData,
+    isLoading: isLoadingUnified,
+    error: unifiedError,
+  } = useGoogleConsoleUnifiedMetrics(unifiedMetricsParams);
+
+  console.log("unifiedMetricsData", unifiedMetricsData, unifiedError);
 
   const {
-    data: billingAccountsData,
-    isLoading: isLoadingAccounts,
-    error: billingAccountsError,
-  } = useGoogleConsoleBillingAccounts();
+    mutateAsync: selectProperty,
+    isPending: isSelectingProperty,
+  } = useGoogleConsoleSelectProperty();
 
   const {
     mutateAsync: reconnectConsole,
@@ -64,30 +92,40 @@ function GoogleConsoleDetailPage() {
     isPending: isDisconnecting,
   } = useGoogleConsoleDisconnect();
 
+  const {
+    mutateAsync: fetchPerformance,
+    isPending: isFetchingPerformance,
+  } = useGoogleConsolePerformance();
+
   const tokenExpired =
-    projectsError &&
-    projectsError.message.includes(
-      "Google token expired or permissions revoked"
+    (propertiesError &&
+      propertiesError.message.toLowerCase().includes("token expired")) ||
+    (unifiedError &&
+      unifiedError.message.toLowerCase().includes("token expired"));
+
+  const properties = propertiesData?.properties ?? [];
+  const selectedProperty = useMemo(
+    () => properties.find((p) => p.isSelected),
+    [properties]
+  );
+
+  const clicksSummary = useMemo(() => {
+    const rows = unifiedMetricsData?.rows ?? [];
+    if (!rows.length) return { total: 0, days: 0 };
+
+    const filtered = rows.filter(
+      (r) =>
+        r.integration === "google-search-console" &&
+        r.metricKey === "google_seo.clicks" &&
+        (!selectedProperty || r.accountId === selectedProperty.siteUrl)
     );
 
-  const projectsSummary = useMemo(
-    () => ({
-      count: projectsData?.count ?? 0,
-      skipped: projectsData?.skipped ?? 0,
-    }),
-    [projectsData]
-  );
+    if (!filtered.length) return { total: 0, days: 0 };
 
-  const billingSummary = useMemo(
-    () => ({
-      inserted: billingData?.inserted ?? 0,
-      skipped: billingData?.skipped ?? 0,
-      window: billingData?.window,
-    }),
-    [billingData]
-  );
-
-  const billingAccounts = billingAccountsData?.accounts ?? [];
+    const total = filtered.reduce((sum, r) => sum + (r.value ?? 0), 0);
+    const days = new Set(filtered.map((r) => r.date)).size;
+    return { total, days };
+  }, [unifiedMetricsData, selectedProperty]);
 
   const handleReconnect = async () => {
     try {
@@ -105,15 +143,51 @@ function GoogleConsoleDetailPage() {
     }
   };
 
+  const handleSelectProperty = async (siteUrl: string) => {
+    console.log(siteUrl);
+    if (!siteUrl) return;
+    try {
+    const resp =  await selectProperty({ siteUrl });
+    console.log(resp);
+      setSelectedSiteUrl(siteUrl);
+    } catch {
+      // toast handled in hook
+    }
+  };
+
+  const handleFetchPerformance = async () => {
+    if (!selectedSiteUrl || !startDate || !endDate) {
+      setPerformanceError("Please select a property and date range first.");
+      return;
+    }
+
+    setPerformanceError(null);
+    try {
+      const resp = await fetchPerformance({
+        siteUrl: selectedSiteUrl,
+        startDate,
+        endDate,
+        dimension,
+      });
+      setPerformanceRows(resp.rows ?? []);
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Failed to fetch Search Console performance data";
+      setPerformanceError(msg);
+    }
+  };
+
   return (
     <div className="w-full h-full flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
       <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
         <div className="w-full h-full flex flex-col">
-          <div className="w-full h-[4.8em]  border-b flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-5 py-3 lg:py-0">
+          <div className="w-full h-[4.8em] border-b flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-5 py-3 lg:py-0">
             <div className="flex items-center gap-3">
               <FaGoogle className="text-2xl text-[#4285F4]" />
               <span className="font-medium text-xl">
-                Google Console Overview
+                Google Search Console Overview
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -160,7 +234,7 @@ function GoogleConsoleDetailPage() {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Google Console</BreadcrumbPage>
+                  <BreadcrumbPage>Google Search Console</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
@@ -171,7 +245,8 @@ function GoogleConsoleDetailPage() {
               <Card className="border border-destructive/40 bg-destructive/5">
                 <CardContent className="py-4 text-sm text-destructive space-y-1">
                   <p>
-                    Google Console token expired or permissions were revoked.
+                    Google Search Console token expired or permissions were
+                    revoked.
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Click <span className="font-semibold">Reconnect</span> to
@@ -181,21 +256,18 @@ function GoogleConsoleDetailPage() {
               </Card>
             )}
 
-            {(projectsError && !tokenExpired) ||
-              billingError ||
-              billingAccountsError ? (
+            {(propertiesError && !tokenExpired) || unifiedError ? (
               <Card className="border border-destructive/40 bg-destructive/5">
                 <CardContent className="py-3 text-sm text-destructive space-y-1">
-                  {projectsError && !tokenExpired && (
-                    <p>Failed to load projects: {projectsError.message}</p>
-                  )}
-                  {billingError && (
-                    <p>Failed to load billing data: {billingError.message}</p>
-                  )}
-                  {billingAccountsError && (
+                  {propertiesError && !tokenExpired && (
                     <p>
-                      Failed to load billing accounts:{" "}
-                      {billingAccountsError.message}
+                      Failed to load Search Console properties:{" "}
+                      {propertiesError.message}
+                    </p>
+                  )}
+                  {unifiedError && (
+                    <p>
+                      Failed to load SEO metrics: {unifiedError.message}
                     </p>
                   )}
                 </CardContent>
@@ -206,26 +278,50 @@ function GoogleConsoleDetailPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm font-medium">
-                    Projects
+                    Selected Property
                   </CardTitle>
                   <CardDescription>
-                    Total Google Cloud projects discovered for this account.
+                    Choose which property daily SEO sync should use.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {isLoadingProjects ? (
+                  {isLoadingProperties ? (
                     <div className="space-y-3">
                       <Skeleton className="h-6 w-24" />
-                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-10 w-full" />
                     </div>
+                  ) : properties.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No Search Console properties found for this account.
+                    </p>
                   ) : (
-                    <div className="space-y-1 text-sm">
-                      <p className="text-2xl font-semibold">
-                        {projectsSummary.count.toLocaleString()}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Skipped: {projectsSummary.skipped.toLocaleString()}
-                      </p>
+                    <div className="space-y-3 text-sm">
+                      <select
+                        className="border rounded px-3 py-2 text-sm w-full"
+                        value={selectedProperty?.siteUrl || ""}
+                        onChange={(e) => {
+                          handleSelectProperty(e.target.value)
+                          console.log(e.target.value);
+                        }}
+                        disabled={isSelectingProperty}
+                      >
+                        <option value="" disabled>
+                          Select a property...
+                        </option>
+                        {properties.map((p) => (
+                          <option key={p.id} value={p.siteUrl}>
+                            {p.siteUrl} ({p.permissionLevel})
+                          </option>
+                        ))}
+                      </select>
+                      {selectedProperty && (
+                        <p className="text-xs text-muted-foreground">
+                          Currently selected:{" "}
+                          <span className="font-medium">
+                            {selectedProperty.siteUrl}
+                          </span>
+                        </p>
+                      )}
                     </div>
                   )}
                 </CardContent>
@@ -234,52 +330,28 @@ function GoogleConsoleDetailPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm font-medium">
-                    Latest Billing Window
+                    SEO Clicks (Cron)
                   </CardTitle>
                   <CardDescription>
-                    Usage pulled from BigQuery for the selected period.
+                    Aggregated clicks from unified metrics for the selected
+                    property.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {isLoadingBilling ? (
+                  {isLoadingUnified ? (
                     <div className="space-y-3">
                       <Skeleton className="h-6 w-24" />
                       <Skeleton className="h-4 w-32" />
                     </div>
-                  ) : billingSummary.window ? (
-                    <div className="space-y-2 text-sm">
-                      <p className="text-xs text-muted-foreground">
-                        Window
-                      </p>
-                      <p className="font-medium">
-                        {format(
-                          new Date(billingSummary.window.start),
-                          "PP"
-                        )}{" "}
-                        –{" "}
-                        {format(
-                          new Date(billingSummary.window.end),
-                          "PP"
-                        )}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Inserted rows:{" "}
-                        <span className="font-medium">
-                          {billingSummary.inserted.toLocaleString()}
-                        </span>
+                  ) : (
+                    <div className="space-y-1 text-sm">
+                      <p className="text-2xl font-semibold">
+                        {clicksSummary.total.toLocaleString()}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Skipped rows:{" "}
-                        <span className="font-medium">
-                          {billingSummary.skipped.toLocaleString()}
-                        </span>
+                        Days tracked: {clicksSummary.days}
                       </p>
                     </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      No billing data available yet. Trigger a sync from the
-                      backend to populate this section.
-                    </p>
                   )}
                 </CardContent>
               </Card>
@@ -287,55 +359,106 @@ function GoogleConsoleDetailPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Billing Accounts</CardTitle>
+                <CardTitle>Manual Performance Fetch (Debug)</CardTitle>
                 <CardDescription>
-                  Google Cloud billing accounts linked to this integration.
+                  Run an on-demand Search Console query for a property and date
+                  range.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                {isLoadingAccounts ? (
-                  <div className="space-y-3">
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium">Property</p>
+                    <select
+                      className="border rounded px-3 py-2 text-sm w-full"
+                      value={selectedSiteUrl}
+                      onChange={(e) => setSelectedSiteUrl(e.target.value)}
+                    >
+                      <option value="">Select...</option>
+                      {properties.map((p) => (
+                        <option key={p.id} value={p.siteUrl}>
+                          {p.siteUrl}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                ) : billingAccountsError ? (
-                  <p className="text-sm text-destructive">
-                    Failed to load billing accounts: {billingAccountsError.message}
-                  </p>
-                ) : billingAccounts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No billing accounts have been detected for this Google Cloud
-                    connection.
-                  </p>
-                ) : (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium">Start date</p>
+                    <input
+                      type="date"
+                      className="border rounded px-3 py-2 text-sm w-full"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium">End date</p>
+                    <input
+                      type="date"
+                      className="border rounded px-3 py-2 text-sm w-full"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium">Dimension</p>
+                    <select
+                      className="border rounded px-3 py-2 text-sm w-full"
+                      value={dimension}
+                      onChange={(e) => setDimension(e.target.value)}
+                    >
+                      <option value="date">date</option>
+                      <option value="query">query</option>
+                      <option value="page">page</option>
+                      <option value="country">country</option>
+                      <option value="device">device</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={handleFetchPerformance}
+                    disabled={isFetchingPerformance}
+                  >
+                    {isFetchingPerformance ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                        Fetching...
+                      </>
+                    ) : (
+                      "Fetch Performance"
+                    )}
+                  </Button>
+                </div>
+
+                {performanceError && (
+                  <p className="text-sm text-destructive">{performanceError}</p>
+                )}
+
+                {performanceRows.length > 0 && (
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Billing Account ID</TableHead>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Status</TableHead>
+                          <TableHead>Key</TableHead>
+                          <TableHead>Clicks</TableHead>
+                          <TableHead>Impressions</TableHead>
+                          <TableHead>CTR</TableHead>
+                          <TableHead>Position</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {billingAccounts.map((account) => (
-                          <TableRow key={account.billingAccountId}>
-                            <TableCell className="font-mono text-xs">
-                              {account.billingAccountId}
-                            </TableCell>
-                            <TableCell>{account.name}</TableCell>
+                        {performanceRows.map((row, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell>{row.keys.join(", ")}</TableCell>
+                            <TableCell>{row.clicks}</TableCell>
+                            <TableCell>{row.impressions}</TableCell>
                             <TableCell>
-                              <span
-                                className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                  account.open
-                                    ? "bg-green-100 text-green-700"
-                                    : "bg-gray-100 text-gray-700"
-                                }`}
-                              >
-                                {account.open ? "Open" : "Closed"}
-                              </span>
+                              {(row.ctr * 100).toFixed(2)}%
                             </TableCell>
+                            <TableCell>{row.position.toFixed(1)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -352,5 +475,4 @@ function GoogleConsoleDetailPage() {
 }
 
 export default GoogleConsoleDetailPage;
-
 

@@ -5,7 +5,7 @@ import { ChartPieInteractive } from "./ChartPieInteractive";
 import { getChangeIndicatorClass } from "../utils/statusColors";
 import { Link, useNavigate } from "react-router-dom";
 import ToolTipComponenet from "./ToolTipComponenet";
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   listDashboards,
@@ -13,13 +13,15 @@ import {
 } from "@/features/reports/api/reportingApi";
 import type {
   ApiError,
+  Dashboard as DashboardModel,
   DashboardWidget,
   ResolvedWidgetData,
+  WidgetSeriesPoint,
+  ResolveWidgetsResponse,
 } from "@/features/reports/api/types";
 import { toast } from "sonner";
 import { subDays, format } from "date-fns";
 import { useAvailableMetrics } from "@/features/reports/hooks/useAvailableMetrics";
-import { useIntegrations } from "@/features/DataSources/hooks/useIntegrations";
 
 const DEFAULT_DASHBOARD_WIDGETS: DashboardWidget[] = [
   {
@@ -92,11 +94,17 @@ const formatNumber = (value?: number) => {
 };
 
 const hasWidgetData = (data?: ResolvedWidgetData) => {
-  if (!data) return false;
-  if ((data.rawCount ?? 0) > 0) return true;
-  if (typeof data.value === "number") return true;
-  if (typeof data.total === "number") return true;
-  if (Array.isArray(data.series) && data.series.length > 0) return true;
+  if (!data || typeof data !== "object") return false;
+  const rawData = data as ResolvedWidgetData & {
+    rawCount?: number;
+    value?: number;
+    total?: number;
+    series?: WidgetSeriesPoint[];
+  };
+  if (typeof rawData.rawCount === "number" && rawData.rawCount > 0) return true;
+  if (typeof rawData.value === "number") return true;
+  if (typeof rawData.total === "number") return true;
+  if (Array.isArray(rawData.series) && rawData.series.length > 0) return true;
   return false;
 };
 
@@ -188,23 +196,25 @@ function Dashboard() {
   const navigate = useNavigate();
   const [dateRange] = useState(getDefaultDateRange());
   
-  const { groupedMetrics, isLoading: isLoadingMetrics } = useAvailableMetrics();
-  const { data: integrationsData } = useIntegrations();
+  const { groupedMetrics } = useAvailableMetrics();
 
   const handleConnectIntegration = useCallback(() => {
     navigate("/data-sources");
   }, [navigate]);
 
-  const dashboardsQuery = useQuery({
+  const dashboardsQuery = useQuery<DashboardModel[], ApiError>({
     queryKey: ["dashboards"],
     queryFn: async () => {
       const response = await listDashboards();
       return response.dashboards;
     },
-    onError: (error: ApiError) => {
-      toast.error(error.message || "Failed to load dashboards");
-    },
   });
+
+  useEffect(() => {
+    if (dashboardsQuery.error) {
+      toast.error(dashboardsQuery.error.message || "Failed to load dashboards");
+    }
+  }, [dashboardsQuery.error]);
 
   const dashboards = dashboardsQuery.data ?? [];
   const activeDashboard = dashboards[0];
@@ -212,7 +222,9 @@ function Dashboard() {
   const dashboardWidgets = useMemo<DashboardWidget[]>(() => {
     // If user has a saved dashboard, use it
     if (activeDashboard?.widgets) {
-      const entries = Object.entries(activeDashboard.widgets);
+      const entries = Object.entries(
+        activeDashboard.widgets
+      ) as [string, DashboardWidget][];
       if (entries.length > 0) {
         return entries.map(([id, widget]) => ({
           ...widget,
@@ -236,7 +248,7 @@ function Dashboard() {
   )}`;
   const widgetSignature = dashboardWidgets.map((widget) => widget.id).join("|");
 
-  const resolveQuery = useQuery({
+  const resolveQuery = useQuery<ResolveWidgetsResponse, ApiError>({
     queryKey: ["dashboard-widget-data", widgetSignature, dateRangeKey],
     enabled: dashboardWidgets.length > 0,
     queryFn: async () => {
@@ -256,12 +268,18 @@ function Dashboard() {
       });
       return response;
     },
-    onError: (error: ApiError) => {
-      toast.error(error.message || "Failed to resolve dashboard data");
-    },
   });
 
-  const resolvedWidgets = resolveQuery.data?.data ?? {};
+  useEffect(() => {
+    if (resolveQuery.error) {
+      toast.error(
+        resolveQuery.error.message || "Failed to resolve dashboard data"
+      );
+    }
+  }, [resolveQuery.error]);
+
+  const resolvedWidgets: Record<string, ResolvedWidgetData> =
+    resolveQuery.data?.data ?? {};
   const isResolving = resolveQuery.isFetching;
 
   const metricCards = useMemo(() => {
@@ -386,9 +404,12 @@ function Dashboard() {
             <div className="border-t pt-3">
               {hasWidgetData(resolvedWidgets[lineChartWidget?.id ?? ""]) ? (
                 <ul className="text-sm text-gray-700 space-y-1">
-                  {(resolvedWidgets[lineChartWidget?.id ?? ""]
-                    ?.series ?? []
-                  ).slice(0, 5).map((point, idx) => (
+                  {(
+                    (resolvedWidgets[lineChartWidget?.id ?? ""]?.series ??
+                      []) as WidgetSeriesPoint[]
+                  )
+                    .slice(0, 5)
+                    .map((point, idx) => (
                     <li key={`${point.x}-${idx}`} className="flex justify-between">
                       <span>{point.x}</span>
                       <span className="font-medium">{point.y}</span>
@@ -431,9 +452,12 @@ function Dashboard() {
             <div className="border-t pt-3">
               {hasWidgetData(resolvedWidgets[pieChartWidget?.id ?? ""]) ? (
                 <ul className="text-sm text-gray-700 space-y-1">
-                  {(resolvedWidgets[pieChartWidget?.id ?? ""]
-                    ?.series ?? []
-                  ).slice(0, 5).map((point, idx) => (
+                  {(
+                    (resolvedWidgets[pieChartWidget?.id ?? ""]?.series ?? []) as
+                      | WidgetSeriesPoint[]
+                  )
+                    .slice(0, 5)
+                    .map((point, idx) => (
                     <li key={`${point.x}-${idx}`} className="flex justify-between">
                       <span>{point.x}</span>
                       <span className="font-medium">{point.y}</span>

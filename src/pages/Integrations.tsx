@@ -18,13 +18,11 @@ function Integrations() {
     }
 
     return integrationsData.integrations.map((integration) => {
-      const platformConfig = getPlatformConfig(integration.platform);
-      let link = platformConfig?.link || `/integrations/${integration.platform}`;
-      
-      // Append accountId for WooCommerce
-      // if (integration.platform.toLowerCase() === "woo" && integration.accountId) {
-      //   link = `${link}?accountId=${integration.accountId}`;
-      // }
+      const platformKey = integration.platform.toLowerCase().replace(/_/g, "-");
+      const platformConfig = getPlatformConfig(platformKey);
+
+      // Prefer mapped link; otherwise fall back to data-sources/<platform>
+      let link = platformConfig?.link || `/data-sources/${platformKey}`;
 
       return {
         name: platformConfig?.name || integration.platform,
@@ -38,6 +36,9 @@ function Integrations() {
       };
     });
   }, [integrationsData]);
+
+
+  console.log("tableData", tableData);
 
   return (
     <div className="w-full  h-[2000vh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 ">

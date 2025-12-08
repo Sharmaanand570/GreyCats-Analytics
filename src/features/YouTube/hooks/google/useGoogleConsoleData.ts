@@ -1,18 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  connectGoogleConsole,
   disconnectGoogleConsole,
-  getGoogleConsoleBilling,
-  getGoogleConsoleBillingAccounts,
-  getGoogleConsoleProjects,
+  fetchGoogleConsolePerformance,
+  getGoogleConsoleProperties,
+  getGoogleConsoleUnifiedMetrics,
   reconnectGoogleConsole,
-  type ConnectGoogleConsoleResponse,
-  type GoogleConsoleBillingAccountsResponse,
-  type GoogleConsoleBillingResponse,
+  selectGoogleConsoleProperty,
   type GoogleConsoleDisconnectResponse,
-  type GoogleConsoleProjectsResponse,
+  type GoogleConsolePerformanceRequest,
+  type GoogleConsolePerformanceResponse,
+  type GoogleConsolePropertiesResponse,
   type GoogleConsoleReconnectResponse,
+  type GoogleConsoleSelectPropertyBody,
+  type GoogleConsoleSelectPropertyResponse,
+  type GoogleConsoleUnifiedMetricsResponse,
+  type GoogleConsoleUnifiedMetricsParams,
 } from "../../API/googleConsoleapi";
 
 const commonQueryOptions = {
@@ -20,23 +23,17 @@ const commonQueryOptions = {
   staleTime: 60 * 1000,
 };
 
-export const useGoogleConsoleConnect = () => {
-  return useMutation<ConnectGoogleConsoleResponse, Error, void>({
-    mutationFn: () => connectGoogleConsole(),
-  });
-};
-
 export const useGoogleConsoleReconnect = () => {
   return useMutation<GoogleConsoleReconnectResponse, Error, void>({
     mutationFn: () => reconnectGoogleConsole(),
     onSuccess: (data) => {
-      toast.success("Google Console reconnect URL generated");
+      toast.success("Google Search Console reconnect URL generated");
       if (data.url) {
         window.location.href = data.url;
       }
     },
     onError: (error) => {
-      toast.error(error.message || "Failed to reconnect Google Console");
+      toast.error(error.message || "Failed to reconnect Google Search Console");
     },
   });
 };
@@ -47,48 +44,68 @@ export const useGoogleConsoleDisconnect = () => {
   return useMutation<GoogleConsoleDisconnectResponse, Error, void>({
     mutationFn: () => disconnectGoogleConsole(),
     onSuccess: (data) => {
-      toast.success(data.message || "Google Console disconnected");
+      toast.success(data.message || "Google Search Console disconnected");
       queryClient.invalidateQueries({ queryKey: ["google-console"] });
     },
     onError: (error) => {
-      toast.error(error.message || "Failed to disconnect Google Console");
+      toast.error(error.message || "Failed to disconnect Google Search Console");
     },
   });
 };
 
-export const useGoogleConsoleProjects = () => {
-  return useQuery<GoogleConsoleProjectsResponse, Error>({
-    queryKey: ["google-console", "projects"],
-    queryFn: () => getGoogleConsoleProjects(),
+export const useGoogleConsoleProperties = () => {
+  return useQuery<GoogleConsolePropertiesResponse, Error>({
+    queryKey: ["google-console", "properties"],
+    queryFn: () => getGoogleConsoleProperties(),
     ...commonQueryOptions,
   });
 };
 
-export const useGoogleConsoleBilling = (days: number) => {
-  return useQuery<GoogleConsoleBillingResponse, Error>({
-    queryKey: ["google-console", "billing", days],
-    queryFn: () => getGoogleConsoleBilling(days),
-    ...commonQueryOptions,
+export const useGoogleConsoleSelectProperty = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    GoogleConsoleSelectPropertyResponse,
+    Error,
+    GoogleConsoleSelectPropertyBody
+  >({
+    mutationFn: (body) => selectGoogleConsoleProperty(body),
+    onSuccess: (data) => {
+      toast.success(
+        data.message || "Google Search Console property selected successfully"
+      );
+      queryClient.invalidateQueries({
+        queryKey: ["google-console", "properties"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["google-console", "unified-metrics"],
+      });
+    },
+    onError: (error) => {
+      toast.error(
+        error.message || "Failed to select Google Search Console property"
+      );
+    },
   });
 };
 
-export const useGoogleConsoleBillingAccounts = () => {
-  return useQuery<GoogleConsoleBillingAccountsResponse, Error>({
-    queryKey: ["google-console", "billing-accounts"],
-    queryFn: () => getGoogleConsoleBillingAccounts(),
-    ...commonQueryOptions,
+export const useGoogleConsolePerformance = () => {
+  return useMutation<
+    GoogleConsolePerformanceResponse,
+    Error,
+    GoogleConsolePerformanceRequest
+  >({
+    mutationFn: (payload) => fetchGoogleConsolePerformance(payload),
   });
 };
 
-
-
-
-
-
-
-
-
-
-
-
+export const useGoogleConsoleUnifiedMetrics = (
+  params?: GoogleConsoleUnifiedMetricsParams
+) => {
+  return useQuery<GoogleConsoleUnifiedMetricsResponse, Error>({
+    queryKey: ["google-console", "unified-metrics", params],
+    queryFn: () => getGoogleConsoleUnifiedMetrics(params),
+    ...commonQueryOptions,
+  });
+};
 

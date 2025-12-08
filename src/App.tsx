@@ -46,7 +46,6 @@ const GoogleConsoleCallbackHandler = lazy(
 );
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
-
 const LoadingFallback = () => (
   <div className="flex items-center justify-center min-h-screen">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
@@ -144,6 +143,10 @@ function App() {
           <Route path="google/callback" element={<GoogleCallbackHandler />} />
           <Route
             path="google-console/callback"
+            element={<GoogleConsoleCallbackHandler />}
+          />
+          <Route
+            path="google-seo/callback"
             element={<GoogleConsoleCallbackHandler />}
           />
           <Route path="shopify/callback" element={<ShopifyCallbackHandler />} />

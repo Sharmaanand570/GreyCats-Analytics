@@ -14,7 +14,7 @@ import EmbedWidgetForm from "../components/EmbedWidgetForm";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { type DateRange } from "react-day-picker";
 import { format, subDays } from "date-fns";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -86,6 +86,7 @@ import {
   updateReportSchedule,
   deleteReportSchedule,
 } from "@/features/reports/api/reportingApi";
+import { getGoogleConsoleUnifiedMetrics } from "@/features/YouTube/API/googleConsoleapi";
 import type {
   ApiError,
   CreateTemplatePayload,
@@ -100,16 +101,15 @@ import type {
 } from "@/features/reports/api/types";
 import { useIntegrations } from "@/features/DataSources/hooks/useIntegrations";
 import { getPlatformConfig } from "@/utils/platformMapping";
-import {
-  useGoogleAnalyticsSummary,
-  useGoogleAnalyticsTopPages,
-  useGoogleAnalyticsTrends,
-  useGoogleAnalyticsMeta,
-} from "@/features/YouTube/hooks/google/useGoogleAnalyticsData";
+import { useAvailableMetrics } from "@/features/reports/hooks/useAvailableMetrics";
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -379,10 +379,40 @@ const renderWidgetContent = (
       const hasData =
         series.length > 0 ||
         typeof (resolvedData as ResolvedWidgetData)?.total === "number";
+
+      const chartData = series.map((point) => ({
+        label: point.x,
+        value: point.y,
+      }));
+
       return (
         <div className="h-full flex flex-col">
           <div className="flex-1">
-            <ChartPieInteractive />
+            {hasData ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip
+                    formatter={(value: number) => value.toLocaleString()}
+                    labelFormatter={(label: string) => label}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#2563EB"
+                    strokeWidth={2}
+                    fillOpacity={0.15}
+                    fill="#2563EB"
+                    dot={false}
+                    activeDot={{ r: 3, fill: "#2563EB" }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <ChartPieInteractive />
+            )}
           </div>
           <div className="border-t px-3 py-2 text-xs md:text-sm space-y-1 min-h-[3.5rem]">
             {hasData
@@ -415,13 +445,53 @@ const renderWidgetContent = (
         widget.metricConfig?.metricKey?.split(".").pop()?.replace(/_/g, " ") ||
         "Metric";
 
+      const chartData = series.map((point) => ({
+        label: point.x,
+        value: point.y,
+      }));
+
       return (
         <div className="h-full flex flex-col p-2 md:p-4">
           <div className="text-xs md:text-sm font-medium text-gray-700 mb-2 capitalize">
             {chartTitle}
           </div>
           <div className="flex-1">
-            <ChartLineMultiple />
+            {hasData ? (
+              <ResponsiveContainer width="100%" height="100%">
+                {widget.widgetType === "bar_chart" ? (
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 10 }} />
+                    <Tooltip
+                      formatter={(value: number) => value.toLocaleString()}
+                      labelFormatter={(label: string) => label}
+                    />
+                    <Bar dataKey="value" fill="#2563EB" />
+                  </BarChart>
+                ) : (
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 10 }} />
+                    <Tooltip
+                      formatter={(value: number) => value.toLocaleString()}
+                      labelFormatter={(label: string) => label}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#2563EB"
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 3 }}
+                    />
+                  </LineChart>
+                )}
+              </ResponsiveContainer>
+            ) : (
+              <ChartLineMultiple />
+            )}
           </div>
           {!hasData && (
             <div className="border-t px-3 py-2 mt-2">
@@ -457,7 +527,38 @@ const renderWidgetContent = (
           ? ((resolvedData as any).rows as unknown[])
           : null;
 
-      const rows = (gaRows as any[]) ?? tableData?.rows ?? reportTableRows;
+      // Generic metrics: if we have a series but no GA rows, render a simple
+      // 2-column table from the series (label + value).
+      let seriesRows =
+        !isGaTopPagesTable &&
+        !gaRows &&
+        Array.isArray((resolvedData as ResolvedWidgetData)?.series)
+          ? (((resolvedData as ResolvedWidgetData)
+              .series as WidgetSeriesPoint[]) as unknown[])
+          : null;
+
+      // For GA tables, filter series to only the core GA metric keys to avoid noisy dimension rows
+      const isGaIntegration =
+        (metricConfig?.integration || "").toLowerCase().replace(/_/g, "-") ===
+        "google-analytics";
+      if (isGaIntegration && seriesRows) {
+        const allowedGaKeys = new Set([
+          "google.activeUsers",
+          "google.bounceRate",
+          "google.pageViews",
+          "google.sessions",
+        ]);
+        const filtered = (seriesRows as WidgetSeriesPoint[]).filter((p) =>
+          allowedGaKeys.has(p.x)
+        );
+        seriesRows = filtered.length ? filtered : [];
+      }
+
+      const rows =
+        (gaRows as any[]) ??
+        (seriesRows as any[]) ??
+        tableData?.rows ??
+        reportTableRows;
 
       const title =
         tableData?.title ??
@@ -476,6 +577,11 @@ const renderWidgetContent = (
               { name: "Page Path", width: "45%" },
               { name: "Title", width: "35%" },
               { name: "Views" },
+            ]
+          : seriesRows
+          ? [
+              { name: "Label", width: "60%" },
+              { name: "Value" },
             ]
           : [
               { name: "Report", width: "35%" },
@@ -531,6 +637,14 @@ const renderWidgetContent = (
                               : col.name === "Views"
                               ? gaRow.views
                               : "";
+                        } else if (seriesRows) {
+                          const sRow = row as any as WidgetSeriesPoint;
+                          cellValue =
+                            col.name === "Label"
+                              ? sRow.x
+                              : col.name === "Value"
+                              ? sRow.y
+                              : "";
                         } else {
                           cellValue =
                             col.name === "Report"
@@ -548,7 +662,7 @@ const renderWidgetContent = (
                                 ] ?? "";
                         }
 
-                        if (!isGaTopPagesTable && col.name === "Status") {
+                        if (!isGaTopPagesTable && !seriesRows && col.name === "Status") {
                           return (
                             <TableCell
                               key={colIndex}
@@ -798,7 +912,8 @@ const renderWidgetContent = (
             <div className="font-semibold mb-2">Table of Contents</div>
             {lines.length === 0 ? (
               <span className="text-[11px] text-gray-400">
-                Add one entry per line in the editor to build the table of contents.
+                Add one entry per line in the editor to build the table of
+                contents.
               </span>
             ) : (
               <div className="w-full overflow-x-auto">
@@ -819,9 +934,7 @@ const renderWidgetContent = (
                         <td className="py-1 pr-2 align-top text-gray-500">
                           {idx + 1}
                         </td>
-                        <td className="py-1 align-top break-words">
-                          {line}
-                        </td>
+                        <td className="py-1 align-top break-words">{line}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -944,73 +1057,48 @@ function ReportBuilder() {
     useState<ReportScheduleFrequency>("daily");
   const [scheduleTimezone, setScheduleTimezone] =
     useState<string>("Asia/Kolkata");
-  const [scheduleTimeOfDay, setScheduleTimeOfDay] =
-    useState<string>("09:00");
+  const [scheduleTimeOfDay, setScheduleTimeOfDay] = useState<string>("09:00");
   const [scheduleSendEmail, setScheduleSendEmail] = useState(false);
   const { data: integrationsData } = useIntegrations();
 
-  // Google Analytics data used for the Integrations metrics panel
   const {
-    data: gaSummaryData,
-    isLoading: isLoadingGaSummary,
-    error: gaSummaryError,
-  } = useGoogleAnalyticsSummary();
+    groupedMetrics,
+    isLoading: isLoadingAvailableMetrics,
+    error: availableMetricsError,
+  } = useAvailableMetrics();
 
-  const {
-    data: gaTrendsData,
-    isLoading: isLoadingGaTrends,
-    error: gaTrendsError,
-  } = useGoogleAnalyticsTrends();
-
-  const {
-    data: gaTopPagesData,
-    isLoading: isLoadingGaTopPages,
-    error: gaTopPagesError,
-  } = useGoogleAnalyticsTopPages();
-
-  const { data: gaMetaData, error: gaMetaError } = useGoogleAnalyticsMeta();
-
-  const gaTrends = gaTrendsData?.trends ?? [];
-  const gaTopPages = gaTopPagesData?.topPages ?? [];
-  const gaSummary = gaSummaryData?.summary;
-
-  const gaTrendsChartData = useMemo(
-    () =>
-      gaTrends.map((point) => {
-        const date = point.date;
-        const label =
-          date && date.length === 8
-            ? `${date.slice(6, 8)}/${date.slice(4, 6)}`
-            : date;
-        return {
-          label,
-          sessions: point.sessions,
-        };
-      }),
-    [gaTrends]
+  // UI state for the AgencyAnalytics-style "Choose your Metrics" panel
+  const [selectedIntegrationForMetrics, setSelectedIntegrationForMetrics] =
+    useState<{
+      platform: string;
+      accountId: string;
+      accountName: string;
+    } | null>(null);
+  const [integrationSearch, setIntegrationSearch] = useState("");
+  const [metricsSearch, setMetricsSearch] = useState("");
+  const [selectedMetricWidgetType, setSelectedMetricWidgetType] =
+    useState<ReportWidgetType>("metric");
+  const [gscDimensionType, setGscDimensionType] = useState<string>("query");
+  const [gscStartDate, setGscStartDate] = useState<string>(
+    dateRange?.from ? formatApiDate(dateRange.from) : formatApiDate(subDays(new Date(), 6))
   );
-
-  const gaIsConnected = !gaMetaError && !!gaMetaData?.property;
-
-  // Find the connected Google Analytics integration (if any) so that drag-and-drop
-  // widgets can be preconfigured with the correct integration + accountId.
-  const googleIntegration = useMemo(() => {
-    if (!integrationsData?.integrations) return null;
-
-    return (
-      integrationsData.integrations.find((integration) => {
-        const normalized = integration.platform
-          .toLowerCase()
-          .replace(/_/g, "-");
-        // Support both "google" and "google-analytics" style platform keys
-        return (
-          normalized === "google" ||
-          normalized === "google-analytics" ||
-          normalized.includes("google-analytics")
-        );
-      }) ?? null
-    );
-  }, [integrationsData]);
+  const [gscEndDate, setGscEndDate] = useState<string>(
+    dateRange?.to ? formatApiDate(dateRange.to) : formatApiDate(new Date())
+  );
+  const isGscSelected = useMemo(() => {
+    if (!selectedIntegrationForMetrics) return false;
+    const normalized = selectedIntegrationForMetrics.platform
+      .toLowerCase()
+      .replace(/_/g, "-");
+    return normalized === "google-console" || normalized === "google-search-console";
+  }, [selectedIntegrationForMetrics]);
+  const isGaSelected = useMemo(() => {
+    if (!selectedIntegrationForMetrics) return false;
+    const normalized = selectedIntegrationForMetrics.platform
+      .toLowerCase()
+      .replace(/_/g, "-");
+    return normalized === "google-analytics";
+  }, [selectedIntegrationForMetrics]);
 
   const handleCancelNewReport = useCallback(() => {
     templateBootstrapRef.current = false;
@@ -1018,6 +1106,69 @@ function ReportBuilder() {
     setNewReportName("");
     navigate("/reports");
   }, [navigate]);
+
+  // Keep GSC param defaults in sync with the main date range
+  useEffect(() => {
+    if (dateRange?.from) {
+      setGscStartDate(formatApiDate(dateRange.from));
+    }
+    if (dateRange?.to) {
+      setGscEndDate(formatApiDate(dateRange.to));
+    }
+  }, [dateRange?.from, dateRange?.to]);
+
+  // If GSC or GA panel is active and dates change there, sync them to the report dateRange
+  useEffect(() => {
+    if (!isGscSelected && !isGaSelected) return;
+    if (!gscStartDate || !gscEndDate) return;
+    const from = new Date(gscStartDate);
+    const to = new Date(gscEndDate);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return;
+    setDateRange((prev) => {
+      const prevFrom = prev?.from?.getTime() ?? 0;
+      const prevTo = prev?.to?.getTime() ?? 0;
+      if (prevFrom === from.getTime() && prevTo === to.getTime()) {
+        return prev;
+      }
+      return { from, to };
+    });
+  }, [isGscSelected, isGaSelected, gscStartDate, gscEndDate, setDateRange]);
+
+  const gscMetricsQuery = useQuery({
+    queryKey: [
+      "report-builder",
+      "integration-metrics",
+      selectedIntegrationForMetrics?.platform,
+      selectedIntegrationForMetrics?.accountId,
+      gscDimensionType,
+      gscStartDate,
+      gscEndDate,
+    ],
+    enabled:
+      !!selectedIntegrationForMetrics &&
+      !!gscStartDate &&
+      !!gscEndDate &&
+      (isGscSelected ||
+        selectedIntegrationForMetrics.platform
+          .toLowerCase()
+          .replace(/_/g, "-") === "google-analytics"),
+    queryFn: () => {
+      const normalized = selectedIntegrationForMetrics!.platform
+        .toLowerCase()
+        .replace(/_/g, "-");
+      const integrationKey =
+        normalized === "google-console" ? "google-search-console" : normalized;
+      return getGoogleConsoleUnifiedMetrics({
+        integration: integrationKey,
+        metricKey: integrationKey === "google-analytics" ? undefined : "google_seo.clicks",
+        dimensionType: isGscSelected ? [gscDimensionType] : undefined,
+        startDate: gscStartDate,
+        endDate: gscEndDate,
+        accountId: selectedIntegrationForMetrics?.accountId,
+      });
+    },
+    staleTime: 60 * 1000,
+  });
 
   const handleConfirmNewReport = useCallback(() => {
     const trimmedName = newReportName.trim();
@@ -1027,8 +1178,7 @@ function ReportBuilder() {
     }
 
     // Prevent creating a report if there are no connected integrations
-    const integrationCount =
-      (integrationsData?.integrations?.length ?? 0);
+    const integrationCount = integrationsData?.integrations?.length ?? 0;
     if (integrationCount === 0) {
       toast.error(
         "You need to connect at least one data source before creating a report."
@@ -1227,11 +1377,30 @@ function ReportBuilder() {
   const templateName =
     (templateQuery.data?.name ?? newReportName) || "Untitled Report";
   const isTemplateLoading = templateQuery.isPending || templateQuery.isFetching;
+
+  // Signature of all metric widgets in the current dashboards/layout state.
+  // This ensures we refetch report data whenever the user adds/removes widgets
+  // or changes their metric configuration, even before saving.
   const widgetSignature = useMemo(() => {
-    return (templateQuery.data?.widgets ?? [])
-      .map((widget: ReportWidgetDefinition) => widget.id)
-      .join("|");
-  }, [templateQuery.data?.widgets]);
+    const ids: string[] = [];
+    dashboards.forEach((layout) => {
+      layout.forEach((widget) => {
+        const metric = widget.metricConfig;
+        if (!metric?.metricKey) return;
+        ids.push(
+          [
+            metric.id ?? widget.i,
+            metric.metricKey,
+            metric.integration ?? "",
+            metric.accountId ?? "",
+            metric.groupBy ?? "",
+            metric.aggregation ?? "",
+          ].join(":")
+        );
+      });
+    });
+    return ids.join("|");
+  }, [dashboards]);
   const dateRangeKey = useMemo(() => {
     if (!dateRange?.from || !dateRange?.to) return "none";
     return `${dateRange.from.toISOString()}_${dateRange.to.toISOString()}`;
@@ -1249,7 +1418,10 @@ function ReportBuilder() {
         return {};
       }
 
-      const widgets = (templateQuery.data?.widgets ?? []).filter(
+      // Build the widgets to resolve from the current dashboards state so that
+      // newly added widgets (from the Integrations panel) immediately get data.
+      const templatePayload = buildTemplatePayloadFromDashboards();
+      const widgets = (templatePayload.widgets ?? []).filter(
         (widget: ReportWidgetDefinition) => widget.metricKey
       );
 
@@ -1311,90 +1483,11 @@ function ReportBuilder() {
   // map from the GA detail APIs so that newly dropped widgets immediately
   // show real values (similar to the right-hand Integrations section).
   const gaResolvedWidgets = useMemo(() => {
-    const overrides: Record<string, ResolvedWidgetData> = {};
-
-    if (!googleIntegration) {
-      return overrides;
-    }
-
-    dashboards.forEach((layout) => {
-      layout.forEach((widget) => {
-        const metric = widget.metricConfig;
-        if (!metric?.metricKey || !metric.integration) return;
-
-        const integrationKey = metric.integration
-          .toLowerCase()
-          .replace(/_/g, "-");
-        const isGoogleAnalyticsIntegration =
-          integrationKey === "google" ||
-          integrationKey === "google-analytics" ||
-          integrationKey.includes("google-analytics");
-        if (!isGoogleAnalyticsIntegration) return;
-
-        const dataKey = metric.id ?? widget.i;
-        if (!dataKey) return;
-
-        switch (metric.metricKey) {
-          case "ga.total_sessions":
-            if (gaSummary) {
-              overrides[dataKey] = {
-                value: gaSummary.totalSessions,
-                rawCount: gaSummary.totalSessions,
-              };
-            }
-            break;
-          case "ga.total_users":
-            if (gaSummary) {
-              overrides[dataKey] = {
-                value: gaSummary.totalUsers,
-                rawCount: gaSummary.totalUsers,
-              };
-            }
-            break;
-          case "ga.total_views":
-            if (gaSummary) {
-              overrides[dataKey] = {
-                value: gaSummary.totalViews,
-                rawCount: gaSummary.totalViews,
-              };
-            }
-            break;
-          case "ga.avg_bounce_rate":
-            if (gaSummary) {
-              overrides[dataKey] = {
-                value: gaSummary.avgBounceRate,
-                rawCount: gaSummary.totalSessions,
-              };
-            }
-            break;
-          case "ga.sessions_trend":
-            if (gaTrendsChartData.length > 0) {
-              overrides[dataKey] = {
-                series: gaTrendsChartData.map((point) => ({
-                  x: point.label,
-                  y: point.sessions,
-                })),
-                rawCount: gaTrendsChartData.length,
-              } as ResolvedWidgetData;
-            }
-            break;
-          case "ga.top_pages_views":
-            if (gaTopPages.length > 0) {
-              overrides[dataKey] = {
-                // Store GA top pages rows so table widgets can render them.
-                rows: gaTopPages as unknown[],
-                rawCount: gaTopPages.length,
-              } as ResolvedWidgetData;
-            }
-            break;
-          default:
-            break;
-        }
-      });
-    });
-
-    return overrides;
-  }, [dashboards, googleIntegration, gaSummary, gaTrendsChartData, gaTopPages]);
+    // GA-specific overrides have been deprecated in favor of using the
+    // unified metrics API + resolveMetricWidgets. Keep this map empty so
+    // the normal report resolution pipeline is the single source of truth.
+    return {} as Record<string, ResolvedWidgetData>;
+  }, []);
 
   const buildTemplatePayloadFromDashboards =
     useCallback((): CreateTemplatePayload => {
@@ -1430,8 +1523,8 @@ function ReportBuilder() {
             },
             // Persist full widget data (manual content blocks, tasks, tables, etc.)
             widgetData: widget.data as unknown,
-             // Also tuck widgetData into filters so it survives on backends that only
-             // persist the documented "filters" bag.
+            // Also tuck widgetData into filters so it survives on backends that only
+            // persist the documented "filters" bag.
             filters: {
               ...existingFilters,
               widgetData: widget.data as unknown,
@@ -1506,7 +1599,13 @@ function ReportBuilder() {
         widgets,
         ...(slidesMeta ? { slidesMeta } : {}),
       };
-    }, [dashboards, templateName, templateQuery.data?.slidesMeta, customPages, integrationsData]);
+    }, [
+      dashboards,
+      templateName,
+      templateQuery.data?.slidesMeta,
+      customPages,
+      integrationsData,
+    ]);
 
   const { mutate: saveTemplate, isPending: isSavingTemplate } = useMutation({
     mutationFn: async (payload: CreateTemplatePayload) => {
@@ -1530,43 +1629,41 @@ function ReportBuilder() {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Report schedule mutations
-  const { mutate: createSchedule } =
-    useMutation({
-      mutationFn: async (payload: CreateReportSchedulePayload) =>
-        createReportSchedule(payload),
-      onSuccess: (response) => {
-        setSchedule(response.data);
-        toast.success("Schedule created");
-      },
-      onError: (error: ApiError) => {
-        toast.error(error.message || "Failed to create schedule");
-      },
-    });
+  const { mutate: createSchedule } = useMutation({
+    mutationFn: async (payload: CreateReportSchedulePayload) =>
+      createReportSchedule(payload),
+    onSuccess: (response) => {
+      setSchedule(response.data);
+      toast.success("Schedule created");
+    },
+    onError: (error: ApiError) => {
+      toast.error(error.message || "Failed to create schedule");
+    },
+  });
 
-  const { mutate: updateSchedule } =
-    useMutation({
-      mutationFn: async (args: {
-        id: number;
-        payload: UpdateReportSchedulePayload;
-      }) => updateReportSchedule(args.id, args.payload),
-      onSuccess: () => {
-        toast.success("Schedule updated");
-      },
-      onError: (error: ApiError) => {
-        toast.error(error.message || "Failed to update schedule");
-      },
-    });
+  const { mutate: updateSchedule } = useMutation({
+    mutationFn: async (args: {
+      id: number;
+      payload: UpdateReportSchedulePayload;
+    }) => updateReportSchedule(args.id, args.payload),
+    onSuccess: () => {
+      toast.success("Schedule updated");
+    },
+    onError: (error: ApiError) => {
+      toast.error(error.message || "Failed to update schedule");
+    },
+  });
 
   const { mutate: removeSchedule } = useMutation({
-      mutationFn: async (id: number) => deleteReportSchedule(id),
-      onSuccess: () => {
-        setSchedule(null);
-        toast.success("Schedule deleted");
-      },
-      onError: (error: ApiError) => {
-        toast.error(error.message || "Failed to delete schedule");
-      },
-    });
+    mutationFn: async (id: number) => deleteReportSchedule(id),
+    onSuccess: () => {
+      setSchedule(null);
+      toast.success("Schedule deleted");
+    },
+    onError: (error: ApiError) => {
+      toast.error(error.message || "Failed to delete schedule");
+    },
+  });
 
   const handleSaveTemplate = useCallback(() => {
     if (!templateId) {
@@ -1745,63 +1842,57 @@ function ReportBuilder() {
     [dashboards]
   );
 
-  const handleDeletePage = useCallback(
-    (slideId: number) => {
-      // Remove the slide from dashboards
-      setDashboards((prev) => {
-        const updated = new Map(prev);
-        updated.delete(slideId);
-        return updated;
-      });
+  const handleDeletePage = useCallback((slideId: number) => {
+    // Remove the slide from dashboards
+    setDashboards((prev) => {
+      const updated = new Map(prev);
+      updated.delete(slideId);
+      return updated;
+    });
 
-      // Remove from custom pages (if it was a custom page)
-      setCustomPages((prev) => prev.filter((p) => p.id !== slideId));
+    // Remove from custom pages (if it was a custom page)
+    setCustomPages((prev) => prev.filter((p) => p.id !== slideId));
 
-      // Remove from page order
-      setPageOrder((prev) => prev.filter((id) => id !== slideId));
+    // Remove from page order
+    setPageOrder((prev) => prev.filter((id) => id !== slideId));
 
-      // Clear any references
-      if (slidesRef.current[slideId]) {
-        slidesRef.current[slideId] = null;
+    // Clear any references
+    if (slidesRef.current[slideId]) {
+      slidesRef.current[slideId] = null;
+    }
+    widgetRefs.current.delete(slideId);
+
+    // If a widget on this slide was selected, clear the selection
+    setWidgetFormState((prev) =>
+      prev.slideId === slideId
+        ? {
+            slideId: 0,
+            widgetId: "",
+            widgetType: "",
+            data: undefined,
+            i: "",
+            x: 0,
+            y: 0,
+            w: 1,
+            h: 1,
+          }
+        : prev
+    );
+  }, []);
+
+  const handleRenamePage = useCallback((slideId: number, newName: string) => {
+    setCustomPages((prev) => {
+      const existing = prev.find((p) => p.id === slideId);
+      if (existing) {
+        return prev.map((p) =>
+          p.id === slideId ? { ...p, name: newName } : p
+        );
       }
-      widgetRefs.current.delete(slideId);
-
-      // If a widget on this slide was selected, clear the selection
-      setWidgetFormState((prev) =>
-        prev.slideId === slideId
-          ? {
-              slideId: 0,
-              widgetId: "",
-              widgetType: "",
-              data: undefined,
-              i: "",
-              x: 0,
-              y: 0,
-              w: 1,
-              h: 1,
-            }
-          : prev
-      );
-    },
-    []
-  );
-
-  const handleRenamePage = useCallback(
-    (slideId: number, newName: string) => {
-      setCustomPages((prev) => {
-        const existing = prev.find((p) => p.id === slideId);
-        if (existing) {
-          return prev.map((p) =>
-            p.id === slideId ? { ...p, name: newName } : p
-          );
-        }
-        // If this slide wasn't in customPages yet (e.g., an older or integration page),
-        // add a new entry so the name override is included in slidesMeta on save.
-        return [...prev, { id: slideId, name: newName }];
-      });
-    },
-    []
-  );
+      // If this slide wasn't in customPages yet (e.g., an older or integration page),
+      // add a new entry so the name override is included in slidesMeta on save.
+      return [...prev, { id: slideId, name: newName }];
+    });
+  }, []);
 
   const handleReorderPages = useCallback(
     (fromIndex: number, toIndex: number) => {
@@ -1933,7 +2024,12 @@ function ReportBuilder() {
       const metricDataStr = e.dataTransfer?.getData("metricData");
       const customKind = e.dataTransfer?.getData("customKind") || undefined;
       let metricData:
-        | { metricKey: string; integration: string; accountId: string }
+        | {
+            metricKey: string;
+            integration: string;
+            accountId: string;
+            filters?: Record<string, unknown>;
+          }
         | undefined;
 
       if (metricDataStr) {
@@ -1974,6 +2070,7 @@ function ReportBuilder() {
               groupBy: "day",
               aggregation: "sum",
               type: widgetType,
+              ...(metricData.filters ? { filters: metricData.filters } : {}),
             }
           : {
               // If we don't have metric data from the API, don't invent a metric.
@@ -2019,6 +2116,7 @@ function ReportBuilder() {
             metricKey: string;
             integration: string;
             accountId: string;
+            filters?: Record<string, unknown>;
           }
         | string
     ) => {
@@ -2174,385 +2272,382 @@ function ReportBuilder() {
   // Memoize right panel content
   const rightPanelContent = useMemo(() => {
     if (rightPanelTitle === "Integrations") {
-      return (
-        <div className="w-full h-full overflow-y-auto">
-          {/* Error state using Google Analytics APIs */}
-          {(gaSummaryError ||
-            gaTrendsError ||
-            gaTopPagesError ||
-            gaMetaError) && (
-            <Card className="border border-destructive/40 bg-destructive/5 m-3">
-              <CardContent className="py-3 text-xs text-destructive space-y-1">
-                {gaSummaryError && (
-                  <p>Failed to load summary: {gaSummaryError.message}</p>
-                )}
-                {gaTrendsError && (
-                  <p>Failed to load trends: {gaTrendsError.message}</p>
-                )}
-                {gaTopPagesError && (
-                  <p>Failed to load top pages: {gaTopPagesError.message}</p>
-                )}
-                {gaMetaError && (
-                  <p>Failed to load analytics meta: {gaMetaError.message}</p>
-                )}
-              </CardContent>
-            </Card>
-          )}
+      // If no integration is selected yet, show the integrations list (step 1)
+      if (!selectedIntegrationForMetrics) {
+        const search = integrationSearch.trim().toLowerCase();
+        const integrations = integrationsData?.integrations ?? [];
 
-          {gaIsConnected ? (
-            <div className="w-full h-full overflow-y-auto p-3 space-y-4">
-              {/* Summary cards */}
-              <div className="grid grid-cols-2 gap-3">
-                <Card>
-                  <CardHeader className="py-2 flex items-center justify-between gap-2">
-                    <CardTitle className="text-xs font-medium">
-                      Total Sessions
-                    </CardTitle>
-                    <div
-                      draggable={!!googleIntegration}
-                      onDragStart={
-                        googleIntegration
-                          ? (e) =>
-                              handleDragStart(e, "metric", {
-                                metricKey: "ga.total_sessions",
-                                integration: googleIntegration.platform,
-                                accountId: googleIntegration.accountId,
-                              })
-                          : undefined
-                      }
-                      className={`flex items-center justify-center w-6 h-6 rounded border text-[10px] ${
-                        googleIntegration
-                          ? "border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing"
-                          : "border-gray-200 text-gray-300 cursor-not-allowed"
-                      }`}
-                      title={
-                        googleIntegration
-                          ? "Drag to add a Total Sessions metric card"
-                          : "Connect Google Analytics to add this metric"
-                      }
-                    >
-                      M
-                    </div>
-                  </CardHeader>
-                  <CardContent className="py-2">
-                    {isLoadingGaSummary ? (
-                      <div className="h-5 w-16 bg-gray-200 animate-pulse rounded" />
-                    ) : (
-                      <p className="text-lg font-semibold">
-                        {gaSummary?.totalSessions?.toLocaleString() ?? 0}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="py-2 flex items-center justify-between gap-2">
-                    <CardTitle className="text-xs font-medium">
-                      Total Users
-                    </CardTitle>
-                    <div
-                      draggable={!!googleIntegration}
-                      onDragStart={
-                        googleIntegration
-                          ? (e) =>
-                              handleDragStart(e, "metric", {
-                                metricKey: "ga.total_users",
-                                integration: googleIntegration.platform,
-                                accountId: googleIntegration.accountId,
-                              })
-                          : undefined
-                      }
-                      className={`flex items-center justify-center w-6 h-6 rounded border text-[10px] ${
-                        googleIntegration
-                          ? "border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing"
-                          : "border-gray-200 text-gray-300 cursor-not-allowed"
-                      }`}
-                      title={
-                        googleIntegration
-                          ? "Drag to add a Total Users metric card"
-                          : "Connect Google Analytics to add this metric"
-                      }
-                    >
-                      M
-                    </div>
-                  </CardHeader>
-                  <CardContent className="py-2">
-                    {isLoadingGaSummary ? (
-                      <div className="h-5 w-16 bg-gray-200 animate-pulse rounded" />
-                    ) : (
-                      <p className="text-lg font-semibold">
-                        {gaSummary?.totalUsers?.toLocaleString() ?? 0}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="py-2 flex items-center justify-between gap-2">
-                    <CardTitle className="text-xs font-medium">
-                      Total Views
-                    </CardTitle>
-                    <div
-                      draggable={!!googleIntegration}
-                      onDragStart={
-                        googleIntegration
-                          ? (e) =>
-                              handleDragStart(e, "metric", {
-                                metricKey: "ga.total_views",
-                                integration: googleIntegration.platform,
-                                accountId: googleIntegration.accountId,
-                              })
-                          : undefined
-                      }
-                      className={`flex items-center justify-center w-6 h-6 rounded border text-[10px] ${
-                        googleIntegration
-                          ? "border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing"
-                          : "border-gray-200 text-gray-300 cursor-not-allowed"
-                      }`}
-                      title={
-                        googleIntegration
-                          ? "Drag to add a Total Views metric card"
-                          : "Connect Google Analytics to add this metric"
-                      }
-                    >
-                      M
-                    </div>
-                  </CardHeader>
-                  <CardContent className="py-2">
-                    {isLoadingGaSummary ? (
-                      <div className="h-5 w-16 bg-gray-200 animate-pulse rounded" />
-                    ) : (
-                      <p className="text-lg font-semibold">
-                        {gaSummary?.totalViews?.toLocaleString() ?? 0}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="py-2 flex items-center justify-between gap-2">
-                    <CardTitle className="text-xs font-medium">
-                      Avg. Bounce Rate
-                    </CardTitle>
-                    <div
-                      draggable={!!googleIntegration}
-                      onDragStart={
-                        googleIntegration
-                          ? (e) =>
-                              handleDragStart(e, "metric", {
-                                metricKey: "ga.avg_bounce_rate",
-                                integration: googleIntegration.platform,
-                                accountId: googleIntegration.accountId,
-                              })
-                          : undefined
-                      }
-                      className={`flex items-center justify-center w-6 h-6 rounded border text-[10px] ${
-                        googleIntegration
-                          ? "border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing"
-                          : "border-gray-200 text-gray-300 cursor-not-allowed"
-                      }`}
-                      title={
-                        googleIntegration
-                          ? "Drag to add an Avg. Bounce Rate metric card"
-                          : "Connect Google Analytics to add this metric"
-                      }
-                    >
-                      M
-                    </div>
-                  </CardHeader>
-                  <CardContent className="py-2">
-                    {isLoadingGaSummary ? (
-                      <div className="h-5 w-20 bg-gray-200 animate-pulse rounded" />
-                    ) : (
-                      <p className="text-lg font-semibold">
-                        {gaSummary
-                          ? `${gaSummary.avgBounceRate.toFixed(1)}%`
-                          : "0.0%"}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
+        const filteredIntegrations = integrations.filter((integration) => {
+          if (!search) return true;
+          const platformConfig = getPlatformConfig(integration.platform);
+          const label =
+            platformConfig?.name ||
+            `${integration.platform} ${integration.accountName}`;
+          return label.toLowerCase().includes(search);
+        });
+
+        return (
+          <div className="w-full h-full flex flex-col overflow-y-auto">
+            <div className="px-3 pt-3 pb-2 border-b space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-gray-700">
+                  Choose your Metrics
+                </span>
               </div>
+              <div className="relative">
+                <Input
+                  placeholder="Search integrations..."
+                  value={integrationSearch}
+                  onChange={(e) => setIntegrationSearch(e.target.value)}
+                  className="h-8 pl-8 text-xs"
+                />
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                  🔍
+                </span>
+              </div>
+            </div>
 
-              {/* Trends chart */}
-              <Card>
-                <CardHeader className="py-3 flex items-center justify-between gap-2">
-                  <CardTitle className="text-sm">
-                    Traffic Trends (Sessions)
-                  </CardTitle>
-                  <div
-                    draggable={!!googleIntegration}
-                    onDragStart={
-                      googleIntegration
-                        ? (e) =>
-                            handleDragStart(e, "line_chart", {
-                              metricKey: "ga.sessions_trend",
-                              integration: googleIntegration.platform,
-                              accountId: googleIntegration.accountId,
-                            })
-                        : undefined
-                    }
-                    className={`flex items-center justify-center w-7 h-7 rounded border text-[10px] ${
-                      googleIntegration
-                        ? "border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing"
-                        : "border-gray-200 text-gray-300 cursor-not-allowed"
-                    }`}
-                    title={
-                      googleIntegration
-                        ? "Drag to add a Traffic Trends line chart"
-                        : "Connect Google Analytics to add this chart"
-                    }
-                  >
-                    ↗
-                  </div>
-                </CardHeader>
-                <CardContent className="py-2">
-                  {isLoadingGaTrends ? (
-                    <div className="h-40 w-full bg-gray-100 animate-pulse rounded" />
-                  ) : gaTrendsChartData.length === 0 ? (
-                    <div className="h-40 flex items-center justify-center text-xs text-gray-500">
-                      No trend data available.
-                    </div>
-                  ) : (
-                    <div className="w-full h-40">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={gaTrendsChartData}>
-                          <defs>
-                            <linearGradient
-                              id="gaSessions"
-                              x1="0"
-                              y1="0"
-                              x2="0"
-                              y2="1"
-                            >
-                              <stop
-                                offset="5%"
-                                stopColor="#2563EB"
-                                stopOpacity={0.35}
-                              />
-                              <stop
-                                offset="95%"
-                                stopColor="#2563EB"
-                                stopOpacity={0}
-                              />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                          <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                          <YAxis tick={{ fontSize: 10 }} />
-                          <Tooltip
-                            formatter={(value: number) => [
-                              value.toLocaleString(),
-                              "Sessions",
-                            ]}
-                          />
-                          <Area
-                            type="monotone"
-                            dataKey="sessions"
-                            stroke="#2563EB"
-                            strokeWidth={2}
-                            fill="url(#gaSessions)"
-                            dot={false}
-                            activeDot={{ r: 3, fill: "#2563EB" }}
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
+            {availableMetricsError && (
+              <div className="px-3 py-2 text-[11px] text-destructive border-b bg-destructive/5">
+                Failed to load metrics catalog: {availableMetricsError.message}
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto">
+              {filteredIntegrations.length === 0 ? (
+                <div className="px-4 py-6 text-xs text-gray-500 text-center">
+                  No integrations match your search.
+                </div>
+              ) : (
+                filteredIntegrations.map((integration) => {
+                  const platformConfig = getPlatformConfig(integration.platform);
+                  return (
+                    <button
+                      key={`${integration.platform}-${integration.accountId}`}
+                      type="button"
+                      onClick={() =>
+                        setSelectedIntegrationForMetrics({
+                          platform: integration.platform,
+                          accountId: integration.accountId,
+                          accountName: integration.accountName,
+                        })
+                      }
+                      className="w-full flex items-center gap-3 px-3 py-2.5 border-b text-left hover:bg-gray-50 transition-colors"
+                    >
+                      {platformConfig && (
+                        <platformConfig.icon
+                          className="w-4 h-4 flex-shrink-0"
+                          style={{ color: platformConfig.color }}
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium text-gray-900 truncate">
+                          {platformConfig?.name || integration.platform}
+                        </div>
+                        <div className="text-[11px] text-gray-500 truncate">
+                          {integration.accountName}
+                        </div>
+                      </div>
+                      <span className="text-gray-300 text-xs">›</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      // Step 2: metrics list for the selected integration
+      const { platform, accountId, accountName } = selectedIntegrationForMetrics;
+      const platformConfig = getPlatformConfig(platform);
+      const normalizedPlatform = platform.toLowerCase().replace(/_/g, "-");
+      const isGoogleConsole =
+        normalizedPlatform === "google-console" ||
+        normalizedPlatform === "google-search-console";
+      const isGoogleAnalytics = normalizedPlatform === "google-analytics";
+
+      // Handle platform aliases (e.g., UI may store "google-console" but metrics come as "google-search-console")
+      const aliasPlatform =
+        platform === "google-console" || normalizedPlatform === "google-console"
+          ? "google-search-console"
+          : undefined;
+
+      // Try direct, normalized, alias, and fallback matches into groupedMetrics
+      const directMetrics = groupedMetrics[platform] ?? {};
+      const normalizedMetrics = groupedMetrics[normalizedPlatform] ?? {};
+      const aliasMetrics = aliasPlatform ? groupedMetrics[aliasPlatform] ?? {} : {};
+
+      const metricsByAccount =
+        Object.keys(directMetrics).length > 0
+          ? directMetrics
+          : Object.keys(normalizedMetrics).length > 0
+          ? normalizedMetrics
+          : Object.keys(aliasMetrics).length > 0
+          ? aliasMetrics
+          : {};
+
+      // If Google Search Console or Google Analytics and we have live unified-metrics rows, map them to metric options
+      if ((isGoogleConsole || isGoogleAnalytics) && gscMetricsQuery.data?.rows?.length) {
+        const liveMetrics = gscMetricsQuery.data.rows.map((row) => ({
+          metricKey: row.metricKey || (isGoogleAnalytics ? "google.sessions" : "google_seo.clicks"),
+          integration: isGoogleAnalytics ? "google-analytics" : "google-search-console",
+          accountId: row.accountId || accountId,
+          displayName: row.dimensionValue || row.metricKey,
+          category:
+            row.dimensionType ||
+            (isGoogleAnalytics ? "metric" : "query"),
+          // tuck dimension params to filters so they flow into the widget
+          filters: {
+            dimensionType: row.dimensionType ? [row.dimensionType] : isGoogleAnalytics ? undefined : [gscDimensionType],
+            dimensionValue: row.dimensionValue || undefined,
+            startDate: gscStartDate,
+            endDate: gscEndDate,
+          },
+          value: row.value,
+        }));
+
+        metricsByAccount[accountId] = liveMetrics;
+      }
+
+      let metricsForAccount = metricsByAccount[accountId] ?? [];
+      if (!metricsForAccount.length) {
+        // Fallback: flatten all account metrics for this integration
+        metricsForAccount = Object.values(metricsByAccount).flat();
+      }
+
+      // Restrict GA metrics to a curated set
+      if (isGoogleAnalytics) {
+        const allowedGaKeys = new Set([
+          "google.activeUsers",
+          "google.bounceRate",
+          "google.pageViews",
+          "google.sessions",
+        ]);
+        metricsForAccount = metricsForAccount.filter((metric) =>
+          allowedGaKeys.has(metric.metricKey)
+        );
+      }
+
+      const search = metricsSearch.trim().toLowerCase();
+      const filteredMetrics = metricsForAccount.filter((metric) => {
+        if (!search) return true;
+        return (
+          metric.displayName.toLowerCase().includes(search) ||
+          metric.category.toLowerCase().includes(search) ||
+          metric.metricKey.toLowerCase().includes(search)
+        );
+      });
+      const metricTypeOptions: Array<{ type: ReportWidgetType; label: string }> =
+        [
+          { type: "metric", label: "#" },
+          { type: "line_chart", label: "↗" },
+          { type: "bar_chart", label: "▮▮" },
+          { type: "table", label: "T" },
+        ];
+
+      return (
+        <div className="w-full h-full flex flex-col overflow-y-auto">
+          {/* Header with back + integration name */}
+          <div className="px-3 pt-3 pb-2 border-b space-y-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedIntegrationForMetrics(null);
+                  setMetricsSearch("");
+                }}
+                className="w-6 h-6 flex items-center justify-center rounded border border-gray-300 text-xs hover:bg-gray-50"
+              >
+                ←
+              </button>
+              {platformConfig && (
+                <platformConfig.icon
+                  className="w-4 h-4 flex-shrink-0"
+                  style={{ color: platformConfig.color }}
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-gray-900 truncate">
+                  {platformConfig?.name || platform}
+                </div>
+                <div className="text-[11px] text-gray-500 truncate">
+                  {accountName}
+                </div>
+              </div>
+            </div>
+
+            {/* Widget type toolbar */}
+            <div className="flex items-center gap-1 mt-2">
+              {metricTypeOptions.map((opt) => (
+                <button
+                  key={opt.type}
+                  type="button"
+                  onClick={() => setSelectedMetricWidgetType(opt.type)}
+                  className={`flex-1 h-7 flex items-center justify-center rounded border text-[10px] ${
+                    selectedMetricWidgetType === opt.type
+                      ? "border-blue-500 bg-blue-50 text-blue-600"
+                      : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Metrics search */}
+            <div className="relative mt-2">
+              <Input
+                placeholder="Search metrics..."
+                value={metricsSearch}
+                onChange={(e) => setMetricsSearch(e.target.value)}
+                className="h-8 pl-8 text-xs"
+              />
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                🔍
+              </span>
+            </div>
+
+            {(isGoogleConsole || isGoogleAnalytics) && (
+              <div className="mt-3 space-y-2 border rounded-md p-3 bg-gray-50">
+                <div className="text-[11px] font-semibold text-gray-700">
+                  {isGoogleConsole
+                    ? "Google Search Console params"
+                    : "Google Analytics params"}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {isGoogleConsole && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] text-gray-500">Dimension</span>
+                      <select
+                        className="h-8 rounded border border-gray-200 text-xs px-2"
+                        value={gscDimensionType}
+                        onChange={(e) => setGscDimensionType(e.target.value)}
+                      >
+                        <option value="query">Query</option>
+                        <option value="page">Page</option>
+                        <option value="country">Country</option>
+                        <option value="device">Device</option>
+                        <option value="date">Date</option>
+                      </select>
                     </div>
                   )}
-                </CardContent>
-              </Card>
-
-              {/* Top pages table */}
-              <Card>
-                <CardHeader className="py-3 flex items-center justify-between gap-2">
-                  <CardTitle className="text-sm">Top Pages by Views</CardTitle>
-                  <div
-                    draggable={!!googleIntegration}
-                    onDragStart={
-                      googleIntegration
-                        ? (e) =>
-                            handleDragStart(e, "table", {
-                              metricKey: "ga.top_pages_views",
-                              integration: googleIntegration.platform,
-                              accountId: googleIntegration.accountId,
-                            })
-                        : undefined
-                    }
-                    className={`flex items-center justify-center w-7 h-7 rounded border text-[10px] ${
-                      googleIntegration
-                        ? "border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing"
-                        : "border-gray-200 text-gray-300 cursor-not-allowed"
-                    }`}
-                    title={
-                      googleIntegration
-                        ? "Drag to add a Top Pages table"
-                        : "Connect Google Analytics to add this table"
-                    }
-                  >
-                    T
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] text-gray-500">Start date</span>
+                    <Input
+                      type="date"
+                      value={gscStartDate}
+                      onChange={(e) => setGscStartDate(e.target.value)}
+                      className="h-8 text-xs"
+                    />
                   </div>
-                </CardHeader>
-                <CardContent className="py-2">
-                  {isLoadingGaTopPages ? (
-                    <div className="space-y-2">
-                      <div className="h-8 w-full bg-gray-100 animate-pulse rounded" />
-                      <div className="h-8 w-full bg-gray-100 animate-pulse rounded" />
-                      <div className="h-8 w-full bg-gray-100 animate-pulse rounded" />
-                    </div>
-                  ) : gaTopPagesError ? (
-                    <p className="text-xs text-destructive">
-                      Failed to load top pages: {gaTopPagesError.message}
-                    </p>
-                  ) : gaTopPages.length === 0 ? (
-                    <p className="text-xs text-gray-500">
-                      No top page data available.
-                    </p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-xs">Page Path</TableHead>
-                            <TableHead className="text-xs">Title</TableHead>
-                            <TableHead className="text-xs text-right">
-                              Views
-                            </TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {gaTopPages.map((page) => (
-                            <TableRow key={page.pagePath}>
-                              <TableCell className="text-xs">
-                                {page.pagePath}
-                              </TableCell>
-                              <TableCell className="text-xs">
-                                {page.pageTitle || "Untitled"}
-                              </TableCell>
-                              <TableCell className="text-xs text-right">
-                                {page.views.toLocaleString()}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] text-gray-500">End date</span>
+                    <Input
+                      type="date"
+                      value={gscEndDate}
+                      onChange={(e) => setGscEndDate(e.target.value)}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div className="flex flex-col justify-end text-[10px] text-gray-500 gap-1">
+                    <span>Applied when you drag a metric.</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-[11px] px-2"
+                      onClick={() => {
+                        if (gscStartDate && gscEndDate) {
+                          setDateRange({
+                            from: new Date(gscStartDate),
+                            to: new Date(gscEndDate),
+                          });
+                        }
+                      }}
+                    >
+                      Apply dates to report
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Metrics list */}
+          <div className="flex-1 overflow-y-auto">
+            {isLoadingAvailableMetrics ? (
+              <div className="px-4 py-4 text-xs text-gray-500">
+                Loading metrics...
+              </div>
+            ) : filteredMetrics.length === 0 ? (
+              <div className="px-4 py-4 text-xs text-gray-500">
+                No metrics found for this integration.
+              </div>
+            ) : (
+              filteredMetrics.map((metric) => (
+                <div
+                  key={metric.metricKey}
+                  className="flex items-center gap-2 px-3 py-2 border-b hover:bg-gray-50"
+                >
+                  {platformConfig && (
+                    <platformConfig.icon
+                      className="w-4 h-4 flex-shrink-0"
+                      style={{ color: platformConfig.color }}
+                    />
                   )}
-                </CardContent>
-              </Card>
-            </div>
-          ) : (
-            <div className="text-center text-sm text-gray-500 py-8 px-4">
-              <p className="font-medium mb-2">
-                Google Analytics is not connected or has no active property.
-              </p>
-              <p className="text-xs mb-4">
-                Connect Google Analytics from the Data Sources page to see
-                metrics here.
-              </p>
-              <Link to="/data-sources/google-analytics">
-                <Button variant="outline" size="sm">
-                  Open Google Analytics
-                </Button>
-              </Link>
-            </div>
-          )}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium text-gray-900 truncate">
+                      {metric.displayName}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="inline-flex items-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-600">
+                        {metric.category}
+                      </span>
+                      <span className="text-[10px] text-gray-400 truncate">
+                        {metric.metricKey}
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) =>
+                      handleDragStart(e, selectedMetricWidgetType, {
+                        metricKey: metric.metricKey,
+                        integration: metric.integration,
+                        accountId: metric.accountId,
+                        ...(metric.filters
+                          ? { filters: metric.filters }
+                          : isGoogleConsole
+                          ? {
+                              filters: {
+                                dimensionType: gscDimensionType,
+                                startDate: gscStartDate,
+                                endDate: gscEndDate,
+                              },
+                            }
+                          : {}),
+                      })
+                    }
+                    className="flex items-center justify-center w-7 h-7 rounded border border-gray-300 text-[10px] hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing"
+                    title={`Drag to add as a ${
+                      selectedMetricWidgetType === "metric"
+                        ? "metric card"
+                        : selectedMetricWidgetType === "line_chart"
+                        ? "line chart"
+                        : selectedMetricWidgetType === "bar_chart"
+                        ? "bar chart"
+                        : "table"
+                    }`}
+                  >
+                    {metricTypeOptions.find(
+                      (opt) => opt.type === selectedMetricWidgetType
+                    )?.label ?? "#"}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       );
     }
@@ -2606,18 +2701,14 @@ function ReportBuilder() {
   }, [
     rightPanelTitle,
     handleDragStart,
-    gaSummaryError,
-    gaTrendsError,
-    gaTopPagesError,
-    gaMetaError,
-    gaIsConnected,
-    isLoadingGaSummary,
-    isLoadingGaTrends,
-    isLoadingGaTopPages,
-    gaSummary,
-    gaTrendsChartData,
-    gaTopPages,
-    gaTopPagesError,
+    integrationsData,
+    groupedMetrics,
+    isLoadingAvailableMetrics,
+    availableMetricsError,
+    selectedIntegrationForMetrics,
+    integrationSearch,
+    metricsSearch,
+    selectedMetricWidgetType,
   ]);
   // Detect if we're on tablet (using window width)
   const [isTablet, setIsTablet] = useState(false);
@@ -2866,8 +2957,9 @@ function ReportBuilder() {
               // the sidebar even before a full save/refresh round-trip.
               slidesMeta={(() => {
                 const base =
-                  (templateQuery.data?.slidesMeta as ReportSlideMeta[] | undefined) ??
-                  [];
+                  (templateQuery.data?.slidesMeta as
+                    | ReportSlideMeta[]
+                    | undefined) ?? [];
                 if (!customPages.length) {
                   return base;
                 }
@@ -2916,33 +3008,32 @@ function ReportBuilder() {
               return undefined;
             };
 
-            // Get slide title - prefer slide metadata from the template so that
-            // the main slide header matches the Pages sidebar. Fall back to
-            // custom page names, then integration names, and finally a neutral
-            // "Untitled page" label.
+            // Get slide title - prefer the current customPages (Pages sidebar)
+            // so that renaming a page immediately updates the main slide
+            // header. Fall back to slide metadata from the template, then
+            // integration names, and finally a neutral "Untitled page" label.
             const slideMeta = templateQuery.data?.slidesMeta?.find(
               (s) => s.id === id
             );
+            const customPage = customPages.find((p) => p.id === id);
+
             let slideTitle: string;
             let slideSubtitle: string | undefined;
 
-            if (slideMeta) {
+            if (customPage) {
+              slideTitle = customPage.name;
+              slideSubtitle = customPage.subtitle;
+            } else if (slideMeta) {
               slideTitle = slideMeta.title;
               slideSubtitle = slideMeta.subtitle;
             } else {
-              const customPage = customPages.find((p) => p.id === id);
-              if (customPage) {
-                slideTitle = customPage.name;
-                slideSubtitle = customPage.subtitle;
+              const integration = integrationsData?.integrations?.[pageIndex];
+              if (integration) {
+                const platformConfig = getPlatformConfig(integration.platform);
+                slideTitle = platformConfig?.name || integration.platform;
+                slideSubtitle = integration.accountName;
               } else {
-                const integration = integrationsData?.integrations?.[pageIndex];
-                if (integration) {
-                  const platformConfig = getPlatformConfig(integration.platform);
-                  slideTitle = platformConfig?.name || integration.platform;
-                  slideSubtitle = integration.accountName;
-                } else {
-                  slideTitle = "Untitled page";
-                }
+                slideTitle = "Untitled page";
               }
             }
 
@@ -3058,7 +3149,7 @@ function ReportBuilder() {
                           <WidgetCard
                             widget={widget}
                             onContentClick={createWidgetClickHandler(id)}
-                      onDelete={() => handleDeleteWidget(id, widget.i)}
+                            onDelete={() => handleDeleteWidget(id, widget.i)}
                           >
                             {renderWidgetContent(widget, widgetResolvedData, {
                               isLoading:
