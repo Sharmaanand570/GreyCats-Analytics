@@ -127,27 +127,90 @@ function CustomWidgetForm({
           </>
         ) : (
           <>
-            <div>
-              <Label className="block text-xs text-gray-600 mb-2">
-                Block type
-              </Label>
-              <Input
-                value={data?.type ?? ""}
-                onChange={(e) => handleChange({ type: e.target.value })}
-                placeholder="e.g. tasks, ai-summary, toc"
-              />
-            </div>
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <Label className="block text-xs text-gray-600 mb-2">
+                  Block type
+                </Label>
+                <Input
+                  value={data?.type ?? ""}
+                  onChange={(e) => handleChange({ type: e.target.value })}
+                  placeholder="e.g. text, tasks, ai-summary, toc"
+                  className="text-xs"
+                />
+              </div>
 
-            <div>
-              <Label className="block text-xs text-gray-600 mb-2">
-                Content
-              </Label>
-              <Textarea
-                rows={10}
-                value={data?.content ?? ""}
-                onChange={(e) => handleChange({ content: e.target.value })}
-                placeholder={`Add your content here. For tasks, you can add one task per line:\n- Task 1\n- Task 2`}
-              />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="block text-xs text-gray-600 mb-1">
+                    Title (optional)
+                  </Label>
+                  <Input
+                    value={data?.title ?? ""}
+                    onChange={(e) => handleChange({ title: e.target.value })}
+                    placeholder="Section heading"
+                    className="text-xs"
+                  />
+                </div>
+                <div>
+                  <Label className="block text-xs text-gray-600 mb-1">
+                    Align
+                  </Label>
+                  <select
+                    className="w-full text-xs border rounded-md h-9 px-2"
+                    value={data?.align ?? "left"}
+                    onChange={(e) =>
+                      handleChange({
+                        align: e.target.value as CustomWidgetData["align"],
+                      })
+                    }
+                  >
+                    <option value="left">Left</option>
+                    <option value="center">Center</option>
+                    <option value="right">Right</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="block text-xs text-gray-600 mb-1">
+                    Background
+                  </Label>
+                  <Input
+                    value={data?.backgroundColor ?? ""}
+                    onChange={(e) =>
+                      handleChange({ backgroundColor: e.target.value })
+                    }
+                    placeholder="#F8FAFC or rgba(...)"
+                    className="text-xs"
+                  />
+                </div>
+                <div>
+                  <Label className="block text-xs text-gray-600 mb-1">
+                    Text color
+                  </Label>
+                  <Input
+                    value={data?.textColor ?? ""}
+                    onChange={(e) => handleChange({ textColor: e.target.value })}
+                    placeholder="#0F172A"
+                    className="text-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="block text-xs text-gray-600 mb-2">
+                  Content
+                </Label>
+                <Textarea
+                  rows={10}
+                  value={data?.content ?? ""}
+                  onChange={(e) => handleChange({ content: e.target.value })}
+                  placeholder={`Add your content here. For tasks, you can add one task per line:\n- Task 1\n- Task 2`}
+                  className="text-xs"
+                />
+              </div>
             </div>
           </>
         )}

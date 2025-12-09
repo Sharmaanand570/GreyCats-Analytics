@@ -80,6 +80,7 @@ import {
   createReportTemplate,
   getReportTemplate,
   resolveMetricWidgets,
+  fetchUnifiedMetric,
   runReport,
   updateReportTemplate,
   createReportSchedule,
@@ -193,7 +194,14 @@ const getDefaultWidgetData = (
     case "embed":
       return { url: "", type: "iframe" };
     case "custom":
-      return { content: "Custom Widget", type: "text" };
+      return {
+        content: "Custom Widget",
+        type: "text",
+        title: "",
+        align: "left",
+        backgroundColor: "",
+        textColor: "",
+      };
     default:
       return undefined;
   }
@@ -202,11 +210,286 @@ const getDefaultWidgetData = (
 // Empty default template - users start with a blank canvas
 const DEFAULT_TEMPLATE_WIDGETS: ReportWidgetDefinition[] = [];
 
+// Feature flag: Set to false to disable auto-population of default widgets
+const ENABLE_AUTO_DEFAULT_WIDGETS = true;
+
+// Curated default metrics per integration platform
+const CURATED_DEFAULTS: Record<string, string[]> = {
+  "google-analytics": [
+    "sessions",
+    "activeUsers",
+    "pageViews",
+    "bounceRate",
+  ],
+  "google-search-console": [
+    "google_seo.clicks",      // Match actual DB format
+    "google_seo.impressions",
+    "google_seo.ctr",
+    "google_seo.position",
+  ],
+  "woo": [                    // Match actual DB integration key
+    "woo.revenue",
+    "woo.orders",
+    "woo.itemsSold",
+  ],
+  "woocommerce": [            // Alias for compatibility
+    "woo.revenue",
+    "woo.orders",
+    "woo.itemsSold",
+  ],
+};
+
+const MAX_DEFAULT_WIDGETS = 8;
+
 const ensureSlide = (map: DashboardMap, slideId: number) => {
   if (!map.has(slideId)) {
     map.set(slideId, []);
   }
 };
+
+type MetricOption = {
+  metricKey: string;
+  integration: string;
+  accountId: string;
+  filters?: Record<string, unknown>;
+};
+
+/**
+ * Pick default metrics for an integration, trying curated keys first,
+ * then falling back to available metrics from groupedMetrics.
+ */
+function pickDefaultMetricsForIntegration(
+  integrationKey: string,
+  accountId: string,
+  groupedMetrics: Record<string, Record<string, MetricOption[]>>,
+  notifyFallback: (msg: string) => void
+): MetricOption[] {
+  const normalized = integrationKey.toLowerCase().replace(/_/g, "-");
+
+  // DEBUG: Log what we're looking for and what's available
+  console.log('🔍 pickDefaultMetricsForIntegration:', {
+    integrationKey,
+    normalized,
+    accountId,
+    availableIntegrations: Object.keys(groupedMetrics),
+  });
+
+  // Try to find metrics for this integration/account in groupedMetrics
+  const perAccount =
+    groupedMetrics[integrationKey] ??
+    groupedMetrics[normalized] ??
+    groupedMetrics[normalized === "google-console" ? "google-search-console" : ""] ??
+    {};
+
+  const candidates =
+    perAccount[accountId] ?? Object.values(perAccount).flat() ?? [];
+
+  // DEBUG: Log what metrics we found
+  console.log('📊 Available metrics for', integrationKey, ':', {
+    candidateCount: candidates.length,
+    sampleKeys: candidates.slice(0, 5).map(m => m.metricKey),
+  });
+
+  if (!candidates.length) {
+    console.warn('⚠️ No metrics found in debug list for', integrationKey, accountId);
+
+    // Fallback: use curated defaults if available
+    const curated = CURATED_DEFAULTS[normalized] ?? CURATED_DEFAULTS[integrationKey] ?? [];
+    if (curated.length > 0) {
+      console.log('✨ Using curated defaults as fallback:', curated);
+      // Create synthetic metric options from curated defaults
+      const syntheticMetrics: MetricOption[] = curated.map(metricKey => ({
+        metricKey,
+        integration: integrationKey,
+        accountId,
+        label: metricKey.split('.').pop() || metricKey,
+      }));
+      return syntheticMetrics;
+    }
+
+    console.error('❌ No curated defaults available for', integrationKey);
+    return [];
+  }
+
+  const curated = CURATED_DEFAULTS[normalized] ?? [];
+  const curatedFound: MetricOption[] = [];
+
+  // Try to match curated metric keys (flexible matching by suffix)
+  curated.forEach((key) => {
+    const hit = candidates.find(
+      (m) =>
+        m.metricKey === key ||
+        m.metricKey.endsWith(`.${key}`) ||
+        m.metricKey.toLowerCase().includes(key.toLowerCase())
+    );
+    if (hit) {
+      console.log('✅ Matched curated metric:', key, '→', hit.metricKey);
+      curatedFound.push(hit);
+    } else {
+      console.log('❌ Curated metric not found:', key);
+    }
+  });
+
+  // If no curated metrics found, use fallback
+  if (!curatedFound.length && candidates.length) {
+    console.warn('⚠️ Using fallback metrics for', integrationKey);
+    notifyFallback(
+      `Using available metrics for ${integrationKey} (curated metrics not found).`
+    );
+    return candidates.slice(0, MAX_DEFAULT_WIDGETS);
+  }
+
+  // Fill remaining slots with other available metrics
+  const remaining =
+    candidates.filter(
+      (m) => !curatedFound.some((c) => c.metricKey === m.metricKey)
+    ) ?? [];
+
+  const result = [...curatedFound, ...remaining].slice(0, MAX_DEFAULT_WIDGETS);
+  console.log('✨ Final metrics selected:', result.map(m => m.metricKey));
+
+  return result;
+}
+
+/**
+ * Build default widget layouts for an integration slide.
+ * Creates metric cards and a line chart from the provided metrics.
+ */
+function buildDefaultWidgetsForIntegration(
+  slideId: number,
+  metrics: MetricOption[]
+): DashboardLayout[] {
+  if (!metrics.length) return [];
+
+  const widgets: DashboardLayout[] = [];
+
+  const addWidget = (
+    type: ReportWidgetType,
+    metric: MetricOption,
+    idx: number
+  ) => {
+    const id = generateWidgetId("auto");
+    const isMetricCard = type === "metric";
+
+    // Get proper label from metric displayName or metricKey
+    const label = metric.displayName ||
+      metric.metricKey.split('.').pop()?.replace(/([A-Z])/g, ' $1').trim() ||
+      'Metric';
+
+    const widget: DashboardLayout = {
+      i: id,
+      x: isMetricCard ? (idx % 2) * 6 : 0,  // Metric cards: 0 or 6, Charts: 0 (full width)
+      y: Math.floor(idx / 2) * (isMetricCard ? 2 : 4),
+      w: isMetricCard ? 3 : 12,  // Metric cards: 3 units, Charts: 12 units (full width)
+      h: isMetricCard ? 2 : 4,   // Metric cards: 2 units tall, Charts: 4 units tall (more compact)
+      widgetType: type,
+      data: isMetricCard
+        ? { label, value: 0 }  // Use proper label for metric cards
+        : { chartType: "line", title: label },  // Use proper title for charts
+      metricConfig: {
+        id,
+        metricKey: metric.metricKey,
+        integration: metric.integration,
+        accountId: metric.accountId,
+        groupBy: isMetricCard ? "none" : "day",
+        aggregation: "sum",
+        type: isMetricCard ? "metric_card" : "line_chart",
+        layout: {
+          slideId,
+          x: isMetricCard ? (idx % 2) * 6 : 0,
+          y: Math.floor(idx / 2) * (isMetricCard ? 2 : 4),
+          w: isMetricCard ? 3 : 12,
+          h: isMetricCard ? 2 : 4,
+        },
+        ...(metric.filters ? { filters: metric.filters } : {}),
+      },
+    };
+    widgets.push(widget);
+  };
+
+  // Add first 2 metrics as cards
+  metrics.slice(0, 2).forEach((m, idx) => addWidget("metric", m, idx));
+
+  // Add first metric as a line chart
+  if (metrics[0]) {
+    addWidget("chart", metrics[0], widgets.length);
+  }
+
+  // Add remaining metrics as cards (up to total of MAX_DEFAULT_WIDGETS)
+  metrics.slice(2, 4).forEach((m) => addWidget("metric", m, widgets.length));
+
+  // For Google Search Console, add dimensional breakdowns (by device, country)
+  // Only if we have space and the first metric exists
+  if (metrics[0] && metrics[0].integration === "google-search-console" && widgets.length < MAX_DEFAULT_WIDGETS) {
+    const firstMetric = metrics[0];
+
+    // Add "By Device" table widget
+    if (widgets.length < MAX_DEFAULT_WIDGETS) {
+      const id = generateWidgetId("auto");
+
+      widgets.push({
+        i: id,
+        x: 0,
+        y: widgets.length * 2 + 4,  // Position below other widgets
+        w: 6,  // Half width
+        h: 3,
+        widgetType: "table",
+        data: undefined,  // Table data will be fetched separately
+        metricConfig: {
+          id,
+          metricKey: firstMetric.metricKey,
+          integration: firstMetric.integration,
+          accountId: firstMetric.accountId,
+          groupBy: "device",  // Group by device dimension
+          aggregation: "sum",
+          type: "table",
+          layout: {
+            slideId,
+            x: 0,
+            y: widgets.length * 2 + 4,
+            w: 6,
+            h: 3,
+          },
+          ...(firstMetric.filters ? { filters: firstMetric.filters } : {}),
+        },
+      });
+    }
+
+    // Add "By Country" table widget
+    if (widgets.length < MAX_DEFAULT_WIDGETS) {
+      const id = generateWidgetId("auto");
+
+      widgets.push({
+        i: id,
+        x: 6,  // Right side
+        y: widgets.length * 2 + 4,
+        w: 6,  // Half width
+        h: 3,
+        widgetType: "table",
+        data: undefined,  // Table data will be fetched separately
+        metricConfig: {
+          id,
+          metricKey: firstMetric.metricKey,
+          integration: firstMetric.integration,
+          accountId: firstMetric.accountId,
+          groupBy: "country",  // Group by country dimension
+          aggregation: "sum",
+          type: "table",
+          layout: {
+            slideId,
+            x: 6,
+            y: widgets.length * 2 + 4,
+            w: 6,
+            h: 3,
+          },
+          ...(firstMetric.filters ? { filters: firstMetric.filters } : {}),
+        },
+      });
+    }
+  }
+
+  return widgets.slice(0, MAX_DEFAULT_WIDGETS);
+}
 
 // Removed createPlaceholderWidget - new reports start with empty slides
 
@@ -273,48 +556,48 @@ const widgetItems: {
   type: ReportWidgetType;
   customKind?: string;
 }[] = [
-  { title: "Stat", description: "type in any stat you choose", type: "metric" },
-  { title: "Textbox", description: "textbox you can design", type: "title" },
-  { title: "Title", description: "Organize using title", type: "title" },
-  {
-    title: "Table of Contents",
-    description: "Table of contents for your report",
-    type: "custom",
-    customKind: "toc",
-  },
-  {
-    title: "AI Summary",
-    description: "A snapshot of your section data that you can auto-generate",
-    type: "custom",
-    customKind: "ai-summary",
-  },
-  {
-    title: "Tasks",
-    description: "Highlight completed tasks",
-    type: "custom",
-    customKind: "tasks",
-  },
-];
+    { title: "Stat", description: "type in any stat you choose", type: "metric" },
+    { title: "Textbox", description: "textbox you can design", type: "title" },
+    { title: "Title", description: "Organize using title", type: "title" },
+    {
+      title: "Table of Contents",
+      description: "Table of contents for your report",
+      type: "custom",
+      customKind: "toc",
+    },
+    {
+      title: "AI Summary",
+      description: "A snapshot of your section data that you can auto-generate",
+      type: "custom",
+      customKind: "ai-summary",
+    },
+    {
+      title: "Tasks",
+      description: "Highlight completed tasks",
+      type: "custom",
+      customKind: "tasks",
+    },
+  ];
 
 const imageWidgetItems: {
   title: string;
   description: string;
   type: ReportWidgetType;
 }[] = [
-  { title: "Image", description: "Add any image you like", type: "image" },
-];
+    { title: "Image", description: "Add any image you like", type: "image" },
+  ];
 
 const embedWidgetItems: {
   title: string;
   description: string;
   type: ReportWidgetType;
 }[] = [
-  {
-    title: "Embed",
-    description: "Embed YouTube, Google Sheets etc",
-    type: "embed",
-  },
-];
+    {
+      title: "Embed",
+      description: "Embed YouTube, Google Sheets etc",
+      type: "embed",
+    },
+  ];
 
 // Table helpers
 const getStatusBadgeClass = (
@@ -417,14 +700,14 @@ const renderWidgetContent = (
           <div className="border-t px-3 py-2 text-xs md:text-sm space-y-1 min-h-[3.5rem]">
             {hasData
               ? series.slice(0, 4).map((point) => (
-                  <div
-                    className="flex justify-between"
-                    key={`${point.x}-${point.y}`}
-                  >
-                    <span className="text-gray-500">{point.x}</span>
-                    <span className="font-medium text-gray-900">{point.y}</span>
-                  </div>
-                ))
+                <div
+                  className="flex justify-between"
+                  key={`${point.x}-${point.y}`}
+                >
+                  <span className="text-gray-500">{point.x}</span>
+                  <span className="font-medium text-gray-900">{point.y}</span>
+                </div>
+              ))
               : renderWidgetEmptyState(onConnectIntegration)}
           </div>
         </div>
@@ -520,10 +803,45 @@ const renderWidgetContent = (
         metricConfig?.metricKey === "ga.top_pages_views" &&
         !!metricConfig?.integration;
 
+      const generateColumnsFromRows = (rows: any[]) => {
+        if (!rows.length) return [];
+        const sample = rows[0] as Record<string, unknown>;
+        return Object.keys(sample).slice(0, 8).map((key) => ({
+          name: key
+            .replace(/[_-]/g, " ")
+            .replace(/\s+/g, " ")
+            .replace(/^\w/, (c) => c.toUpperCase()),
+        }));
+      };
+
+      const resolvedRows =
+        resolvedData && Array.isArray((resolvedData as any).rows)
+          ? ((resolvedData as any).rows as unknown[])
+          : null;
+
+      // Check if this is dimensional data (from GET /unified-metrics with dimensionType)
+      const isDimensionalData =
+        resolvedRows &&
+        resolvedRows.length > 0 &&
+        resolvedRows[0] &&
+        typeof resolvedRows[0] === 'object' &&
+        resolvedRows[0] !== null &&
+        'dimensionValue' in (resolvedRows[0] as Record<string, unknown>) &&
+        'value' in (resolvedRows[0] as Record<string, unknown>);
+
+      // If dimensional data, convert to simple 2-column format
+      let dimensionalRows: Array<{ dimension: string; value: number }> | null = null;
+      if (isDimensionalData && resolvedRows) {
+        dimensionalRows = resolvedRows.map((row: any) => ({
+          dimension: row.dimensionValue || row.dimensionType || 'Unknown',
+          value: typeof row.value === 'number' ? row.value : 0,
+        }));
+      }
+
       const gaRows =
         isGaTopPagesTable &&
-        resolvedData &&
-        Array.isArray((resolvedData as any).rows)
+          resolvedData &&
+          Array.isArray((resolvedData as any).rows)
           ? ((resolvedData as any).rows as unknown[])
           : null;
 
@@ -531,11 +849,34 @@ const renderWidgetContent = (
       // 2-column table from the series (label + value).
       let seriesRows =
         !isGaTopPagesTable &&
-        !gaRows &&
-        Array.isArray((resolvedData as ResolvedWidgetData)?.series)
+          !gaRows &&
+          !dimensionalRows &&  // Don't use series if we have dimensional data
+          Array.isArray((resolvedData as ResolvedWidgetData)?.series)
           ? (((resolvedData as ResolvedWidgetData)
-              .series as WidgetSeriesPoint[]) as unknown[])
+            .series as WidgetSeriesPoint[]) as unknown[])
           : null;
+
+      // Fallback: if metric returns only a single value/total, build a 1-row series
+      if (
+        !isGaTopPagesTable &&
+        !gaRows &&
+        (!seriesRows || seriesRows.length === 0) &&
+        metricConfig?.metricKey &&
+        resolvedData
+      ) {
+        const value =
+          typeof (resolvedData as ResolvedWidgetData)?.value === "number"
+            ? (resolvedData as ResolvedWidgetData).value
+            : typeof (resolvedData as ResolvedWidgetData)?.total === "number"
+              ? (resolvedData as ResolvedWidgetData).total
+              : null;
+
+        if (value !== null) {
+          const metricName =
+            metricConfig.metricKey.split(".").pop() || metricConfig.metricKey;
+          seriesRows = [{ x: metricName, y: value }] as unknown[];
+        }
+      }
 
       // For GA tables, filter series to only the core GA metric keys to avoid noisy dimension rows
       const isGaIntegration =
@@ -554,15 +895,49 @@ const renderWidgetContent = (
         seriesRows = filtered.length ? filtered : [];
       }
 
+      // Identify which data source is driving the table so we render correct columns
+      const usingGaRows = !!gaRows && gaRows.length > 0;
+      const usingDimensionalRows = !usingGaRows && !!dimensionalRows && dimensionalRows.length > 0;
+      const usingSeriesRows = !usingGaRows && !usingDimensionalRows && !!seriesRows && seriesRows.length > 0;
+      const usingResolvedRows =
+        !usingGaRows && !usingDimensionalRows && !usingSeriesRows && !!resolvedRows && resolvedRows.length > 0;
+      const usingTableData =
+        !usingGaRows &&
+        !usingDimensionalRows &&
+        !usingSeriesRows &&
+        !usingResolvedRows &&
+        !!tableData?.rows &&
+        tableData.rows.length > 0;
+
       const rows =
-        (gaRows as any[]) ??
-        (seriesRows as any[]) ??
-        tableData?.rows ??
+        (usingGaRows ? (gaRows as any[]) : null) ??
+        (usingDimensionalRows ? (dimensionalRows as any[]) : null) ??
+        (usingResolvedRows ? (resolvedRows as any[]) : null) ??
+        (usingSeriesRows ? (seriesRows as any[]) : null) ??
+        (usingTableData ? tableData?.rows : null) ??
         reportTableRows;
+
+      const autoColumns =
+        resolvedRows &&
+          resolvedRows.length &&
+          !gaRows &&
+          !dimensionalRows &&
+          !seriesRows &&
+          (!tableData?.columns || tableData.columns.length === 0)
+          ? generateColumnsFromRows(resolvedRows)
+          : null;
+
+      // Get dimension type from metricConfig for title
+      const dimensionType = metricConfig?.groupBy || '';
+      const metricName = metricConfig?.metricKey?.split('.').pop()?.replace(/_/g, ' ') || 'Metric';
 
       const title =
         tableData?.title ??
-        (isGaTopPagesTable ? "Top Pages by Views" : "Scheduled Reports");
+        (isGaTopPagesTable
+          ? "Top Pages by Views"
+          : usingDimensionalRows && dimensionType
+            ? `${metricName} by ${dimensionType.charAt(0).toUpperCase() + dimensionType.slice(1)}`
+            : "Scheduled Reports");
 
       const caption =
         tableData?.caption ??
@@ -571,25 +946,33 @@ const renderWidgetContent = (
           : "Queue of report deliveries.");
 
       const columns =
-        tableData?.columns ??
-        (isGaTopPagesTable
+        isGaTopPagesTable
           ? [
-              { name: "Page Path", width: "45%" },
-              { name: "Title", width: "35%" },
-              { name: "Views" },
+            { name: "Page Path", width: "45%" },
+            { name: "Title", width: "35%" },
+            { name: "Views" },
+          ]
+          : usingDimensionalRows
+            ? [
+              { name: dimensionType.charAt(0).toUpperCase() + dimensionType.slice(1), width: "60%" },
+              { name: metricName.charAt(0).toUpperCase() + metricName.slice(1) },
             ]
-          : seriesRows
-          ? [
-              { name: "Label", width: "60%" },
-              { name: "Value" },
-            ]
-          : [
-              { name: "Report", width: "35%" },
-              { name: "Audience" },
-              { name: "Status" },
-              { name: "Last Run" },
-              { name: "Next Send" },
-            ]);
+            : usingSeriesRows
+              ? [
+                { name: "Label", width: "60%" },
+                { name: "Value" },
+              ]
+              : usingResolvedRows && autoColumns
+                ? autoColumns
+                : tableData?.columns && tableData.columns.length
+                  ? tableData.columns
+                  : [
+                    { name: "Report", width: "35%" },
+                    { name: "Audience" },
+                    { name: "Status" },
+                    { name: "Last Run" },
+                    { name: "Next Send" },
+                  ];
 
       const rawCount =
         typeof resolvedData?.rawCount === "number" ? resolvedData.rawCount : 0;
@@ -633,36 +1016,56 @@ const renderWidgetContent = (
                             col.name === "Page Path"
                               ? gaRow.pagePath
                               : col.name === "Title"
-                              ? gaRow.pageTitle || "Untitled"
-                              : col.name === "Views"
-                              ? gaRow.views
-                              : "";
-                        } else if (seriesRows) {
+                                ? gaRow.pageTitle || "Untitled"
+                                : col.name === "Views"
+                                  ? gaRow.views
+                                  : "";
+                        } else if (usingDimensionalRows) {
+                          const dimRow = row as { dimension: string; value: number };
+                          cellValue =
+                            colIndex === 0
+                              ? dimRow.dimension
+                              : dimRow.value;
+                        } else if (usingSeriesRows) {
                           const sRow = row as any as WidgetSeriesPoint;
                           cellValue =
                             col.name === "Label"
                               ? sRow.x
                               : col.name === "Value"
-                              ? sRow.y
-                              : "";
+                                ? sRow.y
+                                : "";
+                        } else if (resolvedRows) {
+                          const genericRow = row as Record<string, unknown>;
+                          cellValue =
+                            genericRow[col.name] ??
+                            genericRow[col.name.replace(/\s+/g, "")] ??
+                            genericRow[col.name.toLowerCase()] ??
+                            genericRow[col.name
+                              .toLowerCase()
+                              .replace(/\s+/g, "_")] ??
+                            "";
                         } else {
                           cellValue =
                             col.name === "Report"
                               ? (row as any).name
                               : col.name === "Audience"
-                              ? (row as any).audience
-                              : col.name === "Status"
-                              ? (row as any).status
-                              : col.name === "Last Run"
-                              ? (row as any).lastRun
-                              : col.name === "Next Send"
-                              ? (row as any).nextSend
-                              : (row as Record<string, unknown>)[
-                                  col.name.toLowerCase().replace(/\s+/g, "")
-                                ] ?? "";
+                                ? (row as any).audience
+                                : col.name === "Status"
+                                  ? (row as any).status
+                                  : col.name === "Last Run"
+                                    ? (row as any).lastRun
+                                    : col.name === "Next Send"
+                                      ? (row as any).nextSend
+                                      : (row as Record<string, unknown>)[
+                                      col.name.toLowerCase().replace(/\s+/g, "")
+                                      ] ?? "";
                         }
 
-                        if (!isGaTopPagesTable && !seriesRows && col.name === "Status") {
+                        if (
+                          !isGaTopPagesTable &&
+                          !usingSeriesRows &&
+                          col.name === "Status"
+                        ) {
                           return (
                             <TableCell
                               key={colIndex}
@@ -682,11 +1085,10 @@ const renderWidgetContent = (
                         return (
                           <TableCell
                             key={colIndex}
-                            className={`px-2 md:px-4 ${
-                              colIndex === 0
-                                ? "font-medium truncate"
-                                : "truncate"
-                            }`}
+                            className={`px-2 md:px-4 ${colIndex === 0
+                              ? "font-medium truncate"
+                              : "truncate"
+                              }`}
                           >
                             {col.name === "Views" && isGaTopPagesTable
                               ? Number(cellValue ?? 0).toLocaleString()
@@ -723,27 +1125,27 @@ const renderWidgetContent = (
         fontSize === "xs"
           ? "text-xs"
           : fontSize === "sm"
-          ? "text-sm"
-          : fontSize === "base"
-          ? "text-base"
-          : fontSize === "lg"
-          ? "text-lg"
-          : fontSize === "xl"
-          ? "text-xl"
-          : fontSize === "2xl"
-          ? "text-2xl"
-          : fontSize === "3xl"
-          ? "text-3xl"
-          : fontSize === "4xl"
-          ? "text-4xl"
-          : "text-2xl";
+            ? "text-sm"
+            : fontSize === "base"
+              ? "text-base"
+              : fontSize === "lg"
+                ? "text-lg"
+                : fontSize === "xl"
+                  ? "text-xl"
+                  : fontSize === "2xl"
+                    ? "text-2xl"
+                    : fontSize === "3xl"
+                      ? "text-3xl"
+                      : fontSize === "4xl"
+                        ? "text-4xl"
+                        : "text-2xl";
 
       const alignClass =
         align === "left"
           ? "justify-start"
           : align === "right"
-          ? "justify-end"
-          : "justify-center";
+            ? "justify-end"
+            : "justify-center";
 
       return (
         <div
@@ -774,8 +1176,8 @@ const renderWidgetContent = (
         isIntegrationMetric && typeof resolvedData?.value === "number"
           ? resolvedData.value
           : isIntegrationMetric && typeof resolvedData?.total === "number"
-          ? resolvedData.total
-          : undefined;
+            ? resolvedData.total
+            : undefined;
 
       const dataRawCount =
         isIntegrationMetric && typeof resolvedData?.rawCount === "number"
@@ -872,6 +1274,15 @@ const renderWidgetContent = (
 
     case "custom": {
       const customData = widgetData as CustomWidgetData | undefined;
+      const customStyle = {
+        backgroundColor: customData?.backgroundColor || undefined,
+        color: customData?.textColor || undefined,
+        textAlign: customData?.align ?? "left",
+      } as React.CSSProperties;
+      const heading =
+        customData?.title && customData.title.trim().length > 0
+          ? customData.title.trim()
+          : null;
       // Tasks-style custom block
       if (customData?.type === "tasks") {
         const tasks =
@@ -881,7 +1292,13 @@ const renderWidgetContent = (
             .filter(Boolean) || [];
 
         return (
-          <div className="h-full flex flex-col items-stretch justify-start text-xs md:text-sm text-gray-800 px-3 py-2">
+          <div
+            className="h-full flex flex-col items-stretch justify-start text-xs md:text-sm text-gray-800 px-3 py-2 rounded-md"
+            style={customStyle}
+          >
+            {heading && (
+              <div className="font-semibold mb-2 text-gray-900">{heading}</div>
+            )}
             {tasks.length === 0 ? (
               <span className="text-[11px] text-gray-400">
                 No tasks yet. Use the editor to add tasks.
@@ -908,8 +1325,13 @@ const renderWidgetContent = (
             .filter(Boolean) || [];
 
         return (
-          <div className="h-full flex flex-col items-stretch justify-start text-xs md:text-sm text-gray-800 px-3 py-2">
-            <div className="font-semibold mb-2">Table of Contents</div>
+          <div
+            className="h-full flex flex-col items-stretch justify-start text-xs md:text-sm text-gray-800 px-3 py-2 rounded-md"
+            style={customStyle}
+          >
+            <div className="font-semibold mb-2">
+              {heading ?? "Table of Contents"}
+            </div>
             {lines.length === 0 ? (
               <span className="text-[11px] text-gray-400">
                 Add one entry per line in the editor to build the table of
@@ -947,8 +1369,14 @@ const renderWidgetContent = (
 
       // Generic custom text block (e.g. AI summary)
       return (
-        <div className="h-full flex items-center justify-center text-xs md:text-sm text-gray-500 px-2">
-          <span className="text-center break-words">
+        <div
+          className="h-full flex flex-col items-start justify-center text-xs md:text-sm text-gray-800 px-3 py-2 rounded-md w-full"
+          style={customStyle}
+        >
+          {heading && (
+            <div className="font-semibold mb-1 text-gray-900">{heading}</div>
+          )}
+          <span className="break-words">
             {customData?.content ?? "Custom Placeholder"}
           </span>
         </div>
@@ -1060,6 +1488,8 @@ function ReportBuilder() {
   const [scheduleTimeOfDay, setScheduleTimeOfDay] = useState<string>("09:00");
   const [scheduleSendEmail, setScheduleSendEmail] = useState(false);
   const { data: integrationsData } = useIntegrations();
+
+  console.log(integrationsData,"integrationsData")
 
   const {
     groupedMetrics,
@@ -1298,6 +1728,26 @@ function ReportBuilder() {
     });
   }, [dashboardIds]);
 
+  // Map each slideId to its integration (if any) so we can restrict drops to the
+  // matching integration page.
+  const slideIntegrationMap = useMemo(() => {
+    const map = new Map<
+      number,
+      { platform: string; accountId: string; accountName?: string }
+    >();
+    effectivePageOrder.forEach((slideId) => {
+      const integ = integrationsData?.integrations?.[slideId];
+      if (integ) {
+        map.set(slideId, {
+          platform: integ.platform,
+          accountId: integ.accountId,
+          accountName: integ.accountName,
+        });
+      }
+    });
+    return map;
+  }, [effectivePageOrder, integrationsData?.integrations]);
+
   // Update template data when loaded successfully
   useEffect(() => {
     if (!templateQuery.data) return;
@@ -1401,12 +1851,91 @@ function ReportBuilder() {
     });
     return ids.join("|");
   }, [dashboards]);
+
+  // Ensure there is at least one slide per connected integration (e.g., GA + GSC).
+  // If integrations were added after the template was created, append empty slides
+  // so they show up in the Pages sidebar and canvas.
+  // If ENABLE_AUTO_DEFAULT_WIDGETS is true, pre-populate with default widgets.
+  useEffect(() => {
+    const integrationIds = integrationsData?.integrations?.map((_, idx) => idx) ?? [];
+    if (!integrationIds.length) return;
+
+    setDashboards((prev) => {
+      let changed = false;
+      const updated = new Map(prev);
+
+      integrationIds.forEach((id) => {
+        if (!updated.has(id)) {
+          // Slide doesn't exist yet - create it
+          if (ENABLE_AUTO_DEFAULT_WIDGETS && groupedMetrics) {
+            // Auto-populate with default widgets
+            const integration = integrationsData?.integrations?.[id];
+            if (integration) {
+              const picked = pickDefaultMetricsForIntegration(
+                integration.platform,
+                integration.accountId,
+                groupedMetrics as any,
+                (msg) => toast.warning(msg)
+              );
+              const defaults = buildDefaultWidgetsForIntegration(id, picked);
+              updated.set(id, defaults);
+              changed = true;
+            } else {
+              updated.set(id, []);
+              changed = true;
+            }
+          } else {
+            // Feature disabled or metrics not loaded - create empty slide
+            updated.set(id, []);
+            changed = true;
+          }
+        } else if (ENABLE_AUTO_DEFAULT_WIDGETS && groupedMetrics) {
+          // Slide exists - check if it's empty and should be populated
+          const existing = updated.get(id);
+          if (existing && existing.length === 0) {
+            const integration = integrationsData?.integrations?.[id];
+            if (integration) {
+              const picked = pickDefaultMetricsForIntegration(
+                integration.platform,
+                integration.accountId,
+                groupedMetrics as any,
+                (msg) => toast.warning(msg)
+              );
+              const defaults = buildDefaultWidgetsForIntegration(id, picked);
+              if (defaults.length > 0) {
+                updated.set(id, defaults);
+                changed = true;
+              }
+            }
+          }
+        }
+      });
+
+      return changed ? updated : prev;
+    });
+
+    setPageOrder((prev) => {
+      const base = prev.length ? [...prev] : Array.from(dashboards.keys());
+      const existing = new Set(base);
+      let changed = false;
+      integrationIds.forEach((id) => {
+        if (!existing.has(id)) {
+          base.push(id);
+          existing.add(id);
+          changed = true;
+        }
+      });
+      return changed ? base : prev;
+    });
+  }, [integrationsData?.integrations, dashboards, groupedMetrics]);
   const dateRangeKey = useMemo(() => {
     if (!dateRange?.from || !dateRange?.to) return "none";
     return `${dateRange.from.toISOString()}_${dateRange.to.toISOString()}`;
   }, [dateRange]);
+
+  // Allow widget resolution even for new unsaved reports (no templateId yet)
+  // This ensures auto-created default widgets get data immediately
   const shouldResolveWidgets =
-    Boolean(templateId) &&
     Boolean(dateRange?.from && dateRange?.to) &&
     Boolean(widgetSignature);
 
@@ -1414,7 +1943,7 @@ function ReportBuilder() {
     queryKey: ["report-data", templateId, dateRangeKey, widgetSignature],
     enabled: shouldResolveWidgets,
     queryFn: async () => {
-      if (!templateId || !dateRange?.from || !dateRange?.to) {
+      if (!dateRange?.from || !dateRange?.to) {
         return {};
       }
 
@@ -1432,35 +1961,307 @@ function ReportBuilder() {
       const dateFrom = formatApiDate(dateRange.from);
       const dateTo = formatApiDate(dateRange.to);
 
-      const [reportResponse, resolvedResponse] = await Promise.all([
-        runReport({
-          templateId,
-          dateFrom,
-          dateTo,
-        }),
+      // For new unsaved reports (no templateId), only use resolveMetricWidgets
+      // For saved reports, use both runReport and resolveMetricWidgets
+      const promises: Promise<any>[] = [];
+
+      if (templateId) {
+        promises.push(
+          runReport({
+            templateId,
+            dateFrom,
+            dateTo,
+          })
+        );
+      }
+
+      promises.push(
         resolveMetricWidgets({
           dateFrom,
           dateTo,
-          widgets: widgets.map((widget: ReportWidgetDefinition) => ({
-            id: widget.id,
-            type: widget.type ?? "metric_card",
-            metricKey: widget.metricKey,
-            groupBy: widget.groupBy,
-            aggregation: widget.aggregation,
-            integration: widget.integration,
-            accountId: widget.accountId,
-            ...(widget.filters ? { filters: widget.filters } : {}),
-          })),
-        }),
-      ]);
+          widgets: widgets.map((widget: ReportWidgetDefinition) => {
+            // Some integrations (notably GA) may not return data for "table" type.
+            // Resolve as a metric_card for table/metric widgets to ensure values come back.
+            const resolveType =
+              widget.type === "table" || widget.type === "metric"
+                ? "metric_card"
+                : widget.type ?? "metric_card";
+
+            return {
+              id: widget.id,
+              type: resolveType,
+              metricKey: widget.metricKey,
+              groupBy: widget.groupBy,
+              aggregation: widget.aggregation,
+              integration: widget.integration,
+              accountId: widget.accountId,
+              ...(widget.filters ? { filters: widget.filters } : {}),
+            };
+          }),
+        }).then(response => {
+          console.log('📡 resolveMetricWidgets response:', {
+            widgetCount: Object.keys(response.data || {}).length,
+            sampleData: Object.entries(response.data || {}).slice(0, 3).map(([id, data]) => ({
+              id,
+              hasValue: 'value' in data,
+              hasTotal: 'total' in data,
+              hasSeries: 'series' in data,
+              value: (data as any).value,
+              total: (data as any).total,
+            })),
+          });
+          return response;
+        })
+      );
+
+      const responses = await Promise.all(promises);
 
       const merged: Record<string, ResolvedWidgetData> = {};
-      Object.entries(reportResponse.data ?? {}).forEach(([key, value]) => {
-        merged[key] = { ...(merged[key] ?? {}), ...value };
-      });
+
+      // Merge runReport response if it exists (for saved templates)
+      if (templateId && responses[0]) {
+        Object.entries(responses[0].data ?? {}).forEach(([key, value]) => {
+          merged[key] = { ...(merged[key] ?? {}), ...value };
+        });
+      }
+
+      // Merge resolveMetricWidgets response (always present)
+      const resolvedResponse = templateId ? responses[1] : responses[0];
       Object.entries(resolvedResponse.data ?? {}).forEach(([key, value]) => {
         merged[key] = { ...(merged[key] ?? {}), ...value };
       });
+
+      return merged;
+    },
+  });
+
+  // Separate query for table widgets with dimensional data
+  // Extract table widgets that need dimensional breakdowns
+  const tableWidgets = useMemo(() => {
+    const widgets: Array<{
+      id: string;
+      metricKey: string;
+      integration: string;
+      accountId: string;
+      dimensionType: string;
+    }> = [];
+
+    dashboards.forEach((layout) => {
+      layout.forEach((widget) => {
+        if (widget.widgetType === "table" && widget.metricConfig) {
+          const config = widget.metricConfig;
+          const dimensionType = config.groupBy === "device" || config.groupBy === "country"
+            ? config.groupBy
+            : "";
+
+          if (dimensionType && config.metricKey) {
+            widgets.push({
+              id: widget.i,
+              metricKey: config.metricKey,
+              integration: config.integration,
+              accountId: config.accountId,
+              dimensionType: dimensionType as string,  // Type assertion since we checked it's not empty
+            });
+          }
+        }
+      });
+    });
+
+    return widgets;
+  }, [dashboards]);
+
+  const tableDataQuery = useQuery({
+    queryKey: ["table-data", dateRangeKey, tableWidgets],
+    enabled: Boolean(dateRange?.from && dateRange?.to) && tableWidgets.length > 0,
+    queryFn: async () => {
+      if (!dateRange?.from || !dateRange?.to) return {};
+
+      const dateFrom = formatApiDate(dateRange.from);
+      const dateTo = formatApiDate(dateRange.to);
+
+      // Fetch data for each table widget
+      const promises = tableWidgets.map(async (widget) => {
+        try {
+          console.log('📊 Fetching table data for:', {
+            id: widget.id,
+            integration: widget.integration,
+            accountId: widget.accountId,
+            metricKey: widget.metricKey,
+            dimensionType: widget.dimensionType,
+          });
+
+          const data = await fetchUnifiedMetric({
+            integration: widget.integration,
+            accountId: widget.accountId,
+            metricKey: widget.metricKey,
+            dimensionType: widget.dimensionType,
+            startDate: dateFrom,
+            endDate: dateTo,
+          });
+
+          console.log('✅ Table API response for', widget.metricKey, widget.dimensionType, ':', {
+            success: data.success,
+            totalRows: data.rows?.length || 0,
+            sampleRow: data.rows?.[0],
+          });
+
+          return { id: widget.id, data };
+        } catch (error) {
+          console.error(`❌ Failed to fetch table data for ${widget.id}:`, error);
+          return { id: widget.id, data: null };
+        }
+      });
+
+      const results = await Promise.all(promises);
+
+      // Convert to Record<string, any> format and filter by metricKey
+      const merged: Record<string, any> = {};
+      results.forEach(({ id, data }, index) => {
+        if (data && data.rows && Array.isArray(data.rows)) {
+          const widget = tableWidgets[index];
+
+          console.log('🔍 Filtering table rows for widget:', {
+            widgetId: id,
+            metricKey: widget.metricKey,
+            dimensionType: widget.dimensionType,
+            widgetAccountId: widget.accountId,
+            totalRowsFromAPI: data.rows.length,
+            sampleAPIRow: data.rows[0],
+          });
+
+          // Filter rows to only include those matching this widget's metricKey
+          const filteredRows = data.rows.filter((row: any) =>
+            row.metricKey === widget.metricKey
+          );
+
+          console.log('✅ Filtered table rows result:', {
+            widgetId: id,
+            beforeFilter: data.rows.length,
+            afterFilter: filteredRows.length,
+            sampleFiltered: filteredRows[0],
+          });
+
+          merged[id] = { ...data, rows: filteredRows };
+        } else if (data) {
+          merged[id] = data;
+        }
+      });
+
+      return merged;
+    },
+  });
+
+  // Separate query for WooCommerce widgets
+  // Extract all WooCommerce widgets (metric cards, charts, etc.)
+  const wooWidgets = useMemo(() => {
+    const widgets: Array<{
+      id: string;
+      metricKey: string;
+      integration: string;
+      accountId: string;
+    }> = [];
+
+    dashboards.forEach((layout) => {
+      layout.forEach((widget) => {
+        if (widget.metricConfig && widget.metricConfig.integration === "woo") {
+          widgets.push({
+            id: widget.i,
+            metricKey: widget.metricConfig.metricKey,
+            integration: widget.metricConfig.integration,
+            accountId: widget.metricConfig.accountId,
+          });
+        }
+      });
+    });
+
+    return widgets;
+  }, [dashboards]);
+
+  const wooDataQuery = useQuery({
+    queryKey: ["woo-data", dateRangeKey, wooWidgets],
+    enabled: Boolean(dateRange?.from && dateRange?.to) && wooWidgets.length > 0,
+    queryFn: async () => {
+      if (!dateRange?.from || !dateRange?.to) return {};
+
+      const dateFrom = formatApiDate(dateRange.from);
+      const dateTo = formatApiDate(dateRange.to);
+
+      // Fetch data for each WooCommerce widget
+      const promises = wooWidgets.map(async (widget) => {
+        try {
+          console.log('🛒 Fetching WooCommerce data for:', {
+            id: widget.id,
+            metricKey: widget.metricKey,
+            integration: widget.integration,
+            accountId: widget.accountId,
+          });
+
+          const data = await fetchUnifiedMetric({
+            integration: widget.integration,
+            accountId: widget.accountId,
+            metricKey: widget.metricKey,
+            startDate: dateFrom,
+            endDate: dateTo,
+          });
+
+          console.log('✅ WooCommerce API response for', widget.metricKey, ':', {
+            success: data.success,
+            rowCount: data.rows?.length || 0,
+            sampleRow: data.rows?.[0],
+            fullData: data,
+          });
+
+          return { id: widget.id, data };
+        } catch (error) {
+          console.error(`❌ Failed to fetch WooCommerce data for ${widget.id}:`, error);
+          return { id: widget.id, data: null };
+        }
+      });
+
+      const results = await Promise.all(promises);
+
+      // Convert to Record<string, any> format
+      const merged: Record<string, any> = {};
+      results.forEach(({ id, data }, index) => {
+        if (data && data.rows && Array.isArray(data.rows)) {
+          const widget = wooWidgets[index];
+          // Filter rows to only include those matching this widget's metricKey AND accountId
+          const filteredRows = data.rows.filter((row: any) =>
+            row.metricKey === widget.metricKey && row.accountId === widget.accountId
+          );
+
+          console.log('🔍 Filtered WooCommerce rows for', widget.metricKey, ':', {
+            totalRows: data.rows.length,
+            filteredRows: filteredRows.length,
+            accountId: widget.accountId,
+            sampleFiltered: filteredRows[0],
+          });
+
+          // Calculate total value from filtered rows
+          const total = filteredRows.reduce((sum: number, row: any) => sum + (row.value || 0), 0);
+
+          console.log('💰 Calculated total for', widget.metricKey, ':', total);
+
+          // Create time-series data for charts
+          const series = filteredRows.map((row: any) => ({
+            date: row.date || row.dimensionValue,
+            value: row.value || 0,
+          }));
+
+          // Format as ResolvedWidgetData
+          merged[id] = {
+            value: total,
+            total: total,
+            rawCount: filteredRows.length,
+            rows: filteredRows,
+            series: series, // Add series for chart widgets
+          };
+        } else if (data) {
+          merged[id] = data;
+        }
+      });
+
+      console.log('✨ Final WooCommerce merged data:', merged);
 
       return merged;
     },
@@ -1474,8 +2275,26 @@ function ReportBuilder() {
     }
   }, [reportDataQuery.error]);
 
-  const resolvedWidgets = reportDataQuery.data ?? {};
-  const isResolvingWidgets = reportDataQuery.isFetching;
+  // Merge resolved widgets with table widget data and WooCommerce data
+  const resolvedWidgets = useMemo(() => {
+    const merged = { ...(reportDataQuery.data ?? {}) };
+    const tableData = tableDataQuery.data ?? {};
+    const wooData = wooDataQuery.data ?? {};
+
+    // Merge table widget data
+    Object.entries(tableData).forEach(([id, data]) => {
+      merged[id] = data;
+    });
+
+    // Merge WooCommerce widget data
+    Object.entries(wooData).forEach(([id, data]) => {
+      merged[id] = data;
+    });
+
+    return merged;
+  }, [reportDataQuery.data, tableDataQuery.data, wooDataQuery.data]);
+
+  const isResolvingWidgets = reportDataQuery.isFetching || tableDataQuery.isFetching || wooDataQuery.isFetching;
   const { refetch: refetchReportData } = reportDataQuery;
 
   // For Google Analytics-based widgets that use the special GA metric keys
@@ -1544,55 +2363,55 @@ function ReportBuilder() {
         slideIdList.length === 0
           ? undefined
           : slideIdList.map((slideId, index) => {
-              const fromExisting = existingMeta.find((m) => m.id === slideId);
-              const fromCustom = customPages.find((p) => p.id === slideId);
+            const fromExisting = existingMeta.find((m) => m.id === slideId);
+            const fromCustom = customPages.find((p) => p.id === slideId);
 
-              // 1) If we have both existing meta and a user-defined name,
-              //    override the title/subtitle but keep source/grouping.
-              if (fromExisting && fromCustom) {
-                return {
-                  ...fromExisting,
-                  title: fromCustom.name,
-                  subtitle: fromCustom.subtitle ?? fromExisting.subtitle,
-                };
-              }
+            // 1) If we have both existing meta and a user-defined name,
+            //    override the title/subtitle but keep source/grouping.
+            if (fromExisting && fromCustom) {
+              return {
+                ...fromExisting,
+                title: fromCustom.name,
+                subtitle: fromCustom.subtitle ?? fromExisting.subtitle,
+              };
+            }
 
-              // 2) Existing backend title/subtitle (no override)
-              if (fromExisting) {
-                return { ...fromExisting };
-              }
+            // 2) Existing backend title/subtitle (no override)
+            if (fromExisting) {
+              return { ...fromExisting };
+            }
 
-              // 3) Name from custom pages (user-defined) only
-              if (fromCustom) {
-                return {
-                  id: slideId,
-                  title: fromCustom.name,
-                  subtitle: fromCustom.subtitle,
-                  source: "custom" as const,
-                };
-              }
-
-              // 4) Best-effort integration-based name (for integration slides)
-              const integration =
-                integrationsData?.integrations?.[index] ??
-                integrationsData?.integrations?.[slideId];
-              if (integration) {
-                const platformConfig = getPlatformConfig(integration.platform);
-                return {
-                  id: slideId,
-                  title: platformConfig?.name || integration.platform,
-                  subtitle: integration.accountName,
-                  source: "integration" as const,
-                };
-              }
-
-              // 5) Fallback generic name (treat as custom, but without "Slide #")
+            // 3) Name from custom pages (user-defined) only
+            if (fromCustom) {
               return {
                 id: slideId,
-                title: "Untitled page",
+                title: fromCustom.name,
+                subtitle: fromCustom.subtitle,
                 source: "custom" as const,
               };
-            });
+            }
+
+            // 4) Best-effort integration-based name (for integration slides)
+            const integration =
+              integrationsData?.integrations?.[index] ??
+              integrationsData?.integrations?.[slideId];
+            if (integration) {
+              const platformConfig = getPlatformConfig(integration.platform);
+              return {
+                id: slideId,
+                title: platformConfig?.name || integration.platform,
+                subtitle: integration.accountName,
+                source: "integration" as const,
+              };
+            }
+
+            // 5) Fallback generic name (treat as custom, but without "Slide #")
+            return {
+              id: slideId,
+              title: "Untitled page",
+              source: "custom" as const,
+            };
+          });
 
       return {
         name: templateName,
@@ -1866,16 +2685,16 @@ function ReportBuilder() {
     setWidgetFormState((prev) =>
       prev.slideId === slideId
         ? {
-            slideId: 0,
-            widgetId: "",
-            widgetType: "",
-            data: undefined,
-            i: "",
-            x: 0,
-            y: 0,
-            w: 1,
-            h: 1,
-          }
+          slideId: 0,
+          widgetId: "",
+          widgetType: "",
+          data: undefined,
+          i: "",
+          x: 0,
+          y: 0,
+          w: 1,
+          h: 1,
+        }
         : prev
     );
   }, []);
@@ -1956,16 +2775,16 @@ function ReportBuilder() {
       setWidgetFormState((prev) =>
         prev.widgetId === widgetId
           ? {
-              slideId: 0,
-              widgetId: "",
-              widgetType: "",
-              data: undefined,
-              i: "",
-              x: 0,
-              y: 0,
-              w: 1,
-              h: 1,
-            }
+            slideId: 0,
+            widgetId: "",
+            widgetType: "",
+            data: undefined,
+            i: "",
+            x: 0,
+            y: 0,
+            w: 1,
+            h: 1,
+          }
           : prev
       );
     },
@@ -2025,11 +2844,11 @@ function ReportBuilder() {
       const customKind = e.dataTransfer?.getData("customKind") || undefined;
       let metricData:
         | {
-            metricKey: string;
-            integration: string;
-            accountId: string;
-            filters?: Record<string, unknown>;
-          }
+          metricKey: string;
+          integration: string;
+          accountId: string;
+          filters?: Record<string, unknown>;
+        }
         | undefined;
 
       if (metricDataStr) {
@@ -2038,6 +2857,46 @@ function ReportBuilder() {
         } catch (err) {
           console.error("Failed to parse metric data:", err);
         }
+      }
+
+      // Enforce dropping metrics only on their matching integration slide
+      if (metricData) {
+        const expected = slideIntegrationMap.get(id);
+        const normalize = (val?: string) =>
+          (val ?? "").toLowerCase().replace(/_/g, "-");
+        console.log("[ReportBuilder][drop]", {
+          slideId: id,
+          expectedIntegration: expected?.platform,
+          expectedAccountId: expected?.accountId,
+          metricIntegration: metricData.integration,
+          metricAccountId: metricData.accountId,
+        });
+        if (
+          expected &&
+          normalize(metricData.integration) !== normalize(expected.platform)
+        ) {
+          toast.error(
+            `Drop this metric on the ${getPlatformConfig(expected.platform)?.name || expected.platform
+            } page`
+          );
+          return;
+        }
+        // Account mismatch should not hard-block if integration matches; allow but warn
+        if (
+          expected &&
+          metricData.accountId &&
+          expected.accountId &&
+          metricData.accountId !== expected.accountId
+        ) {
+          toast.warning(
+            "This metric is from another account. Verify before using."
+          );
+        }
+      } else {
+        console.log("[ReportBuilder][drop] non-metric widget", {
+          slideId: id,
+          widgetType,
+        });
       }
 
       // ✅ Use defaults or fallbacks
@@ -2063,26 +2922,35 @@ function ReportBuilder() {
         data: widgetData,
         metricConfig: metricData
           ? {
-              id: widgetIdentifier,
-              metricKey: metricData.metricKey,
-              integration: metricData.integration,
-              accountId: metricData.accountId,
-              groupBy: "day",
-              aggregation: "sum",
-              type: widgetType,
-              ...(metricData.filters ? { filters: metricData.filters } : {}),
-            }
+            id: widgetIdentifier,
+            metricKey: metricData.metricKey,
+            integration: metricData.integration,
+            accountId: metricData.accountId,
+            groupBy: "day",
+            aggregation: "sum",
+            type: widgetType,
+            ...(metricData.filters ? { filters: metricData.filters } : {}),
+          }
           : {
-              // If we don't have metric data from the API, don't invent a metric.
-              // Treat this as a layout-only widget; backend can ignore empty metric fields.
-              id: widgetIdentifier,
-              metricKey: "",
-              integration: "",
-              groupBy: "none",
-              aggregation: "sum",
-              type: widgetType,
-            },
+            // If we don't have metric data from the API, don't invent a metric.
+            // Treat this as a layout-only widget; backend can ignore empty metric fields.
+            id: widgetIdentifier,
+            metricKey: "",
+            integration: "",
+            groupBy: "none",
+            aggregation: "sum",
+            type: widgetType,
+          },
       };
+
+      if (widgetType === "table") {
+        console.log("[ReportBuilder] Dropped table widget", {
+          widgetId: widgetIdentifier,
+          slideId: id,
+          metricData,
+          widgetData,
+        });
+      }
 
       // 🪄 Update the dashboards map immutably
       setDashboards((prev) => {
@@ -2092,7 +2960,7 @@ function ReportBuilder() {
         return updated;
       });
     },
-    []
+    [slideIntegrationMap]
   );
 
   const createLayoutChangeHandler = useCallback(
@@ -2113,11 +2981,11 @@ function ReportBuilder() {
       widgetType: ReportWidgetType,
       metricDataOrCustomKind?:
         | {
-            metricKey: string;
-            integration: string;
-            accountId: string;
-            filters?: Record<string, unknown>;
-          }
+          metricKey: string;
+          integration: string;
+          accountId: string;
+          filters?: Record<string, unknown>;
+        }
         | string
     ) => {
       e.dataTransfer.setData("widgetType", widgetType);
@@ -2382,32 +3250,68 @@ function ReportBuilder() {
         Object.keys(directMetrics).length > 0
           ? directMetrics
           : Object.keys(normalizedMetrics).length > 0
-          ? normalizedMetrics
-          : Object.keys(aliasMetrics).length > 0
-          ? aliasMetrics
-          : {};
+            ? normalizedMetrics
+            : Object.keys(aliasMetrics).length > 0
+              ? aliasMetrics
+              : {};
 
       // If Google Search Console or Google Analytics and we have live unified-metrics rows, map them to metric options
       if ((isGoogleConsole || isGoogleAnalytics) && gscMetricsQuery.data?.rows?.length) {
-        const liveMetrics = gscMetricsQuery.data.rows.map((row) => ({
-          metricKey: row.metricKey || (isGoogleAnalytics ? "google.sessions" : "google_seo.clicks"),
-          integration: isGoogleAnalytics ? "google-analytics" : "google-search-console",
-          accountId: row.accountId || accountId,
-          displayName: row.dimensionValue || row.metricKey,
-          category:
-            row.dimensionType ||
-            (isGoogleAnalytics ? "metric" : "query"),
-          // tuck dimension params to filters so they flow into the widget
-          filters: {
-            dimensionType: row.dimensionType ? [row.dimensionType] : isGoogleAnalytics ? undefined : [gscDimensionType],
-            dimensionValue: row.dimensionValue || undefined,
-            startDate: gscStartDate,
-            endDate: gscEndDate,
-          },
-          value: row.value,
-        }));
+        const gaLabelMap: Record<string, string> = {
+          "google.sessions": "Sessions",
+          "google.activeUsers": "Active Users",
+          "google.pageViews": "Page Views",
+          "google.bounceRate": "Bounce Rate",
+        };
+        const gscLabelMap: Record<string, string> = {
+          "google_seo.clicks": "Clicks",
+          "google_seo.impressions": "Impressions",
+          "google_seo.ctr": "CTR",
+          "google_seo.position": "Position",
+        };
 
-        metricsByAccount[accountId] = liveMetrics;
+        // For GA/GSC: drop dimension filters for GA; for GSC keep pure metrics only
+        const liveMetrics = gscMetricsQuery.data.rows
+          .map((row) => {
+            const metricKey =
+              row.metricKey ||
+              (isGoogleAnalytics ? "google.sessions" : "google_seo.clicks");
+            const integrationValue = isGoogleAnalytics
+              ? "google-analytics"
+              : "google-search-console";
+
+            const allowed = isGoogleAnalytics
+              ? gaLabelMap[metricKey]
+              : gscLabelMap[metricKey];
+            if (!allowed) return null;
+
+            return {
+              metricKey,
+              integration: integrationValue,
+              accountId: row.accountId || accountId,
+              displayName: isGoogleAnalytics
+                ? gaLabelMap[metricKey] || metricKey
+                : gscLabelMap[metricKey] || metricKey,
+              category: "metric",
+              // For GA/GSC, do NOT include dimension filters to avoid duplicates
+              filters: undefined,
+              value: row.value,
+            };
+          })
+          .filter(Boolean)
+          // Deduplicate GA metrics by metricKey to avoid dimension variants
+          .reduce<Record<string, (typeof metricsByAccount)[string][number]>>(
+            (acc, item) => {
+              if (!item) return acc;
+              if (!acc[item.metricKey]) {
+                acc[item.metricKey] = item;
+              }
+              return acc;
+            },
+            {}
+          );
+
+        metricsByAccount[accountId] = Object.values(liveMetrics);
       }
 
       let metricsForAccount = metricsByAccount[accountId] ?? [];
@@ -2416,7 +3320,7 @@ function ReportBuilder() {
         metricsForAccount = Object.values(metricsByAccount).flat();
       }
 
-      // Restrict GA metrics to a curated set
+      // Restrict GA/GSC metrics to curated sets
       if (isGoogleAnalytics) {
         const allowedGaKeys = new Set([
           "google.activeUsers",
@@ -2427,7 +3331,25 @@ function ReportBuilder() {
         metricsForAccount = metricsForAccount.filter((metric) =>
           allowedGaKeys.has(metric.metricKey)
         );
+      } else if (isGoogleConsole) {
+        const allowedGscKeys = new Set([
+          "google_seo.clicks",
+          "google_seo.impressions",
+          "google_seo.ctr",
+          "google_seo.position",
+        ]);
+        metricsForAccount = metricsForAccount.filter((metric) =>
+          allowedGscKeys.has(metric.metricKey)
+        );
       }
+
+      // Deduplicate by metricKey after filtering (avoids dimension-based repeats)
+      const seenKeys = new Set<string>();
+      metricsForAccount = metricsForAccount.filter((m) => {
+        if (seenKeys.has(m.metricKey)) return false;
+        seenKeys.add(m.metricKey);
+        return true;
+      });
 
       const search = metricsSearch.trim().toLowerCase();
       const filteredMetrics = metricsForAccount.filter((metric) => {
@@ -2484,11 +3406,10 @@ function ReportBuilder() {
                   key={opt.type}
                   type="button"
                   onClick={() => setSelectedMetricWidgetType(opt.type)}
-                  className={`flex-1 h-7 flex items-center justify-center rounded border text-[10px] ${
-                    selectedMetricWidgetType === opt.type
-                      ? "border-blue-500 bg-blue-50 text-blue-600"
-                      : "border-gray-200 text-gray-500 hover:bg-gray-50"
-                  }`}
+                  className={`flex-1 h-7 flex items-center justify-center rounded border text-[10px] ${selectedMetricWidgetType === opt.type
+                    ? "border-blue-500 bg-blue-50 text-blue-600"
+                    : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                    }`}
                 >
                   {opt.label}
                 </button>
@@ -2619,26 +3540,25 @@ function ReportBuilder() {
                         ...(metric.filters
                           ? { filters: metric.filters }
                           : isGoogleConsole
-                          ? {
+                            ? {
                               filters: {
                                 dimensionType: gscDimensionType,
                                 startDate: gscStartDate,
                                 endDate: gscEndDate,
                               },
                             }
-                          : {}),
+                            : {}),
                       })
                     }
                     className="flex items-center justify-center w-7 h-7 rounded border border-gray-300 text-[10px] hover:border-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing"
-                    title={`Drag to add as a ${
-                      selectedMetricWidgetType === "metric"
-                        ? "metric card"
-                        : selectedMetricWidgetType === "line_chart"
+                    title={`Drag to add as a ${selectedMetricWidgetType === "metric"
+                      ? "metric card"
+                      : selectedMetricWidgetType === "line_chart"
                         ? "line chart"
                         : selectedMetricWidgetType === "bar_chart"
-                        ? "bar chart"
-                        : "table"
-                    }`}
+                          ? "bar chart"
+                          : "table"
+                      }`}
                   >
                     {metricTypeOptions.find(
                       (opt) => opt.type === selectedMetricWidgetType
@@ -3170,11 +4090,10 @@ function ReportBuilder() {
         {/* Right Sidebar */}
         <div className="sticky top-[calc(var(--rb-header)+var(--rb-subheader))] right-0 flex  border-l h-[calc(100vh-(var(--rb-header)+var(--rb-subheader)))] overflow-y-visible z-20">
           <div
-            className={`${
-              rightPanelTitle !== ""
-                ? "w-48 md:w-56 lg:w-[16.25rem]"
-                : "w-0 overflow-hidden"
-            } h-full transition-all duration-300`}
+            className={`${rightPanelTitle !== ""
+              ? "w-48 md:w-56 lg:w-[16.25rem]"
+              : "w-0 overflow-hidden"
+              } h-full transition-all duration-300`}
           >
             <div className="w-full p-3 md:p-4 border-b font-semibold text-sm md:text-base text-accent-foreground">
               {rightPanelTitle}
@@ -3184,11 +4103,10 @@ function ReportBuilder() {
           </div>
 
           <div
-            className={`${
-              widgetFormState.widgetType !== ""
-                ? "w-48 md:w-56 lg:w-[16.25rem]"
-                : "w-0 overflow-hidden"
-            } h-full transition-all duration-300`}
+            className={`${widgetFormState.widgetType !== ""
+              ? "w-48 md:w-56 lg:w-[16.25rem]"
+              : "w-0 overflow-hidden"
+              } h-full transition-all duration-300`}
           >
             {widgetFormSections}
           </div>

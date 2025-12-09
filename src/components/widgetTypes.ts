@@ -61,6 +61,10 @@ export interface TitleWidgetData {
 export interface CustomWidgetData {
   content: string;
   type?: string; // e.g. "tasks", "ai-summary", "toc", "text"
+  title?: string;
+  align?: "left" | "center" | "right";
+  backgroundColor?: string;
+  textColor?: string;
 }
   
   // Union type for all widget data

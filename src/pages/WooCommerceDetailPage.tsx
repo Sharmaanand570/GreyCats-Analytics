@@ -18,7 +18,6 @@ import {
   useWooCommerceAnalytics,
   useWooCommercePerProductPaginated,
   useWooCommerceAgencyRollup,
-  useWooCommerceAccountInfo,
   useWooCommerceSyncStatus,
   useWooCommerceSyncProducts,
   useWooCommerceSyncOrders,
@@ -71,6 +70,7 @@ function WooCommerceDetailPage() {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const { data: accountsData, error: accountsError, isLoading: isLoadingAccounts } = useWooCommerceAccounts();
+  console.log(accountsData);
 
   // Mutations
   const { mutateAsync: syncProducts, isPending: isSyncingProducts } =
@@ -82,9 +82,15 @@ function WooCommerceDetailPage() {
   const { mutateAsync: reconnect, isPending: isReconnecting } =
     useWooCommerceReconnect();
 
-  // Fetch account info and sync status
-  const { data: accountInfo, isLoading: isLoadingAccountInfo } =
-    useWooCommerceAccountInfo(accountId);
+  // Derive account info from accountsData instead of making a separate API call
+  const accountInfo = accountId && accountsData?.accounts
+    ? {
+      success: true,
+      account: accountsData.accounts.find(acc => acc.id === accountId)
+    }
+    : null;
+  const isLoadingAccountInfo = isLoadingAccounts;
+
   const { data: syncStatus, isLoading: isLoadingSyncStatus } =
     useWooCommerceSyncStatus(accountId);
 
@@ -103,12 +109,12 @@ function WooCommerceDetailPage() {
   } = useWooCommercePerProductPaginated(
     accountId
       ? {
-          accountId,
-          page: perProductPage,
-          limit: perProductLimit,
-          sort: "revenue",
-          direction: "desc",
-        }
+        accountId,
+        page: perProductPage,
+        limit: perProductLimit,
+        sort: "revenue",
+        direction: "desc",
+      }
       : null
   );
 
@@ -120,10 +126,10 @@ function WooCommerceDetailPage() {
   } = useWooCommerceOrders(
     accountId
       ? {
-          accountId,
-          page: ordersPage,
-          limit: ordersLimit,
-        }
+        accountId,
+        page: ordersPage,
+        limit: ordersLimit,
+      }
       : null
   );
 
@@ -147,11 +153,11 @@ function WooCommerceDetailPage() {
   } = useWooCommerceProducts(
     accountId
       ? {
-          accountId,
-          page: productsPage,
-          limit: productsLimit,
-          search: productsSearch || undefined,
-        }
+        accountId,
+        page: productsPage,
+        limit: productsLimit,
+        search: productsSearch || undefined,
+      }
       : null
   );
 
@@ -165,9 +171,9 @@ function WooCommerceDetailPage() {
   // Calculate active stores count from rollup data
   const activeStoresCount = rollupData?.accounts?.filter(acc => acc.revenue > 0 || acc.orders > 0).length || rollupData?.accounts?.length || 0;
 
-  // Use account info for sync timestamps (more reliable than sync status alone)
-  const lastProductsSync = accountInfo?.account?.lastProductsSync || syncStatus?.sync?.lastProductsSync;
-  const lastOrdersSync = accountInfo?.account?.lastOrdersSync || syncStatus?.sync?.lastOrdersSync;
+  // Use sync status for sync timestamps
+  const lastProductsSync = syncStatus?.sync?.lastProductsSync;
+  const lastOrdersSync = syncStatus?.sync?.lastOrdersSync;
 
   // Transform revenue data for chart (mock data for now - would come from snapshots API in future)
   // For now, we can use a simple representation based on analytics data
@@ -364,7 +370,7 @@ function WooCommerceDetailPage() {
                   </Select>
                 </div>
               )}
-         
+
               <button className="relative">
                 <FiBell className="text-xl text-gray-500" />
                 <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -464,11 +470,10 @@ function WooCommerceDetailPage() {
                           <p>
                             <span className="text-gray-600">Status:</span>{" "}
                             <span
-                              className={`px-2 py-1 text-xs font-medium rounded-md ${
-                                accountInfo?.account?.isActive
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-gray-100 text-gray-700"
-                              }`}
+                              className={`px-2 py-1 text-xs font-medium rounded-md ${accountInfo?.account?.isActive
+                                ? "bg-green-100 text-green-700"
+                                : "bg-gray-100 text-gray-700"
+                                }`}
                             >
                               {accountInfo?.account?.isActive ? "Active" : "Inactive"}
                             </span>
@@ -485,9 +490,9 @@ function WooCommerceDetailPage() {
                             <span className="font-medium">
                               {lastProductsSync
                                 ? format(
-                                    new Date(lastProductsSync),
-                                    "MMM dd, yyyy HH:mm"
-                                  )
+                                  new Date(lastProductsSync),
+                                  "MMM dd, yyyy HH:mm"
+                                )
                                 : "Never"}
                             </span>
                           </p>
@@ -496,9 +501,9 @@ function WooCommerceDetailPage() {
                             <span className="font-medium">
                               {lastOrdersSync
                                 ? format(
-                                    new Date(lastOrdersSync),
-                                    "MMM dd, yyyy HH:mm"
-                                  )
+                                  new Date(lastOrdersSync),
+                                  "MMM dd, yyyy HH:mm"
+                                )
                                 : "Never"}
                             </span>
                           </p>
@@ -594,18 +599,18 @@ function WooCommerceDetailPage() {
                 {/* KPI Cards - Use analytics data for current account, rollup totals for agency view */}
                 <WooCommerceKPICards
                   totalRevenue={
-                    analyticsData?.analytics?.totalRevenue || 
-                    rollupData?.totals?.totalRevenue || 
+                    analyticsData?.analytics?.totalRevenue ||
+                    rollupData?.totals?.totalRevenue ||
                     0
                   }
                   totalOrders={
-                    analyticsData?.analytics?.orderCount || 
-                    rollupData?.totals?.totalOrders || 
+                    analyticsData?.analytics?.orderCount ||
+                    rollupData?.totals?.totalOrders ||
                     0
                   }
                   avgOrderValue={
-                    analyticsData?.analytics?.avgOrderValue || 
-                    rollupData?.totals?.totalAvgOrder || 
+                    analyticsData?.analytics?.avgOrderValue ||
+                    rollupData?.totals?.totalAvgOrder ||
                     0
                   }
                   activeStores={activeStoresCount}
@@ -642,11 +647,11 @@ function WooCommerceDetailPage() {
                         products={
                           productsAnalyticsData?.products && productsAnalyticsData.products.length > 0
                             ? productsAnalyticsData.products.slice(0, 3).map((p) => ({
-                                productId: p.productId,
-                                name: p.name,
-                                revenue: p.revenue,
-                                qty: p.qty,
-                              }))
+                              productId: p.productId,
+                              name: p.name,
+                              revenue: p.revenue,
+                              qty: p.qty,
+                            }))
                             : []
                         }
                         isLoading={isLoadingProductsAnalytics}
@@ -660,384 +665,383 @@ function WooCommerceDetailPage() {
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Products Catalog Table */}
                     <div className=" border rounded-2xl overflow-hidden">
-                <div className="p-4 border-b">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold">Products</h3>
-                      {productsCatalogData && (
-                        <p className="text-sm text-gray-500 mt-1">
-                          Showing {productsCatalogData.products.length} of {productsCatalogData.total} products
-                        </p>
-                      )}
-                    </div>
-                    <button className="p-2 hover:bg-gray-100 rounded-md">
-                      <MoreVertical className="w-4 h-4 text-gray-500" />
-                    </button>
-                  </div>
-                  {/* Search Input */}
-                  <div className="relative">
-                    <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                    <Input
-                      type="text"
-                      placeholder="Search products by name or SKU..."
-                      value={productsSearch}
-                      onChange={(e) => handleProductsSearchChange(e.target.value)}
-                      className="pl-10 pr-10 w-full max-w-md rounded-md border-gray-300"
-                    />
-                    {productsSearch && (
-                      <button
-                        onClick={handleClearProductsSearch}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        title="Clear search"
-                      >
-                        <span className="text-lg">×</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-                {isLoadingProductsCatalog ? (
-                  <div className="p-6 space-y-4">
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
-                  </div>
-                ) : productsCatalogError ? (
-                  <div className="p-6 text-center">
-                    <p className="text-sm text-destructive">
-                      Failed to load products:{" "}
-                      {productsCatalogError instanceof Error
-                        ? productsCatalogError.message
-                        : "Unknown error"}
-                    </p>
-                  </div>
-                ) : productsCatalogData?.products && productsCatalogData.products.length > 0 ? (
-                  <>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="pl-6">Product Name</TableHead>
-                          <TableHead>SKU</TableHead>
-                          <TableHead>Price</TableHead>
-                          <TableHead>Stock Qty</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="pr-6"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {productsCatalogData.products.map((product) => (
-                          <TableRow key={product.productId}>
-                            <TableCell className="pl-6">
-                              <div className="flex flex-col">
-                                <p className="text-sm font-medium text-gray-900">
-                                  {product.name}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  ID: {product.productId}
-                                </p>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-sm text-gray-600">
-                              {product.sku || "N/A"}
-                            </TableCell>
-                            <TableCell className="text-sm text-gray-600">
-                              ${product.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </TableCell>
-                            <TableCell className="text-sm text-gray-600">
-                              {product.stockQty || 0}
-                            </TableCell>
-                            <TableCell>
-                              <span
-                                className={`px-2 py-1 text-xs font-medium rounded-md whitespace-nowrap ${
-                                  product.status === "publish"
-                                    ? "bg-green-100 text-green-700"
-                                    : "bg-gray-100 text-gray-700"
-                                }`}
-                              >
-                                {product.status || "N/A"}
-                              </span>
-                            </TableCell>
-                            <TableCell className="pr-6">
-                              <button
-                                onClick={() => setSelectedProductId(product.productId)}
-                                className="p-1 hover:bg-gray-100 rounded"
-                                title="View Product Details"
-                              >
-                                <Eye className="w-4 h-4 text-gray-500" />
-                              </button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                    {productsCatalogData.totalPages > 1 && (
-                      <div className="p-4 border-t flex items-center justify-between">
-                        <p className="text-sm text-gray-600">
-                          Page {productsCatalogData.page} of {productsCatalogData.totalPages}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setProductsPage((p) => Math.max(1, p - 1))}
-                            disabled={productsPage === 1 || isLoadingProductsCatalog}
-                          >
-                            Previous
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setProductsPage((p) => p + 1)}
-                            disabled={
-                              productsPage >= (productsCatalogData?.totalPages || 1) ||
-                              isLoadingProductsCatalog
-                            }
-                          >
-                            Next
-                          </Button>
+                      <div className="p-4 border-b">
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <h3 className="text-lg font-semibold">Products</h3>
+                            {productsCatalogData && (
+                              <p className="text-sm text-gray-500 mt-1">
+                                Showing {productsCatalogData.products.length} of {productsCatalogData.total} products
+                              </p>
+                            )}
+                          </div>
+                          <button className="p-2 hover:bg-gray-100 rounded-md">
+                            <MoreVertical className="w-4 h-4 text-gray-500" />
+                          </button>
+                        </div>
+                        {/* Search Input */}
+                        <div className="relative">
+                          <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                          <Input
+                            type="text"
+                            placeholder="Search products by name or SKU..."
+                            value={productsSearch}
+                            onChange={(e) => handleProductsSearchChange(e.target.value)}
+                            className="pl-10 pr-10 w-full max-w-md rounded-md border-gray-300"
+                          />
+                          {productsSearch && (
+                            <button
+                              onClick={handleClearProductsSearch}
+                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                              title="Clear search"
+                            >
+                              <span className="text-lg">×</span>
+                            </button>
+                          )}
                         </div>
                       </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="p-6 text-center text-gray-500">
-                    No products found
-                  </div>
-                )}
+                      {isLoadingProductsCatalog ? (
+                        <div className="p-6 space-y-4">
+                          <Skeleton className="h-16 w-full" />
+                          <Skeleton className="h-16 w-full" />
+                          <Skeleton className="h-16 w-full" />
+                        </div>
+                      ) : productsCatalogError ? (
+                        <div className="p-6 text-center">
+                          <p className="text-sm text-destructive">
+                            Failed to load products:{" "}
+                            {productsCatalogError instanceof Error
+                              ? productsCatalogError.message
+                              : "Unknown error"}
+                          </p>
+                        </div>
+                      ) : productsCatalogData?.products && productsCatalogData.products.length > 0 ? (
+                        <>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="pl-6">Product Name</TableHead>
+                                <TableHead>SKU</TableHead>
+                                <TableHead>Price</TableHead>
+                                <TableHead>Stock Qty</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="pr-6"></TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {productsCatalogData.products.map((product) => (
+                                <TableRow key={product.productId}>
+                                  <TableCell className="pl-6">
+                                    <div className="flex flex-col">
+                                      <p className="text-sm font-medium text-gray-900">
+                                        {product.name}
+                                      </p>
+                                      <p className="text-xs text-gray-500">
+                                        ID: {product.productId}
+                                      </p>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-sm text-gray-600">
+                                    {product.sku || "N/A"}
+                                  </TableCell>
+                                  <TableCell className="text-sm text-gray-600">
+                                    ${product.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </TableCell>
+                                  <TableCell className="text-sm text-gray-600">
+                                    {product.stockQty || 0}
+                                  </TableCell>
+                                  <TableCell>
+                                    <span
+                                      className={`px-2 py-1 text-xs font-medium rounded-md whitespace-nowrap ${product.status === "publish"
+                                        ? "bg-green-100 text-green-700"
+                                        : "bg-gray-100 text-gray-700"
+                                        }`}
+                                    >
+                                      {product.status || "N/A"}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="pr-6">
+                                    <button
+                                      onClick={() => setSelectedProductId(product.productId)}
+                                      className="p-1 hover:bg-gray-100 rounded"
+                                      title="View Product Details"
+                                    >
+                                      <Eye className="w-4 h-4 text-gray-500" />
+                                    </button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                          {productsCatalogData.totalPages > 1 && (
+                            <div className="p-4 border-t flex items-center justify-between">
+                              <p className="text-sm text-gray-600">
+                                Page {productsCatalogData.page} of {productsCatalogData.totalPages}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setProductsPage((p) => Math.max(1, p - 1))}
+                                  disabled={productsPage === 1 || isLoadingProductsCatalog}
+                                >
+                                  Previous
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setProductsPage((p) => p + 1)}
+                                  disabled={
+                                    productsPage >= (productsCatalogData?.totalPages || 1) ||
+                                    isLoadingProductsCatalog
+                                  }
+                                >
+                                  Next
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="p-6 text-center text-gray-500">
+                          No products found
+                        </div>
+                      )}
                     </div>
 
                     {/* Orders Table */}
                     <div className=" border rounded-2xl overflow-hidden">
-                <div className="p-4 border-b flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold">Orders</h3>
-                    {ordersData && (
-                      <p className="text-sm text-gray-500 mt-1">
-                        Showing {ordersData.orders.length} of {ordersData.total} orders
-                      </p>
-                    )}
-                  </div>
-                  <button className="p-2 hover:bg-gray-100 rounded-md">
-                    <MoreVertical className="w-4 h-4 text-gray-500" />
-                  </button>
-                </div>
-                {isLoadingOrders ? (
-                  <div className="p-6 space-y-4">
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
-                  </div>
-                ) : ordersError ? (
-                  <div className="p-6 text-center">
-                    <p className="text-sm text-destructive">
-                      Failed to load orders:{" "}
-                      {ordersError instanceof Error
-                        ? ordersError.message
-                        : "Unknown error"}
-                    </p>
-                  </div>
-                ) : ordersData?.orders && ordersData.orders.length > 0 ? (
-                  <>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="pl-6">Order ID</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Total Amount</TableHead>
-                          <TableHead>Currency</TableHead>
-                          <TableHead>Created At</TableHead>
-                          <TableHead className="pr-6"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {ordersData.orders.map((order) => (
-                          <TableRow key={order.id}>
-                            <TableCell className="pl-6">
-                              <div className="flex flex-col">
-                                <p className="text-sm font-medium text-gray-900">
-                                  #{order.orderId}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  ID: {order.id}
-                                </p>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <span
-                                className={`px-2 py-1 text-xs font-medium rounded-md whitespace-nowrap ${getStatusBadgeClass(
-                                  order.status
-                                )}`}
-                              >
-                                {order.status}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-sm text-gray-600">
-                              {order.currency} {order.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </TableCell>
-                            <TableCell className="text-sm text-gray-600">
-                              {order.currency}
-                            </TableCell>
-                            <TableCell className="text-sm text-gray-600">
-                              {format(new Date(order.createdAt), "MMM dd, yyyy HH:mm")}
-                            </TableCell>
-                            <TableCell className="pr-6">
-                              <button
-                                onClick={() => setSelectedOrderId(order.orderId)}
-                                className="p-1 hover:bg-gray-100 rounded"
-                                title="View Order Details"
-                              >
-                                <Eye className="w-4 h-4 text-gray-500" />
-                              </button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                    {ordersData.totalPages > 1 && (
-                      <div className="p-4 border-t flex items-center justify-between">
-                        <p className="text-sm text-gray-600">
-                          Page {ordersData.page} of {ordersData.totalPages}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setOrdersPage((p) => Math.max(1, p - 1))}
-                            disabled={ordersPage === 1 || isLoadingOrders}
-                          >
-                            Previous
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setOrdersPage((p) => p + 1)}
-                            disabled={
-                              ordersPage >= (ordersData?.totalPages || 1) ||
-                              isLoadingOrders
-                            }
-                          >
-                            Next
-                          </Button>
+                      <div className="p-4 border-b flex items-center justify-between">
+                        <div>
+                          <h3 className="text-lg font-semibold">Orders</h3>
+                          {ordersData && (
+                            <p className="text-sm text-gray-500 mt-1">
+                              Showing {ordersData.orders.length} of {ordersData.total} orders
+                            </p>
+                          )}
                         </div>
+                        <button className="p-2 hover:bg-gray-100 rounded-md">
+                          <MoreVertical className="w-4 h-4 text-gray-500" />
+                        </button>
                       </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="p-6 text-center text-gray-500">
-                    No orders found
-                  </div>
-                )}
+                      {isLoadingOrders ? (
+                        <div className="p-6 space-y-4">
+                          <Skeleton className="h-16 w-full" />
+                          <Skeleton className="h-16 w-full" />
+                          <Skeleton className="h-16 w-full" />
+                        </div>
+                      ) : ordersError ? (
+                        <div className="p-6 text-center">
+                          <p className="text-sm text-destructive">
+                            Failed to load orders:{" "}
+                            {ordersError instanceof Error
+                              ? ordersError.message
+                              : "Unknown error"}
+                          </p>
+                        </div>
+                      ) : ordersData?.orders && ordersData.orders.length > 0 ? (
+                        <>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="pl-6">Order ID</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Total Amount</TableHead>
+                                <TableHead>Currency</TableHead>
+                                <TableHead>Created At</TableHead>
+                                <TableHead className="pr-6"></TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {ordersData.orders.map((order) => (
+                                <TableRow key={order.id}>
+                                  <TableCell className="pl-6">
+                                    <div className="flex flex-col">
+                                      <p className="text-sm font-medium text-gray-900">
+                                        #{order.orderId}
+                                      </p>
+                                      <p className="text-xs text-gray-500">
+                                        ID: {order.id}
+                                      </p>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <span
+                                      className={`px-2 py-1 text-xs font-medium rounded-md whitespace-nowrap ${getStatusBadgeClass(
+                                        order.status
+                                      )}`}
+                                    >
+                                      {order.status}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-sm text-gray-600">
+                                    {order.currency} {order.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </TableCell>
+                                  <TableCell className="text-sm text-gray-600">
+                                    {order.currency}
+                                  </TableCell>
+                                  <TableCell className="text-sm text-gray-600">
+                                    {format(new Date(order.createdAt), "MMM dd, yyyy HH:mm")}
+                                  </TableCell>
+                                  <TableCell className="pr-6">
+                                    <button
+                                      onClick={() => setSelectedOrderId(order.orderId)}
+                                      className="p-1 hover:bg-gray-100 rounded"
+                                      title="View Order Details"
+                                    >
+                                      <Eye className="w-4 h-4 text-gray-500" />
+                                    </button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                          {ordersData.totalPages > 1 && (
+                            <div className="p-4 border-t flex items-center justify-between">
+                              <p className="text-sm text-gray-600">
+                                Page {ordersData.page} of {ordersData.totalPages}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setOrdersPage((p) => Math.max(1, p - 1))}
+                                  disabled={ordersPage === 1 || isLoadingOrders}
+                                >
+                                  Previous
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setOrdersPage((p) => p + 1)}
+                                  disabled={
+                                    ordersPage >= (ordersData?.totalPages || 1) ||
+                                    isLoadingOrders
+                                  }
+                                >
+                                  Next
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="p-6 text-center text-gray-500">
+                          No orders found
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
 
                 {/* Active Stores Performance Table */}
                 <div className=" border rounded-2xl overflow-hidden">
-              <div className="p-4 border-b flex items-center justify-between">
-                <h3 className="text-lg font-semibold">
-                  Active Stores Performance
-                </h3>
-                <button className="p-2 hover:bg-gray-100 rounded-md">
-                  <MoreVertical className="w-4 h-4 text-gray-500" />
-                </button>
-              </div>
-              {isLoadingRollup ? (
-                <div className="p-6 space-y-4">
-                  <Skeleton className="h-16 w-full" />
-                  <Skeleton className="h-16 w-full" />
-                </div>
-              ) : rollupError ? (
-                <div className="p-6 text-center">
-                  <p className="text-sm text-destructive">
-                    Failed to load stores:{" "}
-                    {rollupError instanceof Error
-                      ? rollupError.message
-                      : "Unknown error"}
-                  </p>
-                </div>
-              ) : rollupData?.accounts && rollupData.accounts.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="pl-6">Store Name</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Orders</TableHead>
-                      <TableHead>AOV</TableHead>
-                      <TableHead>Revenue</TableHead>
-                      <TableHead className="pr-6"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rollupData.accounts.map((account) => {
-                      const storeInitial = account.storeUrl
-                        .replace(/^https?:\/\//, "")
-                        .charAt(0)
-                        .toUpperCase();
-                      const shortUrl =
-                        account.storeUrl.length > 30
-                          ? account.storeUrl.substring(0, 30) + "..."
-                          : account.storeUrl;
-
-                      return (
-                        <TableRow key={account.accountId}>
-                          <TableCell className="pl-6">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                                <span className="text-sm font-medium text-gray-700">
-                                  {storeInitial}
-                                </span>
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">
-                                  {account.storeUrl
-                                    .replace(/^https?:\/\//, "")
-                                    .split(".")[0]
-                                    .charAt(0)
-                                    .toUpperCase() +
-                                    account.storeUrl
-                                      .replace(/^https?:\/\//, "")
-                                      .split(".")[0]
-                                      .slice(1)}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {shortUrl}
-                                </p>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className={`px-2 py-1 text-xs font-medium rounded-md whitespace-nowrap ${getStatusBadgeClass(
-                                "Active"
-                              )}`}
-                            >
-                              Active
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-600">
-                            {account.orders || 0}
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-600">
-                            ${account.avgOrderValue?.toFixed(2) || "0.00"}
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-600">
-                            ${account.revenue?.toLocaleString() || "0"}
-                          </TableCell>
-                          <TableCell className="pr-6">
-                            <button className="p-1 hover:bg-gray-100 rounded">
-                              <ExternalLink className="w-4 h-4 text-gray-500" />
-                            </button>
-                          </TableCell>
+                  <div className="p-4 border-b flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">
+                      Active Stores Performance
+                    </h3>
+                    <button className="p-2 hover:bg-gray-100 rounded-md">
+                      <MoreVertical className="w-4 h-4 text-gray-500" />
+                    </button>
+                  </div>
+                  {isLoadingRollup ? (
+                    <div className="p-6 space-y-4">
+                      <Skeleton className="h-16 w-full" />
+                      <Skeleton className="h-16 w-full" />
+                    </div>
+                  ) : rollupError ? (
+                    <div className="p-6 text-center">
+                      <p className="text-sm text-destructive">
+                        Failed to load stores:{" "}
+                        {rollupError instanceof Error
+                          ? rollupError.message
+                          : "Unknown error"}
+                      </p>
+                    </div>
+                  ) : rollupData?.accounts && rollupData.accounts.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="pl-6">Store Name</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Orders</TableHead>
+                          <TableHead>AOV</TableHead>
+                          <TableHead>Revenue</TableHead>
+                          <TableHead className="pr-6"></TableHead>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="p-6 text-center text-gray-500">
-                  No stores found
+                      </TableHeader>
+                      <TableBody>
+                        {rollupData.accounts.map((account) => {
+                          const storeInitial = account.storeUrl
+                            .replace(/^https?:\/\//, "")
+                            .charAt(0)
+                            .toUpperCase();
+                          const shortUrl =
+                            account.storeUrl.length > 30
+                              ? account.storeUrl.substring(0, 30) + "..."
+                              : account.storeUrl;
+
+                          return (
+                            <TableRow key={account.accountId}>
+                              <TableCell className="pl-6">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                                    <span className="text-sm font-medium text-gray-700">
+                                      {storeInitial}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-900">
+                                      {account.storeUrl
+                                        .replace(/^https?:\/\//, "")
+                                        .split(".")[0]
+                                        .charAt(0)
+                                        .toUpperCase() +
+                                        account.storeUrl
+                                          .replace(/^https?:\/\//, "")
+                                          .split(".")[0]
+                                          .slice(1)}
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                      {shortUrl}
+                                    </p>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <span
+                                  className={`px-2 py-1 text-xs font-medium rounded-md whitespace-nowrap ${getStatusBadgeClass(
+                                    "Active"
+                                  )}`}
+                                >
+                                  Active
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-sm text-gray-600">
+                                {account.orders || 0}
+                              </TableCell>
+                              <TableCell className="text-sm text-gray-600">
+                                ${account.avgOrderValue?.toFixed(2) || "0.00"}
+                              </TableCell>
+                              <TableCell className="text-sm text-gray-600">
+                                ${account.revenue?.toLocaleString() || "0"}
+                              </TableCell>
+                              <TableCell className="pr-6">
+                                <button className="p-1 hover:bg-gray-100 rounded">
+                                  <ExternalLink className="w-4 h-4 text-gray-500" />
+                                </button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="p-6 text-center text-gray-500">
+                      No stores found
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
               </>
             ) : accountId ? (
               <Card className=" border border-yellow-200 rounded-2xl">
@@ -1105,11 +1109,10 @@ function WooCommerceDetailPage() {
                 <div>
                   <p className="text-sm font-medium text-gray-500">Status</p>
                   <span
-                    className={`inline-block mt-1 px-2 py-1 text-xs font-medium rounded-md ${
-                      productDetailData.product.status === "publish"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-700"
-                    }`}
+                    className={`inline-block mt-1 px-2 py-1 text-xs font-medium rounded-md ${productDetailData.product.status === "publish"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-gray-100 text-gray-700"
+                      }`}
                   >
                     {productDetailData.product.status || "N/A"}
                   </span>

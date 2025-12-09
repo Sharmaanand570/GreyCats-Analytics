@@ -199,6 +199,28 @@ export const resolveMetricWidgets = (payload: ResolveWidgetsPayload) =>
     return response.data;
   });
 
+// Fetch individual metric data with optional dimensional breakdown
+export const fetchUnifiedMetric = (params: {
+  integration: string;
+  accountId: string;
+  metricKey: string;
+  dimensionType?: string;
+  startDate: string;
+  endDate: string;
+}) =>
+  handleRequest(async () => {
+    const response = await api.get("/unified-metrics", {
+      params: {
+        integration: params.integration,
+        metricKey: params.metricKey,
+        startDate: params.startDate,
+        endDate: params.endDate,
+        dimensionType: params.dimensionType || "",
+      },
+    });
+    return response.data;
+  });
+
 export const createReportTemplate = (payload: CreateTemplatePayload) =>
   handleRequest(async () => {
     const slides = buildSlidesFromWidgets(payload.widgets, payload.slidesMeta);

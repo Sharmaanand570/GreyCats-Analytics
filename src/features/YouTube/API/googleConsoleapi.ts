@@ -304,7 +304,7 @@ export const getGoogleConsoleUnifiedMetrics = async (
       {
         params: {
           integration: "google-search-console",
-          metricKey: "google_seo.clicks",
+        
           ...params,
         },
         headers: seoHeaders,
