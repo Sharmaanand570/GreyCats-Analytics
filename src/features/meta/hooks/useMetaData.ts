@@ -48,6 +48,9 @@ const commonQueryOptions = {
 
 // ============ Meta Ads (ad accounts & campaigns) ============
 
+
+// ============ Meta Ads (ad accounts & campaigns) ============
+
 export const useMetaAccounts = () => {
   return useQuery<MetaAccountsResponse, Error>({
     queryKey: ["meta", "accounts"],
@@ -79,7 +82,7 @@ export const useMetaReconnect = () => {
   return useMutation<MetaReconnectResponse, Error>({
     mutationFn: () => reconnectMeta(),
     onSuccess: (data) => {
-      toast.success(data.message || "Meta reconnected successfully");
+      toast.success("Meta reconnected successfully");
       queryClient.invalidateQueries({ queryKey: ["meta"] });
     },
     onError: (error) => {
@@ -104,10 +107,10 @@ export const useMetaDisconnect = () => {
 
 // ============ Facebook organic insights ============
 
-export const useFacebookPages = () => {
+export const useFacebookPages = (params?: { limit?: number; after?: string; search?: string }) => {
   return useQuery<FacebookPagesResponse, Error>({
-    queryKey: ["meta", "facebook", "pages"],
-    queryFn: () => getFacebookPages(),
+    queryKey: ["meta", "facebook", "pages", params],
+    queryFn: () => getFacebookPages(params),
     ...commonQueryOptions,
   });
 };
@@ -121,20 +124,20 @@ export const useFacebookPageInfo = (pageId: string | undefined) => {
   });
 };
 
-export const useFacebookPagePosts = (pageId: string | undefined) => {
+export const useFacebookPagePosts = (pageId: string | undefined, limit?: number) => {
   return useQuery<FacebookPagePostsResponse, Error>({
-    queryKey: ["meta", "facebook", "page-posts", pageId],
-    queryFn: () => getFacebookPagePosts(pageId as string),
+    queryKey: ["meta", "facebook", "page-posts", pageId, limit],
+    queryFn: () => getFacebookPagePosts(pageId as string, limit),
     enabled: !!pageId,
     ...commonQueryOptions,
   });
 };
 
-export const useFacebookPostInsights = (postId: string | undefined) => {
+export const useFacebookPostInsights = (postId: string | undefined, pageId: string | undefined) => {
   return useQuery<FacebookPostInsightsResponse, Error>({
-    queryKey: ["meta", "facebook", "post-insights", postId],
-    queryFn: () => getFacebookPostInsights(postId as string),
-    enabled: !!postId,
+    queryKey: ["meta", "facebook", "post-insights", postId, pageId],
+    queryFn: () => getFacebookPostInsights(postId as string, pageId as string),
+    enabled: !!postId && !!pageId,
     ...commonQueryOptions,
   });
 };
@@ -173,10 +176,10 @@ export const useInstagramProfile = (igBusinessId: string | undefined) => {
   });
 };
 
-export const useInstagramMedia = (igBusinessId: string | undefined) => {
+export const useInstagramMedia = (igBusinessId: string | undefined, limit?: number) => {
   return useQuery<InstagramMediaResponse, Error>({
-    queryKey: ["meta", "instagram", "media", igBusinessId],
-    queryFn: () => getInstagramMedia(igBusinessId as string),
+    queryKey: ["meta", "instagram", "media", igBusinessId, limit],
+    queryFn: () => getInstagramMedia(igBusinessId as string, limit),
     enabled: !!igBusinessId,
     ...commonQueryOptions,
   });
@@ -207,21 +210,24 @@ export const useInstagramSyncInsights = () => {
 
 // ============ Saved & daily history ============
 
-export const useMetaSavedInsights = () => {
+export const useMetaSavedInsights = (platform?: string) => {
   return useQuery<MetaSavedInsightsResponse, Error>({
-    queryKey: ["meta", "saved-insights"],
-    queryFn: () => getMetaSavedInsights(),
+    queryKey: ["meta", "saved-insights", platform],
+    queryFn: () => getMetaSavedInsights(platform),
     ...commonQueryOptions,
   });
 };
 
-export const useMetaDailyInsights = () => {
+export const useMetaDailyInsights = (platform?: string) => {
   return useQuery<MetaDailyHistoryResponse, Error>({
-    queryKey: ["meta", "daily-insights"],
-    queryFn: () => getMetaDailyInsights(),
+    queryKey: ["meta", "daily-insights", platform],
+    queryFn: () => getMetaDailyInsights(platform),
     ...commonQueryOptions,
   });
 };
+
+
+
 
 
 

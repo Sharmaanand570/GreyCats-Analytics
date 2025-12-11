@@ -190,6 +190,27 @@ export const fetchDebugMetrics = (limit?: number) =>
     return response.data;
   });
 
+/**
+ * Fetch unified metrics (production data) without resolving specific widgets.
+ * This can be used to build the available-metrics list from live data.
+ */
+export const fetchUnifiedMetricsList = (params?: {
+  integration?: string;
+  accountId?: string;
+  metricKey?: string;
+  dimensionType?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+}) =>
+  handleRequest(async () => {
+    const response = await api.get<DebugMetricsResponse>("/unified-metrics", {
+      params,
+    });
+    return response.data;
+  });
+
 export const resolveMetricWidgets = (payload: ResolveWidgetsPayload) =>
   handleRequest(async () => {
     const response = await api.post<ResolveWidgetsResponse>(
@@ -212,6 +233,7 @@ export const fetchUnifiedMetric = (params: {
     const response = await api.get("/unified-metrics", {
       params: {
         integration: params.integration,
+        accountId: params.accountId,
         metricKey: params.metricKey,
         startDate: params.startDate,
         endDate: params.endDate,

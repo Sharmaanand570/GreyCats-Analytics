@@ -1,7 +1,7 @@
 import React from "react";
 import { MdDragIndicator } from "react-icons/md";
 import { FiTrash2 } from "react-icons/fi";
-import type { DashboardLayout } from "./ReportBuilder";
+import type { DashboardLayout } from "../pages/ReportBuilder";
 
 type WidgetCardProps = {
   widget: DashboardLayout;
@@ -47,7 +47,7 @@ export default function WidgetCard({
       </div>
 
       <div
-        className="non-draggable p-2 md:p-3 h-full overflow-auto"
+        className="non-draggable p-1 h-full overflow-hidden flex flex-col"
         onClick={(e) => {
           e.stopPropagation();
           onContentClick(widget);

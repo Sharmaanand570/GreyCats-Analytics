@@ -147,8 +147,8 @@ function GoogleConsoleDetailPage() {
     console.log(siteUrl);
     if (!siteUrl) return;
     try {
-    const resp =  await selectProperty({ siteUrl });
-    console.log(resp);
+      const resp = await selectProperty({ siteUrl });
+      console.log(resp);
       setSelectedSiteUrl(siteUrl);
     } catch {
       // toast handled in hook
@@ -295,33 +295,48 @@ function GoogleConsoleDetailPage() {
                       No Search Console properties found for this account.
                     </p>
                   ) : (
-                    <div className="space-y-3 text-sm">
-                      <select
-                        className="border rounded px-3 py-2 text-sm w-full"
-                        value={selectedProperty?.siteUrl || ""}
-                        onChange={(e) => {
-                          handleSelectProperty(e.target.value)
-                          console.log(e.target.value);
-                        }}
-                        disabled={isSelectingProperty}
-                      >
-                        <option value="" disabled>
-                          Select a property...
-                        </option>
-                        {properties.map((p) => (
-                          <option key={p.id} value={p.siteUrl}>
-                            {p.siteUrl} ({p.permissionLevel})
-                          </option>
-                        ))}
-                      </select>
-                      {selectedProperty && (
-                        <p className="text-xs text-muted-foreground">
-                          Currently selected:{" "}
-                          <span className="font-medium">
-                            {selectedProperty.siteUrl}
-                          </span>
-                        </p>
-                      )}
+                    <div className="space-y-3">
+                      {properties.map((p) => (
+                        <div
+                          key={p.id}
+                          className={`flex items-center justify-between p-3 rounded-lg border ${p.isSelected
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border bg-background'
+                            }`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {p.siteUrl}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {p.permissionLevel}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 ml-3">
+                            {p.isSelected ? (
+                              <span className="text-xs font-medium text-primary px-3 py-1 bg-primary/10 rounded-full">
+                                ✓ Selected
+                              </span>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleSelectProperty(p.siteUrl)}
+                                disabled={isSelectingProperty}
+                              >
+                                {isSelectingProperty ? (
+                                  <>
+                                    <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                    Selecting...
+                                  </>
+                                ) : (
+                                  'Select'
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </CardContent>

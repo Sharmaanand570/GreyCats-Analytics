@@ -42,18 +42,18 @@ export const reportTableRows: ReportTableRow[] = [
 
 // Widget size map for react-grid-layout
 export const WIDGET_SIZE_MAP: Record<ReportWidgetType, { w: number; h: number }> = {
-  title: { w: 10, h: 1 },
-  table: { w: 6, h: 4 },
-  chart: { w: 5, h: 4 },
-  line_chart: { w: 6, h: 4 },
-  area_chart: { w: 6, h: 4 },
-  bar_chart: { w: 5, h: 4 },
-  pie_chart: { w: 4, h: 4 },
-  image: { w: 4, h: 3 },
-  custom: { w: 5, h: 3 },
-  map: { w: 5, h: 3 },
-  metric: { w: 3, h: 2 },
-  embed: { w: 6, h: 4 },
+  title: { w: 12, h: 2 },
+  table: { w: 6, h: 6 },
+  chart: { w: 6, h: 5 },
+  line_chart: { w: 8, h: 5 },
+  area_chart: { w: 8, h: 5 },
+  bar_chart: { w: 6, h: 5 },
+  pie_chart: { w: 4, h: 5 },
+  image: { w: 4, h: 4 },
+  custom: { w: 6, h: 4 },
+  map: { w: 6, h: 5 },
+  metric: { w: 3, h: 3 },
+  embed: { w: 8, h: 6 },
 };
 
 // Simple ID generator; replace with nanoid if needed

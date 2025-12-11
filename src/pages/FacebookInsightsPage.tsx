@@ -14,6 +14,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
 import {
   Table,
@@ -32,12 +33,20 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   useFacebookPageInfo,
   useFacebookPagePosts,
   useFacebookPages,
   useFacebookPostInsights,
   useFacebookSyncInsights,
 } from "@/features/meta/hooks/useMetaData";
+import { Facebook, ThumbsUp, Tag, ExternalLink, Calendar, MessageSquare, BarChart2, RefreshCw } from "lucide-react";
 
 function FacebookInsightsPage() {
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
@@ -65,104 +74,135 @@ function FacebookInsightsPage() {
     data: postInsightsData,
     isLoading: isLoadingPostInsights,
     error: postInsightsError,
-  } = useFacebookPostInsights(selectedPostId || undefined);
+  } = useFacebookPostInsights(selectedPostId || undefined, selectedPageId || undefined);
 
   const {
-    mutate: syncFacebook,
+    mutateAsync: syncFacebook,
     isPending: isSyncingFacebook,
   } = useFacebookSyncInsights();
 
   const pages = pagesData?.pages ?? [];
   const posts = postsData?.posts ?? [];
 
-  const handleSyncFacebook = () => {
+  const handleSyncFacebook = async () => {
     if (!selectedPageId) return;
-    syncFacebook({ pageId: selectedPageId });
+    try {
+      await syncFacebook({ pageId: selectedPageId });
+    } catch {
+      // handled in hook
+    }
   };
 
   return (
     <div className="w-full h-full flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
-      <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
-        <div className="w-full h-full flex flex-col">
-          <div className="w-full h-[4.8em]  border-b flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-5 py-3 lg:py-0">
-            <div className="flex flex-col gap-1">
-              <span className="font-medium text-xl">Facebook Insights</span>
-              <span className="text-xs text-muted-foreground">
-                Drill into Facebook page performance, posts and engagement.
-              </span>
+      <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd] shadow-sm flex flex-col">
+        {/* Header */}
+        <div className="w-full border-b flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-6 py-4 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
+          <div className="flex items-center gap-4">
+            <div className="p-2 bg-blue-50 rounded-lg border border-blue-100">
+              <Facebook className="w-6 h-6 text-blue-600" />
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button asChild variant="outline" size="sm">
-                <Link to="/data-sources/meta-ads">Back to Meta Ads</Link>
-              </Button>
+            <div>
+              <h1 className="font-semibold text-xl text-zinc-900 leading-none">
+                Facebook Insights
+              </h1>
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Page performance & post engagement
+              </p>
             </div>
           </div>
-
-          <div className="w-full px-5 pt-4">
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink asChild>
-                    <Link to="/data-sources">Data Sources</Link>
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbLink asChild>
-                    <Link to="/data-sources/meta-ads">Meta Ads</Link>
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>Facebook Insights</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button asChild variant="outline" size="sm" className="h-9">
+              <Link to="/data-sources/meta-ads">
+                Back to Overview
+              </Link>
+            </Button>
           </div>
+        </div>
 
-          <div className="w-full px-5 py-6 space-y-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Select Facebook Page</CardTitle>
+        {/* Breadcrumbs */}
+        <div className="w-full px-6 py-3 border-b bg-zinc-50/40">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink to="/data-sources" className="text-muted-foreground hover:text-foreground">
+                  Data Sources
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink to="/data-sources/meta-ads" className="text-muted-foreground hover:text-foreground">
+                  Meta Ads
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage className="font-medium text-foreground">Facebook</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-6 py-8">
+          <div className="max-w-7xl mx-auto space-y-6">
+
+            {/* Page Selection Card */}
+            <Card className="border shadow-sm">
+              <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 py-4">
+                <div>
+                  <CardTitle className="text-base font-semibold">Select Facebook Page</CardTitle>
+                  <CardDescription>Choose a page to view organic performance</CardDescription>
+                </div>
+                {/* Sync Button */}
+                {selectedPageId && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={isSyncingFacebook}
+                    onClick={handleSyncFacebook}
+                    className="ml-auto flex-shrink-0"
+                  >
+                    {isSyncingFacebook ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 mr-2 animate-spin" />
+                        Syncing...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 mr-2" />
+                        Sync Insights
+                      </>
+                    )}
+                  </Button>
+                )}
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-0 pb-4">
                 {isLoadingPages ? (
-                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full max-w-sm" />
                 ) : pagesError ? (
-                  <p className="text-sm text-red-500">
-                    {(pagesError as Error).message ||
-                      "Failed to load Facebook pages."}
-                  </p>
+                  <div className="p-3 border border-red-200 bg-red-50 text-red-700 rounded-md text-sm">
+                    {(pagesError as Error).message || "Failed to load Facebook pages."}
+                  </div>
                 ) : pages.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No Facebook pages found for this Meta connection.
-                  </p>
+                  <p className="text-sm text-muted-foreground">No Facebook pages connected.</p>
                 ) : (
-                  <div className="flex flex-col gap-3">
-                    <select
-                      className="w-full rounded-md border px-3 py-2 text-sm"
+                  <div className="max-w-sm">
+                    <Select
                       value={selectedPageId ?? ""}
-                      onChange={(e) =>
-                        setSelectedPageId(e.target.value || null)
-                      }
+                      onValueChange={(val) => setSelectedPageId(val || null)}
                     >
-                      <option value="">Select a page</option>
-                      {pages.map((page) => (
-                        <option key={page.id} value={page.id}>
-                          {page.name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="flex justify-end">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={!selectedPageId || isSyncingFacebook}
-                        onClick={handleSyncFacebook}
-                      >
-                        {isSyncingFacebook ? "Syncing..." : "Sync Facebook Insights"}
-                      </Button>
-                    </div>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a page" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {pages.map((page) => (
+                          <SelectItem key={page.id} value={page.id}>
+                            {page.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 )}
               </CardContent>
@@ -170,177 +210,181 @@ function FacebookInsightsPage() {
 
             {selectedPageId && (
               <div className="grid gap-6 lg:grid-cols-3">
-                <Card className="lg:col-span-1">
-                  <CardHeader>
-                    <CardTitle>Page Info</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {isLoadingPageInfo ? (
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-2/3" />
-                        <Skeleton className="h-4 w-1/2" />
-                        <Skeleton className="h-4 w-3/4" />
-                      </div>
-                    ) : pageInfoError ? (
-                      <p className="text-sm text-red-500">
-                        {(pageInfoError as Error).message ||
-                          "Failed to load page info."}
-                      </p>
-                    ) : pageInfoData?.page ? (
-                      <div className="space-y-2 text-sm">
-                        <div>
-                          <span className="font-medium">Name: </span>
-                          {pageInfoData.page.name}
+                {/* Page Info Column */}
+                <div className="lg:col-span-1 space-y-6">
+                  <Card className="border shadow-sm h-full">
+                    <CardHeader className="pb-3 border-b bg-zinc-50/40">
+                      <CardTitle className="text-base font-semibold">Page Details</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-4">
+                      {isLoadingPageInfo ? (
+                        <div className="space-y-3">
+                          <Skeleton className="h-12 w-full" />
+                          <Skeleton className="h-12 w-full" />
+                          <Skeleton className="h-12 w-full" />
                         </div>
-                        <div>
-                          <span className="font-medium">Fans: </span>
-                          {pageInfoData.page.fan_count.toLocaleString()}
-                        </div>
-                        <div>
-                          <span className="font-medium">Category: </span>
-                          {pageInfoData.page.category_list?.[0]?.name ?? "—"}
-                        </div>
-                        {pageInfoData.page.link && (
-                          <div>
-                            <span className="font-medium">Link: </span>
-                            <a
-                              href={pageInfoData.page.link}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-blue-600 underline"
-                            >
-                              View on Facebook
-                            </a>
+                      ) : pageInfoError ? (
+                        <p className="text-sm text-red-500">Failed to load info.</p>
+                      ) : pageInfoData?.page ? (
+                        <>
+                          <div className="p-3 border rounded-lg hover:bg-zinc-50 transition-colors">
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 mb-1">
+                              <ThumbsUp className="w-3.5 h-3.5" /> Total Fans
+                            </p>
+                            <p className="font-semibold text-lg">{pageInfoData.page.fan_count.toLocaleString()}</p>
                           </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        No page info available.
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
+                          <div className="p-3 border rounded-lg hover:bg-zinc-50 transition-colors">
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 mb-1">
+                              <Tag className="w-3.5 h-3.5" /> Category
+                            </p>
+                            <p className="font-medium text-sm">{pageInfoData.page.category_list?.[0]?.name ?? "—"}</p>
+                          </div>
+                          {pageInfoData.page.link && (
+                            <Button asChild variant="outline" className="w-full justify-between" size="sm">
+                              <a href={pageInfoData.page.link} target="_blank" rel="noreferrer">
+                                <span className="flex items-center gap-2">
+                                  <Facebook className="w-3.5 h-3.5" /> Open Page
+                                </span>
+                                <ExternalLink className="w-3.5 h-3.5 opacity-50" />
+                              </a>
+                            </Button>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No details available.</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
 
-                <Card className="lg:col-span-2">
-                  <CardHeader>
-                    <CardTitle>Recent Posts</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {isLoadingPosts ? (
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-4 w-5/6" />
-                        <Skeleton className="h-4 w-4/6" />
-                      </div>
-                    ) : postsError ? (
-                      <p className="text-sm text-red-500">
-                        {(postsError as Error).message ||
-                          "Failed to load posts."}
-                      </p>
-                    ) : posts.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        No posts found for this page.
-                      </p>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Message</TableHead>
-                              <TableHead>Created</TableHead>
-                              <TableHead className="w-[140px] text-right">
-                                Actions
-                              </TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {posts.map((post) => (
-                              <TableRow key={post.id}>
-                                <TableCell className="max-w-xs truncate">
-                                  {post.message || "(no message)"}
-                                </TableCell>
-                                <TableCell>
-                                  {new Date(
-                                    post.created_time
-                                  ).toLocaleString()}
-                                </TableCell>
-                                <TableCell className="text-right space-x-2">
-                                  {post.permalink_url && (
-                                    <Button
-                                      asChild
-                                      variant="ghost"
-                                      size="sm"
-                                    >
-                                      <a
-                                        href={post.permalink_url}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                      >
-                                        View
-                                      </a>
-                                    </Button>
-                                  )}
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setSelectedPostId(post.id)}
-                                  >
-                                    Insights
-                                  </Button>
-                                </TableCell>
+                {/* Recent Posts Column */}
+                <div className="lg:col-span-2">
+                  <Card className="border shadow-sm h-full flex flex-col">
+                    <CardHeader className="pb-3 border-b bg-zinc-50/40">
+                      <CardTitle className="text-base font-semibold">Recent Posts</CardTitle>
+                      <CardDescription>Latest activity and engagement</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-0 flex-1">
+                      {isLoadingPosts ? (
+                        <div className="p-4 space-y-3">
+                          <Skeleton className="h-10 w-full" />
+                          <Skeleton className="h-10 w-full" />
+                          <Skeleton className="h-10 w-full" />
+                        </div>
+                      ) : postsError ? (
+                        <div className="p-8 text-center text-sm text-red-500">
+                          {(postsError as Error).message}
+                        </div>
+                      ) : posts.length === 0 ? (
+                        <div className="p-8 text-center text-sm text-muted-foreground">
+                          No posts found for this page.
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto max-h-[500px]">
+                          <Table>
+                            <TableHeader className="bg-zinc-50 sticky top-0">
+                              <TableRow>
+                                <TableHead className="w-[50px]"></TableHead>
+                                <TableHead>Post Message</TableHead>
+                                <TableHead className="w-[140px]">Published</TableHead>
+                                <TableHead className="w-[100px] text-right">Actions</TableHead>
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                            </TableHeader>
+                            <TableBody>
+                              {posts.map((post) => (
+                                <TableRow key={post.id} className="group">
+                                  <TableCell>
+                                    <MessageSquare className="w-4 h-4 text-muted-foreground" />
+                                  </TableCell>
+                                  <TableCell className="max-w-[200px] lg:max-w-md">
+                                    <p className="truncate font-medium text-sm">
+                                      {post.message || <span className="italic text-muted-foreground">No message content</span>}
+                                    </p>
+                                  </TableCell>
+                                  <TableCell className="text-xs text-muted-foreground">
+                                    <div className="flex items-center gap-1.5">
+                                      <Calendar className="w-3 h-3" />
+                                      {new Date(post.created_time).toLocaleDateString()}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-1">
+                                      {post.permalink_url && (
+                                        <Button asChild variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                                          <a href={post.permalink_url} target="_blank" rel="noreferrer" title="View on Facebook">
+                                            <ExternalLink className="w-3.5 h-3.5" />
+                                          </a>
+                                        </Button>
+                                      )}
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                        onClick={() => setSelectedPostId(post.id)}
+                                        title="View Insights"
+                                      >
+                                        <BarChart2 className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
             )}
 
-            <Dialog
-              open={!!selectedPostId}
-              onOpenChange={(open) => !open && setSelectedPostId(null)}
-            >
-              <DialogContent>
+            <Dialog open={!!selectedPostId} onOpenChange={(open) => !open && setSelectedPostId(null)}>
+              <DialogContent className="max-w-xl">
                 <DialogHeader>
-                  <DialogTitle>Post Insights</DialogTitle>
+                  <DialogTitle className="flex items-center gap-2">
+                    <div className="p-1.5 bg-blue-50 rounded-md">
+                      <BarChart2 className="w-4 h-4 text-blue-600" />
+                    </div>
+                    Post Insights
+                  </DialogTitle>
                   <DialogDescription>
-                    Engagement metrics for the selected Facebook post.
+                    Detailed engagement metrics for the selected post.
                   </DialogDescription>
                 </DialogHeader>
+
                 {isLoadingPostInsights ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-1/2" />
-                    <Skeleton className="h-4 w-1/3" />
-                    <Skeleton className="h-4 w-2/3" />
+                  <div className="grid grid-cols-2 gap-4 py-4">
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
                   </div>
                 ) : postInsightsError ? (
-                  <p className="text-sm text-red-500">
-                    {(postInsightsError as Error).message ||
-                      "Failed to load post insights."}
-                  </p>
+                  <div className="p-4 bg-red-50 text-red-600 rounded text-sm">
+                    Failed to load insights.
+                  </div>
                 ) : !postInsightsData?.insights?.length ? (
-                  <p className="text-sm text-muted-foreground">
-                    No insights available for this post.
-                  </p>
+                  <div className="p-8 text-center text-muted-foreground text-sm">
+                    No insights data returned from API.
+                  </div>
                 ) : (
-                  <div className="space-y-2 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
                     {postInsightsData.insights.map((metric) => (
-                      <div
-                        key={metric.name}
-                        className="flex items-center justify-between"
-                      >
-                        <span className="font-medium">{metric.name}</span>
-                        <span>{metric.values?.[0]?.value ?? "—"}</span>
+                      <div key={metric.name} className="p-3 border rounded-lg bg-zinc-50/50">
+                        <p className="text-xs text-muted-foreground mb-1 font-medium uppercase tracking-wider">
+                          {metric.name.replace(/_/g, ' ')}
+                        </p>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-xl font-bold text-zinc-900">
+                            {metric.values?.[0]?.value?.toLocaleString() ?? "—"}
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
               </DialogContent>
             </Dialog>
+
           </div>
         </div>
       </div>

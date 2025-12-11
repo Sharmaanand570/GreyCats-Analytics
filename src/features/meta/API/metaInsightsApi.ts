@@ -166,10 +166,16 @@ const handleMetaInsightsError = (
 
 // ==================== API FUNCTIONS ====================
 
-export const getFacebookPages = async (): Promise<FacebookPagesResponse> => {
+
+export const getFacebookPages = async (params?: {
+  limit?: number;
+  after?: string;
+  search?: string;
+}): Promise<FacebookPagesResponse> => {
   try {
     const response = await api.get<FacebookPagesResponse>(
-      "/meta-insights/facebook/pages"
+      "/meta-insights/facebook/pages",
+      { params }
     );
     return response.data;
   } catch (error) {
@@ -209,12 +215,13 @@ export const getFacebookPageInfo = async (
 };
 
 export const getFacebookPagePosts = async (
-  pageId: string
+  pageId: string,
+  limit?: number
 ): Promise<FacebookPagePostsResponse> => {
   try {
     const response = await api.get<FacebookPagePostsResponse>(
       "/meta-insights/facebook/page-posts",
-      { params: { pageId } }
+      { params: { pageId, limit } }
     );
     return response.data;
   } catch (error) {
@@ -226,15 +233,18 @@ export const getFacebookPagePosts = async (
 };
 
 export const getFacebookPostInsights = async (
-  postId: string
+  postId: string,
+  pageId: string
 ): Promise<FacebookPostInsightsResponse> => {
   try {
     const response = await api.get<FacebookPostInsightsResponse>(
       "/meta-insights/facebook/post-insights",
-      { params: { postId } }
+      { params: { postId, pageId } }
     );
+    console.log("✅ Facebook Post Insights Response:", response.data);
     return response.data;
   } catch (error) {
+    console.error("❌ Facebook Post Insights Error:", error);
     return handleMetaInsightsError(
       error,
       "Failed to load Facebook post insights"
@@ -291,12 +301,13 @@ export const getInstagramProfile = async (
 };
 
 export const getInstagramMedia = async (
-  igId: string
+  igId: string,
+  limit?: number
 ): Promise<InstagramMediaResponse> => {
   try {
     const response = await api.get<InstagramMediaResponse>(
       "/meta-insights/instagram/media",
-      { params: { igId } }
+      { params: { igId, limit } }
     );
     return response.data;
   } catch (error) {
@@ -312,8 +323,10 @@ export const getInstagramMediaInsights = async (
       "/meta-insights/instagram/media-insights",
       { params: { mediaId } }
     );
+    console.log("✅ Instagram Media Insights Response:", response.data);
     return response.data;
   } catch (error) {
+    console.error("❌ Instagram Media Insights Error:", error);
     return handleMetaInsightsError(
       error,
       "Failed to load Instagram media insights"
@@ -338,10 +351,13 @@ export const syncInstagramInsights = async (
   }
 };
 
-export const getMetaSavedInsights = async (): Promise<MetaSavedInsightsResponse> => {
+export const getMetaSavedInsights = async (
+  platform?: string
+): Promise<MetaSavedInsightsResponse> => {
   try {
     const response = await api.get<MetaSavedInsightsResponse>(
-      "/meta-insights/saved"
+      "/meta-insights/saved",
+      { params: { platform } }
     );
     return response.data;
   } catch (error) {
@@ -349,10 +365,13 @@ export const getMetaSavedInsights = async (): Promise<MetaSavedInsightsResponse>
   }
 };
 
-export const getMetaDailyInsights = async (): Promise<MetaDailyHistoryResponse> => {
+export const getMetaDailyInsights = async (
+  platform?: string
+): Promise<MetaDailyHistoryResponse> => {
   try {
     const response = await api.get<MetaDailyHistoryResponse>(
-      "/meta-insights/daily"
+      "/meta-insights/daily",
+      { params: { platform } }
     );
     return response.data;
   } catch (error) {

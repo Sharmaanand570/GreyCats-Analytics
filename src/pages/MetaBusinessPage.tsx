@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
 import {
-  useFacebookPageInsights,
-  useFacebookPagePosts,
+  useFacebookPosts,
   useInstagramMedia,
   useInstagramProfile,
   useMetaBusinessAccounts,
   useMetaBusinessAnalyticsSummary,
   useMetaBusinessDisconnect,
-  useMetaBusinessRefresh,
   useMetaBusinessRefreshPage,
   useMetaBusinessSync,
 } from "@/features/meta/hooks/useMetaBusinessData";
@@ -62,11 +60,6 @@ function MetaBusinessPage() {
   } = useMetaBusinessSync();
 
   const {
-    mutateAsync: refreshAccount,
-    isPending: isRefreshing,
-  } = useMetaBusinessRefresh();
-
-  const {
     mutateAsync: refreshPageToken,
     isPending: isRefreshingPage,
   } = useMetaBusinessRefreshPage();
@@ -93,7 +86,7 @@ function MetaBusinessPage() {
   const {
     data: facebookPosts,
     isLoading: isLoadingPosts,
-  } = useFacebookPagePosts(accountIdNumber);
+  } = useFacebookPosts(accountIdNumber);
 
   const {
     data: instagramMedia,
@@ -114,14 +107,7 @@ function MetaBusinessPage() {
     }
   };
 
-  const handleRefresh = async () => {
-    if (!accountIdNumber) return;
-    try {
-      await refreshAccount(accountIdNumber);
-    } catch (error) {
-      console.error(error);
-    }
-  };
+
 
   const handleRefreshPage = async () => {
     if (!accountIdNumber) return;
@@ -175,7 +161,7 @@ function MetaBusinessPage() {
               </div>
               <span className="font-medium text-xl">Meta Business</span>
             </div>
-            
+
             <div className="flex flex-wrap items-center gap-2">
               {accountsData?.accounts?.length ? (
                 <Select
@@ -386,7 +372,7 @@ function MetaBusinessPage() {
                         </div>
                       ) : facebookPosts?.posts?.length ? (
                         <div className="space-y-4">
-                          {facebookPosts.posts.slice(0, 5).map((post) => (
+                          {facebookPosts.posts.slice(0, 5).map((post: any) => (
                             <div key={post.id} className="flex gap-3 border-b pb-3 last:border-0">
                               {post.full_picture && (
                                 <img

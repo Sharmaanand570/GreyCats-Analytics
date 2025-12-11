@@ -79,9 +79,7 @@ import type {
 import {
   createReportTemplate,
   getReportTemplate,
-  resolveMetricWidgets,
   fetchUnifiedMetric,
-  runReport,
   updateReportTemplate,
   createReportSchedule,
   updateReportSchedule,
@@ -142,10 +140,10 @@ export type DashboardMap = Map<number, DashboardLayout[]>;
 
 // Grid constants
 const GRID_CONFIG = {
-  cols: 10,
-  rowHeight: 100,
+  cols: 12,
+  rowHeight: 80,
   width: 1200,
-  margin: [20, 20] as [number, number],
+  margin: [16, 16] as [number, number],
 } as const;
 
 // Tablet grid config
@@ -157,7 +155,7 @@ const TABLET_GRID_CONFIG = {
 
 const DEFAULT_WIDGET_SIZE = {
   w: 4,
-  h: 3,
+  h: 4,
 } as const;
 
 // Auto width provider for react-grid-layout
@@ -216,16 +214,66 @@ const ENABLE_AUTO_DEFAULT_WIDGETS = true;
 // Curated default metrics per integration platform
 const CURATED_DEFAULTS: Record<string, string[]> = {
   "google-analytics": [
-    "sessions",
-    "activeUsers",
-    "pageViews",
-    "bounceRate",
+    "google.sessions",        // Match backend format
+    "google.activeUsers",
+    "google.pageViews",
+    "google.bounceRate",
+  ],
+  "google": [                 // Alias for Google Analytics
+    "google.sessions",
+    "google.activeUsers",
+    "google.pageViews",
+    "google.bounceRate",
   ],
   "google-search-console": [
     "google_seo.clicks",      // Match actual DB format
     "google_seo.impressions",
     "google_seo.ctr",
     "google_seo.position",
+  ],
+  "google-console": [
+    "google-console.billing.cost",
+  ],
+  "meta": [
+    "meta.page.impressions",
+    "meta.page.engagement",
+    "meta.page.fanAdds",
+    "meta.instagram.followers",
+  ],
+  "meta_ads": [
+    // Facebook Page Metrics (Organic)
+    "meta.page.impressions",
+    "meta.page.uniqueImpressions",
+    "meta.page.engagement",
+    "meta.page.fans",
+    "meta.page.postImpressions",
+    "meta.page.views",
+
+    // Instagram Metrics (Organic)
+    "meta.instagram.impressions",
+    "meta.instagram.reach",
+    "meta.instagram.profileViews",
+    "meta.instagram.websiteClicks",
+    "meta.instagram.phoneClicks",
+    "meta.instagram.directionsClicks",
+    "meta.instagram.emailContacts",
+
+    // Meta Ads Campaign Metrics (Paid)
+    "meta.ads.impressions",
+    "meta.ads.clicks",
+    "meta.ads.spend",
+    "meta.ads.cpc",
+  ],
+  "youtube": [
+    "youtube.views",
+    "youtube.likes",
+    "youtube.comments",
+    "youtube.subscribersGained",
+  ],
+  "shopify": [
+    "shopify.revenue",
+    "shopify.orders",
+    "shopify.avgOrderValue",
   ],
   "woo": [                    // Match actual DB integration key
     "woo.revenue",
@@ -251,6 +299,7 @@ type MetricOption = {
   metricKey: string;
   integration: string;
   accountId: string;
+  displayName?: string;
   filters?: Record<string, unknown>;
 };
 
@@ -366,7 +415,8 @@ function buildDefaultWidgetsForIntegration(
   const addWidget = (
     type: ReportWidgetType,
     metric: MetricOption,
-    idx: number
+    indexInType: number,
+    baseY: number = 0
   ) => {
     const id = generateWidgetId("auto");
     const isMetricCard = type === "metric";
@@ -376,12 +426,32 @@ function buildDefaultWidgetsForIntegration(
       metric.metricKey.split('.').pop()?.replace(/([A-Z])/g, ' $1').trim() ||
       'Metric';
 
+    // Layout Logic for 12-col grid
+    let x = 0;
+    let y = baseY;
+    let w = 4;
+    let h = 4;
+
+    if (isMetricCard) {
+      // Metrics: 4 per row (w=3)
+      w = 3;
+      h = 3;
+      x = (indexInType % 4) * 3;
+      y = baseY + Math.floor(indexInType / 4) * 3;
+    } else {
+      // Charts: 2 per row (w=6) or full width (w=12)
+      w = 6; // Default to half width for charts
+      h = 5;
+      x = (indexInType % 2) * 6;
+      y = baseY + Math.floor(indexInType / 2) * 5;
+    }
+
     const widget: DashboardLayout = {
       i: id,
-      x: isMetricCard ? (idx % 2) * 6 : 0,  // Metric cards: 0 or 6, Charts: 0 (full width)
-      y: Math.floor(idx / 2) * (isMetricCard ? 2 : 4),
-      w: isMetricCard ? 3 : 12,  // Metric cards: 3 units, Charts: 12 units (full width)
-      h: isMetricCard ? 2 : 4,   // Metric cards: 2 units tall, Charts: 4 units tall (more compact)
+      x,
+      y,
+      w,
+      h,
       widgetType: type,
       data: isMetricCard
         ? { label, value: 0 }  // Use proper label for metric cards
@@ -396,30 +466,39 @@ function buildDefaultWidgetsForIntegration(
         type: isMetricCard ? "metric_card" : "line_chart",
         layout: {
           slideId,
-          x: isMetricCard ? (idx % 2) * 6 : 0,
-          y: Math.floor(idx / 2) * (isMetricCard ? 2 : 4),
-          w: isMetricCard ? 3 : 12,
-          h: isMetricCard ? 2 : 4,
+          x,
+          y,
+          w,
+          h,
         },
         ...(metric.filters ? { filters: metric.filters } : {}),
       },
     };
     widgets.push(widget);
+    return widget; // Return for sizing ref
   };
 
-  // Add first 2 metrics as cards
-  metrics.slice(0, 2).forEach((m, idx) => addWidget("metric", m, idx));
+  // 1. Add top 4 metrics as cards in the first row
+  let currentY = 0;
+  const metricCards = metrics.slice(0, 4);
+  metricCards.forEach((m, idx) => addWidget("metric", m, idx, currentY));
 
-  // Add first metric as a line chart
-  if (metrics[0]) {
-    addWidget("chart", metrics[0], widgets.length);
+  // Advance Y for next section (if metrics were added)
+  if (metricCards.length > 0) {
+    currentY += 3; // Metrics are h=3
   }
 
-  // Add remaining metrics as cards (up to total of MAX_DEFAULT_WIDGETS)
-  metrics.slice(2, 4).forEach((m) => addWidget("metric", m, widgets.length));
+  // 2. Add first metric as a main chart
+  if (metrics[0]) {
+    const chartWidget = addWidget("chart", metrics[0], 0, currentY);
+    // Make first chart full width
+    chartWidget.w = 12;
+    chartWidget.h = 8;
+    // Don't need to update x/y as it's the first in this row/section
+    currentY += 8;
+  }
 
-  // For Google Search Console, add dimensional breakdowns (by device, country)
-  // Only if we have space and the first metric exists
+  // 3. For Google Search Console, add dimensional breakdowns (by device, country)
   if (metrics[0] && metrics[0].integration === "google-search-console" && widgets.length < MAX_DEFAULT_WIDGETS) {
     const firstMetric = metrics[0];
 
@@ -430,25 +509,25 @@ function buildDefaultWidgetsForIntegration(
       widgets.push({
         i: id,
         x: 0,
-        y: widgets.length * 2 + 4,  // Position below other widgets
-        w: 6,  // Half width
-        h: 3,
+        y: currentY,
+        w: 6,
+        h: 6,
         widgetType: "table",
-        data: undefined,  // Table data will be fetched separately
+        data: undefined,
         metricConfig: {
           id,
           metricKey: firstMetric.metricKey,
           integration: firstMetric.integration,
           accountId: firstMetric.accountId,
-          groupBy: "device",  // Group by device dimension
+          groupBy: "device",
           aggregation: "sum",
           type: "table",
           layout: {
             slideId,
             x: 0,
-            y: widgets.length * 2 + 4,
+            y: currentY,
             w: 6,
-            h: 3,
+            h: 6,
           },
           ...(firstMetric.filters ? { filters: firstMetric.filters } : {}),
         },
@@ -461,31 +540,33 @@ function buildDefaultWidgetsForIntegration(
 
       widgets.push({
         i: id,
-        x: 6,  // Right side
-        y: widgets.length * 2 + 4,
-        w: 6,  // Half width
-        h: 3,
+        x: 6,
+        y: currentY,
+        w: 6,
+        h: 6,
         widgetType: "table",
-        data: undefined,  // Table data will be fetched separately
+        data: undefined,
         metricConfig: {
           id,
           metricKey: firstMetric.metricKey,
           integration: firstMetric.integration,
           accountId: firstMetric.accountId,
-          groupBy: "country",  // Group by country dimension
+          groupBy: "country",
           aggregation: "sum",
           type: "table",
           layout: {
             slideId,
             x: 6,
-            y: widgets.length * 2 + 4,
+            y: currentY,
             w: 6,
-            h: 3,
+            h: 6,
           },
           ...(firstMetric.filters ? { filters: firstMetric.filters } : {}),
         },
       });
     }
+
+    currentY += 6;
   }
 
   return widgets.slice(0, MAX_DEFAULT_WIDGETS);
@@ -734,11 +815,11 @@ const renderWidgetContent = (
       }));
 
       return (
-        <div className="h-full flex flex-col p-2 md:p-4">
+        <div className="h-full flex flex-col p-1">
           <div className="text-xs md:text-sm font-medium text-gray-700 mb-2 capitalize">
             {chartTitle}
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-h-[200px]">
             {hasData ? (
               <ResponsiveContainer width="100%" height="100%">
                 {widget.widgetType === "bar_chart" ? (
@@ -980,8 +1061,8 @@ const renderWidgetContent = (
       const hasTableData = rawCount > 0 || rowCount > 0;
 
       return (
-        <Card className="h-full  flex flex-col rounded-lg md:rounded-2xl overflow-hidden">
-          <CardHeader className="pb-2 md:pb-4 px-3 md:px-6 pt-3 md:pt-6">
+        <Card className="h-full flex flex-col rounded-lg border-0 shadow-none">
+          <CardHeader className="pb-2 px-2 pt-2">
             <CardTitle className="text-sm md:text-base">{title}</CardTitle>
           </CardHeader>
           <CardContent className="flex-1 p-0 overflow-visible">
@@ -1222,7 +1303,7 @@ const renderWidgetContent = (
       const imageFit = imageData?.imageFit || "contain";
       return (
         <div
-          className="h-full flex items-center justify-center text-xs md:text-sm text-gray-500 p-1 md:p-2"
+          className="h-full flex items-center justify-center text-xs md:text-sm text-gray-500 p-0"
           style={
             imageData?.backgroundColor
               ? { backgroundColor: imageData.backgroundColor }
@@ -1489,7 +1570,7 @@ function ReportBuilder() {
   const [scheduleSendEmail, setScheduleSendEmail] = useState(false);
   const { data: integrationsData } = useIntegrations();
 
-  console.log(integrationsData,"integrationsData")
+  console.log(integrationsData, "integrationsData")
 
   const {
     groupedMetrics,
@@ -1947,8 +2028,7 @@ function ReportBuilder() {
         return {};
       }
 
-      // Build the widgets to resolve from the current dashboards state so that
-      // newly added widgets (from the Integrations panel) immediately get data.
+      // Build the widgets to resolve from the current dashboards state
       const templatePayload = buildTemplatePayloadFromDashboards();
       const widgets = (templatePayload.widgets ?? []).filter(
         (widget: ReportWidgetDefinition) => widget.metricKey
@@ -1961,311 +2041,166 @@ function ReportBuilder() {
       const dateFrom = formatApiDate(dateRange.from);
       const dateTo = formatApiDate(dateRange.to);
 
-      // For new unsaved reports (no templateId), only use resolveMetricWidgets
-      // For saved reports, use both runReport and resolveMetricWidgets
-      const promises: Promise<any>[] = [];
 
-      if (templateId) {
-        promises.push(
-          runReport({
-            templateId,
-            dateFrom,
-            dateTo,
-          })
-        );
-      }
 
-      promises.push(
-        resolveMetricWidgets({
-          dateFrom,
-          dateTo,
-          widgets: widgets.map((widget: ReportWidgetDefinition) => {
-            // Some integrations (notably GA) may not return data for "table" type.
-            // Resolve as a metric_card for table/metric widgets to ensure values come back.
-            const resolveType =
-              widget.type === "table" || widget.type === "metric"
-                ? "metric_card"
-                : widget.type ?? "metric_card";
+      // Fetch data for each widget using GET /unified-metrics
+      const promises = widgets.map(async (widget: ReportWidgetDefinition) => {
+        try {
+          // Normalize integration key to match backend schema
+          // Special case: meta_ads should keep underscore (backend uses meta_ads not meta-ads)
+          let normalizedIntegration = widget.integration.toLowerCase();
 
-            return {
-              id: widget.id,
-              type: resolveType,
-              metricKey: widget.metricKey,
-              groupBy: widget.groupBy,
-              aggregation: widget.aggregation,
-              integration: widget.integration,
-              accountId: widget.accountId,
-              ...(widget.filters ? { filters: widget.filters } : {}),
-            };
-          }),
-        }).then(response => {
-          console.log('📡 resolveMetricWidgets response:', {
-            widgetCount: Object.keys(response.data || {}).length,
-            sampleData: Object.entries(response.data || {}).slice(0, 3).map(([id, data]) => ({
-              id,
-              hasValue: 'value' in data,
-              hasTotal: 'total' in data,
-              hasSeries: 'series' in data,
-              value: (data as any).value,
-              total: (data as any).total,
-            })),
-          });
-          return response;
-        })
-      );
+          // Only replace underscores with hyphens for non-meta_ads integrations
+          if (normalizedIntegration !== "meta_ads") {
+            normalizedIntegration = normalizedIntegration.replace(/_/g, '-');
+          }
 
-      const responses = await Promise.all(promises);
+          if (normalizedIntegration === "google") {
+            normalizedIntegration = "google-analytics";
+          } else if (normalizedIntegration === "woocommerce") {
+            normalizedIntegration = "woo";
+          }
 
+          // Validate integration key
+          const validIntegrations = [
+            'google-analytics',
+            'google-search-console',
+            'google-console',
+            'meta',
+            'meta_ads',  // Backend uses underscore, not hyphen
+            'youtube', 'shopify', 'woo'
+          ];
+
+          if (!validIntegrations.includes(normalizedIntegration)) {
+            console.warn(`⚠️ Invalid integration key: ${normalizedIntegration} (original: ${widget.integration})`);
+            return { id: widget.id, widget, data: null };
+          }
+
+          // Validate metric key format (should have platform prefix)
+          const hasValidPrefix =
+            widget.metricKey.startsWith('google.') ||
+            widget.metricKey.startsWith('google_seo.') ||
+            widget.metricKey.startsWith('google-console.') ||
+            widget.metricKey.startsWith('meta.') ||
+            widget.metricKey.startsWith('youtube.') ||
+            widget.metricKey.startsWith('shopify.') ||
+            widget.metricKey.startsWith('woo.');
+
+          if (!hasValidPrefix) {
+            console.warn(`⚠️ Invalid metric key format: ${widget.metricKey} (missing platform prefix)`);
+            return { id: widget.id, widget, data: null };
+          }
+
+          // Convert groupBy to dimensionType
+          // Backend expects empty string for non-dimensional data, not "none" or "day"
+          let dimensionType = widget.groupBy || "";
+          if (dimensionType === "none" || dimensionType === "day") {
+            dimensionType = "";
+          }
+
+          const params = {
+            integration: normalizedIntegration,  // Use normalized key
+            accountId: widget.accountId || "",
+            metricKey: widget.metricKey,
+            dimensionType: dimensionType,
+            startDate: dateFrom,
+            endDate: dateTo,
+          };
+
+          console.log(`📤 GET /unified-metrics params for ${widget.metricKey}:`, params);
+
+          const data = await fetchUnifiedMetric(params);
+
+          // Log the full API response for debugging
+          console.log(`📡 GET /unified-metrics response for ${widget.metricKey}:`, data);
+
+          return { id: widget.id, widget, data };
+        } catch (error) {
+          console.error(`❌ Failed to fetch data for widget ${widget.id}:`, error);
+          return { id: widget.id, widget, data: null };
+        }
+      });
+
+      const results = await Promise.all(promises);
+
+      // Process and format data for each widget type
       const merged: Record<string, ResolvedWidgetData> = {};
 
-      // Merge runReport response if it exists (for saved templates)
-      if (templateId && responses[0]) {
-        Object.entries(responses[0].data ?? {}).forEach(([key, value]) => {
-          merged[key] = { ...(merged[key] ?? {}), ...value };
-        });
-      }
+      results.forEach(({ id, widget, data }) => {
+        if (!data || !data.rows || !Array.isArray(data.rows)) {
+          merged[id] = { value: 0, total: 0, rawCount: 0, rows: [], series: [] };
+          return;
+        }
 
-      // Merge resolveMetricWidgets response (always present)
-      const resolvedResponse = templateId ? responses[1] : responses[0];
-      Object.entries(resolvedResponse.data ?? {}).forEach(([key, value]) => {
-        merged[key] = { ...(merged[key] ?? {}), ...value };
-      });
+        // Filter rows by accountId and metricKey
+        // For metric cards and charts, also filter out dimensional data (dimensionType should be empty)
+        // EXCEPTION: WooCommerce uses dimensionType="date" for time-series, which we want to include
+        // For tables, keep dimensional data
+        const filteredRows = data.rows.filter((row: any) => {
+          const matchesBasic = row.metricKey === widget.metricKey &&
+            row.accountId === widget.accountId &&
+            row.integration === widget.integration;
 
-      return merged;
-    },
-  });
-
-  // Separate query for table widgets with dimensional data
-  // Extract table widgets that need dimensional breakdowns
-  const tableWidgets = useMemo(() => {
-    const widgets: Array<{
-      id: string;
-      metricKey: string;
-      integration: string;
-      accountId: string;
-      dimensionType: string;
-    }> = [];
-
-    dashboards.forEach((layout) => {
-      layout.forEach((widget) => {
-        if (widget.widgetType === "table" && widget.metricConfig) {
-          const config = widget.metricConfig;
-          const dimensionType = config.groupBy === "device" || config.groupBy === "country"
-            ? config.groupBy
-            : "";
-
-          if (dimensionType && config.metricKey) {
-            widgets.push({
-              id: widget.i,
-              metricKey: config.metricKey,
-              integration: config.integration,
-              accountId: config.accountId,
-              dimensionType: dimensionType as string,  // Type assertion since we checked it's not empty
-            });
+          // For tables, we want dimensional data
+          if (widget.type === 'table') {
+            return matchesBasic;
           }
-        }
-      });
-    });
 
-    return widgets;
-  }, [dashboards]);
+          // For metric cards and charts, exclude dimensional data
+          // EXCEPT for WooCommerce which uses dimensionType="date" for time-series
+          const isDimensional = row.dimensionType && row.dimensionType !== "";
+          const isWooDateDimension = widget.metricKey.startsWith('woo.') && row.dimensionType === 'date';
 
-  const tableDataQuery = useQuery({
-    queryKey: ["table-data", dateRangeKey, tableWidgets],
-    enabled: Boolean(dateRange?.from && dateRange?.to) && tableWidgets.length > 0,
-    queryFn: async () => {
-      if (!dateRange?.from || !dateRange?.to) return {};
+          // Include if: not dimensional OR is WooCommerce date dimension
+          return matchesBasic && (!isDimensional || isWooDateDimension);
+        });
 
-      const dateFrom = formatApiDate(dateRange.from);
-      const dateTo = formatApiDate(dateRange.to);
 
-      // Fetch data for each table widget
-      const promises = tableWidgets.map(async (widget) => {
-        try {
-          console.log('📊 Fetching table data for:', {
-            id: widget.id,
-            integration: widget.integration,
-            accountId: widget.accountId,
-            metricKey: widget.metricKey,
-            dimensionType: widget.dimensionType,
-          });
 
-          const data = await fetchUnifiedMetric({
-            integration: widget.integration,
-            accountId: widget.accountId,
-            metricKey: widget.metricKey,
-            dimensionType: widget.dimensionType,
-            startDate: dateFrom,
-            endDate: dateTo,
-          });
+        // Calculate total value
+        const total = filteredRows.reduce((sum: number, row: any) => sum + (row.value || 0), 0);
 
-          console.log('✅ Table API response for', widget.metricKey, widget.dimensionType, ':', {
-            success: data.success,
-            totalRows: data.rows?.length || 0,
-            sampleRow: data.rows?.[0],
-          });
+        // Create time-series data for charts
+        const series = filteredRows.map((row: any) => ({
+          date: row.date || row.dimensionValue,
+          value: row.value || 0,
+        }));
 
-          return { id: widget.id, data };
-        } catch (error) {
-          console.error(`❌ Failed to fetch table data for ${widget.id}:`, error);
-          return { id: widget.id, data: null };
-        }
-      });
-
-      const results = await Promise.all(promises);
-
-      // Convert to Record<string, any> format and filter by metricKey
-      const merged: Record<string, any> = {};
-      results.forEach(({ id, data }, index) => {
-        if (data && data.rows && Array.isArray(data.rows)) {
-          const widget = tableWidgets[index];
-
-          console.log('🔍 Filtering table rows for widget:', {
-            widgetId: id,
-            metricKey: widget.metricKey,
-            dimensionType: widget.dimensionType,
-            widgetAccountId: widget.accountId,
-            totalRowsFromAPI: data.rows.length,
-            sampleAPIRow: data.rows[0],
-          });
-
-          // Filter rows to only include those matching this widget's metricKey
-          const filteredRows = data.rows.filter((row: any) =>
-            row.metricKey === widget.metricKey
-          );
-
-          console.log('✅ Filtered table rows result:', {
-            widgetId: id,
-            beforeFilter: data.rows.length,
-            afterFilter: filteredRows.length,
-            sampleFiltered: filteredRows[0],
-          });
-
-          merged[id] = { ...data, rows: filteredRows };
-        } else if (data) {
-          merged[id] = data;
-        }
-      });
-
-      return merged;
-    },
-  });
-
-  // Separate query for WooCommerce widgets
-  // Extract all WooCommerce widgets (metric cards, charts, etc.)
-  const wooWidgets = useMemo(() => {
-    const widgets: Array<{
-      id: string;
-      metricKey: string;
-      integration: string;
-      accountId: string;
-    }> = [];
-
-    dashboards.forEach((layout) => {
-      layout.forEach((widget) => {
-        if (widget.metricConfig && widget.metricConfig.integration === "woo") {
-          widgets.push({
-            id: widget.i,
-            metricKey: widget.metricConfig.metricKey,
-            integration: widget.metricConfig.integration,
-            accountId: widget.metricConfig.accountId,
-          });
-        }
-      });
-    });
-
-    return widgets;
-  }, [dashboards]);
-
-  const wooDataQuery = useQuery({
-    queryKey: ["woo-data", dateRangeKey, wooWidgets],
-    enabled: Boolean(dateRange?.from && dateRange?.to) && wooWidgets.length > 0,
-    queryFn: async () => {
-      if (!dateRange?.from || !dateRange?.to) return {};
-
-      const dateFrom = formatApiDate(dateRange.from);
-      const dateTo = formatApiDate(dateRange.to);
-
-      // Fetch data for each WooCommerce widget
-      const promises = wooWidgets.map(async (widget) => {
-        try {
-          console.log('🛒 Fetching WooCommerce data for:', {
-            id: widget.id,
-            metricKey: widget.metricKey,
-            integration: widget.integration,
-            accountId: widget.accountId,
-          });
-
-          const data = await fetchUnifiedMetric({
-            integration: widget.integration,
-            accountId: widget.accountId,
-            metricKey: widget.metricKey,
-            startDate: dateFrom,
-            endDate: dateTo,
-          });
-
-          console.log('✅ WooCommerce API response for', widget.metricKey, ':', {
-            success: data.success,
-            rowCount: data.rows?.length || 0,
-            sampleRow: data.rows?.[0],
-            fullData: data,
-          });
-
-          return { id: widget.id, data };
-        } catch (error) {
-          console.error(`❌ Failed to fetch WooCommerce data for ${widget.id}:`, error);
-          return { id: widget.id, data: null };
-        }
-      });
-
-      const results = await Promise.all(promises);
-
-      // Convert to Record<string, any> format
-      const merged: Record<string, any> = {};
-      results.forEach(({ id, data }, index) => {
-        if (data && data.rows && Array.isArray(data.rows)) {
-          const widget = wooWidgets[index];
-          // Filter rows to only include those matching this widget's metricKey AND accountId
-          const filteredRows = data.rows.filter((row: any) =>
-            row.metricKey === widget.metricKey && row.accountId === widget.accountId
-          );
-
-          console.log('🔍 Filtered WooCommerce rows for', widget.metricKey, ':', {
-            totalRows: data.rows.length,
-            filteredRows: filteredRows.length,
-            accountId: widget.accountId,
-            sampleFiltered: filteredRows[0],
-          });
-
-          // Calculate total value from filtered rows
-          const total = filteredRows.reduce((sum: number, row: any) => sum + (row.value || 0), 0);
-
-          console.log('💰 Calculated total for', widget.metricKey, ':', total);
-
-          // Create time-series data for charts
-          const series = filteredRows.map((row: any) => ({
-            date: row.date || row.dimensionValue,
-            value: row.value || 0,
-          }));
-
-          // Format as ResolvedWidgetData
+        // Format based on widget type
+        if (widget.type === 'table') {
+          // For tables, keep dimensional data
+          merged[id] = {
+            rows: filteredRows,
+            rawCount: filteredRows.length,
+          };
+        } else if (widget.type === 'line_chart' || widget.type === 'bar_chart') {
+          // For charts, include series
+          merged[id] = {
+            value: total,
+            total: total,
+            series: series,
+            rawCount: filteredRows.length,
+            rows: filteredRows,
+          };
+        } else {
+          // For metric cards, just value and total
           merged[id] = {
             value: total,
             total: total,
             rawCount: filteredRows.length,
             rows: filteredRows,
-            series: series, // Add series for chart widgets
           };
-        } else if (data) {
-          merged[id] = data;
         }
-      });
 
-      console.log('✨ Final WooCommerce merged data:', merged);
+      });
 
       return merged;
     },
   });
+
+
+
+
 
   // Handle report data query errors
   useEffect(() => {
@@ -2277,24 +2212,11 @@ function ReportBuilder() {
 
   // Merge resolved widgets with table widget data and WooCommerce data
   const resolvedWidgets = useMemo(() => {
-    const merged = { ...(reportDataQuery.data ?? {}) };
-    const tableData = tableDataQuery.data ?? {};
-    const wooData = wooDataQuery.data ?? {};
+    // All data is now fetched via reportDataQuery using GET /unified-metrics
+    return reportDataQuery.data ?? {};
+  }, [reportDataQuery.data]);
 
-    // Merge table widget data
-    Object.entries(tableData).forEach(([id, data]) => {
-      merged[id] = data;
-    });
-
-    // Merge WooCommerce widget data
-    Object.entries(wooData).forEach(([id, data]) => {
-      merged[id] = data;
-    });
-
-    return merged;
-  }, [reportDataQuery.data, tableDataQuery.data, wooDataQuery.data]);
-
-  const isResolvingWidgets = reportDataQuery.isFetching || tableDataQuery.isFetching || wooDataQuery.isFetching;
+  const isResolvingWidgets = reportDataQuery.isFetching;
   const { refetch: refetchReportData } = reportDataQuery;
 
   // For Google Analytics-based widgets that use the special GA metric keys

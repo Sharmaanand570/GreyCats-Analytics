@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchDebugMetrics } from "../api/reportingApi";
+import { fetchDebugMetrics, fetchUnifiedMetricsList } from "../api/reportingApi";
 import type { DebugMetric } from "../api/types";
 import { useMemo } from "react";
 
@@ -53,8 +53,46 @@ const getMetricCategory = (metricKey: string): string => {
 export const useAvailableMetrics = () => {
   const { data, isLoading, error } = useQuery({
     queryKey: ["available-metrics"],
-    queryFn: () => fetchDebugMetrics(1000),
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    queryFn: async () => {
+      let lastError: unknown;
+
+      // Try live unified metrics first (matches what Apidog is calling)
+      // Use a wide date range (last 90 days) to discover all available metrics
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 90);
+
+      const formatDate = (date: Date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
+      try {
+        const unified = await fetchUnifiedMetricsList({ 
+          limit: 1000,
+          startDate: formatDate(startDate),
+          endDate: formatDate(endDate),
+        });
+        if (unified?.rows?.length) {
+          return unified;
+        }
+        console.warn("No rows from /unified-metrics; falling back to debug list");
+      } catch (err) {
+        lastError = err;
+        console.warn("Failed to fetch /unified-metrics; falling back to debug list", err);
+      }
+
+      // Fallback to debug list (seeded data)
+      try {
+        return await fetchDebugMetrics(1000);
+      } catch (err) {
+        // Surface the most recent error to React Query
+        throw err ?? lastError ?? new Error("Failed to fetch available metrics");
+      }
+    },
   });
 
   // Group metrics by integration and accountId, and deduplicate
