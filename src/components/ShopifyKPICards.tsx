@@ -12,11 +12,11 @@ type ShopifyKPICardsProps = {
 
 const formatCurrency = (value?: number) =>
   typeof value === "number"
-    ? `$${value.toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}`
-    : "$0.00";
+    ? `₹${value.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`
+    : "₹0.00";
 
 const formatNumber = (value?: number) =>
   typeof value === "number" ? value.toLocaleString() : "0";

@@ -14,7 +14,7 @@ type AlertRow = {
   lastTriggered: string;
 };
 
-function AlertsPage():React.JSX.Element {
+function AlertsPage(): React.JSX.Element {
   // TODO: Replace with actual data from API/state
   const alertsData: AlertRow[] = [
     {
@@ -44,8 +44,8 @@ function AlertsPage():React.JSX.Element {
     {
       metric: "Revenue",
       client: "E-commerce Plus",
-      currentValue: "$15,500",
-      triggerValue: "$12,000",
+      currentValue: "₹15,500",
+      triggerValue: "₹12,000",
       interval: "Weekly",
       lastTriggered: "2024-01-13 16:45"
     },
@@ -75,7 +75,7 @@ function AlertsPage():React.JSX.Element {
         <div className="w-full h-full flex flex-col">
           <div className="w-full h-[4.8em]  border-b flex justify-between items-center px-5 ">
             <span className="font-medium text-xl">Alerts</span>
-          
+
           </div>
 
           {alertsData.length === 0 ? (

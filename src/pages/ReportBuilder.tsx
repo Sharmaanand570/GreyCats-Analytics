@@ -240,7 +240,7 @@ const CURATED_DEFAULTS: Record<string, string[]> = {
     "meta.page.fanAdds",
     "meta.instagram.followers",
   ],
-  "meta_ads": [
+  "meta_facebook": [
     // Facebook Page Metrics (Organic)
     "meta.page.impressions",
     "meta.page.uniqueImpressions",
@@ -248,7 +248,8 @@ const CURATED_DEFAULTS: Record<string, string[]> = {
     "meta.page.fans",
     "meta.page.postImpressions",
     "meta.page.views",
-
+  ],
+  "meta_instagram": [
     // Instagram Metrics (Organic)
     "meta.instagram.impressions",
     "meta.instagram.reach",
@@ -257,7 +258,9 @@ const CURATED_DEFAULTS: Record<string, string[]> = {
     "meta.instagram.phoneClicks",
     "meta.instagram.directionsClicks",
     "meta.instagram.emailContacts",
-
+    "meta.instagram.followers",
+  ],
+  "meta_ads": [
     // Meta Ads Campaign Metrics (Paid)
     "meta.ads.impressions",
     "meta.ads.clicks",
@@ -2047,11 +2050,11 @@ function ReportBuilder() {
       const promises = widgets.map(async (widget: ReportWidgetDefinition) => {
         try {
           // Normalize integration key to match backend schema
-          // Special case: meta_ads should keep underscore (backend uses meta_ads not meta-ads)
+          // Special case: Meta integrations keep underscores (meta_facebook, meta_instagram, meta_ads)
           let normalizedIntegration = widget.integration.toLowerCase();
 
-          // Only replace underscores with hyphens for non-meta_ads integrations
-          if (normalizedIntegration !== "meta_ads") {
+          // Only replace underscores with hyphens for non-Meta integrations
+          if (!normalizedIntegration.startsWith("meta_")) {
             normalizedIntegration = normalizedIntegration.replace(/_/g, '-');
           }
 
@@ -2067,7 +2070,9 @@ function ReportBuilder() {
             'google-search-console',
             'google-console',
             'meta',
-            'meta_ads',  // Backend uses underscore, not hyphen
+            'meta_facebook',   // Facebook Pages organic
+            'meta_instagram',  // Instagram Business organic
+            'meta_ads',        // Meta Ads paid campaigns
             'youtube', 'shopify', 'woo'
           ];
 

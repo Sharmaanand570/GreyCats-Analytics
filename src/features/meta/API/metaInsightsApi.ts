@@ -58,9 +58,17 @@ export type FacebookPostInsight = {
   values: FacebookMetricValue[];
 };
 
+export type FacebookPostEngagement = {
+  likes: number;
+  comments: number;
+  shares: number;
+  reactions: number;
+};
+
 export type FacebookPostInsightsResponse = {
   success: boolean;
   insights: FacebookPostInsight[];
+  engagement?: FacebookPostEngagement;
 };
 
 export type FacebookSyncBody = {
@@ -81,28 +89,45 @@ export type InstagramBusinessAccountResponse = {
   };
 };
 
-export type InstagramProfile = {
+// Instagram Profile
+export interface InstagramProfile {
   id: string;
   username: string;
+  name: string;
+  profile_picture_url: string;
+  followers_count: number;
+  follows_count: number;
   media_count: number;
-  account_type: string;
-};
+}
 
 export type InstagramProfileResponse = {
   success: boolean;
-  profile: InstagramProfile;
+  data: InstagramProfile;
 };
 
 export type InstagramMediaItem = {
   id: string;
-  caption?: string;
-  media_type: string;
+  caption: string;
+  media_type: 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM';
+  media_url?: string;
   permalink: string;
+  timestamp: string;
+  like_count: number;
+  comments_count: number;
+  username: string;
 };
 
 export type InstagramMediaResponse = {
   success: boolean;
-  media: InstagramMediaItem[];
+  pagination: {
+    cursors?: {
+      before: string;
+      after: string;
+    };
+    next?: string;
+  } | null;
+  count: number;
+  data: InstagramMediaItem[];
 };
 
 export type InstagramMetricValue = {
@@ -112,12 +137,17 @@ export type InstagramMetricValue = {
 
 export type InstagramMediaInsight = {
   name: string;
-  values: InstagramMetricValue[];
+  period: string;
+  values: { value: number }[];
+  title: string;
+  id: string;
 };
 
 export type InstagramMediaInsightsResponse = {
   success: boolean;
-  insights: InstagramMediaInsight[];
+  data: {
+    data: InstagramMediaInsight[];
+  };
 };
 
 export type InstagramSyncBody = {
@@ -287,27 +317,32 @@ export const getInstagramBusinessAccount = async (
 };
 
 export const getInstagramProfile = async (
-  igId: string
+  accountId: string
 ): Promise<InstagramProfileResponse> => {
   try {
+    console.log("accountId", accountId);
+    // UPDATED: Using /api/metabusiness/instagram/profile/:accountId
     const response = await api.get<InstagramProfileResponse>(
-      "/meta-insights/instagram/profile",
-      { params: { igId } }
+      `/metabusiness/instagram/profile/${accountId}`
     );
+    console.log("✅ Instagram Profile Response:", response.data);
     return response.data;
   } catch (error) {
+    console.error("❌ Instagram Profile Error:", error);
     return handleMetaInsightsError(error, "Failed to load Instagram profile");
   }
 };
 
 export const getInstagramMedia = async (
-  igId: string,
-  limit?: number
+  accountId: string,
+  limit: number = 20
 ): Promise<InstagramMediaResponse> => {
+  console.log("accountId", accountId);
   try {
+    // UPDATED: Using /api/metabusiness/instagram/media/:accountId
     const response = await api.get<InstagramMediaResponse>(
-      "/meta-insights/instagram/media",
-      { params: { igId, limit } }
+      `/metabusiness/instagram/media/${accountId}`,
+      { params: { limit } }
     );
     return response.data;
   } catch (error) {
@@ -316,12 +351,15 @@ export const getInstagramMedia = async (
 };
 
 export const getInstagramMediaInsights = async (
+  accountId: string,
   mediaId: string
 ): Promise<InstagramMediaInsightsResponse> => {
+  console.log("accountId", accountId);
+  console.log("mediaId", mediaId);
   try {
+    // UPDATED: Using /api/metabusiness/instagram/media/:accountId/:mediaId/insights
     const response = await api.get<InstagramMediaInsightsResponse>(
-      "/meta-insights/instagram/media-insights",
-      { params: { mediaId } }
+      `/metabusiness/instagram/media/${accountId}/${mediaId}/insights`
     );
     console.log("✅ Instagram Media Insights Response:", response.data);
     return response.data;

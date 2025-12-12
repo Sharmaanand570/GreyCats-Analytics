@@ -19,33 +19,20 @@ function MetaCallbackHandler() {
   useEffect(() => {
     const processCallback = async () => {
       // Extract parameters from URL
-      // Meta redirects with: status, user, metaUserId and hash fragment (#_=_)
-      let status: string | null = null;
-      let user: string | null = null;
-      let metaUserId: string | null = null;
+      // Backend redirects with: status, userId, pageId, instagramUsername, reason (on error)
+      const status = searchParams.get("status");
+      const userId = searchParams.get("userId");
+      const pageId = searchParams.get("pageId");
+      const instagramUsername = searchParams.get("instagramUsername");
+      const reason = searchParams.get("reason");
 
-      try {
-        // Get parameters from search params (before hash)
-        status = searchParams.get("status");
-        user = searchParams.get("user");
-        metaUserId = searchParams.get("metaUserId");
+      // Check for error status first
+      if (status === "error") {
+        const errorMessage = reason
+          ? `Meta connection failed: ${reason.replace(/_/g, ' ')}`
+          : "Meta connection failed. Please try again.";
 
-        // If not found in search params, parse the full URL
-        if (!status || !user || !metaUserId) {
-          const fullUrl = window.location.href;
-
-          // Remove hash fragment first to get clean URL
-          const urlWithoutHash = fullUrl.split("#")[0];
-          const urlObj = new URL(urlWithoutHash);
-
-          // Try to get from URL search params
-          status = urlObj.searchParams.get("status") || status;
-          user = urlObj.searchParams.get("user") || user;
-          metaUserId = urlObj.searchParams.get("metaUserId") || metaUserId;
-        }
-      } catch (error) {
-        console.error("Error parsing URL parameters:", error);
-        toast.error("Error parsing callback URL. Please try connecting again.");
+        toast.error(errorMessage);
         setIsProcessing(false);
         setTimeout(() => {
           navigate("/data-sources");
@@ -53,19 +40,9 @@ function MetaCallbackHandler() {
         return;
       }
 
-      // Validate required parameters
-      if (!status || !user || !metaUserId) {
+      // Validate required parameters for success
+      if (!status || !userId) {
         toast.error("Missing callback parameters. Please try connecting again.");
-        setIsProcessing(false);
-        setTimeout(() => {
-          navigate("/data-sources");
-        }, 3000);
-        return;
-      }
-
-      // Validate parameters are not empty strings
-      if (status.trim() === "" || user.trim() === "" || metaUserId.trim() === "") {
-        toast.error("Invalid callback parameters. Please try connecting again.");
         setIsProcessing(false);
         setTimeout(() => {
           navigate("/data-sources");
@@ -87,8 +64,12 @@ function MetaCallbackHandler() {
 
       // ✅ SUCCESS - Backend already handled everything
       // The backend processed the OAuth callback and saved tokens
-      // We just need to show success and redirect
-      toast.success("Meta connected successfully!");
+      const hasInstagram = instagramUsername === "connected";
+      const successMessage = hasInstagram
+        ? "Meta Business connected successfully with Instagram!"
+        : "Meta Business connected successfully!";
+
+      toast.success(successMessage);
       setIsProcessing(false);
 
       setTimeout(() => {

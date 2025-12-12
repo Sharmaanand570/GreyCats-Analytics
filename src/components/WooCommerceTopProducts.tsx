@@ -75,17 +75,15 @@ export function WooCommerceTopProducts({
                         #{rank}
                       </span>
                       <span
-                        className={`text-sm ${
-                          hasData ? "text-gray-900 font-medium" : "text-gray-400"
-                        }`}
+                        className={`text-sm ${hasData ? "text-gray-900 font-medium" : "text-gray-400"
+                          }`}
                       >
                         {hasData ? product.name : "Product Placeholder"}
                       </span>
                     </div>
                     <p
-                      className={`text-xs ${
-                        hasData ? "text-gray-600" : "text-gray-400"
-                      }`}
+                      className={`text-xs ${hasData ? "text-gray-600" : "text-gray-400"
+                        }`}
                     >
                       {hasData
                         ? `${product.qty} Unit(s) Sold`
@@ -103,15 +101,14 @@ export function WooCommerceTopProducts({
                       />
                     )}
                     <span
-                      className={`text-sm font-semibold ${
-                        hasData && product.revenue > 0
+                      className={`text-sm font-semibold ${hasData && product.revenue > 0
                           ? "text-gray-900"
                           : "text-gray-400"
-                      }`}
+                        }`}
                     >
                       {hasData && product.revenue > 0
-                        ? `$${product.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                        : "$0.00"}
+                        ? `₹${product.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : "₹0.00"}
                     </span>
                   </div>
                 </div>

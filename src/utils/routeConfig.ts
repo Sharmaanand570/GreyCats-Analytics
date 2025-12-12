@@ -18,6 +18,7 @@ export const validRoutes = [
   "/data-sources/google-analytics/:accountId",
   "/data-sources/google-console",
   "/data-sources/meta-ads",
+  "/data-sources/meta-business",
   "/data-sources/meta-facebook",
   "/data-sources/meta-instagram",
   "/integrations",
@@ -35,6 +36,7 @@ export const validRoutes = [
   "/google-seo/callback",
   "/shopify/callback",
   "/meta/callback",
+  "/meta-business/callback",
 ];
 
 // Dynamic route patterns (routes with parameters)

@@ -185,11 +185,14 @@ export const useInstagramMedia = (igBusinessId: string | undefined, limit?: numb
   });
 };
 
-export const useInstagramMediaInsights = (mediaId: string | undefined) => {
+export const useInstagramMediaInsights = (
+  accountId: string | undefined,
+  mediaId: string | undefined
+) => {
   return useQuery<InstagramMediaInsightsResponse, Error>({
-    queryKey: ["meta", "instagram", "media-insights", mediaId],
-    queryFn: () => getInstagramMediaInsights(mediaId as string),
-    enabled: !!mediaId,
+    queryKey: ["meta", "instagram", "media-insights", accountId, mediaId],
+    queryFn: () => getInstagramMediaInsights(accountId as string, mediaId as string),
+    enabled: !!accountId && !!mediaId,
     ...commonQueryOptions,
   });
 };

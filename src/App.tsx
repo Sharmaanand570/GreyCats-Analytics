@@ -25,6 +25,7 @@ const GoogleConsoleDetailPage = lazy(
   () => import("./pages/GoogleConsoleDetailPage")
 );
 const MetaDetailPage = lazy(() => import("./pages/MetaDetailPage"));
+const MetaBusinessDetailPage = lazy(() => import("./pages/MetaBusinessDetailPage"));
 const FacebookInsightsPage = lazy(() => import("./pages/FacebookInsightsPage"));
 const InstagramInsightsPage = lazy(
   () => import("./pages/InstagramInsightsPage")
@@ -107,6 +108,7 @@ function App() {
                 element={<GoogleConsoleDetailPage />}
               />
               <Route path="meta-ads" element={<MetaDetailPage />} />
+              <Route path="meta-business" element={<MetaBusinessDetailPage />} />
               <Route path="meta-facebook" element={<FacebookInsightsPage />} />
               <Route
                 path="meta-instagram"
@@ -151,6 +153,7 @@ function App() {
           />
           <Route path="shopify/callback" element={<ShopifyCallbackHandler />} />
           <Route path="meta/callback" element={<MetaCallbackHandler />} />
+          <Route path="meta-business/callback" element={<MetaCallbackHandler />} />
         </Route>
 
         {/* Dedicated 404 route (accessible from anywhere) */}
