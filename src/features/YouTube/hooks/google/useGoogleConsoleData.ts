@@ -24,8 +24,8 @@ const commonQueryOptions = {
 };
 
 export const useGoogleConsoleReconnect = () => {
-  return useMutation<GoogleConsoleReconnectResponse, Error, void>({
-    mutationFn: () => reconnectGoogleConsole(),
+  return useMutation<GoogleConsoleReconnectResponse, Error, number>({
+    mutationFn: (clientId) => reconnectGoogleConsole(clientId),
     onSuccess: (data) => {
       toast.success("Google Search Console reconnect URL generated");
       if (data.url) {
@@ -41,22 +41,25 @@ export const useGoogleConsoleReconnect = () => {
 export const useGoogleConsoleDisconnect = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<GoogleConsoleDisconnectResponse, Error, void>({
-    mutationFn: () => disconnectGoogleConsole(),
-    onSuccess: (data) => {
+  return useMutation<GoogleConsoleDisconnectResponse, Error, number>({
+    mutationFn: (clientId) => disconnectGoogleConsole(clientId),
+    onSuccess: (data, clientId) => {
       toast.success(data.message || "Google Search Console disconnected");
-      queryClient.invalidateQueries({ queryKey: ["google-console"] });
+      queryClient.invalidateQueries({ queryKey: ["google-console", clientId] });
     },
     onError: (error) => {
-      toast.error(error.message || "Failed to disconnect Google Search Console");
+      toast.error(
+        error.message || "Failed to disconnect Google Search Console"
+      );
     },
   });
 };
 
-export const useGoogleConsoleProperties = () => {
+export const useGoogleConsoleProperties = (clientId: number) => {
   return useQuery<GoogleConsolePropertiesResponse, Error>({
-    queryKey: ["google-console", "properties"],
-    queryFn: () => getGoogleConsoleProperties(),
+    queryKey: ["google-console", "properties", clientId],
+    queryFn: () => getGoogleConsoleProperties(clientId),
+    enabled: !!clientId,
     ...commonQueryOptions,
   });
 };
@@ -67,18 +70,19 @@ export const useGoogleConsoleSelectProperty = () => {
   return useMutation<
     GoogleConsoleSelectPropertyResponse,
     Error,
-    GoogleConsoleSelectPropertyBody
+    { clientId: number; body: GoogleConsoleSelectPropertyBody }
   >({
-    mutationFn: (body) => selectGoogleConsoleProperty(body),
-    onSuccess: (data) => {
+    mutationFn: ({ clientId, body }) =>
+      selectGoogleConsoleProperty(clientId, body),
+    onSuccess: (data, { clientId }) => {
       toast.success(
         data.message || "Google Search Console property selected successfully"
       );
       queryClient.invalidateQueries({
-        queryKey: ["google-console", "properties"],
+        queryKey: ["google-console", "properties", clientId],
       });
       queryClient.invalidateQueries({
-        queryKey: ["google-console", "unified-metrics"],
+        queryKey: ["google-console", "unified-metrics", clientId],
       });
     },
     onError: (error) => {
@@ -93,18 +97,21 @@ export const useGoogleConsolePerformance = () => {
   return useMutation<
     GoogleConsolePerformanceResponse,
     Error,
-    GoogleConsolePerformanceRequest
+    { clientId: number; payload: GoogleConsolePerformanceRequest }
   >({
-    mutationFn: (payload) => fetchGoogleConsolePerformance(payload),
+    mutationFn: ({ clientId, payload }) =>
+      fetchGoogleConsolePerformance(clientId, payload),
   });
 };
 
 export const useGoogleConsoleUnifiedMetrics = (
+  clientId: number,
   params?: GoogleConsoleUnifiedMetricsParams
 ) => {
   return useQuery<GoogleConsoleUnifiedMetricsResponse, Error>({
-    queryKey: ["google-console", "unified-metrics", params],
-    queryFn: () => getGoogleConsoleUnifiedMetrics(params),
+    queryKey: ["google-console", "unified-metrics", clientId, params],
+    queryFn: () => getGoogleConsoleUnifiedMetrics(clientId, params),
+    enabled: !!clientId,
     ...commonQueryOptions,
   });
 };

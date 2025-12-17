@@ -57,12 +57,12 @@ export const useShopifyCallback = () => {
 export const useShopifySyncProducts = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<ShopifySyncResponse, Error, void>({
-    mutationFn: () => syncShopifyProducts(),
-    onSuccess: (data) => {
+  return useMutation<ShopifySyncResponse, Error, number>({
+    mutationFn: (clientId) => syncShopifyProducts(clientId),
+    onSuccess: (data, clientId) => {
       toast.success(data.message || "Products synced successfully");
-      queryClient.invalidateQueries({ queryKey: ["shopify", "products"] });
-      queryClient.invalidateQueries({ queryKey: ["shopify", "analytics"] });
+      queryClient.invalidateQueries({ queryKey: ["shopify", "products", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["shopify", "analytics", clientId] });
     },
     onError: (error) => {
       toast.error(error.message || "Failed to sync Shopify products");
@@ -70,52 +70,56 @@ export const useShopifySyncProducts = () => {
   });
 };
 
-export const useShopifyProductsList = (params?: ShopifyProductListParams) => {
+export const useShopifyProductsList = (clientId: number, params?: ShopifyProductListParams) => {
   return useQuery<ShopifyProductListResponse, Error>({
-    queryKey: ["shopify", "products", params],
-    queryFn: () => getShopifyProductsList(params),
+    queryKey: ["shopify", "products", clientId, params],
+    queryFn: () => getShopifyProductsList(clientId, params),
+    enabled: !!clientId,
     ...commonQueryOptions,
   });
 };
 
-export const useShopifyProduct = (productId?: string | null) => {
+export const useShopifyProduct = (clientId: number, productId?: string | null) => {
   return useQuery<ShopifySingleProductResponse, Error>({
-    queryKey: ["shopify", "product", productId],
-    queryFn: () => getShopifyProduct(productId as string),
-    enabled: Boolean(productId),
+    queryKey: ["shopify", "product", clientId, productId],
+    queryFn: () => getShopifyProduct(clientId, productId as string),
+    enabled: !!clientId && Boolean(productId),
     ...commonQueryOptions,
   });
 };
 
-export const useShopifyOrdersList = (params?: ShopifyOrderListParams) => {
+export const useShopifyOrdersList = (clientId: number, params?: ShopifyOrderListParams) => {
   return useQuery<ShopifyOrderListResponse, Error>({
-    queryKey: ["shopify", "orders", params],
-    queryFn: () => getShopifyOrdersList(params),
+    queryKey: ["shopify", "orders", clientId, params],
+    queryFn: () => getShopifyOrdersList(clientId, params),
+    enabled: !!clientId,
     ...commonQueryOptions,
   });
 };
 
-export const useShopifyOrder = (orderId?: string | null) => {
+export const useShopifyOrder = (clientId: number, orderId?: string | null) => {
   return useQuery<ShopifySingleOrderResponse, Error>({
-    queryKey: ["shopify", "order", orderId],
-    queryFn: () => getShopifyOrder(orderId as string),
-    enabled: Boolean(orderId),
+    queryKey: ["shopify", "order", clientId, orderId],
+    queryFn: () => getShopifyOrder(clientId, orderId as string),
+    enabled: !!clientId && Boolean(orderId),
     ...commonQueryOptions,
   });
 };
 
-export const useShopifyOrderAnalytics = () => {
+export const useShopifyOrderAnalytics = (clientId: number) => {
   return useQuery<ShopifyOrderAnalyticsResponse, Error>({
-    queryKey: ["shopify", "analytics", "orders"],
-    queryFn: () => getShopifyOrderAnalytics(),
+    queryKey: ["shopify", "analytics", "orders", clientId],
+    queryFn: () => getShopifyOrderAnalytics(clientId),
+    enabled: !!clientId,
     ...commonQueryOptions,
   });
 };
 
-export const useShopifyRevenueTrend = () => {
+export const useShopifyRevenueTrend = (clientId: number) => {
   return useQuery<ShopifyRevenueTrendResponse, Error>({
-    queryKey: ["shopify", "analytics", "revenue"],
-    queryFn: () => getShopifyRevenueTrend(),
+    queryKey: ["shopify", "analytics", "revenue", clientId],
+    queryFn: () => getShopifyRevenueTrend(clientId),
+    enabled: !!clientId,
     ...commonQueryOptions,
   });
 };
@@ -123,11 +127,11 @@ export const useShopifyRevenueTrend = () => {
 export const useShopifyDisconnect = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<ShopifyDisconnectResponse, Error, void>({
-    mutationFn: () => disconnectShopify(),
-    onSuccess: (data) => {
+  return useMutation<ShopifyDisconnectResponse, Error, number>({
+    mutationFn: (clientId) => disconnectShopify(clientId),
+    onSuccess: (data, clientId) => {
       toast.success(data.message || "Shopify disconnected successfully");
-      queryClient.invalidateQueries({ queryKey: ["shopify"] });
+      queryClient.invalidateQueries({ queryKey: ["shopify", clientId] });
     },
     onError: (error) => {
       toast.error(error.message || "Failed to disconnect Shopify");
@@ -138,11 +142,11 @@ export const useShopifyDisconnect = () => {
 export const useShopifyDelete = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<ShopifyDeleteResponse, Error, void>({
-    mutationFn: () => deleteShopifyAccount(),
-    onSuccess: (data) => {
+  return useMutation<ShopifyDeleteResponse, Error, number>({
+    mutationFn: (clientId) => deleteShopifyAccount(clientId),
+    onSuccess: (data, clientId) => {
       toast.success(data.message || "Shopify account deleted successfully");
-      queryClient.invalidateQueries({ queryKey: ["shopify"] });
+      queryClient.invalidateQueries({ queryKey: ["shopify", clientId] });
     },
     onError: (error) => {
       toast.error(error.message || "Failed to delete Shopify account");
@@ -151,8 +155,8 @@ export const useShopifyDelete = () => {
 };
 
 export const useShopifyReconnect = () => {
-  return useMutation<ShopifyReconnectResponse, Error, ShopifyConnectParams>({
-    mutationFn: (params) => reconnectShopify(params),
+  return useMutation<ShopifyReconnectResponse, Error, { clientId: number; params: ShopifyConnectParams }>({
+    mutationFn: ({ clientId, params }) => reconnectShopify(clientId, params),
     onSuccess: (data) => {
       toast.success("Shopify reconnect flow started");
       if (data.url) {

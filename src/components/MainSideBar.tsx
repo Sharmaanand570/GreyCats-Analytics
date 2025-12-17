@@ -14,7 +14,7 @@ import {
 } from "./ui/sidebar";
 import type React from "react";
 import {
-  LayoutDashboard,
+
   Bell,
   FileText,
   Layers,
@@ -26,6 +26,8 @@ import { useEffect, useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { Button } from "./ui/button";
+import { ClientSelector } from "./ClientSelector";
+
 
 
 function MainSideBar(): React.JSX.Element {
@@ -85,8 +87,7 @@ function MainSideBar(): React.JSX.Element {
     {
       label: "Main",
       items: [
-        { label: "Dashboard", path: "/", icon: <LayoutDashboard /> },
-        { label: "Data Sources", path: "/data-sources", icon: <Layers /> },
+        { label: "Clients", path: "/clients", icon: <Layers /> },
       ],
     },
     {
@@ -112,58 +113,62 @@ function MainSideBar(): React.JSX.Element {
   return (
     <div className="flex  bg-gradient-to-b from-black via-zinc-950 to-zinc-800 ">
       {/* ---------- 🖥️ DESKTOP SIDEBAR ---------- */}
-     {is404Page ? null : (
+      {is404Page ? null : (
         <SidebarProvider
-          className={` transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] hidden md:block ${
-            !collabsState ? "w-[16rem]" : "w-24"
-          }`}
+          className={` transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] hidden md:block ${!collabsState ? "w-[16rem]" : "w-24"
+            }`}
         >
           <Sidebar
-            className={`transition-all border-none duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-              !collabsState ? "w-[16rem] " : "w-24"
-            } h-screen`}
+            className={`transition-all border-none duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${!collabsState ? "w-[16rem] " : "w-24"
+              } h-screen`}
           >
             <SidebarContent
-              className={`bg-gradient-to-b from-black via-zinc-950 to-zinc-800 text-white transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-                collabsState ? "px-0" : "px-2"
-              }`}
+              className={`bg-gradient-to-b from-black via-zinc-950 to-zinc-800 text-white transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${collabsState ? "px-0" : "px-2"
+                }`}
             >
               {/* className="bg-black" */}
               {/* Header */}
               <SidebarGroup>
-                <SidebarGroupLabel className="p-0 w-full relative justify-between px-2 py-8 pb-9 border-b border-zinc-700">
-                  <span
-                    className={`text-xl text-white transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] overflow-hidden ${
-                      collabsState
-                        ? "opacity-0 max-w-0"
-                        : "opacity-100 max-w-full"
-                    }`}
+                <SidebarGroupLabel className="p-0 w-full relative justify-between px-2 py-8 pb-4">
+                  <div
+                    className={`flex items-center gap-2 transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${collabsState ? "justify-center w-full" : "px-0"
+                      }`}
                   >
-                    Analyst
-                  </span>
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-900 font-bold">
+                      G
+                    </div>
+                    {!collabsState && (
+                      <span className="font-semibold text-lg tracking-tight text-white whitespace-nowrap overflow-hidden">
+                        GreyCats
+                      </span>
+                    )}
+                  </div>
                   <span
-                    className="absolute right-0 cursor-pointer transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-110 active:scale-95"
+                    className="absolute right-0 cursor-pointer transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-110 active:scale-95 text-zinc-400 hover:text-white"
                     onClick={() => setcollabsState(!collabsState)}
                   >
                     <CircleChevronRight
-                      className={`text-xl text-white transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-                        collabsState ? "rotate-0" : "rotate-180"
-                      }`}
+                      className={`text-xl transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${collabsState ? "rotate-0" : "rotate-180"
+                        }`}
                     />
                   </span>
                 </SidebarGroupLabel>
               </SidebarGroup>
+
+              {/* Client Selector Area */}
+              <div className={`transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] mb-6 ${collabsState ? "px-0 flex justify-center" : "px-2"}`}>
+                <ClientSelector isCollapsed={collabsState} />
+              </div>
 
               {/* Menu Groups */}
               {menuGroups.map((group) => (
                 <SidebarGroup key={group.label}>
                   {!collabsState && (
                     <SidebarGroupLabel
-                      className={`text-xs mb-2 uppercase tracking-wider text-zinc-400 px-2 pt-6 pb-2 transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-                        collabsState
-                          ? "opacity-0 max-h-0 overflow-hidden"
-                          : "opacity-100 max-h-20"
-                      }`}
+                      className={`text-xs mb-2 uppercase tracking-wider text-zinc-400 px-2 pt-6 pb-2 transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${collabsState
+                        ? "opacity-0 max-h-0 overflow-hidden"
+                        : "opacity-100 max-h-20"
+                        }`}
                     >
                       {group.label}
                     </SidebarGroupLabel>
@@ -174,17 +179,15 @@ function MainSideBar(): React.JSX.Element {
                         <SidebarMenuItem key={item.path}>
                           <SidebarMenuButton
                             onClick={() => handleChangeURL(item.path)}
-                            className={`group  text-[1rem] rounded-[0.5rem] font-normal h-11 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:text-zinc-100 ${
-                              !collabsState
-                                ? "px-4"
-                                : "flex justify-center items-center"
-                            } ${
-                              (item.path !== "/" &&
+                            className={`group  text-[1rem] rounded-[0.5rem] font-normal h-11 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:text-zinc-100 ${!collabsState
+                              ? "px-4"
+                              : "flex justify-center items-center"
+                              } ${(item.path !== "/" &&
                                 activeTab.startsWith(item.path)) ||
-                              item.path === activeTab
+                                item.path === activeTab
                                 ? "bg-zinc-800 text-white"
                                 : "text-zinc-300"
-                            }`}
+                              }`}
                             style={{
                               transitionDelay: collabsState
                                 ? "0ms"
@@ -215,11 +218,10 @@ function MainSideBar(): React.JSX.Element {
                   </div>
                   {!collabsState && (
                     <div
-                      className={`min-w-0 md:hidden lg:block transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-                        collabsState
-                          ? "opacity-0 max-w-0 overflow-hidden"
-                          : "opacity-100 max-w-full"
-                      }`}
+                      className={`min-w-0 md:hidden lg:block transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${collabsState
+                        ? "opacity-0 max-w-0 overflow-hidden"
+                        : "opacity-100 max-w-full"
+                        }`}
                     >
                       <div className="text-sm font-medium leading-tight text-white transition-colors duration-300">
                         Alex Cohen
@@ -280,15 +282,13 @@ function MainSideBar(): React.JSX.Element {
                         <button
                           key={item.path}
                           onClick={() => handleChangeURL(item.path)}
-                          className={`flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:translate-x-1 ${
-                            activeTab === item.path
-                              ? "bg-zinc-800 translate-x-1 text-white"
-                              : "text-zinc-300"
-                          }`}
+                          className={`flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:translate-x-1 ${activeTab === item.path
+                            ? "bg-zinc-800 translate-x-1 text-white"
+                            : "text-zinc-300"
+                            }`}
                           style={{
-                            transitionDelay: `${
-                              groupIndex * 60 + itemIndex * 30
-                            }ms`,
+                            transitionDelay: `${groupIndex * 60 + itemIndex * 30
+                              }ms`,
                           }}
                         >
                           <span className="transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-110">

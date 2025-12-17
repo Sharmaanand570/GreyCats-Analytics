@@ -50,11 +50,14 @@ const getMetricCategory = (metricKey: string): string => {
   return 'General';
 };
 
-export const useAvailableMetrics = () => {
+export const useAvailableMetrics = (clientId: number | null) => {
   const { data, isLoading, error } = useQuery({
-    queryKey: ["available-metrics"],
+    queryKey: ["available-metrics", clientId],
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    enabled: !!clientId,
     queryFn: async () => {
+      if (!clientId) throw new Error("Client ID is required");
+
       let lastError: unknown;
 
       // Try live unified metrics first (matches what Apidog is calling)
@@ -65,13 +68,13 @@ export const useAvailableMetrics = () => {
 
       const formatDate = (date: Date) => {
         const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
         return `${year}-${month}-${day}`;
       };
 
       try {
-        const unified = await fetchUnifiedMetricsList({ 
+        const unified = await fetchUnifiedMetricsList(clientId, {
           limit: 1000,
           startDate: formatDate(startDate),
           endDate: formatDate(endDate),
@@ -79,18 +82,25 @@ export const useAvailableMetrics = () => {
         if (unified?.rows?.length) {
           return unified;
         }
-        console.warn("No rows from /unified-metrics; falling back to debug list");
+        console.warn(
+          "No rows from /unified-metrics; falling back to debug list"
+        );
       } catch (err) {
         lastError = err;
-        console.warn("Failed to fetch /unified-metrics; falling back to debug list", err);
+        console.warn(
+          "Failed to fetch /unified-metrics; falling back to debug list",
+          err
+        );
       }
 
       // Fallback to debug list (seeded data)
       try {
-        return await fetchDebugMetrics(1000);
+        return await fetchDebugMetrics(clientId, 1000);
       } catch (err) {
         // Surface the most recent error to React Query
-        throw err ?? lastError ?? new Error("Failed to fetch available metrics");
+        throw err ??
+          lastError ??
+          new Error("Failed to fetch available metrics");
       }
     },
   });
@@ -106,7 +116,7 @@ export const useAvailableMetrics = () => {
 
     data.rows.forEach((metric: DebugMetric) => {
       const key = `${metric.integration}:${metric.accountId}:${metric.metricKey}`;
-      
+
       // Skip duplicates
       if (seen.has(key)) return;
       seen.add(key);
@@ -132,12 +142,14 @@ export const useAvailableMetrics = () => {
     });
 
     // Sort metrics within each account by display name
-    Object.values(grouped).forEach(accounts => {
-      Object.values(accounts).forEach(metrics => {
-        metrics.sort((a, b) => a.displayName.localeCompare(b.displayName));
+    Object.values(grouped).forEach((accounts) => {
+      Object.values(accounts).forEach((metrics) => {
+        metrics.sort((a, b) =>
+          a.displayName.localeCompare(b.displayName)
+        );
       });
     });
-    
+
     return grouped;
   }, [data]);
 

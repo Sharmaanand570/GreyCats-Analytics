@@ -22,7 +22,7 @@ function GoogleConsoleCallbackHandler() {
         const errorMessage = reason
           ? decodeURIComponent(reason)
           : "Google Console connection failed";
-        
+
         toast.error(errorMessage);
         setIsProcessing(false);
         setTimeout(() => {
@@ -35,12 +35,19 @@ function GoogleConsoleCallbackHandler() {
       if (!status || status === "success") {
         // Invalidate queries to refetch after successful connection
         queryClient.invalidateQueries({ queryKey: ["google-console", "connect"] });
-        
+
         toast.success("Successfully connected to Google Console!");
         setIsProcessing(false);
         // Redirect to data sources page after a short delay
         setTimeout(() => {
-          navigate("/data-sources");
+          setTimeout(() => {
+            const storedClientId = localStorage.getItem('pending_oauth_client_id');
+            if (storedClientId) {
+              navigate(`/clients/${storedClientId}`);
+            } else {
+              navigate('/data-sources');
+            }
+          }, 1500);
         }, 1500);
       } else {
         // Unknown status

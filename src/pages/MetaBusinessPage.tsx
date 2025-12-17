@@ -294,11 +294,11 @@ function MetaBusinessPage() {
                           ) : (
                             <div className="mt-4 flex gap-4 text-sm">
                               <div>
-                                <span className="font-bold">{instagramProfile?.profile?.followers_count || 0}</span>
+                                <span className="font-bold">{instagramProfile?.data?.followers_count || 0}</span>
                                 <span className="text-muted-foreground ml-1">Followers</span>
                               </div>
                               <div>
-                                <span className="font-bold">{instagramProfile?.profile?.media_count || 0}</span>
+                                <span className="font-bold">{instagramProfile?.data?.media_count || 0}</span>
                                 <span className="text-muted-foreground ml-1">Posts</span>
                               </div>
                             </div>
@@ -370,9 +370,9 @@ function MetaBusinessPage() {
                           <Skeleton className="h-16 w-full" />
                           <Skeleton className="h-16 w-full" />
                         </div>
-                      ) : facebookPosts?.posts?.length ? (
+                      ) : facebookPosts?.data?.length ? (
                         <div className="space-y-4">
-                          {facebookPosts.posts.slice(0, 5).map((post: any) => (
+                          {facebookPosts.data.slice(0, 5).map((post: any) => (
                             <div key={post.id} className="flex gap-3 border-b pb-3 last:border-0">
                               {post.full_picture && (
                                 <img
@@ -410,9 +410,9 @@ function MetaBusinessPage() {
                           <Skeleton className="h-16 w-full" />
                           <Skeleton className="h-16 w-full" />
                         </div>
-                      ) : instagramMedia?.media?.length ? (
+                      ) : instagramMedia?.data?.length ? (
                         <div className="grid grid-cols-3 gap-2">
-                          {instagramMedia.media.slice(0, 6).map((media) => (
+                          {instagramMedia.data.slice(0, 6).map((media) => (
                             <div key={media.id} className="aspect-square relative group">
                               <img
                                 src={media.media_url}

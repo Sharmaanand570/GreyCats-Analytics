@@ -240,7 +240,7 @@ const CURATED_DEFAULTS: Record<string, string[]> = {
     "meta.page.fanAdds",
     "meta.instagram.followers",
   ],
-  "meta_facebook": [
+  "meta-facebook": [
     // Facebook Page Metrics (Organic)
     "meta.page.impressions",
     "meta.page.uniqueImpressions",
@@ -248,19 +248,41 @@ const CURATED_DEFAULTS: Record<string, string[]> = {
     "meta.page.fans",
     "meta.page.postImpressions",
     "meta.page.views",
+    "meta.page.actions",
+    // Facebook Post-level Metrics (NEW)
+    "meta.facebook.post.likes",
+    "meta.facebook.post.comments",
+    "meta.facebook.post.shares",
+    "meta.facebook.post.reactions",
+    "meta.facebook.post.engagement",
   ],
-  "meta_instagram": [
-    // Instagram Metrics (Organic)
-    "meta.instagram.impressions",
-    "meta.instagram.reach",
-    "meta.instagram.profileViews",
-    "meta.instagram.websiteClicks",
-    "meta.instagram.phoneClicks",
-    "meta.instagram.directionsClicks",
-    "meta.instagram.emailContacts",
+  "meta-instagram": [
+    // Instagram Account-level Metrics
     "meta.instagram.followers",
+    "meta.instagram.profileViews",
+    "meta.instagram.mediaCount",
+    // Instagram Media-level Metrics (NEW)
+    "meta.instagram.media.likes",
+    "meta.instagram.media.comments",
+    "meta.instagram.media.impressions",
+    "meta.instagram.media.reach",
+    "meta.instagram.media.engagement",
   ],
-  "meta_ads": [
+  "meta-business": [
+    // Combined Facebook + Instagram metrics for Meta Business integration
+    // These will be separated in the UI by their integration type
+    // Facebook Post Metrics (first 4)
+    "meta.facebook.post.engagement",
+    "meta.facebook.post.likes",
+    "meta.facebook.post.comments",
+    "meta.facebook.post.shares",
+    // Instagram Metrics (next 4)
+    "meta.instagram.followers",
+    "meta.instagram.media.engagement",
+    "meta.instagram.media.impressions",
+    "meta.instagram.mediaCount",
+  ],
+  "meta-ads": [
     // Meta Ads Campaign Metrics (Paid)
     "meta.ads.impressions",
     "meta.ads.clicks",
@@ -325,6 +347,67 @@ function pickDefaultMetricsForIntegration(
     accountId,
     availableIntegrations: Object.keys(groupedMetrics),
   });
+
+  // Special case: meta-business should pull metrics from BOTH meta-facebook AND meta-instagram
+  if (integrationKey === 'meta-business' || normalized === 'meta-business') {
+    console.log('🔄 Meta Business detected - combining Facebook + Instagram metrics');
+
+    const facebookMetrics = groupedMetrics['meta-facebook'] ?? groupedMetrics['meta-facebook'] ?? {};
+    const instagramMetrics = groupedMetrics['meta-instagram'] ?? groupedMetrics['meta-instagram'] ?? {};
+
+    const facebookCandidates = Object.values(facebookMetrics).flat() ?? [];
+    const instagramCandidates = Object.values(instagramMetrics).flat() ?? [];
+
+    const combinedCandidates = [...facebookCandidates, ...instagramCandidates];
+
+    console.log('📊 Combined metrics for meta-business:', {
+      facebookCount: facebookCandidates.length,
+      instagramCount: instagramCandidates.length,
+      totalCount: combinedCandidates.length,
+    });
+
+    if (combinedCandidates.length > 0) {
+      // Use the combined candidates for matching curated defaults
+      const curated = CURATED_DEFAULTS['meta-business'] ?? [];
+      const curatedFound: MetricOption[] = [];
+
+      curated.forEach((key) => {
+        const hit = combinedCandidates.find(
+          (m) =>
+            m.metricKey === key ||
+            m.metricKey.endsWith(`.${key}`) ||
+            m.metricKey.toLowerCase().includes(key.toLowerCase())
+        );
+        if (hit) {
+          console.log('✅ Matched meta-business curated metric:', key, '→', hit.metricKey);
+          curatedFound.push(hit);
+        } else {
+          console.log('❌ meta-business curated metric not found:', key);
+        }
+      });
+
+      if (curatedFound.length > 0) {
+        return curatedFound.slice(0, MAX_DEFAULT_WIDGETS);
+      }
+    }
+
+    // Fallback: create synthetic metrics from curated defaults
+    const curated = CURATED_DEFAULTS['meta-business'] ?? [];
+    if (curated.length > 0) {
+      console.log('✨ Using curated defaults as fallback for meta-business:', curated);
+      const syntheticMetrics: MetricOption[] = curated.map(metricKey => {
+        // Determine which integration this metric belongs to
+        const isFacebookMetric = metricKey.includes('facebook');
+        return {
+          metricKey,
+          integration: isFacebookMetric ? 'meta-facebook' : 'meta-instagram',
+          accountId,
+          displayName: metricKey.split('.').pop() || metricKey,
+        };
+      });
+      return syntheticMetrics;
+    }
+  }
 
   // Try to find metrics for this integration/account in groupedMetrics
   const perAccount =
@@ -1493,7 +1576,8 @@ export interface WidgetFormState {
 }
 
 function ReportBuilder() {
-  const params = useParams<{ id?: string }>();
+  const params = useParams<{ clientId: string; id?: string }>();
+  const parsedClientId = params.clientId ? parseInt(params.clientId) : null;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   // Initialize dashboards based on integrations
@@ -1541,18 +1625,22 @@ function ReportBuilder() {
   );
   const { mutate: createTemplate, isPending: isCreatingTemplate } = useMutation(
     {
-      mutationFn: (payload: CreateTemplatePayload) =>
-        createReportTemplate(payload),
+      mutationFn: (payload: CreateTemplatePayload) => {
+        if (!parsedClientId) throw new Error("Client ID is required");
+        return createReportTemplate(parsedClientId, payload);
+      },
       onSuccess: (response) => {
         const newId = response.template.id;
         setTemplateId(newId);
         templateBootstrapRef.current = false;
-        navigate(`/reports/${newId}`, { replace: true });
+        setIsNameDialogOpen(false); // Close dialog before navigation
+        navigate(`/clients/${parsedClientId}/reports/${newId}`, { replace: true });
         queryClient.invalidateQueries({ queryKey: ["report-template", newId] });
         toast.success("Report template created");
       },
       onError: (error: ApiError) => {
         templateBootstrapRef.current = false;
+        setIsNameDialogOpen(false); // Also close on error
         toast.error(error.message || "Failed to create report template");
       },
     }
@@ -1571,7 +1659,7 @@ function ReportBuilder() {
     useState<string>("Asia/Kolkata");
   const [scheduleTimeOfDay, setScheduleTimeOfDay] = useState<string>("09:00");
   const [scheduleSendEmail, setScheduleSendEmail] = useState(false);
-  const { data: integrationsData } = useIntegrations();
+  const { data: integrationsData } = useIntegrations(parsedClientId);
 
   console.log(integrationsData, "integrationsData")
 
@@ -1579,7 +1667,7 @@ function ReportBuilder() {
     groupedMetrics,
     isLoading: isLoadingAvailableMetrics,
     error: availableMetricsError,
-  } = useAvailableMetrics();
+  } = useAvailableMetrics(parsedClientId);
 
   // UI state for the AgencyAnalytics-style "Choose your Metrics" panel
   const [selectedIntegrationForMetrics, setSelectedIntegrationForMetrics] =
@@ -1618,7 +1706,7 @@ function ReportBuilder() {
     templateBootstrapRef.current = false;
     setIsNameDialogOpen(false);
     setNewReportName("");
-    navigate("/reports");
+    navigate(`/clients/${clientId}/reports`);
   }, [navigate]);
 
   // Keep GSC param defaults in sync with the main date range
@@ -1672,7 +1760,7 @@ function ReportBuilder() {
         .replace(/_/g, "-");
       const integrationKey =
         normalized === "google-console" ? "google-search-console" : normalized;
-      return getGoogleConsoleUnifiedMetrics({
+      return getGoogleConsoleUnifiedMetrics(parsedClientId!, {
         integration: integrationKey,
         metricKey: integrationKey === "google-analytics" ? undefined : "google_seo.clicks",
         dimensionType: isGscSelected ? [gscDimensionType] : undefined,
@@ -1712,10 +1800,10 @@ function ReportBuilder() {
   const templateQuery = useQuery({
     queryKey: ["report-template", templateId],
     queryFn: async () => {
-      if (templateId == null) {
-        throw new Error("Missing template id");
+      if (templateId == null || !parsedClientId) {
+        throw new Error("Missing template id or client id");
       }
-      const response = await getReportTemplate(templateId);
+      const response = await getReportTemplate(parsedClientId, templateId);
       console.log("getReportTemplate response", response);
       return response.template;
     },
@@ -1747,7 +1835,7 @@ function ReportBuilder() {
         // Just inform the user and go back to the reports list.
         templateBootstrapRef.current = false;
         toast.error("Report not found");
-        navigate("/reports");
+        navigate(`/clients/${clientId}/reports`);
         return;
       }
       toast.error(error.message || "Failed to load report template");
@@ -2050,7 +2138,7 @@ function ReportBuilder() {
       const promises = widgets.map(async (widget: ReportWidgetDefinition) => {
         try {
           // Normalize integration key to match backend schema
-          // Special case: Meta integrations keep underscores (meta_facebook, meta_instagram, meta_ads)
+          // Special case: Meta integrations keep underscores (meta-facebook, meta-instagram, meta-ads)
           let normalizedIntegration = widget.integration.toLowerCase();
 
           // Only replace underscores with hyphens for non-Meta integrations
@@ -2070,9 +2158,9 @@ function ReportBuilder() {
             'google-search-console',
             'google-console',
             'meta',
-            'meta_facebook',   // Facebook Pages organic
-            'meta_instagram',  // Instagram Business organic
-            'meta_ads',        // Meta Ads paid campaigns
+            'meta-facebook',   // Facebook Pages organic
+            'meta-instagram',  // Instagram Business organic
+            'meta-ads',        // Meta Ads paid campaigns
             'youtube', 'shopify', 'woo'
           ];
 
@@ -2103,9 +2191,14 @@ function ReportBuilder() {
             dimensionType = "";
           }
 
+          // For meta-ads, don't filter by accountId since backend uses campaign names
+          // and returns all campaigns when accountId is not provided
+          const shouldOmitAccountId = normalizedIntegration === 'meta-ads' ||
+            normalizedIntegration === 'meta-ads';
+
           const params = {
             integration: normalizedIntegration,  // Use normalized key
-            accountId: widget.accountId || "",
+            accountId: shouldOmitAccountId ? "" : (widget.accountId || ""),
             metricKey: widget.metricKey,
             dimensionType: dimensionType,
             startDate: dateFrom,
@@ -2114,7 +2207,7 @@ function ReportBuilder() {
 
           console.log(`📤 GET /unified-metrics params for ${widget.metricKey}:`, params);
 
-          const data = await fetchUnifiedMetric(params);
+          const data = await fetchUnifiedMetric(parsedClientId!, params);
 
           // Log the full API response for debugging
           console.log(`📡 GET /unified-metrics response for ${widget.metricKey}:`, data);
@@ -2128,6 +2221,25 @@ function ReportBuilder() {
 
       const results = await Promise.all(promises);
 
+      // Log all API responses for slides/pages
+      console.log('📊 ========== REPORT BUILDER API RESPONSES ==========');
+      console.log('📋 Total widgets fetched:', results.length);
+      console.log('📅 Date range:', { from: dateFrom, to: dateTo });
+
+      // Log each widget's API response
+      results.forEach(({ id, widget, data }, index) => {
+        console.log(`\n🔹 Widget ${index + 1}/${results.length} [${id}]:`);
+        console.log('  Type:', widget.type);
+        console.log('  Metric:', widget.metricKey);
+        console.log('  Integration:', widget.integration);
+        console.log('  Account ID:', widget.accountId);
+        console.log('  Group By:', widget.groupBy);
+        console.log('  📡 API Response:', data);
+        console.log('  Response rows count:', data?.rows?.length || 0);
+      });
+
+      console.log('\n📊 ========================================\n');
+
       // Process and format data for each widget type
       const merged: Record<string, ResolvedWidgetData> = {};
 
@@ -2140,11 +2252,45 @@ function ReportBuilder() {
         // Filter rows by accountId and metricKey
         // For metric cards and charts, also filter out dimensional data (dimensionType should be empty)
         // EXCEPTION: WooCommerce uses dimensionType="date" for time-series, which we want to include
+        // EXCEPTION: meta-ads returns all campaigns, so we don't filter by accountId
         // For tables, keep dimensional data
+
+        // DEBUG: Log first row to see what accountId format the API returns
+        if (data.rows.length > 0) {
+          console.log(`🔍 DEBUG - Widget ${id} (${widget.metricKey}):`, {
+            widgetAccountId: widget.accountId,
+            apiAccountId: data.rows[0].accountId,
+            match: data.rows[0].accountId === widget.accountId,
+            totalRows: data.rows.length,
+            integration: widget.integration
+          });
+        }
+
+        const isMetaIntegration =
+          widget.integration === 'meta-ads' ||
+          widget.integration === 'meta-ads' ||
+          widget.integration === 'meta-facebook' ||
+          widget.integration === 'meta-facebook' ||
+          widget.integration === 'meta-instagram' ||
+          widget.integration === 'meta-instagram';
+
         const filteredRows = data.rows.filter((row: any) => {
-          const matchesBasic = row.metricKey === widget.metricKey &&
-            row.accountId === widget.accountId &&
-            row.integration === widget.integration;
+          // For meta integrations, don't filter by accountId (aggregate all accounts)
+          const matchesBasic = isMetaIntegration
+            ? (row.metricKey === widget.metricKey && row.integration === widget.integration)
+            : (row.metricKey === widget.metricKey &&
+              row.accountId === widget.accountId &&
+              row.integration === widget.integration);
+
+          // DEBUG: Log when accountId doesn't match (skip for meta integrations)
+          if (!isMetaIntegration && row.metricKey === widget.metricKey && row.accountId !== widget.accountId) {
+            console.log(`❌ AccountId mismatch for ${widget.metricKey}:`, {
+              rowAccountId: row.accountId,
+              widgetAccountId: widget.accountId,
+              rowIntegration: row.integration,
+              widgetIntegration: widget.integration
+            });
+          }
 
           // For tables, we want dimensional data
           if (widget.type === 'table') {
@@ -2167,8 +2313,8 @@ function ReportBuilder() {
 
         // Create time-series data for charts
         const series = filteredRows.map((row: any) => ({
-          date: row.date || row.dimensionValue,
-          value: row.value || 0,
+          x: row.date || row.dimensionValue,
+          y: row.value || 0,
         }));
 
         // Format based on widget type
@@ -2199,6 +2345,20 @@ function ReportBuilder() {
 
       });
 
+      // Log the final merged/processed data
+      console.log('✅ ========== FINAL MERGED WIDGET DATA ==========');
+      console.log('📦 Total widgets processed:', Object.keys(merged).length);
+      Object.entries(merged).forEach(([widgetId, resolvedData]) => {
+        console.log(`\n🔸 Widget [${widgetId}]:`, {
+          value: resolvedData.value,
+          total: resolvedData.total,
+          rawCount: resolvedData.rawCount,
+          seriesLength: (resolvedData as any).series?.length || 0,
+          rowsLength: (resolvedData as any).rows?.length || 0,
+        });
+      });
+      console.log('\n✅ ============================================\n');
+
       return merged;
     },
   });
@@ -2218,7 +2378,15 @@ function ReportBuilder() {
   // Merge resolved widgets with table widget data and WooCommerce data
   const resolvedWidgets = useMemo(() => {
     // All data is now fetched via reportDataQuery using GET /unified-metrics
-    return reportDataQuery.data ?? {};
+    const resolved = reportDataQuery.data ?? {};
+
+    // Log the final resolved widgets that will be used for rendering
+    console.log('🎨 ========== RESOLVED WIDGETS FOR RENDERING ==========');
+    console.log('📊 Total resolved widgets:', Object.keys(resolved).length);
+    console.log('📋 Resolved widgets data:', resolved);
+    console.log('🎨 ===================================================\n');
+
+    return resolved;
   }, [reportDataQuery.data]);
 
   const isResolvingWidgets = reportDataQuery.isFetching;
@@ -2355,10 +2523,10 @@ function ReportBuilder() {
 
   const { mutate: saveTemplate, isPending: isSavingTemplate } = useMutation({
     mutationFn: async (payload: CreateTemplatePayload) => {
-      if (!templateId) {
-        throw new Error("Template not ready");
+      if (!templateId || !parsedClientId) {
+        throw new Error("Template not ready or missing client id");
       }
-      return updateReportTemplate(templateId, payload);
+      return updateReportTemplate(parsedClientId, templateId, payload);
     },
     onSuccess: () => {
       // We already keep the in-memory dashboards (with full widget data)
@@ -2376,8 +2544,10 @@ function ReportBuilder() {
 
   // Report schedule mutations
   const { mutate: createSchedule } = useMutation({
-    mutationFn: async (payload: CreateReportSchedulePayload) =>
-      createReportSchedule(payload),
+    mutationFn: async (payload: CreateReportSchedulePayload) => {
+      if (!parsedClientId) throw new Error("Client ID is required");
+      return createReportSchedule(parsedClientId, payload);
+    },
     onSuccess: (response) => {
       setSchedule(response.data);
       toast.success("Schedule created");
@@ -2391,7 +2561,10 @@ function ReportBuilder() {
     mutationFn: async (args: {
       id: number;
       payload: UpdateReportSchedulePayload;
-    }) => updateReportSchedule(args.id, args.payload),
+    }) => {
+      if (!parsedClientId) throw new Error("Client ID is required");
+      return updateReportSchedule(parsedClientId, args.id, args.payload);
+    },
     onSuccess: () => {
       toast.success("Schedule updated");
     },
@@ -2401,7 +2574,10 @@ function ReportBuilder() {
   });
 
   const { mutate: removeSchedule } = useMutation({
-    mutationFn: async (id: number) => deleteReportSchedule(id),
+    mutationFn: async (id: number) => {
+      if (!parsedClientId) throw new Error("Client ID is required");
+      return deleteReportSchedule(parsedClientId, id);
+    },
     onSuccess: () => {
       setSchedule(null);
       toast.success("Schedule deleted");
@@ -2462,8 +2638,8 @@ function ReportBuilder() {
   }, [isGeneratingPdf]);
 
   const handleConnectIntegration = useCallback(() => {
-    navigate("/data-sources");
-  }, [navigate]);
+    navigate(`/clients/${parsedClientId}?tab=data-sources`);
+  }, [navigate, parsedClientId]);
 
   const handleOpenScheduleDialog = useCallback(() => {
     // Prefill dialog with existing schedule or sensible defaults

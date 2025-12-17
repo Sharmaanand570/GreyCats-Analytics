@@ -6,11 +6,13 @@ import {
   getMetaCampaigns,
   getMetaInsights,
   reconnectMeta,
+  syncMetaAds,
   type MetaAccountsResponse,
   type MetaCampaignsResponse,
   type MetaCampaignInsightsResponse,
   type MetaDisconnectResponse,
   type MetaReconnectResponse,
+  type MetaSyncResponse,
 } from "../API/metaApi";
 import {
   getFacebookPageInfo,
@@ -49,41 +51,42 @@ const commonQueryOptions = {
 // ============ Meta Ads (ad accounts & campaigns) ============
 
 
-// ============ Meta Ads (ad accounts & campaigns) ============
+// ============ Meta Ops ============
 
-export const useMetaAccounts = () => {
+export const useMetaAccounts = (clientId: number) => {
   return useQuery<MetaAccountsResponse, Error>({
-    queryKey: ["meta", "accounts"],
-    queryFn: () => getMetaAccounts(),
+    queryKey: ["meta", "accounts", clientId],
+    queryFn: () => getMetaAccounts(clientId),
+    enabled: !!clientId,
     ...commonQueryOptions,
   });
 };
 
-export const useMetaCampaigns = (accountId: string | null) => {
+export const useMetaCampaigns = (clientId: number, accountId: string | null) => {
   return useQuery<MetaCampaignsResponse, Error>({
-    queryKey: ["meta", "campaigns", accountId],
-    queryFn: () => getMetaCampaigns(accountId as string),
-    enabled: !!accountId,
+    queryKey: ["meta", "campaigns", clientId, accountId],
+    queryFn: () => getMetaCampaigns(clientId, accountId as string),
+    enabled: !!clientId && !!accountId,
     ...commonQueryOptions,
   });
 };
 
-export const useMetaCampaignInsights = (campaignId: string | null) => {
+export const useMetaCampaignInsights = (clientId: number, campaignId: string | null) => {
   return useQuery<MetaCampaignInsightsResponse, Error>({
-    queryKey: ["meta", "campaign-insights", campaignId],
-    queryFn: () => getMetaInsights(campaignId as string),
-    enabled: !!campaignId,
+    queryKey: ["meta", "campaign-insights", clientId, campaignId],
+    queryFn: () => getMetaInsights(clientId, campaignId as string),
+    enabled: !!clientId && !!campaignId,
     ...commonQueryOptions,
   });
 };
 
 export const useMetaReconnect = () => {
   const queryClient = useQueryClient();
-  return useMutation<MetaReconnectResponse, Error>({
-    mutationFn: () => reconnectMeta(),
-    onSuccess: (data) => {
+  return useMutation<MetaReconnectResponse, Error, number>({
+    mutationFn: (clientId) => reconnectMeta(clientId),
+    onSuccess: (_, clientId) => {
       toast.success("Meta reconnected successfully");
-      queryClient.invalidateQueries({ queryKey: ["meta"] });
+      queryClient.invalidateQueries({ queryKey: ["meta", clientId] });
     },
     onError: (error) => {
       toast.error(error.message || "Failed to reconnect Meta");
@@ -93,11 +96,11 @@ export const useMetaReconnect = () => {
 
 export const useMetaDisconnect = () => {
   const queryClient = useQueryClient();
-  return useMutation<MetaDisconnectResponse, Error>({
-    mutationFn: () => disconnectMeta(),
-    onSuccess: (data) => {
+  return useMutation<MetaDisconnectResponse, Error, number>({
+    mutationFn: (clientId) => disconnectMeta(clientId),
+    onSuccess: (data, clientId) => {
       toast.success(data.message || "Meta disconnected successfully");
-      queryClient.invalidateQueries({ queryKey: ["meta"] });
+      queryClient.invalidateQueries({ queryKey: ["meta", clientId] });
     },
     onError: (error) => {
       toast.error(error.message || "Failed to disconnect Meta");
@@ -105,50 +108,77 @@ export const useMetaDisconnect = () => {
   });
 };
 
+export const useMetaSyncAds = () => {
+  const queryClient = useQueryClient();
+  return useMutation<MetaSyncResponse, Error, { clientId: number; accountId: string }>({
+    mutationFn: ({ clientId, accountId }) => syncMetaAds(clientId, accountId),
+    onSuccess: (data, { clientId }) => {
+      toast.success(`Synced ${data.totalCampaigns} campaigns successfully`);
+      queryClient.invalidateQueries({ queryKey: ["meta", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["unified-metrics", clientId] });
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to sync Meta Ads");
+    },
+  });
+};
+
 // ============ Facebook organic insights ============
 
-export const useFacebookPages = (params?: { limit?: number; after?: string; search?: string }) => {
+export const useFacebookPages = (
+  clientId: number,
+  params?: { limit?: number; after?: string; search?: string }
+) => {
   return useQuery<FacebookPagesResponse, Error>({
-    queryKey: ["meta", "facebook", "pages", params],
-    queryFn: () => getFacebookPages(params),
+    queryKey: ["meta", "facebook", "pages", clientId, params],
+    queryFn: () => getFacebookPages(clientId, params),
+    enabled: !!clientId,
     ...commonQueryOptions,
   });
 };
 
-export const useFacebookPageInfo = (pageId: string | undefined) => {
+export const useFacebookPageInfo = (clientId: number, pageId: string | undefined) => {
   return useQuery<FacebookPageInfoResponse, Error>({
-    queryKey: ["meta", "facebook", "page-info", pageId],
-    queryFn: () => getFacebookPageInfo(pageId as string),
-    enabled: !!pageId,
+    queryKey: ["meta", "facebook", "page-info", clientId, pageId],
+    queryFn: () => getFacebookPageInfo(clientId, pageId as string),
+    enabled: !!clientId && !!pageId,
     ...commonQueryOptions,
   });
 };
 
-export const useFacebookPagePosts = (pageId: string | undefined, limit?: number) => {
+export const useFacebookPagePosts = (
+  clientId: number,
+  pageId: string | undefined,
+  limit?: number
+) => {
   return useQuery<FacebookPagePostsResponse, Error>({
-    queryKey: ["meta", "facebook", "page-posts", pageId, limit],
-    queryFn: () => getFacebookPagePosts(pageId as string, limit),
-    enabled: !!pageId,
+    queryKey: ["meta", "facebook", "page-posts", clientId, pageId, limit],
+    queryFn: () => getFacebookPagePosts(clientId, pageId as string, limit),
+    enabled: !!clientId && !!pageId,
     ...commonQueryOptions,
   });
 };
 
-export const useFacebookPostInsights = (postId: string | undefined, pageId: string | undefined) => {
+export const useFacebookPostInsights = (
+  clientId: number,
+  postId: string | undefined,
+  pageId: string | undefined
+) => {
   return useQuery<FacebookPostInsightsResponse, Error>({
-    queryKey: ["meta", "facebook", "post-insights", postId, pageId],
-    queryFn: () => getFacebookPostInsights(postId as string, pageId as string),
-    enabled: !!postId && !!pageId,
+    queryKey: ["meta", "facebook", "post-insights", clientId, postId, pageId],
+    queryFn: () => getFacebookPostInsights(clientId, postId as string, pageId as string),
+    enabled: !!clientId && !!postId && !!pageId,
     ...commonQueryOptions,
   });
 };
 
 export const useFacebookSyncInsights = () => {
   const queryClient = useQueryClient();
-  return useMutation<FacebookSyncResponse, Error, FacebookSyncBody>({
-    mutationFn: (body) => syncFacebookInsights(body),
-    onSuccess: () => {
+  return useMutation<FacebookSyncResponse, Error, { clientId: number; body: FacebookSyncBody }>({
+    mutationFn: ({ clientId, body }) => syncFacebookInsights(clientId, body),
+    onSuccess: (_, { clientId }) => {
       toast.success("Facebook insights synced successfully");
-      queryClient.invalidateQueries({ queryKey: ["meta"] });
+      queryClient.invalidateQueries({ queryKey: ["meta", clientId] });
     },
     onError: (error) => {
       toast.error(error.message || "Failed to sync Facebook insights");
@@ -158,52 +188,58 @@ export const useFacebookSyncInsights = () => {
 
 // ============ Instagram insights ============
 
-export const useInstagramBusinessAccount = (pageId: string | undefined) => {
+export const useInstagramBusinessAccount = (clientId: number, pageId: string | undefined) => {
   return useQuery<InstagramBusinessAccountResponse, Error>({
-    queryKey: ["meta", "instagram", "business-account", pageId],
-    queryFn: () => getInstagramBusinessAccount(pageId as string),
-    enabled: !!pageId,
+    queryKey: ["meta", "instagram", "business-account", clientId, pageId],
+    queryFn: () => getInstagramBusinessAccount(clientId, pageId as string),
+    enabled: !!clientId && !!pageId,
     ...commonQueryOptions,
   });
 };
 
-export const useInstagramProfile = (igBusinessId: string | undefined) => {
+export const useInstagramProfile = (clientId: number, igBusinessId: string | undefined) => {
   return useQuery<InstagramProfileResponse, Error>({
-    queryKey: ["meta", "instagram", "profile", igBusinessId],
-    queryFn: () => getInstagramProfile(igBusinessId as string),
-    enabled: !!igBusinessId,
+    queryKey: ["meta", "instagram", "profile", clientId, igBusinessId],
+    queryFn: () => getInstagramProfile(clientId, igBusinessId as string),
+    enabled: !!clientId && !!igBusinessId,
     ...commonQueryOptions,
   });
 };
 
-export const useInstagramMedia = (igBusinessId: string | undefined, limit?: number) => {
+export const useInstagramMedia = (
+  clientId: number,
+  igBusinessId: string | undefined,
+  limit?: number
+) => {
   return useQuery<InstagramMediaResponse, Error>({
-    queryKey: ["meta", "instagram", "media", igBusinessId, limit],
-    queryFn: () => getInstagramMedia(igBusinessId as string, limit),
-    enabled: !!igBusinessId,
+    queryKey: ["meta", "instagram", "media", clientId, igBusinessId, limit],
+    queryFn: () => getInstagramMedia(clientId, igBusinessId as string, limit),
+    enabled: !!clientId && !!igBusinessId,
     ...commonQueryOptions,
   });
 };
 
 export const useInstagramMediaInsights = (
+  clientId: number,
   accountId: string | undefined,
   mediaId: string | undefined
 ) => {
   return useQuery<InstagramMediaInsightsResponse, Error>({
-    queryKey: ["meta", "instagram", "media-insights", accountId, mediaId],
-    queryFn: () => getInstagramMediaInsights(accountId as string, mediaId as string),
-    enabled: !!accountId && !!mediaId,
+    queryKey: ["meta", "instagram", "media-insights", clientId, accountId, mediaId],
+    queryFn: () =>
+      getInstagramMediaInsights(clientId, accountId as string, mediaId as string),
+    enabled: !!clientId && !!accountId && !!mediaId,
     ...commonQueryOptions,
   });
 };
 
 export const useInstagramSyncInsights = () => {
   const queryClient = useQueryClient();
-  return useMutation<InstagramSyncResponse, Error, InstagramSyncBody>({
-    mutationFn: (body) => syncInstagramInsights(body),
-    onSuccess: () => {
+  return useMutation<InstagramSyncResponse, Error, { clientId: number; body: InstagramSyncBody }>({
+    mutationFn: ({ clientId, body }) => syncInstagramInsights(clientId, body),
+    onSuccess: (_, { clientId }) => {
       toast.success("Instagram insights synced successfully");
-      queryClient.invalidateQueries({ queryKey: ["meta"] });
+      queryClient.invalidateQueries({ queryKey: ["meta", clientId] });
     },
     onError: (error) => {
       toast.error(error.message || "Failed to sync Instagram insights");
@@ -213,18 +249,20 @@ export const useInstagramSyncInsights = () => {
 
 // ============ Saved & daily history ============
 
-export const useMetaSavedInsights = (platform?: string) => {
+export const useMetaSavedInsights = (clientId: number, platform?: string) => {
   return useQuery<MetaSavedInsightsResponse, Error>({
-    queryKey: ["meta", "saved-insights", platform],
-    queryFn: () => getMetaSavedInsights(platform),
+    queryKey: ["meta", "saved-insights", clientId, platform],
+    queryFn: () => getMetaSavedInsights(clientId, platform),
+    enabled: !!clientId,
     ...commonQueryOptions,
   });
 };
 
-export const useMetaDailyInsights = (platform?: string) => {
+export const useMetaDailyInsights = (clientId: number, platform?: string) => {
   return useQuery<MetaDailyHistoryResponse, Error>({
-    queryKey: ["meta", "daily-insights", platform],
-    queryFn: () => getMetaDailyInsights(platform),
+    queryKey: ["meta", "daily-insights", clientId, platform],
+    queryFn: () => getMetaDailyInsights(clientId, platform),
+    enabled: !!clientId,
     ...commonQueryOptions,
   });
 };

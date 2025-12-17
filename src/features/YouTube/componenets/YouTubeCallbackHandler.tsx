@@ -22,7 +22,7 @@ function YouTubeCallbackHandler() {
 
       // Handle error callback (e.g., status=error&reason=oauth_save_failed)
       if (status === "error") {
-        const errorMsg = reason 
+        const errorMsg = reason
           ? `Connection failed: ${reason.replace(/_/g, " ")}`
           : "Failed to connect YouTube. Please try again.";
         setErrorMessage(errorMsg);
@@ -54,7 +54,12 @@ function YouTubeCallbackHandler() {
           );
           // Redirect to YouTube detail page after a short delay
           setTimeout(() => {
-            navigate("/data-sources/youtube");
+            const storedClientId = localStorage.getItem('pending_oauth_client_id');
+            if (storedClientId) {
+              navigate(`/clients/${storedClientId}`);
+            } else {
+              navigate('/data-sources/youtube');
+            }
           }, 1500);
         }
       } catch (error) {

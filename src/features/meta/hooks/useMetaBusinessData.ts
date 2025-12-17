@@ -16,11 +16,15 @@ import {
   refreshMetaBusinessAccount,
   refreshMetaBusinessPageToken,
   syncMetaBusinessDaily,
+  syncMetaBusinessFacebook,
+  syncMetaBusinessInstagram,
   type MetaBusinessCallbackParams,
   type MetaBusinessCallbackResponse,
   type MetaBusinessDisconnectResponse,
   type MetaBusinessRefreshResponse,
   type MetaBusinessSyncResponse,
+  type MetaBusinessFacebookSyncResponse,
+  type MetaBusinessInstagramSyncResponse,
   type MetaBusinessRefreshPageResponse,
 } from "../API/metaBusinessApi";
 
@@ -133,11 +137,14 @@ export const useInstagramMedia = (accountId: number | undefined) => {
   });
 };
 
-export const useInstagramMediaInsights = (mediaId: string | undefined) => {
+export const useInstagramMediaInsights = (
+  accountId: number | undefined,
+  mediaId: string | undefined
+) => {
   return useQuery({
-    queryKey: ["meta-business", "instagram", "media-insights", mediaId],
-    queryFn: () => getInstagramMediaInsights(mediaId!),
-    enabled: !!mediaId,
+    queryKey: ["meta-business", "instagram", "media-insights", accountId, mediaId],
+    queryFn: () => getInstagramMediaInsights(accountId!, mediaId!),
+    enabled: !!accountId && !!mediaId,
     ...commonQueryOptions,
   });
 };
@@ -167,9 +174,40 @@ export const useMetaBusinessSync = () => {
     onSuccess: () => {
       toast.success("Sync completed successfully");
       queryClient.invalidateQueries({ queryKey: ["meta-business"] });
+      queryClient.invalidateQueries({ queryKey: ["unified-metrics"] });
     },
     onError: (error) => {
       toast.error(error.message || "Failed to sync data");
+    },
+  });
+};
+
+export const useMetaBusinessSyncFacebook = () => {
+  const queryClient = useQueryClient();
+  return useMutation<MetaBusinessFacebookSyncResponse, Error, { accountId: number; date?: string }>({
+    mutationFn: ({ accountId, date }) => syncMetaBusinessFacebook(accountId, date),
+    onSuccess: () => {
+      toast.success("Facebook insights synced successfully");
+      queryClient.invalidateQueries({ queryKey: ["meta-business"] });
+      queryClient.invalidateQueries({ queryKey: ["unified-metrics"] });
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to sync Facebook data");
+    },
+  });
+};
+
+export const useMetaBusinessSyncInstagram = () => {
+  const queryClient = useQueryClient();
+  return useMutation<MetaBusinessInstagramSyncResponse, Error, { accountId: number; date?: string }>({
+    mutationFn: ({ accountId, date }) => syncMetaBusinessInstagram(accountId, date),
+    onSuccess: () => {
+      toast.success("Instagram insights synced successfully");
+      queryClient.invalidateQueries({ queryKey: ["meta-business"] });
+      queryClient.invalidateQueries({ queryKey: ["unified-metrics"] });
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to sync Instagram data");
     },
   });
 };

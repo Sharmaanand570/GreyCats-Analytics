@@ -124,13 +124,12 @@ const handleGoogleApiError = (error: unknown, fallbackMessage: string): never =>
 
 // ==================== API FUNCTIONS ====================
 
+// ==================== API FUNCTIONS ====================
+
 export const connectGoogle = async (): Promise<connectGoogleTypeResponse> => {
   try {
-    console.log("connectGoogle",import.meta.env.VITE_NGROK_URL);
-    const response = await api.get<connectGoogleTypeResponse>("/google/connect", {
-      baseURL: import.meta.env.VITE_NGROK_URL,
-      headers: { "ngrok-skip-browser-warning": "true" },
-    });
+    // Using standard api client to avoid CORS issues with manual baseURL
+    const response = await api.get<connectGoogleTypeResponse>("/google/connect");
     return response.data;
   } catch (error) {
     return handleGoogleApiError(error, "Failed to initiate Google connection");
@@ -153,27 +152,42 @@ export const handleGoogleCallback = async (
   }
 };
 
-export const reconnectGoogle = async (): Promise<GoogleReconnectResponse> => {
+export const reconnectGoogle = async (
+  clientId: number
+): Promise<GoogleReconnectResponse> => {
   try {
-    const response = await api.get<GoogleReconnectResponse>("/google/reconnect");
+    const response = await api.get<GoogleReconnectResponse>(
+      `/clients/${clientId}/google-analytics/reconnect`
+    );
     return response.data;
   } catch (error) {
-    return handleGoogleApiError(error, "Failed to generate Google reconnect URL");
+    return handleGoogleApiError(
+      error,
+      "Failed to generate Google reconnect URL"
+    );
   }
 };
 
-export const disconnectGoogle = async (): Promise<GoogleDisconnectResponse> => {
+export const disconnectGoogle = async (
+  clientId: number
+): Promise<GoogleDisconnectResponse> => {
   try {
-    const response = await api.post<GoogleDisconnectResponse>("/google/disconnect");
+    const response = await api.post<GoogleDisconnectResponse>(
+      `/clients/${clientId}/google-analytics/disconnect`
+    );
     return response.data;
   } catch (error) {
     return handleGoogleApiError(error, "Failed to disconnect Google Analytics");
   }
 };
 
-export const getGoogleProperties = async (): Promise<GooglePropertiesResponse> => {
+export const getGoogleProperties = async (
+  clientId: number
+): Promise<GooglePropertiesResponse> => {
   try {
-    const response = await api.get<GooglePropertiesResponse>("/google/properties");
+    const response = await api.get<GooglePropertiesResponse>(
+      `/clients/${clientId}/google-analytics/properties`
+    );
     return response.data;
   } catch (error) {
     return handleGoogleApiError(error, "Failed to load GA4 properties");
@@ -181,11 +195,12 @@ export const getGoogleProperties = async (): Promise<GooglePropertiesResponse> =
 };
 
 export const selectGoogleProperty = async (
+  clientId: number,
   body: GoogleSelectPropertyBody
 ): Promise<GoogleSelectPropertyResponse> => {
   try {
     const response = await api.post<GoogleSelectPropertyResponse>(
-      "/google/select-property",
+      `/clients/${clientId}/google-analytics/select-property`,
       body
     );
     return response.data;
@@ -194,21 +209,28 @@ export const selectGoogleProperty = async (
   }
 };
 
-export const getGoogleAnalyticsProperties = async (): Promise<GoogleAnalyticsPropertiesResponse> => {
+export const getGoogleAnalyticsProperties = async (
+  clientId: number
+): Promise<GoogleAnalyticsPropertiesResponse> => {
   try {
     const response = await api.get<GoogleAnalyticsPropertiesResponse>(
-      "/google/analytics"
+      `/clients/${clientId}/google-analytics/meta`
     );
     return response.data;
   } catch (error) {
-    return handleGoogleApiError(error, "Failed to load Google Analytics properties");
+    return handleGoogleApiError(
+      error,
+      "Failed to load Google Analytics properties"
+    );
   }
 };
 
-export const getGoogleAnalyticsTrends = async (): Promise<GoogleAnalyticsTrendsResponse> => {
+export const getGoogleAnalyticsTrends = async (
+  clientId: number
+): Promise<GoogleAnalyticsTrendsResponse> => {
   try {
     const response = await api.get<GoogleAnalyticsTrendsResponse>(
-      "/analytics/trends"
+      `/clients/${clientId}/google-analytics/trends`
     );
     return response.data;
   } catch (error) {
@@ -216,10 +238,12 @@ export const getGoogleAnalyticsTrends = async (): Promise<GoogleAnalyticsTrendsR
   }
 };
 
-export const getGoogleAnalyticsTopPages = async (): Promise<GoogleAnalyticsTopPagesResponse> => {
+export const getGoogleAnalyticsTopPages = async (
+  clientId: number
+): Promise<GoogleAnalyticsTopPagesResponse> => {
   try {
     const response = await api.get<GoogleAnalyticsTopPagesResponse>(
-      "/analytics/top-pages"
+      `/clients/${clientId}/google-analytics/top-pages`
     );
     return response.data;
   } catch (error) {
@@ -227,19 +251,25 @@ export const getGoogleAnalyticsTopPages = async (): Promise<GoogleAnalyticsTopPa
   }
 };
 
-export const getGoogleAnalyticsMeta = async (): Promise<GoogleAnalyticsMetaResponse> => {
+export const getGoogleAnalyticsMeta = async (
+  clientId: number
+): Promise<GoogleAnalyticsMetaResponse> => {
   try {
-    const response = await api.get<GoogleAnalyticsMetaResponse>("/analytics/google");
+    const response = await api.get<GoogleAnalyticsMetaResponse>(
+      `/clients/${clientId}/google-analytics/meta`
+    );
     return response.data;
   } catch (error) {
     return handleGoogleApiError(error, "Failed to load Google analytics meta");
   }
 };
 
-export const getGoogleAnalyticsSummary = async (): Promise<GoogleAnalyticsSummaryResponse> => {
+export const getGoogleAnalyticsSummary = async (
+  clientId: number
+): Promise<GoogleAnalyticsSummaryResponse> => {
   try {
     const response = await api.get<GoogleAnalyticsSummaryResponse>(
-      "/analytics/summary"
+      `/clients/${clientId}/google-analytics/summary`
     );
     return response.data;
   } catch (error) {

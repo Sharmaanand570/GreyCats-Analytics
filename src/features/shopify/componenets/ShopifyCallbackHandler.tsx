@@ -27,7 +27,14 @@ export default function ShopifyCallbackHandler() {
       toast.success(`Shopify store ${shop} connected successfully`);
       setIsProcessing(false);
       setTimeout(() => {
-        navigate("/data-sources");
+        setTimeout(() => {
+          const storedClientId = localStorage.getItem('pending_oauth_client_id');
+          if (storedClientId) {
+            navigate(`/clients/${storedClientId}`);
+          } else {
+            navigate('/data-sources');
+          }
+        }, 1500);
       }, 1500);
       return;
     }

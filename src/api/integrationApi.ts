@@ -1,0 +1,129 @@
+import { api } from '../apiConfig';
+import type {
+  AvailableAccount,
+  IntegrationType,
+  AccountAssignmentRequest,
+  AccountAssignmentResponse,
+} from '../types/integration.types';
+
+// Helper to normalize account data based on integration type
+const normalizeAccount = (account: any, type: IntegrationType): AvailableAccount => {
+  let name = '';
+  let identifier = '';
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, prefer-const
+  let id = account.id;
+
+  switch (type) {
+    case 'meta-business':
+      name = account.pageName;
+      identifier = account.pageId;
+      break;
+    case 'youtube':
+      name = account.channelTitle;
+      identifier = account.channelId;
+      id = account.id; // Using internal ID for assignment? Or connection ID? Usually internal DB ID.
+      break;
+    case 'shopify':
+      name = account.shopDomain;
+      identifier = account.shopDomain;
+      break;
+    case 'woocommerce':
+      name = account.storeUrl;
+      identifier = account.storeUrl;
+      break;
+    case 'google-search-console':
+      name = account.siteUrl;
+      identifier = account.siteUrl;
+      break;
+    case 'google-analytics':
+      name = account.propertyName || account.name || `Google Analytics (${account.platform || 'GA4'})`;
+      identifier = account.id;
+      break;
+    case 'meta-ads':
+      name = account.name || account.accountId;
+      identifier = account.accountId;
+      break;
+    case 'meta-insights':
+      name = account.platform || 'Meta Insights';
+      identifier = account.id;
+      break;
+    default:
+      name = account.name || 'Unknown Account';
+      identifier = account.id || 'unknown';
+  }
+
+  return {
+    id: account.id, // This determines what we send to the backend for assignment
+    name,
+    identifier,
+    platform: account.platform,
+    original: account,
+    assignedToClient: account.assignedToClient
+  };
+};
+
+export const getAvailableAccounts = async (integration: IntegrationType): Promise<AvailableAccount[]> => {
+  try {
+    // API endpoints use hyphens (e.g. meta-ads), but types use underscores (e.g. meta-ads)
+    const urlIntegration = integration.replace(/_/g, '-');
+    console.log("integrations/${urlIntegration}/available-accounts");
+    const response = await api.get<any>(`/integrations/${urlIntegration}/available-accounts`);
+    console.log("getAvailableAccounts", response.data);
+    // Handle different response structures if necessary, but guide says { accounts: [] }
+    const rawAccounts = response.data.accounts || response.data.properties || response.data.sites || [];
+    
+    return rawAccounts.map((acc: any) => normalizeAccount(acc, integration));
+  } catch (error) {
+    console.error(`Error fetching accounts for ${integration}:`, error);
+    throw error;
+  }
+};
+
+export const assignAccountToClient = async (
+  clientId: number,
+  integration: IntegrationType,
+  accountId: string | number
+): Promise<AccountAssignmentResponse> => {
+  console.log("assignAccountToClient", clientId, integration, accountId);
+  try {
+    const response = await api.post<AccountAssignmentResponse>(
+      `/clients/${clientId}/accounts`,
+      {
+        integrationType: integration,
+        accountId
+      } as AccountAssignmentRequest
+    );
+
+    console.log("assignAccountToClient", response.data);
+    return response.data;
+  } catch (error) {
+    console.error(`Error assigning account to client ${clientId}:`, error);
+    throw error;
+  }
+};
+
+export const removeAccountFromClient = async (
+  clientId: number,
+  integration: IntegrationType,
+  accountId: string | number
+): Promise<any> => {
+  try {
+    const response = await api.delete(
+      `/clients/${clientId}/accounts/${integration}/${accountId}`
+    );
+    return response.data;
+  } catch (error) {
+    console.error(`Error removing account from client ${clientId}:`, error);
+    throw error;
+  }
+};
+
+export const getConnectedIntegrations = async (): Promise<import('../types/integration.types').ConnectedIntegrationsResponse> => {
+  try {
+    const response = await api.get<import('../types/integration.types').ConnectedIntegrationsResponse>('/integrations/connected');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching connected integrations:', error);
+    throw error;
+  }
+};

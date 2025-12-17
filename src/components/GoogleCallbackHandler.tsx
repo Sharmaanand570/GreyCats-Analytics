@@ -34,7 +34,14 @@ function GoogleCallbackHandler() {
           );
           // Redirect to data sources page after a short delay
           setTimeout(() => {
-            navigate("/data-sources");
+            setTimeout(() => {
+              const storedClientId = localStorage.getItem('pending_oauth_client_id');
+              if (storedClientId) {
+                navigate(`/clients/${storedClientId}`);
+              } else {
+                navigate('/data-sources');
+              }
+            }, 1500);
           }, 1500);
         }
       } catch (error) {

@@ -30,6 +30,8 @@ const FacebookInsightsPage = lazy(() => import("./pages/FacebookInsightsPage"));
 const InstagramInsightsPage = lazy(
   () => import("./pages/InstagramInsightsPage")
 );
+const ReportsLandingPage = lazy(() => import("./pages/ReportsLandingPage"));
+
 const Reports = lazy(() => import("./components/Reports"));
 const ReportBuilder = lazy(() => import("./pages/ReportBuilder"));
 const Goals = lazy(() => import("./pages/GoalsPage"));
@@ -46,6 +48,11 @@ const GoogleConsoleCallbackHandler = lazy(
   () => import("./components/GoogleConsoleCallbackHandler")
 );
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
+
+// Multi-Client Pages
+const ClientsPage = lazy(() => import("./pages/ClientsPage"));
+const ClientDetailPage = lazy(() => import("./pages/ClientDetailPage"));
+const OAuthCallbackPage = lazy(() => import("./pages/OAuthCallbackPage"));
 
 const LoadingFallback = () => (
   <div className="flex items-center justify-center min-h-screen">
@@ -91,6 +98,15 @@ function App() {
 
           {/* Protected routes with sidebar */}
           <Route path="/" element={<MainSideBar />}>
+            {/* Multi-Client Routes */}
+            <Route path="clients">
+              <Route index element={<ClientsPage />} />
+              <Route path=":clientId/reports/new" element={<ReportBuilder />} />
+              <Route path=":clientId/reports/:id" element={<ReportBuilder />} />
+              <Route path=":clientId/reports" element={<Reports />} />
+              <Route path=":clientId" element={<ClientDetailPage />} />
+            </Route>
+
             <Route index element={<Dashboard />} />
             <Route path="edit-dashboard" element={<EditDashboard />} />
 
@@ -122,13 +138,10 @@ function App() {
               <Route path="*" element={<NotFoundPage />} />
             </Route>
 
-            <Route path="reports">
-              <Route index element={<Reports />} />
-              <Route path=":id" element={<ReportBuilder />} />
-              <Route path="*" element={<NotFoundPage />} />
-            </Route>
+
 
             <Route path="goals" element={<Goals />} />
+            <Route path="reports" element={<ReportsLandingPage />} />
             <Route path="alerts" element={<AlertsPage />} />
             <Route path="tasks" element={<TasksPage />} />
             <Route path="account-setup" element={<SettingsPage />} />
@@ -154,6 +167,9 @@ function App() {
           <Route path="shopify/callback" element={<ShopifyCallbackHandler />} />
           <Route path="meta/callback" element={<MetaCallbackHandler />} />
           <Route path="meta-business/callback" element={<MetaCallbackHandler />} />
+
+          {/* Multi-Client OAuth Callback */}
+          <Route path="oauth/callback" element={<OAuthCallbackPage />} />
         </Route>
 
         {/* Dedicated 404 route (accessible from anywhere) */}

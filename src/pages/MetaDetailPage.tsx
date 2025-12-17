@@ -62,6 +62,7 @@ import {
   useMetaDisconnect,
   useMetaReconnect,
   useMetaSavedInsights,
+  useMetaSyncAds,
 } from "@/features/meta/hooks/useMetaData";
 
 import {
@@ -179,6 +180,7 @@ function MetaDetailPage() {
   const { data: dailyInsightsData } = useMetaDailyInsights();
   const { mutateAsync: reconnectMeta, isPending: isReconnecting } = useMetaReconnect();
   const { mutateAsync: disconnectMeta, isPending: isDisconnecting } = useMetaDisconnect();
+  const { mutateAsync: syncAds, isPending: isSyncingAds } = useMetaSyncAds();
   const { mutateAsync: syncFacebook, isPending: isSyncingFacebook } = useFacebookSyncInsights();
 
   // -- Instagram Hooks --
@@ -240,6 +242,15 @@ function MetaDetailPage() {
   const handleReconnect = async () => { try { await reconnectMeta(); } catch { } };
   const handleDisconnect = async () => { try { await disconnectMeta(); } catch { } };
 
+  const handleSyncAds = async () => {
+    if (!selectedAccountId) return;
+    try {
+      await syncAds(selectedAccountId);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const handleSyncFacebook = async (pageId: string) => {
     try {
       setSyncingPageId(pageId);
@@ -294,12 +305,12 @@ function MetaDetailPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleReconnect}
-                disabled={isReconnecting}
+                onClick={handleSyncAds}
+                disabled={isSyncingAds || !selectedAccountId}
                 className="bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-sm"
               >
-                {isReconnecting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2 text-slate-500" />}
-                Sync Data
+                {isSyncingAds ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2 text-slate-500" />}
+                Sync Campaigns
               </Button>
               <Button
                 variant="ghost"

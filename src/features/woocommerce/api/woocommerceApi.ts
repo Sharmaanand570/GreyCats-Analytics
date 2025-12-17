@@ -24,11 +24,12 @@ export type wooCommerceConnectionAPIResponse = {
   };
 };
 
+// Connection API Function
 export const wooCommerceConnectionAPI = async (
   params: wooCommerceConnectionAPIparams
 ): Promise<wooCommerceConnectionAPIResponse> => {
   const response = await api.post<wooCommerceConnectionAPIResponse>(
-    "/woocommerce/connect",
+    `/woocommerce/connect`,
     params
   );
 
@@ -291,20 +292,22 @@ export type WooCommerceAgencyRollupParams = {
 
 // Sync API Functions
 export const syncWooCommerceProducts = async (
+  clientId: number,
   params: WooCommerceSyncParams
 ): Promise<WooCommerceSyncResponse> => {
   const response = await api.post<WooCommerceSyncResponse>(
-    "/woocommerce/sync/products",
+    `/clients/${clientId}/woocommerce/sync/products`,
     params
   );
   return response.data;
 };
 
 export const syncWooCommerceOrders = async (
+  clientId: number,
   params: WooCommerceSyncParams
 ): Promise<WooCommerceSyncResponse> => {
   const response = await api.post<WooCommerceSyncResponse>(
-    "/woocommerce/sync/orders",
+    `/clients/${clientId}/woocommerce/sync/orders`,
     params
   );
   return response.data;
@@ -312,10 +315,11 @@ export const syncWooCommerceOrders = async (
 
 // Analytics API Functions
 export const getWooCommerceAnalytics = async (
+  clientId: number,
   accountId: number
 ): Promise<WooCommerceAnalyticsResponse> => {
   const response = await api.get<WooCommerceAnalyticsResponse>(
-    "/woocommerce/analytics",
+    `/clients/${clientId}/woocommerce/analytics`,
     {
       params: { accountId },
     }
@@ -325,10 +329,11 @@ export const getWooCommerceAnalytics = async (
 
 // Legacy function for backward compatibility (without pagination)
 export const getWooCommercePerProductAnalyticsLegacy = async (
+  clientId: number,
   accountId: number
 ): Promise<WooCommercePerProductResponse> => {
   const response = await api.get<WooCommercePerProductResponse>(
-    "/woocommerce/analytics/per-product",
+    `/clients/${clientId}/woocommerce/analytics/per-product`,
     {
       params: { accountId },
     }
@@ -337,10 +342,11 @@ export const getWooCommercePerProductAnalyticsLegacy = async (
 };
 
 export const getWooCommerceAgencyRollup = async (
+  clientId: number,
   params?: WooCommerceAgencyRollupParams
 ): Promise<WooCommerceAgencyRollupResponse> => {
   const response = await api.get<WooCommerceAgencyRollupResponse>(
-    "/woocommerce/agency/rollup",
+    `/clients/${clientId}/woocommerce/agency/rollup`,
     { params }
   );
   return response.data;
@@ -348,20 +354,22 @@ export const getWooCommerceAgencyRollup = async (
 
 // Disconnect/Reconnect API Functions
 export const disconnectWooCommerce = async (
+  clientId: number,
   params: WooCommerceDisconnectParams
 ): Promise<WooCommerceDisconnectResponse> => {
   const response = await api.post<WooCommerceDisconnectResponse>(
-    "/woocommerce/disconnect",
+    `/clients/${clientId}/woocommerce/disconnect`,
     params
   );
   return response.data;
 };
 
 export const reconnectWooCommerce = async (
+  clientId: number,
   params: WooCommerceDisconnectParams
 ): Promise<WooCommerceReconnectResponse> => {
   const response = await api.post<WooCommerceReconnectResponse>(
-    "/woocommerce/reconnect",
+    `/clients/${clientId}/woocommerce/reconnect`,
     params
   );
   return response.data;
@@ -369,21 +377,23 @@ export const reconnectWooCommerce = async (
 
 // Products API Functions
 export const getWooCommerceProducts = async (
+  clientId: number,
   params: WooCommerceProductsParams
 ): Promise<WooCommerceProductsResponse> => {
   const response = await api.get<WooCommerceProductsResponse>(
-    "/woocommerce/products",
+    `/clients/${clientId}/woocommerce/products`,
     { params }
   );
   return response.data;
 };
 
 export const getWooCommerceProduct = async (
+  clientId: number,
   productId: string,
   accountId: number
 ): Promise<WooCommerceSingleProductResponse> => {
   const response = await api.get<WooCommerceSingleProductResponse>(
-    `/woocommerce/products/${productId}`,
+    `/clients/${clientId}/woocommerce/products/${productId}`,
     { params: { accountId } }
   );
   return response.data;
@@ -391,21 +401,23 @@ export const getWooCommerceProduct = async (
 
 // Orders API Functions
 export const getWooCommerceOrders = async (
+  clientId: number,
   params: WooCommerceOrdersParams
 ): Promise<WooCommerceOrdersResponse> => {
   const response = await api.get<WooCommerceOrdersResponse>(
-    "/woocommerce/orders",
+    `/clients/${clientId}/woocommerce/orders`,
     { params }
   );
   return response.data;
 };
 
 export const getWooCommerceOrder = async (
+  clientId: number,
   orderId: string,
   accountId: number
 ): Promise<WooCommerceSingleOrderResponse> => {
   const response = await api.get<WooCommerceSingleOrderResponse>(
-    `/woocommerce/orders/${orderId}`,
+    `/clients/${clientId}/woocommerce/orders/${orderId}`,
     { params: { accountId } }
   );
   return response.data;
@@ -413,20 +425,22 @@ export const getWooCommerceOrder = async (
 
 // Account Info API Functions
 export const getWooCommerceAccountInfo = async (
+  clientId: number,
   accountId: number
 ): Promise<WooCommerceAccountInfoResponse> => {
   const response = await api.get<WooCommerceAccountInfoResponse>(
-    "/woocommerce/account",
+    `/clients/${clientId}/woocommerce/account`,
     { params: { accountId } }
   );
   return response.data;
 };
 
 export const getWooCommerceSyncStatus = async (
+  clientId: number,
   accountId: number
 ): Promise<WooCommerceSyncStatusResponse> => {
   const response = await api.get<WooCommerceSyncStatusResponse>(
-    "/woocommerce/sync/status",
+    `/clients/${clientId}/woocommerce/sync/status`,
     { params: { accountId } }
   );
   return response.data;
@@ -434,10 +448,11 @@ export const getWooCommerceSyncStatus = async (
 
 // Per Product Analytics with Pagination
 export const getWooCommercePerProductAnalytics = async (
+  clientId: number,
   params: WooCommercePerProductAnalyticsParams
 ): Promise<WooCommercePerProductAnalyticsResponse> => {
   const response = await api.get<WooCommercePerProductAnalyticsResponse>(
-    "/woocommerce/analytics/per-product",
+    `/clients/${clientId}/woocommerce/analytics/per-product`,
     { params }
   );
   return response.data;
@@ -445,39 +460,44 @@ export const getWooCommercePerProductAnalytics = async (
 
 // Report Draft API Functions
 export const saveWooCommerceReportDraft = async (
+  clientId: number,
   params: WooCommerceReportDraftParams
 ): Promise<WooCommerceReportDraftResponse> => {
   const response = await api.put<WooCommerceReportDraftResponse>(
-    "/woocommerce/report/draft",
+    `/clients/${clientId}/woocommerce/report/draft`,
     params
   );
   return response.data;
 };
 
 export const publishWooCommerceSnapshot = async (
+  clientId: number,
   params: WooCommerceSyncParams
 ): Promise<WooCommercePublishSnapshotResponse> => {
   const response = await api.post<WooCommercePublishSnapshotResponse>(
-    "/woocommerce/report/publish",
+    `/clients/${clientId}/woocommerce/report/publish`,
     params
   );
   return response.data;
 };
 
 export const getWooCommerceSnapshots = async (
+  clientId: number,
   accountId: number
 ): Promise<WooCommerceSnapshotsResponse> => {
   const response = await api.get<WooCommerceSnapshotsResponse>(
-    "/woocommerce/snapshots",
+    `/clients/${clientId}/woocommerce/snapshots`,
     { params: { accountId } }
   );
   return response.data;
 };
 
 // Accounts List API Function
-export const getWooCommerceAccounts = async (): Promise<WooCommerceAccountsResponse> => {
+export const getWooCommerceAccounts = async (
+  clientId: number
+): Promise<WooCommerceAccountsResponse> => {
   const response = await api.get<WooCommerceAccountsResponse>(
-    "/woocommerce/accounts"
+    `/clients/${clientId}/woocommerce/accounts`
   );
   return response.data;
 };

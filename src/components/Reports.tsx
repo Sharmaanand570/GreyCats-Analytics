@@ -10,7 +10,7 @@ import {
   listReportTemplates,
 } from "@/features/reports/api/reportingApi";
 import type { ReportTemplateSummary } from "@/features/reports/api/types";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useIntegrations } from "@/features/DataSources/hooks/useIntegrations";
 
@@ -54,6 +54,9 @@ function mapTemplateToRow(template: ReportTemplateSummary) {
 }
 
 function Reports() {
+  const { clientId } = useParams<{ clientId: string }>();
+  const parsedClientId = clientId ? parseInt(clientId) : null;
+
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
   const {
@@ -62,20 +65,29 @@ function Reports() {
     isError,
     refetch,
   } = useQuery({
-    queryKey: ["report-templates", "list"],
+    queryKey: ["report-templates", "list", parsedClientId],
     queryFn: async () => {
-      const response = await listReportTemplates();
+      if (!parsedClientId) return [];
+      const response = await listReportTemplates(parsedClientId);
       return response.templates ?? [];
     },
+    enabled: !!parsedClientId,
   });
 
   const {
     data: integrationsData,
     isLoading: isLoadingIntegrations,
-  } = useIntegrations();
+  } = useIntegrations(parsedClientId);
 
   const hasIntegrations =
     (integrationsData?.integrations?.length ?? 0) > 0;
+
+  console.log('Reports - Integration check:', {
+    clientId: parsedClientId,
+    integrationsData,
+    hasIntegrations,
+    isLoadingIntegrations,
+  });
 
   const handleCreateReportClick = () => {
     if (isLoadingIntegrations) {
@@ -84,14 +96,13 @@ function Reports() {
 
     if (!hasIntegrations) {
       toast.error(
-        "Please connect at least one data source before creating a report."
+        "You need to connect at least one data source before creating a report."
       );
       return;
     }
 
-    navigate("/reports/new");
+    navigate(`/clients/${clientId}/reports/new`);
   };
-
 
   const templates = (rawTemplates ?? []) as ReportTemplateSummary[];
 
@@ -108,7 +119,8 @@ function Reports() {
 
   const { mutate: deleteTemplate } = useMutation({
     mutationFn: async (id: number) => {
-      await deleteReportTemplate(id);
+      if (!parsedClientId) return;
+      await deleteReportTemplate(parsedClientId, id);
     },
     onSuccess: () => {
       toast.success("Report template deleted");
@@ -124,11 +136,16 @@ function Reports() {
     if (!filteredTemplates.length) return [];
     return filteredTemplates.map((template) => ({
       ...mapTemplateToRow(template),
+      link: `/clients/${parsedClientId}/reports/${template.id}`,
       onDelete: () => deleteTemplate(template.id),
     }));
   }, [filteredTemplates, deleteTemplate]);
 
   const showTable = tableRows.length > 0;
+
+  if (!parsedClientId) {
+    return <div>Loading client...</div>;
+  }
 
   return (
     <div className="w-full  h-[2000vh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 ">

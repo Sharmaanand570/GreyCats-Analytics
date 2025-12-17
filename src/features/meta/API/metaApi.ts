@@ -74,6 +74,13 @@ export type MetaCampaignInsightsResponse = {
   insights: MetaCampaignInsight[];
 };
 
+export type MetaSyncResponse = {
+  success: boolean;
+  totalCampaigns: number;
+  totalNormalized: number;
+  results: any[];
+};
+
 export type ApiErrorResponse = {
   message?: string;
   error?: string;
@@ -87,10 +94,7 @@ export type ApiErrorResponse = {
  */
 export const connectMeta = async (): Promise<MetaConnectResponse> => {
   try {
-    const response = await api.get<MetaConnectResponse>("/meta/connect", {
-      baseURL: import.meta.env.VITE_NGROK_URL,
-      headers: { "ngrok-skip-browser-warning": "true" },
-    });
+    const response = await api.get<MetaConnectResponse>("/meta/connect");
 
     return response.data;
   } catch (error) {
@@ -121,9 +125,7 @@ export const handleMetaCallback = async (
     if (params.metaUserId) queryParams.metaUserId = params.metaUserId;
 
     const response = await api.get<MetaCallbackResponse>("/meta/callback", {
-      baseURL: import.meta.env.VITE_NGROK_URL,
       params: queryParams,
-      headers: { "ngrok-skip-browser-warning": "true" },
     });
 
     return response.data;
@@ -138,11 +140,11 @@ export const handleMetaCallback = async (
 };
 
 /**
- * GET /meta/reconnect
+ * GET /clients/:clientId/meta/reconnect
  */
-export const reconnectMeta = async (): Promise<MetaReconnectResponse> => {
+export const reconnectMeta = async (clientId: number): Promise<MetaReconnectResponse> => {
   try {
-    const response = await api.get<MetaReconnectResponse>("/meta/reconnect");
+    const response = await api.get<MetaReconnectResponse>(`/clients/${clientId}/meta/reconnect`);
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
@@ -155,11 +157,11 @@ export const reconnectMeta = async (): Promise<MetaReconnectResponse> => {
 };
 
 /**
- * POST /meta/disconnect
+ * POST /clients/:clientId/meta/disconnect
  */
-export const disconnectMeta = async (): Promise<MetaDisconnectResponse> => {
+export const disconnectMeta = async (clientId: number): Promise<MetaDisconnectResponse> => {
   try {
-    const response = await api.post<MetaDisconnectResponse>("/meta/disconnect");
+    const response = await api.post<MetaDisconnectResponse>(`/clients/${clientId}/meta/disconnect`);
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
@@ -172,11 +174,11 @@ export const disconnectMeta = async (): Promise<MetaDisconnectResponse> => {
 };
 
 /**
- * GET /meta/accounts
+ * GET /clients/:clientId/meta/accounts
  */
-export const getMetaAccounts = async (): Promise<MetaAccountsResponse> => {
+export const getMetaAccounts = async (clientId: number): Promise<MetaAccountsResponse> => {
   try {
-    const response = await api.get<MetaAccountsResponse>("/meta/accounts");
+    const response = await api.get<MetaAccountsResponse>(`/clients/${clientId}/meta/accounts`);
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
@@ -189,13 +191,14 @@ export const getMetaAccounts = async (): Promise<MetaAccountsResponse> => {
 };
 
 /**
- * GET /meta/campaigns?accountId=xxx
+ * GET /clients/:clientId/meta/campaigns?accountId=xxx
  */
 export const getMetaCampaigns = async (
+  clientId: number,
   accountId: string
 ): Promise<MetaCampaignsResponse> => {
   try {
-    const response = await api.get<MetaCampaignsResponse>("/meta/campaigns", {
+    const response = await api.get<MetaCampaignsResponse>(`/clients/${clientId}/meta/campaigns`, {
       params: { accountId },
     });
     return response.data;
@@ -210,14 +213,15 @@ export const getMetaCampaigns = async (
 };
 
 /**
- * GET /meta/insights?campaignId=xxx
+ * GET /clients/:clientId/meta/insights?campaignId=xxx
  */
 export const getMetaInsights = async (
+  clientId: number,
   campaignId: string
 ): Promise<MetaCampaignInsightsResponse> => {
   try {
     const response = await api.get<MetaCampaignInsightsResponse>(
-      "/meta/insights",
+      `/clients/${clientId}/meta/insights`,
       { params: { campaignId } }
     );
     return response.data;
@@ -231,3 +235,25 @@ export const getMetaInsights = async (
   }
 };
 
+/**
+ * POST /clients/:clientId/meta/sync/:accountId
+ * Sync Meta Ads campaigns and insights for an account
+ */
+export const syncMetaAds = async (
+  clientId: number,
+  accountId: string
+): Promise<MetaSyncResponse> => {
+  try {
+    const response = await api.post<MetaSyncResponse>(
+      `/clients/${clientId}/meta/sync/${accountId}`
+    );
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+        axiosError.response?.data?.error ||
+        "Failed to sync Meta Ads data"
+    );
+  }
+};

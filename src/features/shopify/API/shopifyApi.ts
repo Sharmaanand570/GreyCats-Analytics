@@ -184,11 +184,9 @@ export const connectShopify = async (
 ): Promise<ShopifyConnectResponse> => {
   try {
     const response = await api.get<ShopifyConnectResponse>("/shopify/connect", {
-      baseURL: import.meta.env.VITE_NGROK_URL,
       params: {
         shop: params.shop,
       },
-      headers: { "ngrok-skip-browser-warning": "true" },
     });
 
     return response.data;
@@ -207,12 +205,10 @@ export const handleShopifyCallback = async (
     const response = await api.get<ShopifyCallbackResponse>(
       "/shopify/callback",
       {
-        baseURL: import.meta.env.VITE_NGROK_URL,
         params: {
           shop: params.shop,
           status: params.status,
         },
-        headers: { "ngrok-skip-browser-warning": "true" },
       }
     );
     return response.data;
@@ -221,9 +217,9 @@ export const handleShopifyCallback = async (
   }
 };
 
-export const syncShopifyProducts = async (): Promise<ShopifySyncResponse> => {
+export const syncShopifyProducts = async (clientId: number): Promise<ShopifySyncResponse> => {
   try {
-    const response = await api.get<ShopifySyncResponse>("/shopify/sync");
+    const response = await api.get<ShopifySyncResponse>(`/clients/${clientId}/shopify/sync`);
     return response.data;
   } catch (error) {
     return handleApiError(error, "Failed to sync Shopify products");
@@ -231,11 +227,12 @@ export const syncShopifyProducts = async (): Promise<ShopifySyncResponse> => {
 };
 
 export const getShopifyProductsList = async (
+  clientId: number,
   params?: ShopifyProductListParams
 ): Promise<ShopifyProductListResponse> => {
   try {
     const response = await api.get<ShopifyProductListResponse>(
-      "/shopify/products/list",
+      `/clients/${clientId}/shopify/products/list`,
       { params }
     );
     return response.data;
@@ -245,11 +242,12 @@ export const getShopifyProductsList = async (
 };
 
 export const getShopifyProduct = async (
+  clientId: number,
   productId: string
 ): Promise<ShopifySingleProductResponse> => {
   try {
     const response = await api.get<ShopifySingleProductResponse>(
-      `/shopify/products/${productId}`
+      `/clients/${clientId}/shopify/products/${productId}`
     );
     return response.data;
   } catch (error) {
@@ -258,11 +256,12 @@ export const getShopifyProduct = async (
 };
 
 export const getShopifyOrdersList = async (
+  clientId: number,
   params?: ShopifyOrderListParams
 ): Promise<ShopifyOrderListResponse> => {
   try {
     const response = await api.get<ShopifyOrderListResponse>(
-      "/shopify/orders/list",
+      `/clients/${clientId}/shopify/orders/list`,
       { params }
     );
     return response.data;
@@ -272,11 +271,12 @@ export const getShopifyOrdersList = async (
 };
 
 export const getShopifyOrder = async (
+  clientId: number,
   orderId: string
 ): Promise<ShopifySingleOrderResponse> => {
   try {
     const response = await api.get<ShopifySingleOrderResponse>(
-      `/shopify/orders/${orderId}`
+      `/clients/${clientId}/shopify/orders/${orderId}`
     );
     return response.data;
   } catch (error) {
@@ -284,10 +284,12 @@ export const getShopifyOrder = async (
   }
 };
 
-export const getShopifyOrderAnalytics = async (): Promise<ShopifyOrderAnalyticsResponse> => {
+export const getShopifyOrderAnalytics = async (
+  clientId: number
+): Promise<ShopifyOrderAnalyticsResponse> => {
   try {
     const response = await api.get<ShopifyOrderAnalyticsResponse>(
-      "/shopify/analytics/orders"
+      `/clients/${clientId}/shopify/analytics/orders`
     );
     return response.data;
   } catch (error) {
@@ -295,10 +297,12 @@ export const getShopifyOrderAnalytics = async (): Promise<ShopifyOrderAnalyticsR
   }
 };
 
-export const getShopifyRevenueTrend = async (): Promise<ShopifyRevenueTrendResponse> => {
+export const getShopifyRevenueTrend = async (
+  clientId: number
+): Promise<ShopifyRevenueTrendResponse> => {
   try {
     const response = await api.get<ShopifyRevenueTrendResponse>(
-      "/shopify/analytics/revenue"
+      `/clients/${clientId}/shopify/analytics/revenue`
     );
     return response.data;
   } catch (error) {
@@ -306,10 +310,10 @@ export const getShopifyRevenueTrend = async (): Promise<ShopifyRevenueTrendRespo
   }
 };
 
-export const disconnectShopify = async (): Promise<ShopifyDisconnectResponse> => {
+export const disconnectShopify = async (clientId: number): Promise<ShopifyDisconnectResponse> => {
   try {
     const response = await api.post<ShopifyDisconnectResponse>(
-      "/shopify/disconnect"
+      `/clients/${clientId}/shopify/disconnect`
     );
     return response.data;
   } catch (error) {
@@ -317,10 +321,10 @@ export const disconnectShopify = async (): Promise<ShopifyDisconnectResponse> =>
   }
 };
 
-export const deleteShopifyAccount = async (): Promise<ShopifyDeleteResponse> => {
+export const deleteShopifyAccount = async (clientId: number): Promise<ShopifyDeleteResponse> => {
   try {
     const response = await api.delete<ShopifyDeleteResponse>(
-      "/shopify/delete"
+      `/clients/${clientId}/shopify/delete`
     );
     return response.data;
   } catch (error) {
@@ -329,11 +333,12 @@ export const deleteShopifyAccount = async (): Promise<ShopifyDeleteResponse> => 
 };
 
 export const reconnectShopify = async (
+  clientId: number,
   params: ShopifyConnectParams
 ): Promise<ShopifyReconnectResponse> => {
   try {
     const response = await api.get<ShopifyReconnectResponse>(
-      "/shopify/reconnect",
+      `/clients/${clientId}/shopify/reconnect`,
       { params: { shop: params.shop } }
     );
     return response.data;

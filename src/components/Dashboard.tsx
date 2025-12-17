@@ -125,7 +125,7 @@ const createDashboardWidgetsFromMetrics = (
   for (const integration of Object.keys(groupedMetrics)) {
     for (const accountId of Object.keys(groupedMetrics[integration])) {
       const metrics = groupedMetrics[integration][accountId];
-      
+
       for (const metric of metrics.slice(0, 4 - widgets.length)) {
         widgets.push({
           id: `dw${widgetId++}`,
@@ -137,7 +137,7 @@ const createDashboardWidgetsFromMetrics = (
           type: "metric_card",
         });
       }
-      
+
       if (widgets.length >= 4) break;
     }
     if (widgets.length >= 4) break;
@@ -146,7 +146,7 @@ const createDashboardWidgetsFromMetrics = (
   // Add chart widgets if we have at least one metric
   if (widgets.length > 0) {
     const firstMetric = widgets[0];
-    
+
     // Line chart
     widgets.push({
       id: `dw${widgetId++}`,
@@ -192,27 +192,42 @@ const DashboardEmptyState = ({
   </div>
 );
 
-function Dashboard() {
+interface DashboardProps {
+  clientId?: number;
+  onConnectIntegration?: () => void;
+  withLayout?: boolean;
+  hideHeader?: boolean;
+}
+
+function Dashboard({ clientId, onConnectIntegration, withLayout = true, hideHeader = false }: DashboardProps) {
   const navigate = useNavigate();
   const [dateRange] = useState(getDefaultDateRange());
-  
-  const { groupedMetrics } = useAvailableMetrics();
+
+  const { groupedMetrics } = useAvailableMetrics(clientId);
 
   const handleConnectIntegration = useCallback(() => {
-    navigate("/data-sources");
-  }, [navigate]);
+    if (onConnectIntegration) {
+      onConnectIntegration();
+    } else {
+      navigate(`/clients/${clientId}?tab=data-sources`);
+    }
+  }, [navigate, clientId, onConnectIntegration]);
 
   const dashboardsQuery = useQuery<DashboardModel[], ApiError>({
-    queryKey: ["dashboards"],
+    queryKey: ["dashboards", clientId],
     queryFn: async () => {
-      const response = await listDashboards();
+      if (!clientId) return [];
+      const response = await listDashboards(clientId);
       return response.dashboards;
     },
+    enabled: !!clientId,
   });
 
   useEffect(() => {
     if (dashboardsQuery.error) {
-      toast.error(dashboardsQuery.error.message || "Failed to load dashboards");
+      toast.error(
+        dashboardsQuery.error.message || "Failed to load dashboards"
+      );
     }
   }, [dashboardsQuery.error]);
 
@@ -232,13 +247,13 @@ function Dashboard() {
         }));
       }
     }
-    
+
     // If we have connected integrations with metrics, create dynamic widgets
     if (Object.keys(groupedMetrics).length > 0) {
       return createDashboardWidgetsFromMetrics(groupedMetrics);
     }
-    
-    // Otherwise fall back to hardcoded defaults
+
+    // Otherwise fall back to hardcoded defaults (NOTE: these might show empty data if not configured for this client)
     return getDefaultDashboardWidgets();
   }, [activeDashboard, groupedMetrics]);
 
@@ -246,13 +261,20 @@ function Dashboard() {
     dateRange.to,
     "yyyy-MM-dd"
   )}`;
-  const widgetSignature = dashboardWidgets.map((widget) => widget.id).join("|");
+  const widgetSignature = dashboardWidgets
+    .map((widget) => widget.id)
+    .join("|");
 
   const resolveQuery = useQuery<ResolveWidgetsResponse, ApiError>({
-    queryKey: ["dashboard-widget-data", widgetSignature, dateRangeKey],
-    enabled: dashboardWidgets.length > 0,
+    queryKey: [
+      "dashboard-widget-data",
+      clientId,
+      widgetSignature,
+      dateRangeKey,
+    ],
+    enabled: !!clientId && dashboardWidgets.length > 0,
     queryFn: async () => {
-      const response = await resolveMetricWidgets({
+      const response = await resolveMetricWidgets(clientId, {
         dateFrom: format(dateRange.from, "yyyy-MM-dd"),
         dateTo: format(dateRange.to, "yyyy-MM-dd"),
         widgets: dashboardWidgets.map((widget) => ({
@@ -349,10 +371,10 @@ function Dashboard() {
     );
   };
 
-  return (
-    <div className="w-full h-[2000vh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 ">
-      <div className="w-full  rounded-l-2xl overflow-hidden h-full   my-4 bg-background ">
-        {/* Header */}
+  const content = (
+    <>
+      {/* Header */}
+      {!hideHeader && (
         <div className="w-full h-[4.8em] bg-background border-b flex justify-between items-center px-4 sm:px-5">
           <span className="font-medium text-lg sm:text-xl">Dashboard</span>
           <div className="flex items-center gap-3 sm:gap-4">
@@ -371,112 +393,137 @@ function Dashboard() {
             </ToolTipComponenet>
           </div>
         </div>
-        {/* Stats Cards */}
-        <div className="w-full flex flex-wrap gap-3 sm:gap-4 px-3 sm:px-5 py-4">
-          {metricCards.map(renderMetricCard)}
+      )}
+      {hideHeader && (
+        <div className="w-full flex justify-end px-3 sm:px-5 py-2">
+          <Link to={"/edit-dashboard"}>
+            <Button variant="outline" size="sm" className="text-xs">
+              Edit Dashboard
+            </Button>
+          </Link>
         </div>
+      )}
+      {/* Stats Cards */}
+      <div className="w-full flex flex-wrap gap-3 sm:gap-4 px-3 sm:px-5 py-4">
+        {metricCards.map(renderMetricCard)}
+      </div>
 
-        {/* Charts Section */}
-        <div className="w-full px-3 sm:px-5 pb-6 flex flex-col lg:flex-row gap-6">
-          {/* Line Chart */}
-          <div className="w-full lg:w-2/3  rounded-2xl border p-3 sm:p-4 flex flex-col gap-3">
-            <div className="flex justify-between items-center">
-              <div>
-                <span className="text-xs uppercase text-gray-500">
-                  {lineChartWidget?.metricKey ?? "Chart"}
-                </span>
-                <p className="text-base font-semibold text-gray-900">
-                  {lineChartWidget?.integration ?? "Unified Metrics"}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {format(dateRange.from, "MMM d")} - {format(dateRange.to, "MMM d")}
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleConnectIntegration}
-              >
-                Connect Integration
-              </Button>
+      {/* Charts Section */}
+      <div className="w-full px-3 sm:px-5 pb-6 flex flex-col lg:flex-row gap-6">
+        {/* Line Chart */}
+        <div className="w-full lg:w-2/3  rounded-2xl border p-3 sm:p-4 flex flex-col gap-3">
+          <div className="flex justify-between items-center">
+            <div>
+              <span className="text-xs uppercase text-gray-500">
+                {lineChartWidget?.metricKey ?? "Chart"}
+              </span>
+              <p className="text-base font-semibold text-gray-900">
+                {lineChartWidget?.integration ?? "Unified Metrics"}
+              </p>
+              <p className="text-xs text-gray-500">
+                {format(dateRange.from, "MMM d")} - {format(dateRange.to, "MMM d")}
+              </p>
             </div>
-            <ChartLineMultiple />
-            <div className="border-t pt-3">
-              {hasWidgetData(resolvedWidgets[lineChartWidget?.id ?? ""]) ? (
-                <ul className="text-sm text-gray-700 space-y-1">
-                  {(
-                    (resolvedWidgets[lineChartWidget?.id ?? ""]?.series ??
-                      []) as WidgetSeriesPoint[]
-                  )
-                    .slice(0, 5)
-                    .map((point, idx) => (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleConnectIntegration}
+            >
+              Connect Integration
+            </Button>
+          </div>
+          <ChartLineMultiple />
+          <div className="border-t pt-3">
+            {hasWidgetData(resolvedWidgets[lineChartWidget?.id ?? ""]) ? (
+              <ul className="text-sm text-gray-700 space-y-1">
+                {(
+                  (resolvedWidgets[lineChartWidget?.id ?? ""]?.series ??
+                    []) as WidgetSeriesPoint[]
+                )
+                  .slice(0, 5)
+                  .map((point, idx) => (
                     <li key={`${point.x}-${idx}`} className="flex justify-between">
                       <span>{point.x}</span>
                       <span className="font-medium">{point.y}</span>
                     </li>
                   ))}
-                </ul>
-              ) : (
-                <DashboardEmptyState
-                  message={
-                    isResolving
-                      ? "Fetching chart data..."
-                      : "No chart data yet"
-                  }
-                  onConnectIntegration={handleConnectIntegration}
-                />
-              )}
-            </div>
+              </ul>
+            ) : (
+              <DashboardEmptyState
+                message={
+                  isResolving
+                    ? "Fetching chart data..."
+                    : "No chart data yet"
+                }
+                onConnectIntegration={handleConnectIntegration}
+              />
+            )}
           </div>
+        </div>
 
-          {/* Pie Chart */}
-          <div className="w-full lg:w-1/3  rounded-2xl border p-3 sm:p-4 flex flex-col gap-3">
-            <div className="flex justify-between items-center">
-              <div>
-                <span className="text-xs uppercase text-gray-500">
-                  {pieChartWidget?.metricKey ?? "Breakdown"}
-                </span>
-                <p className="text-base font-semibold text-gray-900">
-                  {pieChartWidget?.integration ?? "Unified Metrics"}
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleConnectIntegration}
-              >
-                Connect Integration
-              </Button>
+        {/* Pie Chart */}
+        <div className="w-full lg:w-1/3  rounded-2xl border p-3 sm:p-4 flex flex-col gap-3">
+          <div className="flex justify-between items-center">
+            <div>
+              <span className="text-xs uppercase text-gray-500">
+                {pieChartWidget?.metricKey ?? "Breakdown"}
+              </span>
+              <p className="text-base font-semibold text-gray-900">
+                {pieChartWidget?.integration ?? "Unified Metrics"}
+              </p>
             </div>
-            <ChartPieInteractive />
-            <div className="border-t pt-3">
-              {hasWidgetData(resolvedWidgets[pieChartWidget?.id ?? ""]) ? (
-                <ul className="text-sm text-gray-700 space-y-1">
-                  {(
-                    (resolvedWidgets[pieChartWidget?.id ?? ""]?.series ?? []) as
-                      | WidgetSeriesPoint[]
-                  )
-                    .slice(0, 5)
-                    .map((point, idx) => (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleConnectIntegration}
+            >
+              Connect Integration
+            </Button>
+          </div>
+          <ChartPieInteractive />
+          <div className="border-t pt-3">
+            {hasWidgetData(resolvedWidgets[pieChartWidget?.id ?? ""]) ? (
+              <ul className="text-sm text-gray-700 space-y-1">
+                {(
+                  (resolvedWidgets[pieChartWidget?.id ?? ""]?.series ?? []) as
+                  | WidgetSeriesPoint[]
+                )
+                  .slice(0, 5)
+                  .map((point, idx) => (
                     <li key={`${point.x}-${idx}`} className="flex justify-between">
                       <span>{point.x}</span>
                       <span className="font-medium">{point.y}</span>
                     </li>
                   ))}
-                </ul>
-              ) : (
-                <DashboardEmptyState
-                  message={
-                    isResolving
-                      ? "Fetching widget data..."
-                      : "No breakdown data yet"
-                  }
-                  onConnectIntegration={handleConnectIntegration}
-                />
-              )}
-            </div>
+              </ul>
+            ) : (
+              <DashboardEmptyState
+                message={
+                  isResolving
+                    ? "Fetching widget data..."
+                    : "No breakdown data yet"
+                }
+                onConnectIntegration={handleConnectIntegration}
+              />
+            )}
           </div>
         </div>
+      </div>
+    </>
+  );
+
+  if (!withLayout) {
+    return (
+      <div className="w-full flex flex-col">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-[2000vh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 ">
+      <div className="w-full  rounded-l-2xl overflow-hidden h-full   my-4 bg-background ">
+        {content}
       </div>
     </div>
   );

@@ -25,6 +25,7 @@ type IntegrationRow = {
   identifier: string;
   clientsConnected: number;
   status: string;
+  onDisconnect?: () => void;
 };
 
 type ReportRow = {
@@ -41,7 +42,10 @@ type ReportRow = {
   awaitingApproval: boolean;
   lastSentStatus: string;
   // Optional action handler for deleting a report/template (used on Reports page)
+  // Optional action handler for deleting a report/template (used on Reports page)
   onDelete?: () => void;
+  // Optional link for the report name
+  link?: string;
 };
 
 type AlertRow = {
@@ -92,8 +96,8 @@ function TableComponent({ header, bodyData }: TableType) {
     }
     const IconComponent = icon as IconType;
     return (
-      <IconComponent 
-        className="w-5 h-5" 
+      <IconComponent
+        className="w-5 h-5"
         style={color ? { color } : undefined}
       />
     );
@@ -138,9 +142,8 @@ function TableComponent({ header, bodyData }: TableType) {
               {header.map((h, i) => (
                 <th
                   key={h}
-                  className={`${
-                    i === 0 ? "pl-6" : "pl-2"
-                  } pr-6 py-3 font-medium text-sm text-gray-500 whitespace-nowrap`}
+                  className={`${i === 0 ? "pl-6" : "pl-2"
+                    } pr-6 py-3 font-medium text-sm text-gray-500 whitespace-nowrap`}
                 >
                   {h}
                 </th>
@@ -176,6 +179,20 @@ function TableComponent({ header, bodyData }: TableType) {
                       {row.clientsConnected}
                     </td>
                     <td>{renderStatusChip(row.status)}</td>
+                    {row.onDisconnect && (
+                      <td className="pl-2 pr-6 text-sm text-right whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            row.onDisconnect?.();
+                          }}
+                          className="text-red-500 hover:text-red-700 text-sm font-medium"
+                        >
+                          Disconnect
+                        </button>
+                      </td>
+                    )}
                   </>
                 )}
 
@@ -237,7 +254,7 @@ function TableComponent({ header, bodyData }: TableType) {
                     <td className="pl-6 pr-6 text-sm font-medium text-gray-700 whitespace-nowrap">
                       {row.id ? (
                         <Link
-                        to={`/reports/${row.id}`}
+                          to={row.link || `/reports/${row.id}`}
                           className="text-accent-foreground hover:underline"
                         >
                           {row.name}
@@ -267,27 +284,27 @@ function TableComponent({ header, bodyData }: TableType) {
                     <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
                       {row.lastSent}
                     </td>
-                <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
-                  {row.nextSendDate}
-                </td>
-                <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
-                  {row.awaitingApproval ? "Yes" : "No"}
-                </td>
-                <td>{renderStatusChip(row.lastSentStatus)}</td>
-                {row.onDelete && (
-                  <td className="pl-2 pr-6 text-sm text-right whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        row.onDelete?.();
-                      }}
-                      className="text-red-500 hover:text-red-700 text-sm font-medium"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                )}
+                    <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
+                      {row.nextSendDate}
+                    </td>
+                    <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
+                      {row.awaitingApproval ? "Yes" : "No"}
+                    </td>
+                    <td>{renderStatusChip(row.lastSentStatus)}</td>
+                    {row.onDelete && (
+                      <td className="pl-2 pr-6 text-sm text-right whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            row.onDelete?.();
+                          }}
+                          className="text-red-500 hover:text-red-700 text-sm font-medium"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    )}
                   </>
                 )}
 

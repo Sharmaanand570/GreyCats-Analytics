@@ -160,10 +160,7 @@ export type ApiErrorResponse = {
  */
 export const connectYouTube = async (): Promise<YouTubeConnectResponse> => {
   try {
-    const response = await api.get<YouTubeConnectResponse>("/youtube/connect",{
-      baseURL:import.meta.env.VITE_NGROK_URL,
-      headers: { "ngrok-skip-browser-warning": "true" },
-    });
+    const response = await api.get<YouTubeConnectResponse>("/youtube/connect");
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
@@ -183,15 +180,12 @@ export const handleYouTubeCallback = async (
   params: YouTubeCallbackParams
 ): Promise<YouTubeCallbackResponse> => {
   try {
-    const response = await api.get<YouTubeCallbackResponse>(
-      "/youtube/callback",
-      {
-        params: {
-          code: params.code,
-          state: params.state,
-        },
-      }
-    );
+    const response = await api.get<YouTubeCallbackResponse>("/youtube/callback", {
+      params: {
+        code: params.code,
+        state: params.state,
+      },
+    });
 
     return response.data;
   } catch (error) {
@@ -206,11 +200,15 @@ export const handleYouTubeCallback = async (
 
 /**
  * STEP 3: Get YouTube channel information
- * GET /youtube/channel
+ * GET /clients/:clientId/youtube/channel
  */
-export const getYouTubeChannel = async (): Promise<YouTubeChannelResponse> => {
+export const getYouTubeChannel = async (
+  clientId: number
+): Promise<YouTubeChannelResponse> => {
   try {
-    const response = await api.get<YouTubeChannelResponse>("/youtube/channel");
+    const response = await api.get<YouTubeChannelResponse>(
+      `/clients/${clientId}/youtube/channel`
+    );
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
@@ -224,11 +222,15 @@ export const getYouTubeChannel = async (): Promise<YouTubeChannelResponse> => {
 
 /**
  * STEP 4: Manual sync for YouTube data
- * POST /youtube/sync
+ * POST /clients/:clientId/youtube/sync
  */
-export const syncYouTube = async (): Promise<YouTubeSyncResponse> => {
+export const syncYouTube = async (
+  clientId: number
+): Promise<YouTubeSyncResponse> => {
   try {
-    const response = await api.post<YouTubeSyncResponse>("/youtube/sync");
+    const response = await api.post<YouTubeSyncResponse>(
+      `/clients/${clientId}/youtube/sync`
+    );
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
@@ -242,19 +244,23 @@ export const syncYouTube = async (): Promise<YouTubeSyncResponse> => {
 
 /**
  * STEP 5: Get paginated videos list
- * GET /youtube/videos?page=1&pageSize=20&q=searchText
+ * GET /clients/:clientId/youtube/videos
  */
 export const getYouTubeVideos = async (
+  clientId: number,
   params?: YouTubeVideosParams
 ): Promise<YouTubeVideosResponse> => {
   try {
-    const response = await api.get<YouTubeVideosResponse>("/youtube/videos", {
-      params: {
-        page: params?.page || 1,
-        pageSize: params?.pageSize || 20,
-        search: params?.search || "",
-      },
-    });
+    const response = await api.get<YouTubeVideosResponse>(
+      `/clients/${clientId}/youtube/videos`,
+      {
+        params: {
+          page: params?.page || 1,
+          pageSize: params?.pageSize || 20,
+          search: params?.search || "",
+        },
+      }
+    );
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
@@ -268,14 +274,15 @@ export const getYouTubeVideos = async (
 
 /**
  * STEP 6: Get analytics summary
- * GET /youtube/analytics?from=2024-01-01&to=2024-02-20
+ * GET /clients/:clientId/youtube/analytics
  */
 export const getYouTubeAnalytics = async (
+  clientId: number,
   params: YouTubeAnalyticsParams
 ): Promise<YouTubeAnalyticsResponse> => {
   try {
     const response = await api.get<YouTubeAnalyticsResponse>(
-      "/youtube/analytics",
+      `/clients/${clientId}/youtube/analytics`,
       {
         params: {
           from: params.from,
@@ -296,14 +303,15 @@ export const getYouTubeAnalytics = async (
 
 /**
  * STEP 7: Get per-video analytics
- * GET /youtube/analytics/per-video?videoId=xxx&from=...&to=...
+ * GET /clients/:clientId/youtube/analytics/per-video
  */
 export const getYouTubePerVideoAnalytics = async (
+  clientId: number,
   params: YouTubePerVideoAnalyticsParams
 ): Promise<YouTubePerVideoAnalyticsResponse> => {
   try {
     const response = await api.get<YouTubePerVideoAnalyticsResponse>(
-      "/youtube/analytics/per-video",
+      `/clients/${clientId}/youtube/analytics/per-video`,
       {
         params: {
           videoId: params.videoId,
@@ -325,12 +333,14 @@ export const getYouTubePerVideoAnalytics = async (
 
 /**
  * STEP 8: Generate reconnect URL
- * GET /youtube/reconnect
+ * GET /clients/:clientId/youtube/reconnect
  */
-export const reconnectYouTube = async (): Promise<YouTubeReconnectResponse> => {
+export const reconnectYouTube = async (
+  clientId: number
+): Promise<YouTubeReconnectResponse> => {
   try {
     const response = await api.get<YouTubeReconnectResponse>(
-      "/youtube/reconnect"
+      `/clients/${clientId}/youtube/reconnect`
     );
     return response.data;
   } catch (error) {
@@ -345,12 +355,14 @@ export const reconnectYouTube = async (): Promise<YouTubeReconnectResponse> => {
 
 /**
  * STEP 9: Disconnect YouTube integration
- * POST /youtube/disconnect
+ * POST /clients/:clientId/youtube/disconnect
  */
-export const disconnectYouTube = async (): Promise<YouTubeDisconnectResponse> => {
+export const disconnectYouTube = async (
+  clientId: number
+): Promise<YouTubeDisconnectResponse> => {
   try {
     const response = await api.post<YouTubeDisconnectResponse>(
-      "/youtube/disconnect"
+      `/clients/${clientId}/youtube/disconnect`
     );
     return response.data;
   } catch (error) {

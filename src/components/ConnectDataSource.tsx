@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { IconType } from "react-icons";
-import { FaFacebook, FaGoogle, FaYoutube } from "react-icons/fa6";
+import { FaGoogle, FaYoutube } from "react-icons/fa6";
 import React from "react";
 import { useYouTubeConnect } from "@/features/YouTube/hooks/useYouTubeConnect";
 import { toast } from "sonner";
@@ -24,11 +24,14 @@ import { useMetaConnect } from "@/features/meta/hooks/useMetaConnect";
 import { useMetaBusinessConnect } from "@/features/meta/hooks/useMetaBusinessData";
 import { useQueryClient } from "@tanstack/react-query";
 import { getPlatformConfig } from "@/utils/platformMapping";
+import { assignAccountToClient } from "@/api/integrationApi";
 
 
 type ConnectDataSourceType = {
   children: React.ReactNode;
+  clientId?: number;
 };
+
 
 type DataSourceOption = {
   id: string | number;
@@ -91,6 +94,7 @@ const dataSourceOptions: DataSourceOption[] = [
 
 function ConnectDataSource({
   children,
+  clientId,
 }: ConnectDataSourceType): React.JSX.Element {
   const [open, setOpen] = React.useState(false);
   const [Next, setNext] = React.useState<string | null>(null);
@@ -153,13 +157,21 @@ function ConnectDataSource({
     toast: any
   ) {
     try {
+      if (!clientId) {
+        toast.error("Client context is missing");
+        return;
+      }
       const response = await connectWooCommerce({
-        storeUrl: payload.storeUrl,
-        consumerKey: payload.consumerKey,
-        consumerSecret: payload.consumerSecret,
+        params: {
+          storeUrl: payload.storeUrl,
+          consumerKey: payload.consumerKey,
+          consumerSecret: payload.consumerSecret,
+        }
       });
 
-      if (response.success) {
+      if (response.success && response.account) {
+        // Now assign it to the client
+        await assignAccountToClient(clientId, 'woocommerce', response.account.id);
         toast.success("WooCommerce connected successfully");
         setNext(null);
         setOpen(false);
@@ -167,8 +179,11 @@ function ConnectDataSource({
         toast.error(response.message || "Failed to connect WooCommerce");
       }
 
-      // Refetch integrations
+      // Refetch integrations and client details
       queryClient.invalidateQueries({ queryKey: ["integrations"] });
+      if (clientId) {
+        queryClient.invalidateQueries({ queryKey: ["client", clientId] });
+      }
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error
@@ -267,6 +282,10 @@ function ConnectDataSource({
                       try {
                         const response = await connectYouTube();
                         if (response.success && response.url) {
+                          if (clientId) {
+                            localStorage.setItem("pending_oauth_client_id", clientId.toString());
+                            localStorage.setItem("pending_oauth_integration", "youtube");
+                          }
                           window.location.href = response.url;
                         }
                       } catch (error) {
@@ -281,6 +300,10 @@ function ConnectDataSource({
                         const response = await connectGoogle();
                         console.log(response);
                         if (response.success && response.url) {
+                          if (clientId) {
+                            localStorage.setItem("pending_oauth_client_id", clientId.toString());
+                            localStorage.setItem("pending_oauth_integration", "google-analytics");
+                          }
                           window.location.href = response.url;
                         }
                       } catch (error) {
@@ -294,6 +317,10 @@ function ConnectDataSource({
                       try {
                         const response = await connectGoogleConsole();
                         if (response.success && response.url) {
+                          if (clientId) {
+                            localStorage.setItem("pending_oauth_client_id", clientId.toString());
+                            localStorage.setItem("pending_oauth_integration", "google-search-console");
+                          }
                           window.location.href = response.url;
                         }
                       } catch (error) {
@@ -311,6 +338,10 @@ function ConnectDataSource({
                       try {
                         const response = await connectMeta({});
                         if (response.success && response.url) {
+                          if (clientId) {
+                            localStorage.setItem("pending_oauth_client_id", clientId.toString());
+                            localStorage.setItem("pending_oauth_integration", "meta-ads");
+                          }
                           window.location.href = response.url;
                         } else {
                           toast.error("Failed to initiate Meta connection");
@@ -326,6 +357,14 @@ function ConnectDataSource({
                     } else if (SelectedSource.id === "meta-business") {
                       try {
                         await connectMetaBusiness();
+                        if (clientId) {
+                          // Meta Business hook might handle redirect immediately, 
+                          // but if it returns a URL or promise, we should set state there.
+                          // Assuming the hook handles it or we need to look into it. 
+                          // For now, setting it here safety.
+                          localStorage.setItem("pending_oauth_client_id", clientId.toString());
+                          localStorage.setItem("pending_oauth_integration", "meta-business");
+                        }
                         // The hook handles redirection or toast on error
                       } catch (error) {
                         console.error(error);
@@ -505,6 +544,10 @@ function ConnectDataSource({
                       });
 
                       if (response.success && response.url) {
+                        if (clientId) {
+                          localStorage.setItem("pending_oauth_client_id", clientId.toString());
+                          localStorage.setItem("pending_oauth_integration", "shopify");
+                        }
                         window.location.href = response.url;
                       }
 

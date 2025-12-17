@@ -197,14 +197,17 @@ const handleMetaInsightsError = (
 // ==================== API FUNCTIONS ====================
 
 
-export const getFacebookPages = async (params?: {
-  limit?: number;
-  after?: string;
-  search?: string;
-}): Promise<FacebookPagesResponse> => {
+export const getFacebookPages = async (
+  clientId: number,
+  params?: {
+    limit?: number;
+    after?: string;
+    search?: string;
+  }
+): Promise<FacebookPagesResponse> => {
   try {
     const response = await api.get<FacebookPagesResponse>(
-      "/meta-insights/facebook/pages",
+      `/clients/${clientId}/meta-insights/facebook/pages`,
       { params }
     );
     return response.data;
@@ -214,11 +217,12 @@ export const getFacebookPages = async (params?: {
 };
 
 export const getFacebookPageToken = async (
+  clientId: number,
   pageId: string
 ): Promise<FacebookPageTokenResponse> => {
   try {
     const response = await api.get<FacebookPageTokenResponse>(
-      "/meta-insights/facebook/page-token",
+      `/clients/${clientId}/meta-insights/facebook/page-token`,
       { params: { pageId } }
     );
     return response.data;
@@ -231,11 +235,12 @@ export const getFacebookPageToken = async (
 };
 
 export const getFacebookPageInfo = async (
+  clientId: number,
   pageId: string
 ): Promise<FacebookPageInfoResponse> => {
   try {
     const response = await api.get<FacebookPageInfoResponse>(
-      "/meta-insights/facebook/page-info",
+      `/clients/${clientId}/meta-insights/facebook/page-info`,
       { params: { pageId } }
     );
     return response.data;
@@ -245,12 +250,13 @@ export const getFacebookPageInfo = async (
 };
 
 export const getFacebookPagePosts = async (
+  clientId: number,
   pageId: string,
   limit?: number
 ): Promise<FacebookPagePostsResponse> => {
   try {
     const response = await api.get<FacebookPagePostsResponse>(
-      "/meta-insights/facebook/page-posts",
+      `/clients/${clientId}/meta-insights/facebook/page-posts`,
       { params: { pageId, limit } }
     );
     return response.data;
@@ -263,12 +269,13 @@ export const getFacebookPagePosts = async (
 };
 
 export const getFacebookPostInsights = async (
+  clientId: number,
   postId: string,
   pageId: string
 ): Promise<FacebookPostInsightsResponse> => {
   try {
     const response = await api.get<FacebookPostInsightsResponse>(
-      "/meta-insights/facebook/post-insights",
+      `/clients/${clientId}/meta-insights/facebook/post-insights`,
       { params: { postId, pageId } }
     );
     console.log("✅ Facebook Post Insights Response:", response.data);
@@ -283,11 +290,12 @@ export const getFacebookPostInsights = async (
 };
 
 export const syncFacebookInsights = async (
+  clientId: number,
   body: FacebookSyncBody
 ): Promise<FacebookSyncResponse> => {
   try {
     const response = await api.post<FacebookSyncResponse>(
-      "/meta-insights/facebook/sync",
+      `/clients/${clientId}/meta-insights/facebook/sync`,
       body
     );
     return response.data;
@@ -300,11 +308,12 @@ export const syncFacebookInsights = async (
 };
 
 export const getInstagramBusinessAccount = async (
+  clientId: number,
   pageId: string
 ): Promise<InstagramBusinessAccountResponse> => {
   try {
     const response = await api.get<InstagramBusinessAccountResponse>(
-      "/meta-insights/instagram/business",
+      `/clients/${clientId}/meta-insights/instagram/business`,
       { params: { pageId } }
     );
     return response.data;
@@ -316,14 +325,19 @@ export const getInstagramBusinessAccount = async (
   }
 };
 
+/**
+ * @deprecated Use getInstagramProfile from metaBusinessApi.ts instead
+ * This is a legacy wrapper that will be removed in a future version
+ */
 export const getInstagramProfile = async (
+  clientId: number,
   accountId: string
 ): Promise<InstagramProfileResponse> => {
   try {
     console.log("accountId", accountId);
-    // UPDATED: Using /api/metabusiness/instagram/profile/:accountId
+    // UPDATED: Using /clients/:clientId/metabusiness/instagram/profile/:accountId
     const response = await api.get<InstagramProfileResponse>(
-      `/metabusiness/instagram/profile/${accountId}`
+      `/clients/${clientId}/metabusiness/instagram/profile/${accountId}`
     );
     console.log("✅ Instagram Profile Response:", response.data);
     return response.data;
@@ -333,15 +347,20 @@ export const getInstagramProfile = async (
   }
 };
 
+/**
+ * @deprecated Use getInstagramMedia from metaBusinessApi.ts instead
+ * This is a legacy wrapper that will be removed in a future version
+ */
 export const getInstagramMedia = async (
+  clientId: number,
   accountId: string,
   limit: number = 20
 ): Promise<InstagramMediaResponse> => {
   console.log("accountId", accountId);
   try {
-    // UPDATED: Using /api/metabusiness/instagram/media/:accountId
+    // UPDATED: Using /clients/:clientId/metabusiness/instagram/media/:accountId
     const response = await api.get<InstagramMediaResponse>(
-      `/metabusiness/instagram/media/${accountId}`,
+      `/clients/${clientId}/metabusiness/instagram/media/${accountId}`,
       { params: { limit } }
     );
     return response.data;
@@ -350,16 +369,21 @@ export const getInstagramMedia = async (
   }
 };
 
+/**
+ * @deprecated Use getInstagramMediaInsights from metaBusinessApi.ts instead
+ * This is a legacy wrapper that will be removed in a future version
+ */
 export const getInstagramMediaInsights = async (
+  clientId: number,
   accountId: string,
   mediaId: string
 ): Promise<InstagramMediaInsightsResponse> => {
   console.log("accountId", accountId);
   console.log("mediaId", mediaId);
   try {
-    // UPDATED: Using /api/metabusiness/instagram/media/:accountId/:mediaId/insights
+    // UPDATED: Using /clients/:clientId/metabusiness/instagram/media/:accountId/:mediaId/insights
     const response = await api.get<InstagramMediaInsightsResponse>(
-      `/metabusiness/instagram/media/${accountId}/${mediaId}/insights`
+      `/clients/${clientId}/metabusiness/instagram/media/${accountId}/${mediaId}/insights`
     );
     console.log("✅ Instagram Media Insights Response:", response.data);
     return response.data;
@@ -373,11 +397,12 @@ export const getInstagramMediaInsights = async (
 };
 
 export const syncInstagramInsights = async (
+  clientId: number,
   body: InstagramSyncBody
 ): Promise<InstagramSyncResponse> => {
   try {
     const response = await api.post<InstagramSyncResponse>(
-      "/meta-insights/instagram/sync",
+      `/clients/${clientId}/meta-insights/instagram/sync`,
       body
     );
     return response.data;
@@ -390,11 +415,12 @@ export const syncInstagramInsights = async (
 };
 
 export const getMetaSavedInsights = async (
+  clientId: number,
   platform?: string
 ): Promise<MetaSavedInsightsResponse> => {
   try {
     const response = await api.get<MetaSavedInsightsResponse>(
-      "/meta-insights/saved",
+      `/clients/${clientId}/meta-insights/saved`,
       { params: { platform } }
     );
     return response.data;
@@ -404,11 +430,12 @@ export const getMetaSavedInsights = async (
 };
 
 export const getMetaDailyInsights = async (
+  clientId: number,
   platform?: string
 ): Promise<MetaDailyHistoryResponse> => {
   try {
     const response = await api.get<MetaDailyHistoryResponse>(
-      "/meta-insights/daily",
+      `/clients/${clientId}/meta-insights/daily`,
       { params: { platform } }
     );
     return response.data;

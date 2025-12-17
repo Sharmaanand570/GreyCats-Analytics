@@ -108,26 +108,7 @@ export type GoogleConsoleApiErrorResponse = {
   error?: string;
 };
 
-const buildGoogleSeoBaseUrl = (): string => {
-  const rawBase = import.meta.env.VITE_NGROK_URL || api.defaults.baseURL || "";
-  if (!rawBase) return "";
 
-  // Normalize to avoid accidental double "/api/google-seo" when the env already
-  // contains it (common when pointing directly to the SEO service).
-  const base = rawBase.endsWith("/")
-    ? rawBase.slice(0, -1)
-    : rawBase;
-
-  if (base.includes("/google-seo")) {
-    return base;
-  }
-
-  if (base.endsWith("/api")) {
-    return `${base}/google-seo`;
-  }
-
-  return `${base}/api/google-seo`;
-};
 
 const seoHeaders = { "ngrok-skip-browser-warning": "true" };
 
@@ -138,8 +119,8 @@ const handleGoogleConsoleApiError = (
   const axiosError = error as AxiosError<GoogleConsoleApiErrorResponse>;
   throw new Error(
     axiosError.response?.data?.message ||
-      axiosError.response?.data?.error ||
-      fallbackMessage
+    axiosError.response?.data?.error ||
+    fallbackMessage
   );
 };
 
@@ -147,17 +128,16 @@ const handleGoogleConsoleApiError = (
 
 /**
  * 1) CONNECT GOOGLE SEARCH CONSOLE
- * POST /api/google-seo/connect
+ * GET /api/google-seo/connect
  */
 export const connectGoogleConsole =
   async (): Promise<ConnectGoogleConsoleResponse> => {
     try {
       const response = await api.post<ConnectGoogleConsoleResponse>(
-        "/connect",
-        {},
+        "/google-seo/connect",
         {
-          baseURL: buildGoogleSeoBaseUrl(),
-        headers: seoHeaders,
+          baseURL:import.meta.env.VITE_NGROK_URL,
+          headers: seoHeaders,
         }
       );
       return response.data;
@@ -171,89 +151,89 @@ export const connectGoogleConsole =
 
 /**
  * 2) RECONNECT GOOGLE SEARCH CONSOLE
- * POST /api/google-seo/reconnect
+ * POST /clients/:clientId/google-search-console/reconnect
  */
-export const reconnectGoogleConsole =
-  async (): Promise<GoogleConsoleReconnectResponse> => {
-    try {
-      const response = await api.post<GoogleConsoleReconnectResponse>(
-        "/reconnect",
-        {},
-        {
-          baseURL: buildGoogleSeoBaseUrl(),
+export const reconnectGoogleConsole = async (
+  clientId: number
+): Promise<GoogleConsoleReconnectResponse> => {
+  try {
+    const response = await api.post<GoogleConsoleReconnectResponse>(
+      `/clients/${clientId}/google-search-console/reconnect`,
+      {},
+      {
         headers: seoHeaders,
-        }
-      );
-      return response.data;
-    } catch (error) {
-      return handleGoogleConsoleApiError(
-        error,
-        "Failed to generate Google Search Console reconnect URL"
-      );
-    }
-  };
+      }
+    );
+    return response.data;
+  } catch (error) {
+    return handleGoogleConsoleApiError(
+      error,
+      "Failed to generate Google Search Console reconnect URL"
+    );
+  }
+};
 
 /**
  * 3) DISCONNECT GOOGLE SEARCH CONSOLE
- * POST /api/google-seo/disconnect
+ * POST /clients/:clientId/google-search-console/disconnect
  */
-export const disconnectGoogleConsole =
-  async (): Promise<GoogleConsoleDisconnectResponse> => {
-    try {
-      const response = await api.post<GoogleConsoleDisconnectResponse>(
-        "/disconnect",
-        {},
-        {
-          baseURL: buildGoogleSeoBaseUrl(),
+export const disconnectGoogleConsole = async (
+  clientId: number
+): Promise<GoogleConsoleDisconnectResponse> => {
+  try {
+    const response = await api.post<GoogleConsoleDisconnectResponse>(
+      `/clients/${clientId}/google-search-console/disconnect`,
+      {},
+      {
         headers: seoHeaders,
-        }
-      );
-      return response.data;
-    } catch (error) {
-      return handleGoogleConsoleApiError(
-        error,
-        "Failed to disconnect Google Search Console"
-      );
-    }
-  };
+      }
+    );
+    return response.data;
+  } catch (error) {
+    return handleGoogleConsoleApiError(
+      error,
+      "Failed to disconnect Google Search Console"
+    );
+  }
+};
 
 /**
  * 4) LIST SEARCH CONSOLE PROPERTIES
- * GET /api/google-seo/properties
+ * GET /clients/:clientId/google-search-console/properties
  */
-export const getGoogleConsoleProperties =
-  async (): Promise<GoogleConsolePropertiesResponse> => {
-    try {
+export const getGoogleConsoleProperties = async (
+  clientId: number
+): Promise<GoogleConsolePropertiesResponse> => {
+  try {
     const response = await api.get<GoogleConsolePropertiesResponse>(
-      "/properties",
+      `/clients/${clientId}/google-search-console/properties`,
       {
-        baseURL: buildGoogleSeoBaseUrl(),
         headers: seoHeaders,
       }
     );
     console.log("response-----------------------------", response.data);
-      return response.data;
-    } catch (error) {
-      return handleGoogleConsoleApiError(
-        error,
-        "Failed to load Google Search Console properties"
-      );
-    }
-  };
+    return response.data;
+  } catch (error) {
+    return handleGoogleConsoleApiError(
+      error,
+      "Failed to load Google Search Console properties"
+    );
+  }
+};
 
 /**
  * 5) SELECT A PROPERTY
- * POST /api/google-seo/properties/select
+ * POST /clients/:clientId/google-search-console/properties/select
  */
 export const selectGoogleConsoleProperty = async (
+  clientId: number,
   body: GoogleConsoleSelectPropertyBody
 ): Promise<GoogleConsoleSelectPropertyResponse> => {
   try {
     const response = await api.post<GoogleConsoleSelectPropertyResponse>(
-      "/properties/select",
+      `/clients/${clientId}/google-search-console/properties/select`,
       body,
       {
-        baseURL: buildGoogleSeoBaseUrl(),
         headers: seoHeaders,
       }
     );
@@ -268,17 +248,17 @@ export const selectGoogleConsoleProperty = async (
 
 /**
  * 6) MANUAL PERFORMANCE FETCH
- * POST /api/google-seo/performance
+ * POST /clients/:clientId/google-search-console/performance
  */
 export const fetchGoogleConsolePerformance = async (
+  clientId: number,
   payload: GoogleConsolePerformanceRequest
 ): Promise<GoogleConsolePerformanceResponse> => {
   try {
     const response = await api.post<GoogleConsolePerformanceResponse>(
-      "/performance",
+      `/clients/${clientId}/google-search-console/performance`,
       payload,
       {
-        baseURL: buildGoogleSeoBaseUrl(),
         headers: seoHeaders,
       }
     );
@@ -293,18 +273,19 @@ export const fetchGoogleConsolePerformance = async (
 
 /**
  * 7) VERIFY CRON OUTPUT (UnifiedMetric)
- * GET /api/unified-metrics?integration=google-search-console&metricKey=google_seo.clicks
+ * GET /clients/:clientId/google-search-console/unified-metrics
  */
 export const getGoogleConsoleUnifiedMetrics = async (
+  clientId: number,
   params: GoogleConsoleUnifiedMetricsParams = {}
 ): Promise<GoogleConsoleUnifiedMetricsResponse> => {
   try {
     const response = await api.get<GoogleConsoleUnifiedMetricsResponse>(
-      "/unified-metrics",
+      `/clients/${clientId}/google-search-console/unified-metrics`,
       {
         params: {
           integration: "google-search-console",
-        
+
           ...params,
         },
         headers: seoHeaders,
@@ -321,4 +302,3 @@ export const getGoogleConsoleUnifiedMetrics = async (
   }
 };
 
- 

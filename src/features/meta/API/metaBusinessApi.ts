@@ -31,15 +31,19 @@ export type MetaBusinessCallbackResponse = {
 
 export type MetaBusinessAccount = {
   id: number;
-  userId: number;
+  userId?: number;
   pageId: string;
   pageName: string;
   instagramBusinessId: string | null;
   instagramUsername: string | null;
+  hasInstagram: boolean;
+  lastSynced: string | null;
+  createdAt: string;
 };
 
 export type MetaBusinessAccountsResponse = {
   success: boolean;
+  total: number;
   accounts: MetaBusinessAccount[];
 };
 
@@ -65,7 +69,7 @@ export type MetaBusinessInsightMetric = {
 
 export type MetaBusinessInsightsResponse = {
   success: boolean;
-  insights: {
+  data: {
     data: MetaBusinessInsightMetric[];
   };
 };
@@ -80,7 +84,9 @@ export type MetaBusinessPost = {
 
 export type MetaBusinessPostsResponse = {
   success: boolean;
-  posts: MetaBusinessPost[];
+  count: number;
+  pagination: any | null;
+  data: MetaBusinessPost[];
 };
 
 export type MetaBusinessInstagramProfile = {
@@ -93,7 +99,7 @@ export type MetaBusinessInstagramProfile = {
 
 export type MetaBusinessInstagramProfileResponse = {
   success: boolean;
-  profile: MetaBusinessInstagramProfile;
+  data: MetaBusinessInstagramProfile;
 };
 
 export type MetaBusinessInstagramMediaItem = {
@@ -103,11 +109,15 @@ export type MetaBusinessInstagramMediaItem = {
   timestamp: string;
   caption?: string;
   permalink?: string;
+  like_count: number;
+  comments_count: number;
 };
 
 export type MetaBusinessInstagramMediaResponse = {
   success: boolean;
-  media: MetaBusinessInstagramMediaItem[];
+  count: number;
+  pagination: any | null;
+  data: MetaBusinessInstagramMediaItem[];
 };
 
 export type MetaBusinessInstagramStoryItem = {
@@ -119,7 +129,9 @@ export type MetaBusinessInstagramStoryItem = {
 
 export type MetaBusinessInstagramStoriesResponse = {
   success: boolean;
-  stories: MetaBusinessInstagramStoryItem[];
+  count: number;
+  pagination: any | null;
+  data: MetaBusinessInstagramStoryItem[];
 };
 
 export type MetaBusinessAnalyticsSummaryResponse = {
@@ -142,6 +154,27 @@ export type MetaBusinessSyncResponse = {
     platform: string;
     date: string;
     metrics: Record<string, any>;
+  };
+};
+
+export type MetaBusinessFacebookSyncResponse = {
+  success: boolean;
+  platform: "facebook";
+  metrics: {
+    page: Record<string, any>;
+    posts: any[];
+  };
+};
+
+export type MetaBusinessInstagramSyncResponse = {
+  success: boolean;
+  platform: "instagram";
+  metrics: {
+    instagram: {
+      profile: Record<string, any>;
+      data: any[];
+    };
+    media: any[];
   };
 };
 
@@ -168,13 +201,13 @@ export type ApiErrorResponse = {
 
 /**
  * 1) START OAUTH
- * GET /api/meta/login
+ * GET /metabusiness/login
  */
 export const loginMetaBusiness = async (): Promise<void> => {
   try {
     // Step 1: Call backend to initiate OAuth and get redirect URL
     // Backend will authenticate using the Authorization header (from axios interceptor)
-    const response = await api.get<MetaBusinessLoginResponse>("/meta/login");
+    const response = await api.get<MetaBusinessLoginResponse>("/metabusiness/login");
     
     // Step 2: Redirect to the Facebook OAuth URL returned by backend
     window.location.href = response.data.url;
@@ -192,14 +225,14 @@ export const loginMetaBusiness = async (): Promise<void> => {
 
 /**
  * 2) OAUTH CALLBACK
- * GET /api/meta/callback?code=XXXX&state=USERID
+ * GET /metabusiness/callback?code=XXXX&state=USERID
  */
 export const handleMetaBusinessCallback = async (
   params: MetaBusinessCallbackParams
 ): Promise<MetaBusinessCallbackResponse> => {
   try {
     const response = await api.get<MetaBusinessCallbackResponse>(
-      "/meta/callback",
+      "/meta-business/callback",
       {
         params,
       }
@@ -237,14 +270,14 @@ export const getMetaBusinessAccounts = async (): Promise<MetaBusinessAccountsRes
 
 /**
  * 4) REFRESH META ACCOUNT
- * GET /api/meta/refresh/:id
+ * GET /metabusiness/refresh/:id
  */
 export const refreshMetaBusinessAccount = async (
   id: number
 ): Promise<MetaBusinessRefreshResponse> => {
   try {
     const response = await api.get<MetaBusinessRefreshResponse>(
-      `/meta/refresh/${id}`
+      `/metabusiness/refresh/${id}`
     );
     return response.data;
   } catch (error) {
@@ -259,14 +292,14 @@ export const refreshMetaBusinessAccount = async (
 
 /**
  * 5) DISCONNECT META ACCOUNT
- * DELETE /api/meta/disconnect/:id
+ * DELETE /metabusiness/disconnect/:id
  */
 export const disconnectMetaBusinessAccount = async (
   id: number
 ): Promise<MetaBusinessDisconnectResponse> => {
   try {
     const response = await api.delete<MetaBusinessDisconnectResponse>(
-      `/meta/disconnect/${id}`
+      `/metabusiness/disconnect/${id}`
     );
     return response.data;
   } catch (error) {
@@ -281,14 +314,20 @@ export const disconnectMetaBusinessAccount = async (
 
 /**
  * 6) GET PAGE INSIGHTS
- * GET /api/meta/facebook/insights/:accountId
+ * GET /metabusiness/facebook/insights/:accountId
  */
 export const getFacebookPageInsights = async (
-  accountId: number
+  accountId: number,
+  params?: {
+    period?: string;
+    since?: string;
+    until?: string;
+  }
 ): Promise<MetaBusinessInsightsResponse> => {
   try {
     const response = await api.get<MetaBusinessInsightsResponse>(
-      `/meta/facebook/insights/${accountId}`
+      `/metabusiness/facebook/insights/${accountId}`,
+      { params }
     );
     return response.data;
   } catch (error) {
@@ -303,14 +342,20 @@ export const getFacebookPageInsights = async (
 
 /**
  * 7) GET PAGE POSTS
- * GET /api/meta/facebook/posts/:accountId
+ * GET /metabusiness/facebook/posts/:accountId
  */
 export const getFacebookPagePosts = async (
-  accountId: number
+  accountId: number,
+  params?: {
+    limit?: number;
+    sort?: string;
+    order?: 'asc' | 'desc';
+  }
 ): Promise<MetaBusinessPostsResponse> => {
   try {
     const response = await api.get<MetaBusinessPostsResponse>(
-      `/meta/facebook/posts/${accountId}`
+      `/metabusiness/facebook/posts/${accountId}`,
+      { params }
     );
     return response.data;
   } catch (error) {
@@ -325,14 +370,18 @@ export const getFacebookPagePosts = async (
 
 /**
  * 8) GET FACEBOOK POST INSIGHTS
- * GET /api/meta/facebook/post/:postId/insights
+ * GET /metabusiness/facebook/post/:postId/insights
  */
 export const getFacebookPostInsights = async (
-  postId: string
+  postId: string,
+  params?: {
+    metrics?: string;
+  }
 ): Promise<MetaBusinessInsightsResponse> => {
   try {
     const response = await api.get<MetaBusinessInsightsResponse>(
-      `/meta/facebook/post/${postId}/insights`
+      `/metabusiness/facebook/post/${postId}/insights`,
+      { params }
     );
     return response.data;
   } catch (error) {
@@ -347,14 +396,14 @@ export const getFacebookPostInsights = async (
 
 /**
  * 9) GET INSTAGRAM PROFILE
- * GET /api/meta/instagram/profile/:accountId
+ * GET /metabusiness/instagram/profile/:accountId
  */
 export const getInstagramProfile = async (
   accountId: number
 ): Promise<MetaBusinessInstagramProfileResponse> => {
   try {
     const response = await api.get<MetaBusinessInstagramProfileResponse>(
-      `/meta/instagram/profile/${accountId}`
+      `/metabusiness/instagram/profile/${accountId}`
     );
     return response.data;
   } catch (error) {
@@ -369,14 +418,21 @@ export const getInstagramProfile = async (
 
 /**
  * 10) GET INSTAGRAM MEDIA
- * GET /api/meta/instagram/media/:accountId
+ * GET /metabusiness/instagram/media/:accountId
  */
 export const getInstagramMedia = async (
-  accountId: number
+  accountId: number,
+  params?: {
+    limit?: number;
+    type?: 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM';
+    sort?: string;
+    order?: 'asc' | 'desc';
+  }
 ): Promise<MetaBusinessInstagramMediaResponse> => {
   try {
     const response = await api.get<MetaBusinessInstagramMediaResponse>(
-      `/meta/instagram/media/${accountId}`
+      `/metabusiness/instagram/media/${accountId}`,
+      { params }
     );
     return response.data;
   } catch (error) {
@@ -391,15 +447,19 @@ export const getInstagramMedia = async (
 
 /**
  * 11) GET INSTAGRAM MEDIA INSIGHTS
- * GET /api/meta/instagram/media/:accountId/:mediaId/insights
+ * GET /metabusiness/instagram/media/:accountId/:mediaId/insights
  */
 export const getInstagramMediaInsights = async (
   accountId: number,
-  mediaId: string
+  mediaId: string,
+  params?: {
+    metrics?: string;
+  }
 ): Promise<MetaBusinessInsightsResponse> => {
   try {
     const response = await api.get<MetaBusinessInsightsResponse>(
-      `/meta/instagram/media/${accountId}/${mediaId}/insights`
+      `/metabusiness/instagram/media/${accountId}/${mediaId}/insights`,
+      { params }
     );
     return response.data;
   } catch (error) {
@@ -414,14 +474,18 @@ export const getInstagramMediaInsights = async (
 
 /**
  * 12) GET INSTAGRAM STORIES
- * GET /api/meta/instagram/stories/:accountId
+ * GET /metabusiness/instagram/stories/:accountId
  */
 export const getInstagramStories = async (
-  accountId: number
+  accountId: number,
+  params?: {
+    limit?: number;
+  }
 ): Promise<MetaBusinessInstagramStoriesResponse> => {
   try {
     const response = await api.get<MetaBusinessInstagramStoriesResponse>(
-      `/meta/instagram/stories/${accountId}`
+      `/metabusiness/instagram/stories/${accountId}`,
+      { params }
     );
     return response.data;
   } catch (error) {
@@ -436,14 +500,14 @@ export const getInstagramStories = async (
 
 /**
  * 13) GET ANALYTICS SUMMARY
- * GET /api/meta/analytics/summary/:accountId
+ * GET /metabusiness/analytics/summary/:accountId
  */
 export const getMetaBusinessAnalyticsSummary = async (
   accountId: number
 ): Promise<MetaBusinessAnalyticsSummaryResponse> => {
   try {
     const response = await api.get<MetaBusinessAnalyticsSummaryResponse>(
-      `/meta/analytics/summary/${accountId}`
+      `/metabusiness/analytics/summary/${accountId}`
     );
     return response.data;
   } catch (error) {
@@ -457,8 +521,8 @@ export const getMetaBusinessAnalyticsSummary = async (
 };
 
 /**
- * 14) MANUAL DAILY SYNC
- * POST /api/meta/sync-daily/:accountId
+ * 14) SYNC BOTH (DAILY)
+ * POST /metabusiness/sync-daily/:accountId
  */
 export const syncMetaBusinessDaily = async (
   accountId: number,
@@ -466,7 +530,7 @@ export const syncMetaBusinessDaily = async (
 ): Promise<MetaBusinessSyncResponse> => {
   try {
     const response = await api.post<MetaBusinessSyncResponse>(
-      `/meta/sync-daily/${accountId}`,
+      `/metabusiness/sync-daily/${accountId}`,
       {},
       {
         params: { date },
@@ -484,15 +548,69 @@ export const syncMetaBusinessDaily = async (
 };
 
 /**
- * 15) REFRESH PAGE TOKEN
- * POST /api/meta/refresh-page/:id
+ * 15) SYNC FACEBOOK ONLY
+ * POST /metabusiness/sync-facebook/:accountId
+ */
+export const syncMetaBusinessFacebook = async (
+  accountId: number,
+  date?: string
+): Promise<MetaBusinessFacebookSyncResponse> => {
+  try {
+    const response = await api.post<MetaBusinessFacebookSyncResponse>(
+      `/metabusiness/sync-facebook/${accountId}`,
+      {},
+      {
+        params: { date },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+        axiosError.response?.data?.error ||
+        "Failed to sync Facebook data"
+    );
+  }
+};
+
+/**
+ * 16) SYNC INSTAGRAM ONLY
+ * POST /metabusiness/sync-instagram/:accountId
+ */
+export const syncMetaBusinessInstagram = async (
+  accountId: number,
+  date?: string
+): Promise<MetaBusinessInstagramSyncResponse> => {
+  try {
+    const response = await api.post<MetaBusinessInstagramSyncResponse>(
+      `/metabusiness/sync-instagram/${accountId}`,
+      {},
+      {
+        params: { date },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+        axiosError.response?.data?.error ||
+        "Failed to sync Instagram data"
+    );
+  }
+};
+
+/**
+ * 17) REFRESH PAGE TOKEN
+ * POST /metabusiness/refresh-page/:id
  */
 export const refreshMetaBusinessPageToken = async (
   id: number
 ): Promise<MetaBusinessRefreshPageResponse> => {
   try {
     const response = await api.post<MetaBusinessRefreshPageResponse>(
-      `/meta/refresh-page/${id}`
+      `/metabusiness/refresh-page/${id}`
     );
     return response.data;
   } catch (error) {

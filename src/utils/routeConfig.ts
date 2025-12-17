@@ -37,11 +37,16 @@ export const validRoutes = [
   "/shopify/callback",
   "/meta/callback",
   "/meta-business/callback",
+  // Multi-Client Routes
+  "/clients",
+  "/oauth/callback",
 ];
 
 // Dynamic route patterns (routes with parameters)
 const dynamicRoutePatterns = [
   /^\/reports\/[^/]+$/, // /reports/:id
+  /^\/clients\/[^/]+$/, // /clients/:id
+  /^\/clients\/[^/]+\/.+$/, // /clients/:id/sub-routes (like /clients/1/reports)
 ];
 
 /**

@@ -41,20 +41,16 @@ import {
     BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 
 // Import Meta Business API hooks
-import { useMetaBusinessAccounts } from "@/features/meta/hooks/useMetaBusiness.ts";
+import { useMetaBusinessAccounts, useMetaBusinessSyncFacebook, useMetaBusinessSyncInstagram, useMetaBusinessSync } from "@/features/meta/hooks/useMetaBusinessData.ts";
 
 // Import Meta Insights API hooks (existing)
 import {
-    useFacebookPages,
     useFacebookPagePosts,
     useFacebookPostInsights,
-    useFacebookSyncInsights,
     useInstagramMedia,
     useInstagramMediaInsights,
-    useInstagramSyncInsights,
     useInstagramProfile,
 } from "@/features/meta/hooks/useMetaData";
 
@@ -74,27 +70,42 @@ function MetaBusinessDetailPage() {
     // Meta Business Accounts (from metaBusinessApi)
     const { data: accountsData, isLoading: isLoadingAccounts } = useMetaBusinessAccounts();
 
+    // Sync hooks
+    const { mutateAsync: syncFacebook, isPending: isSyncingFacebook } = useMetaBusinessSyncFacebook();
+    const { mutateAsync: syncInstagram, isPending: isSyncingInstagram } = useMetaBusinessSyncInstagram();
+    const { mutateAsync: syncBoth, isPending: isSyncingBoth } = useMetaBusinessSync();
+
     // Data Processing - Get accounts first
     const accounts = accountsData?.accounts ?? [];
 
-    // Facebook Data (from metaInsightsApi)
-    const { data: pagesData, isLoading: isLoadingPages } = useFacebookPages();
+    // Meta Business accounts ARE the pages - no need for separate API call
+    // Each account represents a Facebook Page with optional Instagram Business Account
+    const pages = accounts.map((acc: any) => ({
+        id: acc.pageId,
+        name: acc.pageName,
+        instagram_business_account: acc.instagramBusinessId,
+        accountId: acc.id, // Store the Meta Business account ID for API calls
+    }));
+    const isLoadingPages = isLoadingAccounts;
+
+    // Get the selected account's Meta Business ID for API calls
+    const selectedAccount = accounts.find((acc: any) => acc.pageId === selectedPageId);
+    const selectedAccountId = selectedAccount?.id;
+
+    // Facebook Data - Use Meta Business API for posts
+    // Note: Posts should come from /metabusiness/facebook/posts/:accountId
+    // But we're currently using Meta Insights API - this might need backend support
     const { data: postsData, isLoading: isLoadingPosts } = useFacebookPagePosts(selectedPageId || undefined, 10);
     const { data: postInsightsData, isLoading: isLoadingPostInsights } = useFacebookPostInsights(selectedPostId || undefined, selectedPageId || undefined);
-    const { mutateAsync: syncFacebook, isPending: isSyncingFacebook } = useFacebookSyncInsights();
 
-    // Instagram Data - Using Meta Business Account ID (not Instagram Business ID!)
-    // selectedIgPageId will be the account.id from Meta Business accounts
-    const selectedAccount = accounts.find((acc: any) => acc.id.toString() === selectedIgPageId);
-    const accountIdForInstagram = selectedIgPageId || undefined; // Convert null to undefined
+    // Instagram Data - Using Meta Business Account ID
+    const accountIdForInstagram = selectedIgPageId || undefined;
 
     const { data: igProfileData, isLoading: isLoadingIgProfile } = useInstagramProfile(accountIdForInstagram);
     const { data: igMediaData, isLoading: isLoadingIgMedia } = useInstagramMedia(accountIdForInstagram, 20);
     const { data: igInsightsData, isLoading: isLoadingIgInsights, error: igInsightsError } = useInstagramMediaInsights(accountIdForInstagram, selectedIgMediaId || undefined);
-    const { mutateAsync: syncInstagram, isPending: isSyncingInstagram } = useInstagramSyncInsights();
 
     // More Data Processing
-    const pages = pagesData?.pages ?? [];
     const posts = postsData?.posts ?? [];
     const postInsights = postInsightsData?.insights ?? [];
     const postEngagement = postInsightsData?.engagement;
@@ -102,28 +113,36 @@ function MetaBusinessDetailPage() {
     const igInsights = igInsightsData?.data?.data ?? [];
 
     // Handlers
-    const handleSyncFacebook = async (pageId: string) => {
+    const handleSyncFacebook = async (accountId: number) => {
         try {
-            setSyncingPageId(pageId);
-            await syncFacebook({ pageId });
-            toast.success("Facebook insights synced successfully!");
+            setSyncingPageId(accountId.toString());
+            await syncFacebook({ accountId });
         } catch (error) {
-            toast.error("Failed to sync Facebook insights");
+            console.error(error);
         } finally {
             setSyncingPageId(null);
         }
     };
 
-    const handleSyncInstagram = async (accountId: string) => {
+    const handleSyncInstagram = async (accountId: number) => {
         try {
-            setSyncingIgId(accountId);
-            // Use the account ID for syncing
-            await syncInstagram({ igBusinessId: accountId });
-            toast.success("Instagram insights synced successfully!");
+            setSyncingIgId(accountId.toString());
+            await syncInstagram({ accountId });
         } catch (error) {
-            toast.error("Failed to sync Instagram insights");
+            console.error(error);
         } finally {
             setSyncingIgId(null);
+        }
+    };
+
+    const handleSyncBoth = async (accountId: number) => {
+        try {
+            setSyncingPageId(accountId.toString());
+            await syncBoth({ accountId });
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setSyncingPageId(null);
         }
     };
 
@@ -241,23 +260,59 @@ function MetaBusinessDetailPage() {
                                                     </div>
                                                     <CardTitle className="text-base mt-3">{page.name}</CardTitle>
                                                 </CardHeader>
-                                                <CardContent>
+                                                <CardContent className="space-y-2">
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="w-full text-xs"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleSyncFacebook(page.accountId);
+                                                            }}
+                                                            disabled={isSyncingFacebook && syncingPageId === page.accountId.toString()}
+                                                        >
+                                                            {isSyncingFacebook && syncingPageId === page.accountId.toString() ? (
+                                                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                                            ) : (
+                                                                <SiFacebook className="w-3 h-3 mr-1" />
+                                                            )}
+                                                            Facebook
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="w-full text-xs"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleSyncInstagram(page.accountId);
+                                                            }}
+                                                            disabled={!page.instagram_business_account || (isSyncingInstagram && syncingIgId === page.accountId.toString())}
+                                                        >
+                                                            {isSyncingInstagram && syncingIgId === page.accountId.toString() ? (
+                                                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                                            ) : (
+                                                                <SiInstagram className="w-3 h-3 mr-1" />
+                                                            )}
+                                                            Instagram
+                                                        </Button>
+                                                    </div>
                                                     <Button
                                                         size="sm"
-                                                        variant="outline"
-                                                        className="w-full"
+                                                        variant="default"
+                                                        className="w-full text-xs"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            handleSyncFacebook(page.id);
+                                                            handleSyncBoth(page.accountId);
                                                         }}
-                                                        disabled={isSyncingFacebook && syncingPageId === page.id}
+                                                        disabled={isSyncingBoth && syncingPageId === page.accountId.toString()}
                                                     >
-                                                        {isSyncingFacebook && syncingPageId === page.id ? (
+                                                        {isSyncingBoth && syncingPageId === page.accountId.toString() ? (
                                                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                                         ) : (
                                                             <RefreshCw className="w-4 h-4 mr-2" />
                                                         )}
-                                                        Sync Insights
+                                                        Sync Both
                                                     </Button>
                                                 </CardContent>
                                             </Card>
@@ -401,12 +456,12 @@ function MetaBusinessDetailPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {accounts.map((acc: any) => (
-                                            <SelectItem key={acc.id} value={acc.id.toString()} disabled={!acc.hasInstagram}>
+                                            <SelectItem key={acc.id} value={acc.id.toString()} disabled={!acc.instagramBusinessId}>
                                                 <div className="flex items-center justify-between w-full">
                                                     <span>{acc.pageName}</span>
-                                                    {acc.hasInstagram ? (
+                                                    {acc.instagramBusinessId ? (
                                                         <Badge variant="secondary" className="ml-2 h-5 text-[10px] bg-pink-50 text-pink-600">
-                                                            @{acc.instagramUsername}
+                                                            @{acc.instagramUsername || 'Instagram'}
                                                         </Badge>
                                                     ) : (
                                                         <span className="text-xs text-slate-400 ml-2">(No IG)</span>
@@ -438,7 +493,7 @@ function MetaBusinessDetailPage() {
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
-                                                    onClick={() => handleSyncInstagram(accountIdForInstagram)}
+                                                    onClick={() => handleSyncInstagram(Number(accountIdForInstagram))}
                                                     disabled={isSyncingInstagram && syncingIgId === accountIdForInstagram}
                                                 >
                                                     {isSyncingInstagram && syncingIgId === accountIdForInstagram ? (
@@ -558,7 +613,7 @@ function MetaBusinessDetailPage() {
                     </Tabs>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
 

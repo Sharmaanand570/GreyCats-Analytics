@@ -1,0 +1,152 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '../apiConfig';
+import type {
+  IntegrationType,
+  AvailableAccount,
+  AvailableAccountsResponse,
+  AssignAccountRequest,
+  AssignAccountResponse,
+} from '../types/client.types';
+import { toast } from 'sonner';
+import { clientKeys } from './useClients';
+
+// Query Keys
+export const integrationKeys = {
+  all: ['integrations'] as const,
+  available: (type: IntegrationType) => [...integrationKeys.all, 'available', type] as const,
+};
+
+// Fetch available accounts for an integration
+export const useAvailableAccounts = (integrationType: IntegrationType | null) => {
+  return useQuery({
+    queryKey: integrationKeys.available(integrationType!),
+    queryFn: async (): Promise<AvailableAccount[]> => {
+      try {
+        const response = await api.get<AvailableAccountsResponse>(
+          `/api/integrations/${integrationType}/available-accounts`
+        );
+        return response.data.accounts || [];
+      } catch (error: any) {
+        console.error('Error fetching available accounts:', error);
+        toast.error(
+          error.response?.data?.message || 'Failed to fetch available accounts'
+        );
+        throw error;
+      }
+    },
+    enabled: !!integrationType,
+    staleTime: 1 * 60 * 1000, // 1 minute
+    retry: 2,
+  });
+};
+
+// Assign account to client
+export const useAssignAccount = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      clientId,
+      data,
+    }: {
+      clientId: number;
+      data: AssignAccountRequest;
+    }): Promise<AssignAccountResponse> => {
+      try {
+        const response = await api.post<AssignAccountResponse>(
+          `/api/clients/${clientId}/accounts`,
+          data
+        );
+        return response.data;
+      } catch (error: any) {
+        console.error('Error assigning account:', error);
+        const errorMessage =
+          error.response?.data?.message ||
+          error.response?.data?.error ||
+          'Failed to assign account';
+        toast.error(errorMessage);
+        throw error;
+      }
+    },
+    onSuccess: (_, variables) => {
+      // Invalidate client details to refresh integrations
+      queryClient.invalidateQueries({ queryKey: clientKeys.detail(variables.clientId) });
+      // Invalidate available accounts to update assignment status
+      queryClient.invalidateQueries({
+        queryKey: integrationKeys.available(variables.data.integrationType),
+      });
+      toast.success('Account connected successfully');
+    },
+    onError: (error: any) => {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        'Failed to assign account';
+      toast.error(errorMessage);
+    },
+  });
+};
+
+// Remove account from client
+export const useRemoveAccount = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      clientId,
+      integrationType,
+      accountId,
+    }: {
+      clientId: number;
+      integrationType: IntegrationType;
+      accountId: number;
+    }): Promise<void> => {
+      try {
+        await api.delete(
+          `/clients/${clientId}/accounts/${integrationType}/${accountId}`
+        );
+      } catch (error: any) {
+        console.error('Error removing account:', error);
+        toast.error(error.response?.data?.message || 'Failed to remove account');
+        throw error;
+      }
+    },
+    onSuccess: (_, variables) => {
+      // Invalidate client details
+      queryClient.invalidateQueries({ queryKey: clientKeys.detail(variables.clientId) });
+      // Invalidate available accounts
+      queryClient.invalidateQueries({
+        queryKey: integrationKeys.available(variables.integrationType),
+      });
+      // Invalidate connected integrations to update platform counts
+      queryClient.invalidateQueries({
+        queryKey: [...integrationKeys.all, 'connected'] as const,
+      });
+      toast.success('Account disconnected successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to remove account');
+    },
+  });
+};
+
+// Fetch connected integrations
+export const useConnectedIntegrations = () => {
+  return useQuery({
+    queryKey: [...integrationKeys.all, 'connected'] as const,
+    queryFn: async () => {
+      try {
+        const response = await api.get<import('../types/integration.types').ConnectedIntegrationsResponse>('/integrations/connected');
+        return response.data;
+      } catch (error: any) {
+        console.error('Error fetching connected integrations:', error);
+        toast.error(
+          error.response?.data?.message || 'Failed to fetch connected integrations'
+        );
+        throw error;
+      }
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    retry: 2,
+  });
+};
