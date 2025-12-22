@@ -38,11 +38,11 @@ export const getIntegrations = async (
     const response = await api.get<any>(
       `/clients/${clientId}`
     );
-    
+
     // Extract integrations from client data
     const client = response.data?.client || response.data;
     const integrations: Integration[] = [];
-    
+
     // Map all account types to integrations
     if (client.metaBusinessAccounts) {
       client.metaBusinessAccounts.forEach((acc: any) => {
@@ -59,7 +59,7 @@ export const getIntegrations = async (
         });
       });
     }
-    
+
     if (client.shopifyAccounts) {
       client.shopifyAccounts.forEach((acc: any) => {
         integrations.push({
@@ -75,8 +75,25 @@ export const getIntegrations = async (
         });
       });
     }
-    
-    // Platform Accounts (Google Analytics)
+
+    // Google Analytics Properties (from actual API response structure)
+    if (client.googleAnalyticsProperties) {
+      client.googleAnalyticsProperties.forEach((gaProperty: any) => {
+        integrations.push({
+          id: gaProperty.id,
+          userId: client.userId,
+          platform: 'google-analytics',
+          accountId: gaProperty.platformAccount?.propertyId || gaProperty.id.toString(),
+          accountName: gaProperty.platformAccount?.propertyName || 'Google Analytics',
+          status: 'connected',
+          lastSyncedAt: gaProperty.lastHistoricalSyncDate || null,
+          connectedAt: gaProperty.createdAt,
+          extra: null,
+        });
+      });
+    }
+
+    // Platform Accounts (Google Analytics) - legacy support
     if (client.platformAccounts) {
       client.platformAccounts.forEach((platformAcc: any) => {
         if (platformAcc.account?.platform === 'GOOGLE') {
@@ -94,7 +111,7 @@ export const getIntegrations = async (
         }
       });
     }
-    
+
     // Meta Ads Accounts
     if (client.metaAdAccounts) {
       client.metaAdAccounts.forEach((acc: any) => {
@@ -111,7 +128,7 @@ export const getIntegrations = async (
         });
       });
     }
-    
+
     // Google Search Console Properties
     if (client.googleSearchConsoleProperties) {
       client.googleSearchConsoleProperties.forEach((acc: any) => {
@@ -128,7 +145,7 @@ export const getIntegrations = async (
         });
       });
     }
-    
+
     // Add other integration types as needed
     if (client.youtubeAccounts) {
       client.youtubeAccounts.forEach((acc: any) => {
@@ -145,7 +162,25 @@ export const getIntegrations = async (
         });
       });
     }
-    
+
+    // WooCommerce Accounts
+    if (client.wooCommerceAccounts) {
+      client.wooCommerceAccounts.forEach((acc: any) => {
+        integrations.push({
+          id: acc.id,
+          userId: client.userId,
+          platform: 'woocommerce',
+          // Match the pattern from useClients.ts - check nested woocommerceAccount first
+          accountId: acc.woocommerceAccount?.storeUrl || acc.storeUrl || acc.id.toString(),
+          accountName: acc.woocommerceAccount?.storeUrl || acc.storeUrl || 'WooCommerce Store',
+          status: 'connected',
+          lastSyncedAt: acc.lastSynced || null,
+          connectedAt: acc.createdAt,
+          extra: null,
+        });
+      });
+    }
+
     return {
       success: true,
       integrations,
@@ -154,8 +189,8 @@ export const getIntegrations = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to fetch integrations"
+      axiosError.response?.data?.error ||
+      "Failed to fetch integrations"
     );
   }
 };

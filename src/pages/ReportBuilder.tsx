@@ -257,29 +257,21 @@ const CURATED_DEFAULTS: Record<string, string[]> = {
     "meta.facebook.post.engagement",
   ],
   "meta-instagram": [
-    // Instagram Account-level Metrics
+    // Instagram Account-level Metrics (ONLY metrics that exist in DB)
     "meta.instagram.followers",
-    "meta.instagram.profileViews",
     "meta.instagram.mediaCount",
-    // Instagram Media-level Metrics (NEW)
-    "meta.instagram.media.likes",
-    "meta.instagram.media.comments",
-    "meta.instagram.media.impressions",
-    "meta.instagram.media.reach",
-    "meta.instagram.media.engagement",
+    // NOTE: The following metrics are defined but not yet in the database:
+    // "meta.instagram.profileViews",
+    // "meta.instagram.media.likes",
+    // "meta.instagram.media.comments",
+    // "meta.instagram.media.impressions",
+    // "meta.instagram.media.reach",
+    // "meta.instagram.media.engagement",
   ],
   "meta-business": [
-    // Combined Facebook + Instagram metrics for Meta Business integration
-    // These will be separated in the UI by their integration type
-    // Facebook Post Metrics (first 4)
-    "meta.facebook.post.engagement",
-    "meta.facebook.post.likes",
-    "meta.facebook.post.comments",
-    "meta.facebook.post.shares",
-    // Instagram Metrics (next 4)
+    // Meta Business integration - ONLY Instagram metrics that exist in DB
+    // Facebook metrics are not yet in the database, so we exclude them
     "meta.instagram.followers",
-    "meta.instagram.media.engagement",
-    "meta.instagram.media.impressions",
     "meta.instagram.mediaCount",
   ],
   "meta-ads": [
@@ -398,10 +390,16 @@ function pickDefaultMetricsForIntegration(
       const syntheticMetrics: MetricOption[] = curated.map(metricKey => {
         // Determine which integration this metric belongs to
         const isFacebookMetric = metricKey.includes('facebook');
+        const isInstagramMetric = metricKey.includes('instagram');
+
+        // For Instagram metrics, use "ciestahotels" as the accountId
+        // For Facebook metrics, use the provided accountId
+        const metricAccountId = isInstagramMetric ? 'ciestahotels' : accountId;
+
         return {
           metricKey,
           integration: isFacebookMetric ? 'meta-facebook' : 'meta-instagram',
-          accountId,
+          accountId: metricAccountId,
           displayName: metricKey.split('.').pop() || metricKey,
         };
       });
@@ -1316,15 +1314,18 @@ const renderWidgetContent = (
 
       return (
         <div
-          className={`h-full w-full flex items-center ${alignClass} hover:border  text-xs md:text-sm text-gray-900 px-2`}
-          style={
-            titleData?.backgroundColor
+          className={`h-full w-full flex items-start ${alignClass} hover:border text-xs md:text-sm text-gray-900`}
+          style={{
+            ...(titleData?.backgroundColor
               ? { backgroundColor: titleData.backgroundColor }
-              : undefined
-          }
+              : {}),
+            ...(titleData?.padding
+              ? { padding: titleData.padding }
+              : {}),
+          }}
         >
           <span
-            className={`${fontSizeClass} place-self-center font-semibold break-words text-center`}
+            className={`${fontSizeClass} font-semibold break-words text-center`}
             style={titleData?.color ? { color: titleData.color } : undefined}
           >
             {text}
@@ -1629,13 +1630,18 @@ function ReportBuilder() {
         if (!parsedClientId) throw new Error("Client ID is required");
         return createReportTemplate(parsedClientId, payload);
       },
-      onSuccess: (response) => {
-        const newId = response.template.id;
-        setTemplateId(newId);
+      onSuccess: () => {
+        // const newId = response.template.id;
+        // setTemplateId(newId); // No longer needed as we redirect
         templateBootstrapRef.current = false;
-        setIsNameDialogOpen(false); // Close dialog before navigation
-        navigate(`/clients/${parsedClientId}/reports/${newId}`, { replace: true });
-        queryClient.invalidateQueries({ queryKey: ["report-template", newId] });
+        setIsNameDialogOpen(false); // Close dialog
+
+        // Invalidate list query so the new report appears in the table
+        queryClient.invalidateQueries({ queryKey: ["report-templates", "list", parsedClientId] });
+
+        // Redirect to reports list
+        navigate(`/clients/${parsedClientId}/reports`);
+
         toast.success("Report template created");
       },
       onError: (error: ApiError) => {
@@ -1659,9 +1665,14 @@ function ReportBuilder() {
     useState<string>("Asia/Kolkata");
   const [scheduleTimeOfDay, setScheduleTimeOfDay] = useState<string>("09:00");
   const [scheduleSendEmail, setScheduleSendEmail] = useState(false);
+
+  // Auto-save state
+  const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
   const { data: integrationsData } = useIntegrations(parsedClientId);
 
-  console.log(integrationsData, "integrationsData")
+  console.log(integrationsData, "integrationsData", parsedClientId)
 
   const {
     groupedMetrics,
@@ -1706,8 +1717,8 @@ function ReportBuilder() {
     templateBootstrapRef.current = false;
     setIsNameDialogOpen(false);
     setNewReportName("");
-    navigate(`/clients/${clientId}/reports`);
-  }, [navigate]);
+    navigate(`/clients/${parsedClientId}/reports`);
+  }, [navigate, parsedClientId]);
 
   // Keep GSC param defaults in sync with the main date range
   useEffect(() => {
@@ -1782,6 +1793,7 @@ function ReportBuilder() {
     // Prevent creating a report if there are no connected integrations
     const integrationCount = integrationsData?.integrations?.length ?? 0;
     if (integrationCount === 0) {
+
       toast.error(
         "You need to connect at least one data source before creating a report."
       );
@@ -1803,7 +1815,7 @@ function ReportBuilder() {
       if (templateId == null || !parsedClientId) {
         throw new Error("Missing template id or client id");
       }
-      const response = await getReportTemplate(parsedClientId, templateId);
+      const response = await getReportTemplate(templateId);
       console.log("getReportTemplate response", response);
       return response.template;
     },
@@ -1835,12 +1847,12 @@ function ReportBuilder() {
         // Just inform the user and go back to the reports list.
         templateBootstrapRef.current = false;
         toast.error("Report not found");
-        navigate(`/clients/${clientId}/reports`);
+        navigate(`/clients/${parsedClientId}/reports`);
         return;
       }
       toast.error(error.message || "Failed to load report template");
     }
-  }, [templateQuery.error, navigate]);
+  }, [templateQuery.error, navigate, parsedClientId]);
 
   // Initialize slides based on connected integrations (only for new reports without template data)
   useEffect(() => {
@@ -1907,18 +1919,21 @@ function ReportBuilder() {
       number,
       { platform: string; accountId: string; accountName?: string }
     >();
-    effectivePageOrder.forEach((slideId) => {
-      const integ = integrationsData?.integrations?.[slideId];
+
+    // Iterate through integrations array by index
+    // The slideId corresponds to the array index
+    integrationsData?.integrations?.forEach((integ, index) => {
       if (integ) {
-        map.set(slideId, {
+        map.set(index, {
           platform: integ.platform,
           accountId: integ.accountId,
           accountName: integ.accountName,
         });
       }
     });
+
     return map;
-  }, [effectivePageOrder, integrationsData?.integrations]);
+  }, [integrationsData?.integrations]);
 
   // Update template data when loaded successfully
   useEffect(() => {
@@ -2023,6 +2038,29 @@ function ReportBuilder() {
     });
     return ids.join("|");
   }, [dashboards]);
+
+  // Auto-save: Debounced save when dashboards, customPages, or templateName changes
+  useEffect(() => {
+    // Skip auto-save if:
+    // - No template ID (new template not yet created)
+    // - Template is loading
+    // - Template is being bootstrapped
+    if (!templateId || isTemplateLoading || templateBootstrapRef.current) {
+      return;
+    }
+
+    // Mark that there are unsaved changes
+    setHasUnsavedChanges(true);
+
+    // Debounce: wait 2 seconds after last change before saving
+    const timer = setTimeout(() => {
+      const payload = buildTemplatePayloadFromDashboards();
+      saveTemplate(payload);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [dashboards, customPages, templateName, templateId, isTemplateLoading]);
+
 
   // Ensure there is at least one slide per connected integration (e.g., GA + GSC).
   // If integrations were added after the template was created, append empty slides
@@ -2186,8 +2224,15 @@ function ReportBuilder() {
 
           // Convert groupBy to dimensionType
           // Backend expects empty string for non-dimensional data, not "none" or "day"
+          // For Google Search Console, don't use dimensionType at all (fetch aggregated data)
           let dimensionType = widget.groupBy || "";
           if (dimensionType === "none" || dimensionType === "day") {
+            dimensionType = "";
+          }
+
+          // Skip dimensionType for Google Search Console
+          const isGoogleSearchConsole = normalizedIntegration === 'google-search-console';
+          if (isGoogleSearchConsole) {
             dimensionType = "";
           }
 
@@ -2196,18 +2241,37 @@ function ReportBuilder() {
           const shouldOmitAccountId = normalizedIntegration === 'meta-ads' ||
             normalizedIntegration === 'meta-ads';
 
-          const params = {
+          const params: Record<string, string> = {
             integration: normalizedIntegration,  // Use normalized key
             accountId: shouldOmitAccountId ? "" : (widget.accountId || ""),
             metricKey: widget.metricKey,
-            dimensionType: dimensionType,
             startDate: dateFrom,
             endDate: dateTo,
           };
 
-          console.log(`📤 GET /unified-metrics params for ${widget.metricKey}:`, params);
+          // Only add dimensionType if NOT Google Search Console
+          if (!isGoogleSearchConsole && dimensionType) {
+            params.dimensionType = dimensionType;
+          }
 
-          const data = await fetchUnifiedMetric(parsedClientId!, params);
+          console.log(`📤 GET /unified-metrics params for ${widget.metricKey}:`, params);
+          console.log(`🔧 Widget config:`, {
+            id: widget.id,
+            metricKey: widget.metricKey,
+            integration: widget.integration,
+            accountId: widget.accountId,
+            accountIdType: typeof widget.accountId,
+            groupBy: widget.groupBy
+          });
+
+          const data = await fetchUnifiedMetric(parsedClientId!, params as {
+            integration: string;
+            accountId: string;
+            metricKey: string;
+            dimensionType?: string;
+            startDate: string;
+            endDate: string;
+          });
 
           // Log the full API response for debugging
           console.log(`📡 GET /unified-metrics response for ${widget.metricKey}:`, data);
@@ -2244,7 +2308,18 @@ function ReportBuilder() {
       const merged: Record<string, ResolvedWidgetData> = {};
 
       results.forEach(({ id, widget, data }) => {
+        // DEBUG: Log the exact data structure we receive
+        console.log(`🔍 Processing widget ${id}:`, {
+          widgetType: widget.type,
+          hasData: !!data,
+          dataKeys: data ? Object.keys(data) : [],
+          dataStructure: data,
+          hasRows: data?.rows ? 'YES' : 'NO',
+          rowsLength: data?.rows?.length || 0
+        });
+
         if (!data || !data.rows || !Array.isArray(data.rows)) {
+          console.warn(`⚠️ Widget ${id} has no valid data, using empty state`);
           merged[id] = { value: 0, total: 0, rawCount: 0, rows: [], series: [] };
           return;
         }
@@ -2275,18 +2350,48 @@ function ReportBuilder() {
           widget.integration === 'meta-instagram';
 
         const filteredRows = data.rows.filter((row: any) => {
-          // For meta integrations, don't filter by accountId (aggregate all accounts)
-          const matchesBasic = isMetaIntegration
-            ? (row.metricKey === widget.metricKey && row.integration === widget.integration)
-            : (row.metricKey === widget.metricKey &&
-              row.accountId === widget.accountId &&
-              row.integration === widget.integration);
+          // Normalize integration names for comparison
+          // Frontend uses "google-analytics" but API returns "google_analytics"
+          // We generically replace all underscores with hyphens to handle all cases
+          const normalizeIntegration = (name: string) => {
+            // Special case: API returns "woo" but frontend uses "woocommerce"
+            if (name === 'woo') return 'woocommerce';
+            return name.replace(/_/g, '-');
+          };
 
-          // DEBUG: Log when accountId doesn't match (skip for meta integrations)
-          if (!isMetaIntegration && row.metricKey === widget.metricKey && row.accountId !== widget.accountId) {
-            console.log(`❌ AccountId mismatch for ${widget.metricKey}:`, {
+          const rowIntegration = normalizeIntegration(row.integration || '');
+          const widgetIntegration = widget.integration || '';
+
+          // DEBUG: Log WooCommerce filtering
+          if (widget.integration === 'woocommerce' || row.integration === 'woo') {
+            console.log('🛒 WooCommerce filtering:', {
+              rowIntegration: row.integration,
+              normalizedRowIntegration: rowIntegration,
+              widgetIntegration,
+              rowMetricKey: row.metricKey,
+              widgetMetricKey: widget.metricKey,
               rowAccountId: row.accountId,
               widgetAccountId: widget.accountId,
+              metricMatch: row.metricKey === widget.metricKey,
+              integrationMatch: rowIntegration === widgetIntegration,
+              accountMatch: row.accountId == widget.accountId,
+            });
+          }
+
+          // For meta integrations, don't filter by accountId (aggregate all accounts)
+          const matchesBasic = isMetaIntegration || widget.integration === 'woocommerce'
+            ? (row.metricKey === widget.metricKey && rowIntegration === widgetIntegration)
+            : (row.metricKey === widget.metricKey &&
+              row.accountId == widget.accountId &&  // Use == to handle string/number mismatch
+              rowIntegration === widgetIntegration);
+
+          // DEBUG: Log when accountId doesn't match (skip for meta integrations)
+          if (!isMetaIntegration && row.metricKey === widget.metricKey && row.accountId != widget.accountId) {
+            console.log(`❌ AccountId mismatch for ${widget.metricKey}:`, {
+              rowAccountId: row.accountId,
+              rowAccountIdType: typeof row.accountId,
+              widgetAccountId: widget.accountId,
+              widgetAccountIdType: typeof widget.accountId,
               rowIntegration: row.integration,
               widgetIntegration: widget.integration
             });
@@ -2533,6 +2638,8 @@ function ReportBuilder() {
       // as the source of truth. Avoid immediately re-hydrating from the
       // backend, since the backend may not yet persist manual widgetData
       // (content blocks), which would make them appear to "reset" after save.
+      setLastSavedTime(new Date());
+      setHasUnsavedChanges(false);
       toast.success("Report template saved");
     },
     onError: (error: ApiError) => {
@@ -2628,14 +2735,14 @@ function ReportBuilder() {
     if (isGeneratingPdf) return;
     try {
       setIsGeneratingPdf(true);
-      await exportAllSlidesToPDF(slidesRef.current);
+      await exportAllSlidesToPDF(slidesRef.current, effectivePageOrder);
     } catch (error) {
       console.error("Failed to generate PDF from frontend", error);
       toast.error("Failed to generate PDF");
     } finally {
       setIsGeneratingPdf(false);
     }
-  }, [isGeneratingPdf]);
+  }, [isGeneratingPdf, effectivePageOrder]);
 
   const handleConnectIntegration = useCallback(() => {
     navigate(`/clients/${parsedClientId}?tab=data-sources`);
@@ -3339,15 +3446,35 @@ function ReportBuilder() {
       const isGoogleAnalytics = normalizedPlatform === "google-analytics";
 
       // Handle platform aliases (e.g., UI may store "google-console" but metrics come as "google-search-console")
+      // Also handle underscore vs hyphen mismatches for other platforms
       const aliasPlatform =
         platform === "google-console" || normalizedPlatform === "google-console"
           ? "google-search-console"
-          : undefined;
+          : (platform === "woocommerce" || normalizedPlatform === "woocommerce")
+            ? "woo"
+            : (platform === "meta-ads" || normalizedPlatform === "meta-ads")
+              ? "meta_ads"
+              : (platform === "google-analytics" || normalizedPlatform === "google-analytics")
+                ? "google_analytics"
+                : (platform === "meta-business" || normalizedPlatform === "meta-business")
+                  ? "meta_business" // Or verify if it's meta_facebook/meta_instagram? Usually unified is separate.
+                  : undefined;
 
       // Try direct, normalized, alias, and fallback matches into groupedMetrics
       const directMetrics = groupedMetrics[platform] ?? {};
       const normalizedMetrics = groupedMetrics[normalizedPlatform] ?? {};
       const aliasMetrics = aliasPlatform ? groupedMetrics[aliasPlatform] ?? {} : {};
+
+      // DEBUG: Log sidebar lookup attempts
+      console.log('🔍 Sidebar Metric Lookup:', {
+        integration: platform,
+        normalized: normalizedPlatform,
+        alias: aliasPlatform,
+        keysInGroupedMetrics: Object.keys(groupedMetrics),
+        foundDirect: Object.keys(directMetrics).length > 0,
+        foundNormalized: Object.keys(normalizedMetrics).length > 0,
+        foundAlias: Object.keys(aliasMetrics).length > 0,
+      });
 
       const metricsByAccount =
         Object.keys(directMetrics).length > 0
@@ -3419,8 +3546,39 @@ function ReportBuilder() {
 
       let metricsForAccount = metricsByAccount[accountId] ?? [];
       if (!metricsForAccount.length) {
-        // Fallback: flatten all account metrics for this integration
+        // Fallback 1: flatten all account metrics for this integration
         metricsForAccount = Object.values(metricsByAccount).flat();
+      }
+
+      // Fallback 2: If still empty, use CURATED_DEFAULTS for this platform
+      // This handles cases where the API returns no metrics (e.g. Meta Ads/Business in some clients)
+      // but we want to allow the user to select them anyway.
+      if (!metricsForAccount.length) {
+        const defaults = CURATED_DEFAULTS[platform] ||
+          CURATED_DEFAULTS[normalizedPlatform] ||
+          (aliasPlatform ? CURATED_DEFAULTS[aliasPlatform] : undefined);
+
+        if (defaults) {
+          console.log('⚠️ Sidebar: Using CURATED_DEFAULTS fallback for', platform);
+          metricsForAccount = defaults.map(metricKey => {
+            // Generate a friendly name like "Meta Instagram Followers"
+            const parts = metricKey.split('.');
+            const name = parts[parts.length - 1]
+              .replace(/([A-Z])/g, ' $1')
+              .replace(/[._-]/g, ' ')
+              .trim();
+            const displayName = name.charAt(0).toUpperCase() + name.slice(1);
+
+            return {
+              metricKey,
+              integration: platform,
+              accountId: accountId,
+              displayName: displayName,
+              category: "General",
+              value: 0
+            };
+          });
+        }
       }
 
       // Restrict GA/GSC metrics to curated sets
@@ -3902,9 +4060,25 @@ function ReportBuilder() {
       <div className="sticky z-50 top-0 py-3 md:py-[1.3em]  border-b flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-3 md:px-5">
         <div className="flex flex-col">
           <span className="font-medium text-lg md:text-xl">Report Builder</span>
-          <span className="text-xs md:text-sm text-gray-500">
-            {isTemplateLoading ? "Loading template..." : templateName}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs md:text-sm text-gray-500">
+              {isTemplateLoading ? "Loading template..." : templateName}
+            </span>
+            {templateId && (
+              <span className="text-xs text-gray-400">
+                {isSavingTemplate ? (
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                    Saving...
+                  </span>
+                ) : hasUnsavedChanges ? (
+                  <span>Unsaved changes</span>
+                ) : lastSavedTime ? (
+                  <span>All changes saved</span>
+                ) : null}
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <span className="mx-1 md:mx-2 text-base md:text-lg text-gray-500 cursor-pointer">
@@ -4007,7 +4181,7 @@ function ReportBuilder() {
 
         {/* Grid Area */}
         <div className="flex-1 overflow-y-auto bg-gray-100 flex flex-col items-center h-[calc(100vh-(var(--rb-header)+var(--rb-subheader)))] px-2 md:px-0">
-          {effectivePageOrder.map((id, pageIndex) => {
+          {effectivePageOrder.map((id) => {
             const layout = dashboards.get(id);
             if (!layout) return null;
 
@@ -4050,7 +4224,9 @@ function ReportBuilder() {
               slideTitle = slideMeta.title;
               slideSubtitle = slideMeta.subtitle;
             } else {
-              const integration = integrationsData?.integrations?.[pageIndex];
+              // Use slideIntegrationMap which correctly maps slideId to integration
+              const integration = slideIntegrationMap.get(id);
+
               if (integration) {
                 const platformConfig = getPlatformConfig(integration.platform);
                 slideTitle = platformConfig?.name || integration.platform;

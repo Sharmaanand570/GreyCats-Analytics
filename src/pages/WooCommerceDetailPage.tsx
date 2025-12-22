@@ -28,7 +28,10 @@ import {
   useWooCommerceProduct,
   useWooCommerceOrders,
   useWooCommerceOrder,
+  useWooCommerceTrends,
+  useWooCommerceAccountInfo,
 } from "@/features/woocommerce/hooks/useWooCommerce";
+import { useClients } from "@/hooks/useClients";
 import {
   Table,
   TableBody,
@@ -58,17 +61,29 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 
-function WooCommerceDetailPage() {
+const WooCommerceDetailPage = () => {
+  // Get clients list and auto-select first client (matching pattern from MetaDetailPage, GoogleAnalyticsDetailPage)
+  const { data: clientsData } = useClients();
+  const clients = clientsData || [];
+
+  // State management
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [accountId, setAccountId] = useState<number | null>(null);
-  const [productsPage, setProductsPage] = useState(1);
-  const [productsLimit] = useState(10);
   const [productsSearch, setProductsSearch] = useState<string>("");
-  const [ordersPage, setOrdersPage] = useState(1);
-  const [ordersLimit] = useState(10);
-  const [perProductPage] = useState(1);
-  const [perProductLimit] = useState(10);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+
+  // Pagination state (for future use)
+  const perProductPage = 1;
+  const perProductLimit = 10;
+
+  // Auto-select first client (matching pattern from MetaDetailPage - NOT in useEffect!)
+  console.log('DEBUG: clients =', clients, 'selectedClientId =', selectedClientId);
+  if (clients.length > 0 && !selectedClientId) {
+    console.log('DEBUG: Auto-selecting client:', clients[0]);
+    setSelectedClientId(clients[0].id);
+  }
+
   const { data: accountsData, error: accountsError, isLoading: isLoadingAccounts } = useWooCommerceAccounts();
   console.log(accountsData);
 
@@ -83,23 +98,22 @@ function WooCommerceDetailPage() {
     useWooCommerceReconnect();
 
   // Derive account info from accountsData instead of making a separate API call
-  const accountInfo = accountId && accountsData?.accounts
-    ? {
-      success: true,
-      account: accountsData.accounts.find(acc => acc.id === accountId)
-    }
-    : null;
-  const isLoadingAccountInfo = isLoadingAccounts;
+  // Fetch detailed account info including currency, version etc
+  const {
+    data: accountInfoResponse,
+    isLoading: isLoadingAccountInfo
+  } = useWooCommerceAccountInfo(1, accountId); // Defaulting clientId to 1 until route params are fixed
+
+  const accountInfo = accountInfoResponse?.success ? accountInfoResponse : null;
 
   const { data: syncStatus, isLoading: isLoadingSyncStatus } =
-    useWooCommerceSyncStatus(accountId);
+    useWooCommerceSyncStatus(1, accountId);
 
   // Fetch analytics data
   const {
     data: analyticsData,
-    isLoading: isLoadingAnalytics,
     error: analyticsError,
-  } = useWooCommerceAnalytics(accountId);
+  } = useWooCommerceAnalytics(selectedClientId || 0); // Use selected client
 
   // Fetch per-product analytics data (for top products with revenue) - using paginated version
   const {
@@ -107,6 +121,7 @@ function WooCommerceDetailPage() {
     isLoading: isLoadingProductsAnalytics,
     error: productsAnalyticsError,
   } = useWooCommercePerProductPaginated(
+    1,
     accountId
       ? {
         accountId,
@@ -123,50 +138,33 @@ function WooCommerceDetailPage() {
     data: ordersData,
     isLoading: isLoadingOrders,
     error: ordersError,
-  } = useWooCommerceOrders(
-    accountId
-      ? {
-        accountId,
-        page: ordersPage,
-        limit: ordersLimit,
-      }
-      : null
-  );
+  } = useWooCommerceOrders(selectedClientId || 0); // Use selected client
 
   // Fetch single product detail
   const {
     data: productDetailData,
     isLoading: isLoadingProductDetail,
-  } = useWooCommerceProduct(selectedProductId, accountId);
+  } = useWooCommerceProduct(1, selectedProductId ?? '', accountId ?? 0);
 
   // Fetch single order detail
   const {
     data: orderDetailData,
     isLoading: isLoadingOrderDetail,
-  } = useWooCommerceOrder(selectedOrderId, accountId);
+  } = useWooCommerceOrder(1, selectedOrderId, accountId);
 
   // Fetch products catalog
   const {
     data: productsCatalogData,
     isLoading: isLoadingProductsCatalog,
     error: productsCatalogError,
-  } = useWooCommerceProducts(
-    accountId
-      ? {
-        accountId,
-        page: productsPage,
-        limit: productsLimit,
-        search: productsSearch || undefined,
-      }
-      : null
-  );
+  } = useWooCommerceProducts(selectedClientId || 0); // Use selected client
 
   // Fetch agency rollup data for stores table
   const {
     data: rollupData,
     isLoading: isLoadingRollup,
     error: rollupError,
-  } = useWooCommerceAgencyRollup();
+  } = useWooCommerceAgencyRollup(1);
 
   // Calculate active stores count from rollup data
   const activeStoresCount = rollupData?.accounts?.filter(acc => acc.revenue > 0 || acc.orders > 0).length || rollupData?.accounts?.length || 0;
@@ -175,25 +173,25 @@ function WooCommerceDetailPage() {
   const lastProductsSync = syncStatus?.sync?.lastProductsSync;
   const lastOrdersSync = syncStatus?.sync?.lastOrdersSync;
 
-  // Transform revenue data for chart (mock data for now - would come from snapshots API in future)
-  // For now, we can use a simple representation based on analytics data
-  const revenueChartData = [
-    { day: "Mon", revenue: 0 },
-    { day: "Tue", revenue: 5 },
-    { day: "Wed", revenue: 2.5 },
-    { day: "Thu", revenue: 7.5 },
-    { day: "Fri", revenue: 12.5 },
-    { day: "Sat", revenue: 15 },
-    { day: "Sun", revenue: 17.5 },
-  ];
+  // Fetch trends data for revenue chart
+  const {
+    data: trendsData,
+    isLoading: isLoadingTrends,
+  } = useWooCommerceTrends(selectedClientId || 0); // Use selected client
+
+  // Transform trends data for chart
+  const revenueChartData = trendsData?.trends?.map((trend) => ({
+    day: new Date(trend.date).toLocaleDateString('en-US', { weekday: 'short' }),
+    revenue: trend.revenue,
+  })) || [];
 
   // Set default account only if accountId is null (preserve user selection)
   useEffect(() => {
-    if (accountId === null && accountsData?.success && accountsData?.accounts && accountsData.accounts.length > 0) {
+    if (accountId === null && accountsData && accountsData.length > 0) {
       // Get the first active account, or the first account if none are active
-      const activeAccount = accountsData.accounts.find((acc) => acc.isActive);
-      const selectedAccount = activeAccount || accountsData.accounts[0];
-      setAccountId(selectedAccount.id);
+      const activeAccount = accountsData.find((acc: any) => acc.original?.isActive);
+      const selectedAccount = activeAccount || accountsData[0];
+      setAccountId(selectedAccount.id as number);
     }
   }, [accountsData, accountId]);
 
@@ -201,28 +199,23 @@ function WooCommerceDetailPage() {
     const newAccountId = parseInt(value, 10);
     if (!isNaN(newAccountId)) {
       setAccountId(newAccountId);
-      // Reset pagination and search when switching accounts
-      setProductsPage(1);
-      setOrdersPage(1);
+      // Reset search when switching accounts
       setProductsSearch("");
     }
   };
 
   const handleProductsSearchChange = (value: string) => {
     setProductsSearch(value);
-    // Reset to first page when search changes
-    setProductsPage(1);
   };
 
   const handleClearProductsSearch = () => {
     setProductsSearch("");
-    setProductsPage(1);
   };
 
   const handleSyncProducts = async () => {
     if (!accountId) return;
     try {
-      await syncProducts({ accountId });
+      await syncProducts();
     } catch (error) {
       // Error is handled in the hook with toast
     }
@@ -231,7 +224,7 @@ function WooCommerceDetailPage() {
   const handleSyncOrders = async () => {
     if (!accountId) return;
     try {
-      await syncOrders({ accountId });
+      await syncOrders();
     } catch (error) {
       // Error is handled in the hook with toast
     }
@@ -240,7 +233,7 @@ function WooCommerceDetailPage() {
   const handleDisconnect = async () => {
     if (!accountId) return;
     try {
-      await disconnect({ accountId });
+      await disconnect();
     } catch (error) {
       // Error is handled in the hook with toast
     }
@@ -249,7 +242,7 @@ function WooCommerceDetailPage() {
   const handleReconnect = async () => {
     if (!accountId) return;
     try {
-      await reconnect({ accountId });
+      await reconnect();
     } catch (error) {
       // Error is handled in the hook with toast
     }
@@ -303,7 +296,7 @@ function WooCommerceDetailPage() {
   }
 
   // Show message if no accounts found
-  if (accountsData?.success && (!accountsData.accounts || accountsData.accounts.length === 0)) {
+  if (accountsData && accountsData.length === 0) {
     return (
       <div className="w-full h-full flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
         <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
@@ -344,7 +337,7 @@ function WooCommerceDetailPage() {
             </div>
             <div className="flex items-center gap-4">
               {/* Account Selector */}
-              {accountsData?.success && accountsData.accounts && accountsData.accounts.length > 0 && (
+              {accountsData && accountsData.length > 0 && (
                 <div className="flex items-center gap-2">
                   <Label htmlFor="account-select" className="text-sm text-gray-600 whitespace-nowrap">
                     Account:
@@ -357,9 +350,9 @@ function WooCommerceDetailPage() {
                       <SelectValue placeholder="Select an account" />
                     </SelectTrigger>
                     <SelectContent>
-                      {accountsData.accounts.map((account) => {
-                        const displayUrl = account.storeUrl.replace(/^https?:\/\//, "");
-                        const statusText = account.isActive ? " (Active)" : " (Inactive)";
+                      {accountsData.map((account) => {
+                        const displayUrl = account.name || "Unknown Store";
+                        const statusText = account.original?.isActive ? " (Active)" : " (Inactive)";
                         return (
                           <SelectItem key={account.id} value={account.id.toString()}>
                             {displayUrl}{statusText}
@@ -555,8 +548,8 @@ function WooCommerceDetailPage() {
               </Card>
             )}
 
-            {/* Overview sections - only show when account is active */}
-            {accountInfo?.account?.isActive ? (
+            {/* Overview sections */}
+            {accountId && (
               <>
                 {/* Error States */}
                 {analyticsError && (
@@ -599,17 +592,17 @@ function WooCommerceDetailPage() {
                 {/* KPI Cards - Use analytics data for current account, rollup totals for agency view */}
                 <WooCommerceKPICards
                   totalRevenue={
-                    analyticsData?.analytics?.totalRevenue ||
+                    analyticsData?.summary?.totalRevenue ||
                     rollupData?.totals?.totalRevenue ||
                     0
                   }
                   totalOrders={
-                    analyticsData?.analytics?.orderCount ||
+                    analyticsData?.summary?.totalOrders ||
                     rollupData?.totals?.totalOrders ||
                     0
                   }
                   avgOrderValue={
-                    analyticsData?.analytics?.avgOrderValue ||
+                    analyticsData?.summary?.averageOrderValue ||
                     rollupData?.totals?.totalAvgOrder ||
                     0
                   }
@@ -622,7 +615,7 @@ function WooCommerceDetailPage() {
                   <div>
                     <WooCommerceRevenueChart
                       data={revenueChartData}
-                      isLoading={isLoadingAnalytics}
+                      isLoading={isLoadingTrends}
                     />
                   </div>
 
@@ -647,7 +640,7 @@ function WooCommerceDetailPage() {
                         products={
                           productsAnalyticsData?.products && productsAnalyticsData.products.length > 0
                             ? productsAnalyticsData.products.slice(0, 3).map((p) => ({
-                              productId: p.productId,
+                              productId: p.id.toString(),
                               name: p.name,
                               revenue: p.revenue,
                               qty: p.qty,
@@ -671,7 +664,7 @@ function WooCommerceDetailPage() {
                             <h3 className="text-lg font-semibold">Products</h3>
                             {productsCatalogData && (
                               <p className="text-sm text-gray-500 mt-1">
-                                Showing {productsCatalogData.products.length} of {productsCatalogData.total} products
+                                Showing {productsCatalogData.products.length} products
                               </p>
                             )}
                           </div>
@@ -730,14 +723,14 @@ function WooCommerceDetailPage() {
                             </TableHeader>
                             <TableBody>
                               {productsCatalogData.products.map((product) => (
-                                <TableRow key={product.productId}>
+                                <TableRow key={product.id}>
                                   <TableCell className="pl-6">
                                     <div className="flex flex-col">
                                       <p className="text-sm font-medium text-gray-900">
                                         {product.name}
                                       </p>
                                       <p className="text-xs text-gray-500">
-                                        ID: {product.productId}
+                                        ID: {product.id}
                                       </p>
                                     </div>
                                   </TableCell>
@@ -745,24 +738,24 @@ function WooCommerceDetailPage() {
                                     {product.sku || "N/A"}
                                   </TableCell>
                                   <TableCell className="text-sm text-gray-600">
-                                    ${product.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    ${parseFloat(product.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </TableCell>
                                   <TableCell className="text-sm text-gray-600">
-                                    {product.stockQty || 0}
+                                    {product.stockQuantity || 0}
                                   </TableCell>
                                   <TableCell>
                                     <span
-                                      className={`px-2 py-1 text-xs font-medium rounded-md whitespace-nowrap ${product.status === "publish"
+                                      className={`px-2 py-1 text-xs font-medium rounded-md whitespace-nowrap ${product.stockStatus === "instock"
                                         ? "bg-green-100 text-green-700"
                                         : "bg-gray-100 text-gray-700"
                                         }`}
                                     >
-                                      {product.status || "N/A"}
+                                      {product.stockStatus || "N/A"}
                                     </span>
                                   </TableCell>
                                   <TableCell className="pr-6">
                                     <button
-                                      onClick={() => setSelectedProductId(product.productId)}
+                                      onClick={() => setSelectedProductId(product.id.toString())}
                                       className="p-1 hover:bg-gray-100 rounded"
                                       title="View Product Details"
                                     >
@@ -773,34 +766,6 @@ function WooCommerceDetailPage() {
                               ))}
                             </TableBody>
                           </Table>
-                          {productsCatalogData.totalPages > 1 && (
-                            <div className="p-4 border-t flex items-center justify-between">
-                              <p className="text-sm text-gray-600">
-                                Page {productsCatalogData.page} of {productsCatalogData.totalPages}
-                              </p>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setProductsPage((p) => Math.max(1, p - 1))}
-                                  disabled={productsPage === 1 || isLoadingProductsCatalog}
-                                >
-                                  Previous
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setProductsPage((p) => p + 1)}
-                                  disabled={
-                                    productsPage >= (productsCatalogData?.totalPages || 1) ||
-                                    isLoadingProductsCatalog
-                                  }
-                                >
-                                  Next
-                                </Button>
-                              </div>
-                            </div>
-                          )}
                         </>
                       ) : (
                         <div className="p-6 text-center text-gray-500">
@@ -816,7 +781,7 @@ function WooCommerceDetailPage() {
                           <h3 className="text-lg font-semibold">Orders</h3>
                           {ordersData && (
                             <p className="text-sm text-gray-500 mt-1">
-                              Showing {ordersData.orders.length} of {ordersData.total} orders
+                              Showing {ordersData.orders.length} orders
                             </p>
                           )}
                         </div>
@@ -858,7 +823,7 @@ function WooCommerceDetailPage() {
                                   <TableCell className="pl-6">
                                     <div className="flex flex-col">
                                       <p className="text-sm font-medium text-gray-900">
-                                        #{order.orderId}
+                                        #{order.orderNumber}
                                       </p>
                                       <p className="text-xs text-gray-500">
                                         ID: {order.id}
@@ -875,17 +840,17 @@ function WooCommerceDetailPage() {
                                     </span>
                                   </TableCell>
                                   <TableCell className="text-sm text-gray-600">
-                                    {order.currency} {order.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {order.currency} {parseFloat(order.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </TableCell>
                                   <TableCell className="text-sm text-gray-600">
                                     {order.currency}
                                   </TableCell>
                                   <TableCell className="text-sm text-gray-600">
-                                    {format(new Date(order.createdAt), "MMM dd, yyyy HH:mm")}
+                                    {format(new Date(order.dateCreated), "MMM dd, yyyy HH:mm")}
                                   </TableCell>
                                   <TableCell className="pr-6">
                                     <button
-                                      onClick={() => setSelectedOrderId(order.orderId)}
+                                      onClick={() => setSelectedOrderId(order.orderNumber)}
                                       className="p-1 hover:bg-gray-100 rounded"
                                       title="View Order Details"
                                     >
@@ -896,34 +861,6 @@ function WooCommerceDetailPage() {
                               ))}
                             </TableBody>
                           </Table>
-                          {ordersData.totalPages > 1 && (
-                            <div className="p-4 border-t flex items-center justify-between">
-                              <p className="text-sm text-gray-600">
-                                Page {ordersData.page} of {ordersData.totalPages}
-                              </p>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setOrdersPage((p) => Math.max(1, p - 1))}
-                                  disabled={ordersPage === 1 || isLoadingOrders}
-                                >
-                                  Previous
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setOrdersPage((p) => p + 1)}
-                                  disabled={
-                                    ordersPage >= (ordersData?.totalPages || 1) ||
-                                    isLoadingOrders
-                                  }
-                                >
-                                  Next
-                                </Button>
-                              </div>
-                            </div>
-                          )}
                         </>
                       ) : (
                         <div className="p-6 text-center text-gray-500">
@@ -982,7 +919,7 @@ function WooCommerceDetailPage() {
                               : account.storeUrl;
 
                           return (
-                            <TableRow key={account.accountId}>
+                            <TableRow key={account.id}>
                               <TableCell className="pl-6">
                                 <div className="flex items-center gap-3">
                                   <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
@@ -1043,17 +980,7 @@ function WooCommerceDetailPage() {
                   )}
                 </div>
               </>
-            ) : accountId ? (
-              <Card className=" border border-yellow-200 rounded-2xl">
-                <CardContent className="p-6">
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600 mb-2">
-                      Account is disconnected. Please reconnect to view the overview.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : null}
+            )}
           </div>
         </div>
       </div>
@@ -1085,7 +1012,7 @@ function WooCommerceDetailPage() {
                 <div>
                   <p className="text-sm font-medium text-gray-500">Product ID</p>
                   <p className="text-base text-gray-900 mt-1">
-                    {productDetailData.product.productId}
+                    {productDetailData.product.id}
                   </p>
                 </div>
                 <div>
@@ -1097,24 +1024,24 @@ function WooCommerceDetailPage() {
                 <div>
                   <p className="text-sm font-medium text-gray-500">Price</p>
                   <p className="text-base font-semibold text-gray-900 mt-1">
-                    ${productDetailData.product.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ${parseFloat(productDetailData.product.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-500">Stock Quantity</p>
                   <p className="text-base text-gray-900 mt-1">
-                    {productDetailData.product.stockQty || 0}
+                    {productDetailData.product.stockQuantity || 0}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-500">Status</p>
                   <span
-                    className={`inline-block mt-1 px-2 py-1 text-xs font-medium rounded-md ${productDetailData.product.status === "publish"
+                    className={`inline-block mt-1 px-2 py-1 text-xs font-medium rounded-md ${productDetailData.product.stockStatus === "instock"
                       ? "bg-green-100 text-green-700"
                       : "bg-gray-100 text-gray-700"
                       }`}
                   >
-                    {productDetailData.product.status || "N/A"}
+                    {productDetailData.product.stockStatus || "N/A"}
                   </span>
                 </div>
               </div>
@@ -1148,7 +1075,7 @@ function WooCommerceDetailPage() {
                 <div>
                   <p className="text-sm font-medium text-gray-500">Order ID</p>
                   <p className="text-base font-semibold text-gray-900 mt-1">
-                    #{orderDetailData.order.orderId}
+                    #{orderDetailData.order.orderNumber}
                   </p>
                 </div>
                 <div>
@@ -1167,7 +1094,7 @@ function WooCommerceDetailPage() {
                   <p className="text-sm font-medium text-gray-500">Total Amount</p>
                   <p className="text-base font-semibold text-gray-900 mt-1">
                     {orderDetailData.order.currency}{" "}
-                    {orderDetailData.order.totalAmount.toLocaleString(undefined, {
+                    {parseFloat(orderDetailData.order.total).toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}
@@ -1177,7 +1104,7 @@ function WooCommerceDetailPage() {
                   <p className="text-sm font-medium text-gray-500">Created At</p>
                   <p className="text-base text-gray-900 mt-1">
                     {format(
-                      new Date(orderDetailData.order.createdAt),
+                      new Date(orderDetailData.order.dateCreated),
                       "MMM dd, yyyy HH:mm"
                     )}
                   </p>
@@ -1216,7 +1143,7 @@ function WooCommerceDetailPage() {
                             {item.quantity}
                           </TableCell>
                           <TableCell className="text-right text-sm font-medium text-gray-900">
-                            {orderDetailData.order.currency}{" "}
+                            {orderDetailData?.order?.currency}{" "}
                             {item.total.toLocaleString(undefined, {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,

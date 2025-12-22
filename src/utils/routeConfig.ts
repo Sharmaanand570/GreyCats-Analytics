@@ -15,7 +15,7 @@ export const validRoutes = [
   "/data-sources/woocommerce",
   "/data-sources/shopify",
   "/data-sources/google-analytics",
-  "/data-sources/google-analytics/:accountId",
+  "/data-sources/google-analytics/:clientId",
   "/data-sources/google-console",
   "/data-sources/meta-ads",
   "/data-sources/meta-business",
@@ -47,6 +47,8 @@ const dynamicRoutePatterns = [
   /^\/reports\/[^/]+$/, // /reports/:id
   /^\/clients\/[^/]+$/, // /clients/:id
   /^\/clients\/[^/]+\/.+$/, // /clients/:id/sub-routes (like /clients/1/reports)
+  /^\/data-sources\/google-analytics\/\d+$/, // /data-sources/google-analytics/:clientId
+  /^\/data-sources\/google-console\/\d+$/, // /data-sources/google-console/:clientId
 ];
 
 /**

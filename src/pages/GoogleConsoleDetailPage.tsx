@@ -1,5 +1,4 @@
-import { useMemo, useState } from "react";
-import { format, subDays } from "date-fns";
+import { useParams, useNavigate } from "react-router-dom";
 import { FaGoogle } from "react-icons/fa6";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,55 +26,73 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useClients } from "@/hooks/useClients";
+import {
   useGoogleConsoleDisconnect,
-  useGoogleConsolePerformance,
   useGoogleConsoleProperties,
   useGoogleConsoleReconnect,
   useGoogleConsoleSelectProperty,
-  useGoogleConsoleUnifiedMetrics,
+  useGoogleConsoleSummary,
+  useGoogleConsoleTopPages,
+  useGoogleConsoleTopQueries,
 } from "@/features/YouTube/hooks/google/useGoogleConsoleData";
-import { Loader2 } from "lucide-react";
+import {
+  Loader2,
+  MousePointer2,
+  Eye,
+  Percent,
+  Trophy,
+  ArrowUpRight,
+  TrendingUp
+} from "lucide-react";
 
 function GoogleConsoleDetailPage() {
+  const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
+  const navigate = useNavigate();
+
+  // Parse clientId from URL or default to null
+  const selectedClientId = clientIdParam ? Number(clientIdParam) : null;
+
+  // Fetch all clients for selector
+  const { data: clients } = useClients();
+
+  // Handle client selection - update URL
+  const handleClientChange = (newClientId: string) => {
+    navigate(`/data-sources/google-console/${newClientId}`);
+  };
+
+  const clientId = selectedClientId || 0;
+
   const {
     data: propertiesData,
     isLoading: isLoadingProperties,
     error: propertiesError,
-  } = useGoogleConsoleProperties();
+  } = useGoogleConsoleProperties(clientId);
 
   console.log("propertiesData", propertiesData);
 
-  const [selectedSiteUrl, setSelectedSiteUrl] = useState<string>("");
-  const [startDate, setStartDate] = useState<string>(
-    format(subDays(new Date(), 6), "yyyy-MM-dd")
-  );
-  const [endDate, setEndDate] = useState<string>(
-    format(new Date(), "yyyy-MM-dd")
-  );
-  const [dimension, setDimension] = useState<string>("date");
-  const [performanceRows, setPerformanceRows] = useState<
-    { keys: string[]; clicks: number; impressions: number; ctr: number; position: number }[]
-  >([]);
-  const [performanceError, setPerformanceError] = useState<string | null>(null);
-
-  const unifiedMetricsParams = useMemo(
-    () => ({
-      integration: "google-search-console",
-      metricKey: "google_seo.clicks",
-      dimensionType: dimension ? [dimension] : undefined,
-      startDate,
-      endDate,
-    }),
-    [dimension, startDate, endDate]
-  );
+  // Use new overview endpoints
+  const {
+    data: summaryData,
+    isLoading: isLoadingSummary,
+    error: summaryError,
+  } = useGoogleConsoleSummary(clientId);
 
   const {
-    data: unifiedMetricsData,
-    isLoading: isLoadingUnified,
-    error: unifiedError,
-  } = useGoogleConsoleUnifiedMetrics(unifiedMetricsParams);
+    data: topPagesData,
+    isLoading: isLoadingTopPages,
+  } = useGoogleConsoleTopPages(clientId);
 
-  console.log("unifiedMetricsData", unifiedMetricsData, unifiedError);
+  const {
+    data: topQueriesData,
+    isLoading: isLoadingTopQueries,
+  } = useGoogleConsoleTopQueries(clientId);
 
   const {
     mutateAsync: selectProperty,
@@ -92,44 +109,25 @@ function GoogleConsoleDetailPage() {
     isPending: isDisconnecting,
   } = useGoogleConsoleDisconnect();
 
-  const {
-    mutateAsync: fetchPerformance,
-    isPending: isFetchingPerformance,
-  } = useGoogleConsolePerformance();
-
   const tokenExpired =
     (propertiesError &&
       propertiesError.message.toLowerCase().includes("token expired")) ||
-    (unifiedError &&
-      unifiedError.message.toLowerCase().includes("token expired"));
+    (summaryError &&
+      summaryError.message.toLowerCase().includes("token expired"));
 
   const properties = propertiesData?.properties ?? [];
-  const selectedProperty = useMemo(
-    () => properties.find((p) => p.isSelected),
-    [properties]
-  );
 
-  const clicksSummary = useMemo(() => {
-    const rows = unifiedMetricsData?.rows ?? [];
-    if (!rows.length) return { total: 0, days: 0 };
-
-    const filtered = rows.filter(
-      (r) =>
-        r.integration === "google-search-console" &&
-        r.metricKey === "google_seo.clicks" &&
-        (!selectedProperty || r.accountId === selectedProperty.siteUrl)
-    );
-
-    if (!filtered.length) return { total: 0, days: 0 };
-
-    const total = filtered.reduce((sum, r) => sum + (r.value ?? 0), 0);
-    const days = new Set(filtered.map((r) => r.date)).size;
-    return { total, days };
-  }, [unifiedMetricsData, selectedProperty]);
+  // Summary metrics from new endpoint
+  const summaryMetrics = summaryData?.summary || {
+    totalClicks: 0,
+    totalImpressions: 0,
+    avgCTR: 0,
+    avgPosition: 0,
+  };
 
   const handleReconnect = async () => {
     try {
-      await reconnectConsole();
+      await reconnectConsole(clientId);
     } catch {
       // handled in hook via toast
     }
@@ -137,45 +135,18 @@ function GoogleConsoleDetailPage() {
 
   const handleDisconnect = async () => {
     try {
-      await disconnectConsole();
+      await disconnectConsole(clientId);
     } catch {
       // handled in hook via toast
     }
   };
 
   const handleSelectProperty = async (siteUrl: string) => {
-    console.log(siteUrl);
     if (!siteUrl) return;
     try {
-      const resp = await selectProperty({ siteUrl });
-      console.log(resp);
-      setSelectedSiteUrl(siteUrl);
+      await selectProperty({ clientId, body: { siteUrl } });
     } catch {
       // toast handled in hook
-    }
-  };
-
-  const handleFetchPerformance = async () => {
-    if (!selectedSiteUrl || !startDate || !endDate) {
-      setPerformanceError("Please select a property and date range first.");
-      return;
-    }
-
-    setPerformanceError(null);
-    try {
-      const resp = await fetchPerformance({
-        siteUrl: selectedSiteUrl,
-        startDate,
-        endDate,
-        dimension,
-      });
-      setPerformanceRows(resp.rows ?? []);
-    } catch (err) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : "Failed to fetch Search Console performance data";
-      setPerformanceError(msg);
     }
   };
 
@@ -191,6 +162,23 @@ function GoogleConsoleDetailPage() {
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              {clients && clients.length > 0 && (
+                <Select
+                  value={selectedClientId?.toString() || ""}
+                  onValueChange={handleClientChange}
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Select Client" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id.toString()}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <Button
                 variant="secondary"
                 size="sm"
@@ -256,23 +244,16 @@ function GoogleConsoleDetailPage() {
               </Card>
             )}
 
-            {(propertiesError && !tokenExpired) || unifiedError ? (
+            {/* Error display removed for properties error as requested */}
+            {summaryError && (
               <Card className="border border-destructive/40 bg-destructive/5">
                 <CardContent className="py-3 text-sm text-destructive space-y-1">
-                  {propertiesError && !tokenExpired && (
-                    <p>
-                      Failed to load Search Console properties:{" "}
-                      {propertiesError.message}
-                    </p>
-                  )}
-                  {unifiedError && (
-                    <p>
-                      Failed to load SEO metrics: {unifiedError.message}
-                    </p>
-                  )}
+                  <p>
+                    Failed to load SEO metrics: {summaryError.message}
+                  </p>
                 </CardContent>
               </Card>
-            ) : null}
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card>
@@ -300,8 +281,8 @@ function GoogleConsoleDetailPage() {
                         <div
                           key={p.id}
                           className={`flex items-center justify-between p-3 rounded-lg border ${p.isSelected
-                              ? 'border-primary bg-primary/5'
-                              : 'border-border bg-background'
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border bg-background'
                             }`}
                         >
                           <div className="flex-1 min-w-0">
@@ -342,146 +323,222 @@ function GoogleConsoleDetailPage() {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm font-medium">
-                    SEO Clicks (Cron)
-                  </CardTitle>
-                  <CardDescription>
-                    Aggregated clicks from unified metrics for the selected
-                    property.
-                  </CardDescription>
+              {/* Summary Metrics Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Total Clicks
+                    </CardTitle>
+                    <MousePointer2 className="h-4 w-4 text-blue-500" />
+                  </CardHeader>
+                  <CardContent>
+                    {isLoadingSummary ? (
+                      <Skeleton className="h-8 w-20" />
+                    ) : (
+                      <div className="flex flex-col gap-1">
+                        <div className="text-2xl font-bold">
+                          {summaryMetrics.totalClicks.toLocaleString()}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Last 30 days
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Total Impressions
+                    </CardTitle>
+                    <Eye className="h-4 w-4 text-violet-500" />
+                  </CardHeader>
+                  <CardContent>
+                    {isLoadingSummary ? (
+                      <Skeleton className="h-8 w-20" />
+                    ) : (
+                      <div className="flex flex-col gap-1">
+                        <div className="text-2xl font-bold">
+                          {summaryMetrics.totalImpressions.toLocaleString()}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Last 30 days
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Average CTR
+                    </CardTitle>
+                    <Percent className="h-4 w-4 text-emerald-500" />
+                  </CardHeader>
+                  <CardContent>
+                    {isLoadingSummary ? (
+                      <Skeleton className="h-8 w-20" />
+                    ) : (
+                      <div className="flex flex-col gap-1">
+                        <div className="text-2xl font-bold">
+                          {(summaryMetrics.avgCTR * 100).toFixed(2)}%
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Last 30 days
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Avg Position
+                    </CardTitle>
+                    <Trophy className="h-4 w-4 text-amber-500" />
+                  </CardHeader>
+                  <CardContent>
+                    {isLoadingSummary ? (
+                      <Skeleton className="h-8 w-20" />
+                    ) : (
+                      <div className="flex flex-col gap-1">
+                        <div className="text-2xl font-bold">
+                          {summaryMetrics.avgPosition.toFixed(1)}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Last 30 days
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Top Pages */}
+              <Card className="col-span-1">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div className="space-y-1">
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4" />
+                      Top Performing Pages
+                    </CardTitle>
+                    <CardDescription>Highest traffic pages by clicks</CardDescription>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  {isLoadingUnified ? (
-                    <div className="space-y-3">
-                      <Skeleton className="h-6 w-24" />
-                      <Skeleton className="h-4 w-32" />
+                  {isLoadingTopPages ? (
+                    <div className="space-y-4">
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                    </div>
+                  ) : topPagesData?.topPages && topPagesData.topPages.length > 0 ? (
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="w-[40%]">Page URL</TableHead>
+                            <TableHead className="text-right">Clicks</TableHead>
+                            <TableHead className="text-right">Impr.</TableHead>
+                            <TableHead className="text-right">CTR</TableHead>
+                            <TableHead className="text-right">Pos.</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {topPagesData.topPages.map((page, idx) => (
+                            <TableRow key={idx} className="hover:bg-muted/50">
+                              <TableCell className="font-medium">
+                                <div className="flex items-center gap-2 max-w-md">
+                                  <span className="truncate text-blue-600 hover:underline cursor-pointer" title={page.page}>
+                                    {page.page.replace(/^https?:\/\/[^/]+/, '')}
+                                  </span>
+                                  <a href={page.page} target="_blank" rel="noopener noreferrer" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <ArrowUpRight className="h-3 w-3 text-muted-foreground" />
+                                  </a>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right font-medium">{page.clicks.toLocaleString()}</TableCell>
+                              <TableCell className="text-right text-muted-foreground">{page.impressions.toLocaleString()}</TableCell>
+                              <TableCell className="text-right text-muted-foreground">
+                                {(page.ctr * 100).toFixed(1)}%
+                              </TableCell>
+                              <TableCell className="text-right text-muted-foreground">
+                                {page.position.toFixed(1)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
                   ) : (
-                    <div className="space-y-1 text-sm">
-                      <p className="text-2xl font-semibold">
-                        {clicksSummary.total.toLocaleString()}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Days tracked: {clicksSummary.days}
-                      </p>
+                    <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+                      <TrendingUp className="h-8 w-8 mb-4 opacity-20" />
+                      <p>No page data available for this period</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Top Queries */}
+              <Card className="col-span-1">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div className="space-y-1">
+                    <CardTitle className="flex items-center gap-2">
+                      <MousePointer2 className="h-4 w-4" />
+                      Top Search Queries
+                    </CardTitle>
+                    <CardDescription>Keywords driving traffic (last 30 days)</CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingTopQueries ? (
+                    <div className="space-y-4">
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                    </div>
+                  ) : topQueriesData?.topQueries && topQueriesData.topQueries.length > 0 ? (
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="w-[40%]">Query</TableHead>
+                            <TableHead className="text-right">Clicks</TableHead>
+                            <TableHead className="text-right">Impr.</TableHead>
+                            <TableHead className="text-right">CTR</TableHead>
+                            <TableHead className="text-right">Pos.</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {topQueriesData.topQueries.map((query, idx) => (
+                            <TableRow key={idx} className="hover:bg-muted/50">
+                              <TableCell className="font-medium">{query.query}</TableCell>
+                              <TableCell className="text-right font-medium">{query.clicks.toLocaleString()}</TableCell>
+                              <TableCell className="text-right text-muted-foreground">{query.impressions.toLocaleString()}</TableCell>
+                              <TableCell className="text-right text-muted-foreground">
+                                {(query.ctr * 100).toFixed(1)}%
+                              </TableCell>
+                              <TableCell className="text-right text-muted-foreground">
+                                {query.position.toFixed(1)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+                      <MousePointer2 className="h-8 w-8 mb-4 opacity-20" />
+                      <p>No query data available for this period</p>
                     </div>
                   )}
                 </CardContent>
               </Card>
             </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Manual Performance Fetch (Debug)</CardTitle>
-                <CardDescription>
-                  Run an on-demand Search Console query for a property and date
-                  range.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium">Property</p>
-                    <select
-                      className="border rounded px-3 py-2 text-sm w-full"
-                      value={selectedSiteUrl}
-                      onChange={(e) => setSelectedSiteUrl(e.target.value)}
-                    >
-                      <option value="">Select...</option>
-                      {properties.map((p) => (
-                        <option key={p.id} value={p.siteUrl}>
-                          {p.siteUrl}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium">Start date</p>
-                    <input
-                      type="date"
-                      className="border rounded px-3 py-2 text-sm w-full"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium">End date</p>
-                    <input
-                      type="date"
-                      className="border rounded px-3 py-2 text-sm w-full"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium">Dimension</p>
-                    <select
-                      className="border rounded px-3 py-2 text-sm w-full"
-                      value={dimension}
-                      onChange={(e) => setDimension(e.target.value)}
-                    >
-                      <option value="date">date</option>
-                      <option value="query">query</option>
-                      <option value="page">page</option>
-                      <option value="country">country</option>
-                      <option value="device">device</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex justify-end">
-                  <Button
-                    size="sm"
-                    onClick={handleFetchPerformance}
-                    disabled={isFetchingPerformance}
-                  >
-                    {isFetchingPerformance ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin mr-1" />
-                        Fetching...
-                      </>
-                    ) : (
-                      "Fetch Performance"
-                    )}
-                  </Button>
-                </div>
-
-                {performanceError && (
-                  <p className="text-sm text-destructive">{performanceError}</p>
-                )}
-
-                {performanceRows.length > 0 && (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Key</TableHead>
-                          <TableHead>Clicks</TableHead>
-                          <TableHead>Impressions</TableHead>
-                          <TableHead>CTR</TableHead>
-                          <TableHead>Position</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {performanceRows.map((row, idx) => (
-                          <TableRow key={idx}>
-                            <TableCell>{row.keys.join(", ")}</TableCell>
-                            <TableCell>{row.clicks}</TableCell>
-                            <TableCell>{row.impressions}</TableCell>
-                            <TableCell>
-                              {(row.ctr * 100).toFixed(2)}%
-                            </TableCell>
-                            <TableCell>{row.position.toFixed(1)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>

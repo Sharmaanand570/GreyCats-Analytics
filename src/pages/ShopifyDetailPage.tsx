@@ -44,13 +44,16 @@ import {
   useShopifyDelete,
   useShopifyDisconnect,
   useShopifyOrder,
-  useShopifyOrderAnalytics,
   useShopifyOrdersList,
   useShopifyProduct,
   useShopifyProductsList,
   useShopifyReconnect,
-  useShopifyRevenueTrend,
   useShopifySyncProducts,
+  // New client-specific hooks
+  useShopifySummary,
+  useShopifySimpleProducts,
+  useShopifySimpleOrders,
+  useShopifyTrends,
 } from "@/features/shopify/hooks/useShopify";
 import { Label } from "@/components/ui/label";
 import {
@@ -60,8 +63,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useClients } from "@/hooks/useClients";
 
 function ShopifyDetailPage() {
+  // Get clients and auto-select first client (matching WooCommerce pattern)
+  const { data: clientsData } = useClients();
+  const clients = clientsData || [];
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+
+  // Auto-select first client
+  if (clients.length > 0 && !selectedClientId) {
+    setSelectedClientId(clients[0].id);
+  }
+
+  // Use the selected client ID, or the first client's ID if available, otherwise null
+  const clientId = selectedClientId || (clients.length > 0 ? clients[0].id : null);
+
   const [productsPage, setProductsPage] = useState(1);
   const [ordersPage, setOrdersPage] = useState(1);
   const [productsSearch, setProductsSearch] = useState("");
@@ -96,36 +113,54 @@ function ShopifyDetailPage() {
     [ordersPage, ordersStatus]
   );
 
+  // Use new client-specific summary hook (only when clientId is available)
   const {
-    data: analyticsData,
+    data: summaryData,
     isLoading: isLoadingAnalytics,
     error: analyticsError,
-  } = useShopifyOrderAnalytics();
+  } = useShopifySummary(clientId || 0);
 
+  // Use new client-specific trends hook (only when clientId is available)
   const {
-    data: revenueTrendData,
+    data: trendsData,
     isLoading: isLoadingRevenue,
     error: revenueError,
-  } = useShopifyRevenueTrend();
+  } = useShopifyTrends(clientId || 0);
 
+  // Use new client-specific products hook
+  // const {
+  //   data: productsDataNew,
+  //   isLoading: isLoadingProductsNew,
+  //   error: productsErrorNew,
+  // } = useShopifySimpleProducts(clientId, 10);
+
+  // Keep old products list hook for pagination
   const {
     data: productsData,
     isLoading: isLoadingProducts,
     error: productsError,
-  } = useShopifyProductsList(productsParams);
+  } = useShopifyProductsList(clientId || 0, productsParams);
 
+  // Use new client-specific orders hook
+  // const {
+  //   data: ordersDataNew,
+  //   isLoading: isLoadingOrdersNew,
+  //   error: ordersErrorNew,
+  // } = useShopifySimpleOrders(clientId || 0, 10);
+
+  // Keep old orders list hook for pagination
   const {
     data: ordersData,
     isLoading: isLoadingOrders,
     error: ordersError,
-  } = useShopifyOrdersList(ordersParams);
+  } = useShopifyOrdersList(clientId || 0, ordersParams);
 
   const { data: productDetailData, isLoading: isLoadingProductDetail } =
-    useShopifyProduct(selectedProductId);
+    useShopifyProduct(clientId || 0, selectedProductId);
 
-  const { data: orderDetailData, isLoading: isLoadingOrderDetail } = useShopifyOrder(selectedOrderId);
+  const { data: orderDetailData, isLoading: isLoadingOrderDetail } = useShopifyOrder(clientId || 0, selectedOrderId);
   const { mutateAsync: syncProducts, isPending: isSyncing } = useShopifySyncProducts();
-  const { mutateAsync: disconnectShopify, isPending: isDisconnecting } =  useShopifyDisconnect();
+  const { mutateAsync: disconnectShopify, isPending: isDisconnecting } = useShopifyDisconnect();
   const { mutateAsync: deleteShopify, isPending: isDeleting } = useShopifyDelete();
   const { mutateAsync: reconnectShopify, isPending: isReconnecting } = useShopifyReconnect();
 
@@ -139,7 +174,7 @@ function ShopifyDetailPage() {
 
     setReconnectError("");
     try {
-      await reconnectShopify({ shop: reconnectShopDomain.trim() });
+      await reconnectShopify({ clientId: clientId || 0, params: { shop: reconnectShopDomain.trim() } });
       setIsReconnectDialogOpen(false);
       setReconnectShopDomain("");
     } catch (error) {
@@ -148,13 +183,13 @@ function ShopifyDetailPage() {
   };
 
   const revenueChartData: ShopifyRevenuePoint[] = useMemo(() => {
-    if (!revenueTrendData?.data) return [];
+    if (!trendsData?.trends) return [];
 
-    return Object.entries(revenueTrendData.data).sort(([dateA], [dateB]) =>new Date(dateA).getTime() - new Date(dateB).getTime()).map(([date, revenue]) => ({
-        label: format(new Date(date), "MMM dd"),
-        revenue,
-      }));
-  }, [revenueTrendData]);
+    return trendsData.trends.map((trend) => ({
+      label: format(new Date(trend.date), "MMM dd"),
+      revenue: trend.revenue,
+    }));
+  }, [trendsData]);
 
   const handleProductsSearch = (value: string) => {
     setProductsSearch(value);
@@ -207,7 +242,7 @@ function ShopifyDetailPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => syncProducts()}
+                    onClick={() => syncProducts(clientId || 0)}
                     disabled={isSyncing}
                     className="gap-2"
                   >
@@ -245,7 +280,7 @@ function ShopifyDetailPage() {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => disconnectShopify()}
+                    onClick={() => disconnectShopify(clientId || 0)}
                     disabled={isDisconnecting}
                     className="gap-2"
                   >
@@ -264,7 +299,7 @@ function ShopifyDetailPage() {
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => deleteShopify()}
+                    onClick={() => deleteShopify(clientId || 0)}
                     disabled={isDeleting}
                     className="gap-2"
                   >
@@ -334,10 +369,10 @@ function ShopifyDetailPage() {
             )}
 
             <ShopifyKPICards
-              totalRevenue={analyticsData?.data.totalRevenue}
-              totalOrders={analyticsData?.data.totalOrders}
-              avgOrderValue={analyticsData?.data.avgOrderValue}
-              statusBreakdown={analyticsData?.data.statusBreakdown}
+              totalRevenue={summaryData?.summary.totalRevenue}
+              totalOrders={summaryData?.summary.totalOrders}
+              avgOrderValue={summaryData?.summary.averageOrderValue}
+              statusBreakdown={undefined}
             />
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -359,23 +394,26 @@ function ShopifyDetailPage() {
                       <Skeleton className="h-4 w-3/4" />
                       <Skeleton className="h-4 w-2/3" />
                     </div>
-                  ) : analyticsData?.data.statusBreakdown ? (
+                  ) : summaryData?.summary ? (
                     <div className="space-y-3">
-                      {Object.entries(analyticsData.data.statusBreakdown).map(
-                        ([status, count]) => (
-                          <div
-                            key={status}
-                            className="flex items-center justify-between"
-                          >
-                            <span className="text-sm text-gray-600 capitalize">
-                              {status}
-                            </span>
-                            <span className="text-sm font-semibold text-gray-900">
-                              {count}
-                            </span>
-                          </div>
-                        )
-                      )}
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Total Revenue</span>
+                        <span className="text-sm font-semibold text-gray-900">
+                          ${summaryData.summary.totalRevenue.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Total Orders</span>
+                        <span className="text-sm font-semibold text-gray-900">
+                          {summaryData.summary.totalOrders}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Fulfilled Orders</span>
+                        <span className="text-sm font-semibold text-gray-900">
+                          {summaryData.summary.fulfilledOrders}
+                        </span>
+                      </div>
                     </div>
                   ) : (
                     <p className="text-sm text-gray-500">No analytics data</p>

@@ -24,7 +24,7 @@ const getMetricDisplayName = (metricKey: string): string => {
   // Extract the last part after the last dot
   const parts = metricKey.split('.');
   const name = parts[parts.length - 1];
-  
+
   // Convert snake_case or camelCase to Title Case
   return name
     .replace(/[_-]/g, ' ')
@@ -75,7 +75,7 @@ export const useAvailableMetrics = (clientId: number | null) => {
 
       try {
         const unified = await fetchUnifiedMetricsList(clientId, {
-          limit: 1000,
+          limit: 1000, // Increased to fetch all metrics at once
           startDate: formatDate(startDate),
           endDate: formatDate(endDate),
         });
@@ -99,8 +99,8 @@ export const useAvailableMetrics = (clientId: number | null) => {
       } catch (err) {
         // Surface the most recent error to React Query
         throw err ??
-          lastError ??
-          new Error("Failed to fetch available metrics");
+        lastError ??
+        new Error("Failed to fetch available metrics");
       }
     },
   });
@@ -157,7 +157,7 @@ export const useAvailableMetrics = (clientId: number | null) => {
     groupedMetrics,
     isLoading,
     error,
-    totalCount: data?.count ?? 0,
+    totalCount: data?.pagination?.total ?? 0,
   };
 };
 

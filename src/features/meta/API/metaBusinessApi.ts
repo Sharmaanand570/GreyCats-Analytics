@@ -80,6 +80,33 @@ export type MetaBusinessPost = {
   created_time: string;
   full_picture?: string;
   permalink_url?: string;
+  attachments?: {
+    data: Array<{
+      media?: {
+        image?: {
+          height: number;
+          src: string;
+          width: number;
+        };
+        source?: string;
+      };
+      type: string;
+      media_type: string;
+    }>;
+  };
+  likes?: {
+    summary: {
+      total_count: number;
+    };
+  };
+  comments?: {
+    summary: {
+      total_count: number;
+    };
+  };
+  shares?: {
+    count: number;
+  };
 };
 
 export type MetaBusinessPostsResponse = {
@@ -106,6 +133,7 @@ export type MetaBusinessInstagramMediaItem = {
   id: string;
   media_type: "IMAGE" | "VIDEO" | "CAROUSEL_ALBUM";
   media_url: string;
+  thumbnail_url?: string; // Video thumbnail/poster
   timestamp: string;
   caption?: string;
   permalink?: string;
@@ -208,7 +236,7 @@ export const loginMetaBusiness = async (): Promise<void> => {
     // Step 1: Call backend to initiate OAuth and get redirect URL
     // Backend will authenticate using the Authorization header (from axios interceptor)
     const response = await api.get<MetaBusinessLoginResponse>("/metabusiness/login");
-    
+
     // Step 2: Redirect to the Facebook OAuth URL returned by backend
     window.location.href = response.data.url;
   } catch (error) {
@@ -242,8 +270,8 @@ export const handleMetaBusinessCallback = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to complete Meta Business connection"
+      axiosError.response?.data?.error ||
+      "Failed to complete Meta Business connection"
     );
   }
 };
@@ -262,8 +290,8 @@ export const getMetaBusinessAccounts = async (): Promise<MetaBusinessAccountsRes
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to fetch Meta Business accounts"
+      axiosError.response?.data?.error ||
+      "Failed to fetch Meta Business accounts"
     );
   }
 };
@@ -284,8 +312,8 @@ export const refreshMetaBusinessAccount = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to refresh Meta Business account"
+      axiosError.response?.data?.error ||
+      "Failed to refresh Meta Business account"
     );
   }
 };
@@ -306,8 +334,8 @@ export const disconnectMetaBusinessAccount = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to disconnect Meta Business account"
+      axiosError.response?.data?.error ||
+      "Failed to disconnect Meta Business account"
     );
   }
 };
@@ -334,8 +362,8 @@ export const getFacebookPageInsights = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to fetch Facebook Page insights"
+      axiosError.response?.data?.error ||
+      "Failed to fetch Facebook Page insights"
     );
   }
 };
@@ -362,8 +390,8 @@ export const getFacebookPagePosts = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to fetch Facebook Page posts"
+      axiosError.response?.data?.error ||
+      "Failed to fetch Facebook Page posts"
     );
   }
 };
@@ -388,8 +416,8 @@ export const getFacebookPostInsights = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to fetch Facebook Post insights"
+      axiosError.response?.data?.error ||
+      "Failed to fetch Facebook Post insights"
     );
   }
 };
@@ -410,8 +438,8 @@ export const getInstagramProfile = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to fetch Instagram profile"
+      axiosError.response?.data?.error ||
+      "Failed to fetch Instagram profile"
     );
   }
 };
@@ -439,8 +467,8 @@ export const getInstagramMedia = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to fetch Instagram media"
+      axiosError.response?.data?.error ||
+      "Failed to fetch Instagram media"
     );
   }
 };
@@ -466,8 +494,8 @@ export const getInstagramMediaInsights = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to fetch Instagram media insights"
+      axiosError.response?.data?.error ||
+      "Failed to fetch Instagram media insights"
     );
   }
 };
@@ -492,8 +520,8 @@ export const getInstagramStories = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to fetch Instagram stories"
+      axiosError.response?.data?.error ||
+      "Failed to fetch Instagram stories"
     );
   }
 };
@@ -514,8 +542,8 @@ export const getMetaBusinessAnalyticsSummary = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to fetch analytics summary"
+      axiosError.response?.data?.error ||
+      "Failed to fetch analytics summary"
     );
   }
 };
@@ -541,8 +569,8 @@ export const syncMetaBusinessDaily = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to sync daily data"
+      axiosError.response?.data?.error ||
+      "Failed to sync daily data"
     );
   }
 };
@@ -568,8 +596,8 @@ export const syncMetaBusinessFacebook = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to sync Facebook data"
+      axiosError.response?.data?.error ||
+      "Failed to sync Facebook data"
     );
   }
 };
@@ -595,8 +623,8 @@ export const syncMetaBusinessInstagram = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to sync Instagram data"
+      axiosError.response?.data?.error ||
+      "Failed to sync Instagram data"
     );
   }
 };
@@ -617,8 +645,8 @@ export const refreshMetaBusinessPageToken = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to refresh page token"
+      axiosError.response?.data?.error ||
+      "Failed to refresh page token"
     );
   }
 };

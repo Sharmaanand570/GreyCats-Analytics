@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { useClient } from '../hooks/useClients';
 import Integrations from './Integrations';
+import Reports from '../components/Reports';
 import { AccountSelectionModal } from '../components/clients/AccountSelectionModal';
 import type { IntegrationType } from '../types/integration.types';
 import { useQueryClient } from '@tanstack/react-query';
@@ -139,30 +140,7 @@ const ClientDetailPage: React.FC = () => {
                             </TabsContent>
 
                             <TabsContent value="reports" className="space-y-4 focus-visible:outline-none">
-                                <div className="rounded-xl border border-zinc-100 bg-white px-1 py-6 shadow-sm">
-                                    <div className="flex justify-between items-start px-6 mb-6">
-                                        <div>
-                                            <h3 className="text-lg font-semibold text-zinc-900">Client Reports</h3>
-                                            <p className="text-muted-foreground mt-1">
-                                                Create and manage automated reports for {client.name}.
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-4 px-6">
-                                        <Button
-                                            onClick={() => navigate(`/clients/${clientId}/reports`)}
-                                            className="bg-zinc-900 hover:bg-zinc-800"
-                                        >
-                                            View All Reports
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => navigate(`/clients/${clientId}/reports/new`)}
-                                        >
-                                            Create New Report
-                                        </Button>
-                                    </div>
-                                </div>
+                                <Reports viewMode="embedded" />
                             </TabsContent>
 
                             <TabsContent value="data-sources" className="space-y-4 focus-visible:outline-none">

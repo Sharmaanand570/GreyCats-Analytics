@@ -116,11 +116,11 @@ function App() {
               <Route path="woocommerce" element={<WooCommerceDetailPage />} />
               <Route path="shopify" element={<ShopifyDetailPage />} />
               <Route
-                path="google-analytics"
+                path="google-analytics/:clientId?"
                 element={<GoogleAnalyticsDetailPage />}
               />
               <Route
-                path="google-console"
+                path="google-console/:clientId?"
                 element={<GoogleConsoleDetailPage />}
               />
               <Route path="meta-ads" element={<MetaDetailPage />} />

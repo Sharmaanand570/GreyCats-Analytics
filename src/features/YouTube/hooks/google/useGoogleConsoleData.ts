@@ -5,6 +5,11 @@ import {
   fetchGoogleConsolePerformance,
   getGoogleConsoleProperties,
   getGoogleConsoleUnifiedMetrics,
+  getGoogleConsoleSummary,
+  getGoogleConsoleTrends,
+  getGoogleConsoleTopPages,
+  getGoogleConsoleTopQueries,
+  getGoogleConsoleMeta,
   reconnectGoogleConsole,
   selectGoogleConsoleProperty,
   type GoogleConsoleDisconnectResponse,
@@ -16,6 +21,11 @@ import {
   type GoogleConsoleSelectPropertyResponse,
   type GoogleConsoleUnifiedMetricsResponse,
   type GoogleConsoleUnifiedMetricsParams,
+  type GoogleConsoleSummaryResponse,
+  type GoogleConsoleTrendsResponse,
+  type GoogleConsoleTopPagesResponse,
+  type GoogleConsoleTopQueriesResponse,
+  type GoogleConsoleMetaResponse,
 } from "../../API/googleConsoleapi";
 
 const commonQueryOptions = {
@@ -115,4 +125,52 @@ export const useGoogleConsoleUnifiedMetrics = (
     ...commonQueryOptions,
   });
 };
+
+// ==================== OVERVIEW HOOKS ====================
+
+export const useGoogleConsoleSummary = (clientId: number) => {
+  return useQuery<GoogleConsoleSummaryResponse, Error>({
+    queryKey: ["google-console", "summary", clientId],
+    queryFn: () => getGoogleConsoleSummary(clientId),
+    enabled: !!clientId,
+    ...commonQueryOptions,
+  });
+};
+
+export const useGoogleConsoleTrends = (clientId: number) => {
+  return useQuery<GoogleConsoleTrendsResponse, Error>({
+    queryKey: ["google-console", "trends", clientId],
+    queryFn: () => getGoogleConsoleTrends(clientId),
+    enabled: !!clientId,
+    ...commonQueryOptions,
+  });
+};
+
+export const useGoogleConsoleTopPages = (clientId: number) => {
+  return useQuery<GoogleConsoleTopPagesResponse, Error>({
+    queryKey: ["google-console", "top-pages", clientId],
+    queryFn: () => getGoogleConsoleTopPages(clientId),
+    enabled: !!clientId,
+    ...commonQueryOptions,
+  });
+};
+
+export const useGoogleConsoleTopQueries = (clientId: number) => {
+  return useQuery<GoogleConsoleTopQueriesResponse, Error>({
+    queryKey: ["google-console", "top-queries", clientId],
+    queryFn: () => getGoogleConsoleTopQueries(clientId),
+    enabled: !!clientId,
+    ...commonQueryOptions,
+  });
+};
+
+export const useGoogleConsoleMeta = (clientId: number) => {
+  return useQuery<GoogleConsoleMetaResponse, Error>({
+    queryKey: ["google-console", "meta", clientId],
+    queryFn: () => getGoogleConsoleMeta(clientId),
+    enabled: !!clientId,
+    ...commonQueryOptions,
+  });
+};
+
 

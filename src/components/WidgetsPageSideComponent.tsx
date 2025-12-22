@@ -3,7 +3,7 @@ import { FiPlus } from "react-icons/fi";
 import React from "react";
 import { useIntegrations } from "@/features/DataSources/hooks/useIntegrations";
 import { getPlatformConfig } from "@/utils/platformMapping";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -54,7 +54,12 @@ function WidgetsPageSideComponent({
   const [pageSubtitle, setPageSubtitle] = React.useState("");
   const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = React.useState<number | null>(null);
-  const { data: integrationsData, isLoading } = useIntegrations();
+
+  // Extract clientId from URL params
+  const params = useParams<{ clientId: string }>();
+  const parsedClientId = params.clientId ? parseInt(params.clientId) : null;
+
+  const { data: integrationsData, isLoading } = useIntegrations(parsedClientId);
   const [editingSlideId, setEditingSlideId] = React.useState<number | null>(
     null
   );
@@ -199,7 +204,10 @@ function WidgetsPageSideComponent({
           isCustom: false,
           pages: [
             {
-              innerlabel: slide.title,
+              // Use integration name if slide.title is empty or starts with "Untitled"
+              innerlabel: (slide.title && !slide.title.startsWith("Untitled"))
+                ? slide.title
+                : (platformConfig?.name || integration?.platform || "Integration"),
               sublabel:
                 slide.subtitle ||
                 integration?.accountName ||
@@ -311,7 +319,7 @@ function WidgetsPageSideComponent({
 
     // Ensure we have a page entry for every slideId coming from dashboards/template
     const knownIds = new Set(combined.map((entry) => entry.slideIndex));
-    allSlideIds.forEach((id, index) => {
+    allSlideIds.forEach((id) => {
       if (!knownIds.has(id)) {
         combined.push({
           label: "Page",
@@ -428,9 +436,8 @@ function WidgetsPageSideComponent({
           pages.map((p, groupIndex) => (
             <div
               key={p.integrationId}
-              className={`flex flex-col gap-1.5 md:gap-2 ${
-                groupIndex === 0 ? "" : "my-3 md:my-4"
-              }`}
+              className={`flex flex-col gap-1.5 md:gap-2 ${groupIndex === 0 ? "" : "my-3 md:my-4"
+                }`}
             >
               <div>
                 <span className="text-[10px] md:text-xs text-gray-500 font-medium w-full">
@@ -458,15 +465,12 @@ function WidgetsPageSideComponent({
                       }
                     }}
                     key={pageIndex}
-                    className={`w-full gap-1.5 md:gap-2 border rounded-lg md:rounded-[0.6rem] p-2.5 md:p-3 lg:p-4 flex items-center cursor-move transition-all ${
-                      isDragging ? "opacity-50 scale-95" : ""
-                    } ${
-                      isDragOver ? "border-blue-500 border-2 bg-blue-50" : ""
-                    } ${
-                      activeIndex === slideIdx
+                    className={`w-full gap-1.5 md:gap-2 border rounded-lg md:rounded-[0.6rem] p-2.5 md:p-3 lg:p-4 flex items-center cursor-move transition-all ${isDragging ? "opacity-50 scale-95" : ""
+                      } ${isDragOver ? "border-blue-500 border-2 bg-blue-50" : ""
+                      } ${activeIndex === slideIdx
                         ? "bg-gray-100 border-gray-400"
                         : "hover:bg-gray-50"
-                    }`}
+                      }`}
                     role="button"
                     tabIndex={0}
                   >
@@ -509,9 +513,8 @@ function WidgetsPageSideComponent({
                       ) : (
                         <>
                           <span
-                            className={`font-medium text-xs md:text-sm truncate ${
-                              activeIndex === slideIdx ? "text-gray-900" : ""
-                            }`}
+                            className={`font-medium text-xs md:text-sm truncate ${activeIndex === slideIdx ? "text-gray-900" : ""
+                              }`}
                           >
                             {ps.innerlabel}
                           </span>

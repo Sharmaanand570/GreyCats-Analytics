@@ -22,7 +22,7 @@ const platformMap: Record<string, PlatformConfig> = {
     link: "/data-sources/meta-business",
     color: "#1877F2", // Meta blue
   },
-  
+
   youtube: {
     name: "YouTube",
     icon: FaYoutube,
@@ -34,6 +34,13 @@ const platformMap: Record<string, PlatformConfig> = {
     icon: SiGoogleanalytics,
     link: "/data-sources/google-analytics",
     color: "#F4B400", // Google Analytics yellow/orange
+  },
+  // Alias for frontend platform name "google-analytics"
+  "google-analytics": {
+    name: "Google Analytics",
+    icon: SiGoogleanalytics,
+    link: "/data-sources/google-analytics",
+    color: "#F4B400",
   },
   "google-console": {
     name: "Google Search Console",
@@ -53,6 +60,13 @@ const platformMap: Record<string, PlatformConfig> = {
     icon: FaCartShopping,
     link: "/data-sources/woocommerce",
     color: "#96588A", // WooCommerce purple
+  },
+  // Alias for legacy/frontend compatibility
+  "woocommerce": {
+    name: "WooCommerce",
+    icon: FaCartShopping,
+    link: "/data-sources/woocommerce",
+    color: "#96588A",
   },
   shopify: {
     name: "Shopify",

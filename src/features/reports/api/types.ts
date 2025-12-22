@@ -17,11 +17,13 @@ export type ApiError = {
 };
 
 export interface DebugMetric {
-  id: number;
-  userId: number;
+  id?: number;
+  userId?: number;
   integration: string;
   accountId: string;
   metricKey: string;
+  dimensionType?: string;
+  dimensionValue?: string;
   date: string;
   value: number;
   extra?: Record<string, unknown>;
@@ -29,7 +31,12 @@ export interface DebugMetric {
 }
 
 export type DebugMetricsResponse = ApiSuccessResponse<{
-  count: number;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
   rows: DebugMetric[];
 }>;
 
@@ -55,11 +62,11 @@ export interface WidgetSeriesPoint {
 
 export type ResolvedWidgetData =
   | {
-      series?: WidgetSeriesPoint[];
-      total?: number;
-      value?: number;
-      rawCount?: number;
-    }
+    series?: WidgetSeriesPoint[];
+    total?: number;
+    value?: number;
+    rawCount?: number;
+  }
   | Record<string, unknown>;
 
 export type ResolveWidgetsResponse = ApiSuccessResponse<{

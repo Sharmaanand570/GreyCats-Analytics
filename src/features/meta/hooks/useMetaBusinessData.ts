@@ -28,6 +28,7 @@ import {
   type MetaBusinessRefreshPageResponse,
 } from "../API/metaBusinessApi";
 
+
 const commonQueryOptions = {
   retry: 1,
   staleTime: 60 * 1000,
@@ -113,7 +114,9 @@ export const useFacebookPosts = (accountId: number | undefined) => {
 export const useFacebookPostInsights = (postId: string | undefined) => {
   return useQuery({
     queryKey: ["meta-business", "facebook", "post-insights", postId],
-    queryFn: () => getFacebookPostInsights(postId!),
+    queryFn: () => getFacebookPostInsights(postId!, {
+      metrics: "post_impressions,post_impressions_unique,post_clicks,post_clicks_unique,post_clicks_by_type,post_reactions_by_type_total"
+    }),
     enabled: !!postId,
     ...commonQueryOptions,
   });
@@ -225,3 +228,8 @@ export const useMetaBusinessRefreshPage = () => {
     },
   });
 };
+
+// ============ New Meta Insights Endpoints ============
+
+
+

@@ -53,7 +53,11 @@ function mapTemplateToRow(template: ReportTemplateSummary) {
   };
 }
 
-function Reports() {
+interface ReportsProps {
+  viewMode?: "full" | "embedded";
+}
+
+function Reports({ viewMode = "full" }: ReportsProps) {
   const { clientId } = useParams<{ clientId: string }>();
   const parsedClientId = clientId ? parseInt(clientId) : null;
 
@@ -106,7 +110,7 @@ function Reports() {
 
   const templates = (rawTemplates ?? []) as ReportTemplateSummary[];
 
-  // Simple client-side search by name (and optional description if added later)
+  // Simple client-side search by name
   const filteredTemplates = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return templates;
@@ -119,8 +123,7 @@ function Reports() {
 
   const { mutate: deleteTemplate } = useMutation({
     mutationFn: async (id: number) => {
-      if (!parsedClientId) return;
-      await deleteReportTemplate(parsedClientId, id);
+      await deleteReportTemplate(id);
     },
     onSuccess: () => {
       toast.success("Report template deleted");
@@ -147,95 +150,118 @@ function Reports() {
     return <div>Loading client...</div>;
   }
 
-  return (
-    <div className="w-full  h-[2000vh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 ">
-      <div className="w-full  rounded-l-2xl overflow-hidden h-full   my-4 bg-[#fdfdfd] ">
-        <div className="w-full h-full flex flex-col">
-          <div className="w-full h-[4.8em]  border-b flex justify-between items-center px-5 ">
-            <span className="font-medium text-xl">Reports</span>
-            <div className="flex items-center">
-              <span className="mx-2 text-lg text-gray-500">
-                <FiSearch />
-              </span>
-              <span className="mx-2 text-lg text-gray-500 ">
-                {" "}
-                <FiBell />
-              </span>
-              <span className="ml-4">
-                <Button
-                  className="rounded-[0.4rem]"
-                  onClick={handleCreateReportClick}
-                  disabled={isLoadingIntegrations}
-                >
-                  Create Report
-                </Button>
-              </span>
-            </div>
-          </div>
-
-          <div className="w-full justify-between items-center flex px-5">
-            <div className="flex w-[30%]  gap-3 py-6">
-              <div className="w-[60%]">
-                <Input
-                  className="w-full rounded-[0.5rem] p-4 py-5"
-                  type="text"
-                  placeholder="Search reports"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <DropDownFilter />
-              </div>
-            </div>
-            <div>
-              {/* <Button className="rounded-[0.5rem]"> Add Client</Button> */}
-            </div>
-          </div>
-          <div className="w-full px-5">
-            {isLoading && (
-              <div className="w-full border rounded-2xl py-16 flex flex-col items-center justify-center text-gray-500 text-sm">
-                Loading reports...
-              </div>
-            )}
-            {!isLoading && isError && (
-              <div className="w-full border rounded-2xl py-16 flex flex-col items-center justify-center text-gray-500 text-sm gap-4">
-                <span>Unable to load reports right now.</span>
-                <Button onClick={() => refetch()} variant="outline" size="sm">
-                  Retry
-                </Button>
-              </div>
-            )}
-            {!isLoading && !isError && showTable && (
-              <TableComponent header={TABLE_HEADERS} bodyData={tableRows} />
-            )}
-            {!isLoading && !isError && !showTable && (
-              <div className="w-full border border-dashed rounded-2xl py-16 flex flex-col items-center justify-center text-center px-6 gap-4 bg-gradient-to-br from-white to-zinc-50">
-                <div>
-                  <p className="text-lg font-semibold text-gray-900">
-                    No reports yet
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Create a template in the builder or connect an integration
-                    to start generating reports.
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                  <Button
-                    onClick={handleCreateReportClick}
-                    disabled={isLoadingIntegrations}
-                  >
-                    Create Report
-                  </Button>
-                  <Button variant="outline" onClick={() => refetch()}>
-                    Refresh
-                  </Button>
-                </div>
-              </div>
-            )}
+  const Content = (
+    <div className="w-full h-full flex flex-col">
+      {viewMode === "full" && (
+        <div className="w-full h-[4.8em] border-b flex justify-between items-center px-5 ">
+          <span className="font-medium text-xl">Reports</span>
+          <div className="flex items-center">
+            <span className="mx-2 text-lg text-gray-500">
+              <FiSearch />
+            </span>
+            <span className="mx-2 text-lg text-gray-500 ">
+              {" "}
+              <FiBell />
+            </span>
+            <span className="ml-4">
+              <Button
+                className="rounded-[0.4rem]"
+                onClick={handleCreateReportClick}
+                disabled={isLoadingIntegrations}
+              >
+                Create Report
+              </Button>
+            </span>
           </div>
         </div>
+      )}
+
+      {/* Toolbar - Sticky for usage? No requests for sticky yet. */}
+      {/* In embedded mode, maybe we want 'Create Report' here if main header is gone? */}
+      <div className="w-full justify-between items-center flex px-5 py-6">
+        <div className="flex w-full md:w-[60%] lg:w-[40%] gap-3">
+          <div className="w-full">
+            <Input
+              className="w-full rounded-[0.5rem] p-4 py-5"
+              type="text"
+              placeholder="Search reports"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div>
+            <DropDownFilter />
+          </div>
+        </div>
+
+        {viewMode === "embedded" && (
+          <div>
+            <Button
+              className="rounded-[0.4rem]"
+              onClick={handleCreateReportClick}
+              disabled={isLoadingIntegrations}
+            >
+              Create Report
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <div className="w-full px-5 pb-10">
+        {isLoading && (
+          <div className="w-full border rounded-2xl py-16 flex flex-col items-center justify-center text-gray-500 text-sm">
+            Loading reports...
+          </div>
+        )}
+        {!isLoading && isError && (
+          <div className="w-full border rounded-2xl py-16 flex flex-col items-center justify-center text-gray-500 text-sm gap-4">
+            <span>Unable to load reports right now.</span>
+            <Button onClick={() => refetch()} variant="outline" size="sm">
+              Retry
+            </Button>
+          </div>
+        )}
+        {!isLoading && !isError && showTable && (
+          <div className={`${viewMode === 'embedded' ? 'border rounded-2xl overflow-hidden' : ''}`}>
+            <TableComponent header={TABLE_HEADERS} bodyData={tableRows} />
+          </div>
+        )}
+        {!isLoading && !isError && !showTable && (
+          <div className="w-full border border-dashed rounded-2xl py-16 flex flex-col items-center justify-center text-center px-6 gap-4 bg-gradient-to-br from-white to-zinc-50">
+            <div>
+              <p className="text-lg font-semibold text-gray-900">
+                No reports yet
+              </p>
+              <p className="text-sm text-gray-500">
+                Create a template in the builder or connect an integration
+                to start generating reports.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Button
+                onClick={handleCreateReportClick}
+                disabled={isLoadingIntegrations}
+              >
+                Create Report
+              </Button>
+              <Button variant="outline" onClick={() => refetch()}>
+                Refresh
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  if (viewMode === "embedded") {
+    return Content;
+  }
+
+  return (
+    <div className="w-full h-[2000vh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 ">
+      <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd] ">
+        {Content}
       </div>
     </div>
   );

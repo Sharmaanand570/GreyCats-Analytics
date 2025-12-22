@@ -214,6 +214,7 @@ export const fetchUnifiedMetricsList = (
         params: { ...params, clientId },
       }
     );
+    console.log("response fetchUnifiedMetricsList", response.data);
     return response.data;
   });
 
@@ -236,37 +237,51 @@ export const fetchUnifiedMetric = (
     integration: string;
     accountId: string;
     metricKey: string;
-    dimensionType?: string;
+    dimensionType?: string;  // Made optional
     startDate: string;
     endDate: string;
   }
 ) =>
   handleRequest(async () => {
-    // For meta integrations, omit accountId to get all accounts/pages
-    const isMetaIntegration =
-      params.integration === "meta-ads" ||
-      params.integration === "meta-ads" ||
-      params.integration === "meta-facebook" ||
-      params.integration === "meta-facebook" ||
-      params.integration === "meta-instagram" ||
-      params.integration === "meta-instagram";
+    // Map frontend integration names to backend format
+    // Most integrations (meta-instagram, google-analytics) require underscores
+    // Exception: google-search-console requires hyphens
+    let integrationName = params.integration;
+    if (params.integration !== 'google-search-console') {
+      integrationName = params.integration.replace(/-/g, '_');
+    }
+
+    // WooCommerce special case: backend expects "woo"
+    if (integrationName === 'woocommerce') {
+      integrationName = 'woo';
+    }
+
+    if (integrationName !== params.integration) {
+      console.log(`🔄 Normalized integration for API: ${params.integration} -> ${integrationName}`);
+    }
 
     const requestParams: Record<string, string> = {
-      integration: params.integration,
+      integration: integrationName,
       metricKey: params.metricKey,
       startDate: params.startDate,
       endDate: params.endDate,
-      dimensionType: params.dimensionType || "",
     };
 
-    // Only include accountId if not a meta integration
-    if (!isMetaIntegration && params.accountId) {
+    // Only include dimensionType if provided
+    if (params.dimensionType) {
+      requestParams.dimensionType = params.dimensionType;
+    }
+
+    // Only include accountId if provided (skip for WooCommerce as it doesn't use accountId)
+    if (params.accountId && integrationName !== 'woo') {
       requestParams.accountId = params.accountId;
     }
 
+    console.log("requestParams", requestParams);
     const response = await api.get(`/unified-metrics`, {
       params: { ...requestParams, clientId },
     });
+    console.log("response requestParams", response.data);
     return response.data;
   });
 
@@ -311,10 +326,13 @@ export const getReportTemplate = (templateId: number) =>
     return mapped;
   });
 
-export const listReportTemplates = () =>
+export const listReportTemplates = (clientId?: number) =>
   handleRequest(async () => {
     const response = await api.get<ListTemplatesResponse>(
-      `/report-templates`
+      `/report-templates`,
+      {
+        params: { clientId },
+      }
     );
     return response.data;
   });

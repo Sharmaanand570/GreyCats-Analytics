@@ -33,9 +33,17 @@ export type YouTubeThumbnail = {
 export type YouTubeChannelResponse = {
   success: boolean;
   channel: {
-    kind: string;
-    etag: string;
-    id: string;
+    channelId: string;
+    channelTitle: string;
+    channelHandle?: string;
+    videoCount: number;
+    totalViews: number;
+    totalSubscribers: number;
+    connectedAt?: string;
+    // Legacy support (optional)
+    kind?: string;
+    etag?: string;
+    id?: string;
     title?: string;
     customUrl?: string;
     description?: string;
@@ -74,77 +82,136 @@ export type YouTubeSyncResponse = {
   message?: string;
 };
 
-export type YouTubeVideosParams = {
-  page?: number;
-  pageSize?: number;
-  search?: string;
-};
-
-export type YouTubeVideoThumbnails = {
-  default?: YouTubeThumbnail;
-  medium?: YouTubeThumbnail;
-  high?: YouTubeThumbnail;
-  [key: string]: YouTubeThumbnail | undefined;
+export type YouTubeSummaryResponse = {
+  success: boolean;
+  message?: string;
+  channelTitle?: string;
+  channelId?: string;
+  summary: {
+    totalViews: number;
+    totalSubscribers: number;
+    totalWatchTime: number;
+    totalLikes: number;
+    averageViewsPerDay: number;
+  };
 };
 
 export type YouTubeVideoItem = {
-  videoId: string;
+  id: string;
+  // Support both id structure and top videos structure
+  videoId?: string;
   title: string;
   description?: string;
-  thumbnails?: YouTubeVideoThumbnails;
   publishedAt: string;
+  thumbnails: {
+    default?: YouTubeThumbnail;
+    medium?: YouTubeThumbnail;
+    high?: YouTubeThumbnail;
+    [key: string]: YouTubeThumbnail | undefined;
+  };
+  privacyStatus?: string;
+  duration?: string;
+  // Metrics for Top Videos
+  views?: number;
+  likes?: number;
+  comments?: number;
+  watchTime?: number;
+  // Legacy support
   viewCount?: number;
   likeCount?: number;
   commentCount?: number;
   durationISO?: string;
 };
 
-export type YouTubeVideosResponse = {
+export type YouTubeVideosListResponse = {
   success: boolean;
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-  items: YouTubeVideoItem[];
+  videos: YouTubeVideoItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalCount: number;
+    totalPages: number;
+  };
 };
 
-export type YouTubeAnalyticsDataPoint = {
+export type YouTubeTrendItem = {
   date: string;
-  views?: number;
-  likes?: number;
-  comments?: number;
-  subscribers?: number;
-  [key: string]: string | number | undefined;
+  views: number;
+  subscribersGained: number;
+  watchTimeSec: number;
+  likes: number;
+  comments: number;
 };
 
-export type YouTubeAnalyticsParams = {
-  from: string;
-  to: string;
-};
-
-export type YouTubeAnalyticsResponse = {
+export type YouTubeTrendsResponse = {
   success: boolean;
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-  series: YouTubeAnalyticsDataPoint[];
+  message?: string;
+  trends: YouTubeTrendItem[];
 };
 
-export type YouTubePerVideoAnalyticsParams = {
-  videoId: string;
-  from: string;
-  to: string;
-};
-
-export type YouTubePerVideoAnalyticsResponse = {
+export type YouTubeVideoAnalyticsResponse = {
   success: boolean;
-  videoId: string;
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-  series: YouTubeAnalyticsDataPoint[];
+  video: {
+    id: string;
+    title: string;
+    publishedAt: string;
+    thumbnails: {
+      default?: YouTubeThumbnail;
+      high?: YouTubeThumbnail;
+    };
+  };
+  analytics: {
+    totalViews: number;
+    totalLikes: number;
+    totalComments: number;
+    totalWatchTime: number;
+    dailyMetrics: Array<{
+      date: string;
+      views: number;
+      likes: number;
+      comments: number;
+      watchTimeSec: number;
+    }>;
+  };
+};
+
+export type YouTubeTopVideosResponse = {
+  success: boolean;
+  metric: string;
+  period: string;
+  topVideos: YouTubeVideoItem[];
+};
+
+export type YouTubeSubscribersGrowthResponse = {
+  success: boolean;
+  totalGained: number;
+  growth: Array<{
+    date: string;
+    subscribersGained: number;
+  }>;
+};
+
+export type YouTubeWatchTimeResponse = {
+  success: boolean;
+  totalWatchTimeHours: string;
+  averageWatchTimePerDay: string;
+  dailyWatchTime: Array<{
+    date: string;
+    watchTimeSec: number;
+    watchTimeHours: string;
+  }>;
+};
+
+export type YouTubeEngagementResponse = {
+  success: boolean;
+  engagement: {
+    totalViews: number;
+    totalLikes: number;
+    totalComments: number;
+    engagementRate: string;
+    likesPerView: string;
+    commentsPerView: string;
+  };
 };
 
 export type ApiErrorResponse = {
@@ -166,8 +233,8 @@ export const connectYouTube = async (): Promise<YouTubeConnectResponse> => {
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to initiate YouTube connection"
+      axiosError.response?.data?.error ||
+      "Failed to initiate YouTube connection"
     );
   }
 };
@@ -192,15 +259,141 @@ export const handleYouTubeCallback = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to complete YouTube connection"
+      axiosError.response?.data?.error ||
+      "Failed to complete YouTube connection"
     );
   }
 };
 
 /**
- * STEP 3: Get YouTube channel information
- * GET /clients/:clientId/youtube/channel
+ * 1. Summary
+ * GET /api/clients/:clientId/youtube/summary
+ */
+export const getYouTubeSummary = async (
+  clientId: number
+): Promise<YouTubeSummaryResponse> => {
+  try {
+    const response = await api.get<YouTubeSummaryResponse>(
+      `/clients/${clientId}/youtube/summary`
+    );
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+      axiosError.response?.data?.error ||
+      "Failed to fetch YouTube summary"
+    );
+  }
+};
+
+/**
+ * 2. Videos List
+ * GET /api/clients/:clientId/youtube/videos/list
+ */
+export const getYouTubeVideosList = async (
+  clientId: number,
+  params?: { page?: number; limit?: number }
+): Promise<YouTubeVideosListResponse> => {
+  try {
+    const response = await api.get<YouTubeVideosListResponse>(
+      `/clients/${clientId}/youtube/videos/list`,
+      {
+        params: {
+          page: params?.page || 1,
+          limit: params?.limit || 25,
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+      axiosError.response?.data?.error ||
+      "Failed to fetch YouTube videos list"
+    );
+  }
+};
+
+/**
+ * 3. Trends
+ * GET /api/clients/:clientId/youtube/trends
+ */
+export const getYouTubeTrends = async (
+  clientId: number
+): Promise<YouTubeTrendsResponse> => {
+  try {
+    const response = await api.get<YouTubeTrendsResponse>(
+      `/clients/${clientId}/youtube/trends`
+    );
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+      axiosError.response?.data?.error ||
+      "Failed to fetch YouTube trends"
+    );
+  }
+};
+
+/**
+ * 4. Per-Video Analytics
+ * GET /api/clients/:clientId/youtube/videos/:videoId/analytics
+ */
+export const getYouTubeVideoAnalytics = async (
+  clientId: number,
+  videoId: string
+): Promise<YouTubeVideoAnalyticsResponse> => {
+  try {
+    const response = await api.get<YouTubeVideoAnalyticsResponse>(
+      `/clients/${clientId}/youtube/videos/${videoId}/analytics`
+    );
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+      axiosError.response?.data?.error ||
+      "Failed to fetch video analytics"
+    );
+  }
+};
+
+/**
+ * 5. Top Performing Videos
+ * GET /api/clients/:clientId/youtube/videos/top
+ */
+export const getYouTubeTopVideos = async (
+  clientId: number,
+  params?: { metric?: string; limit?: number; period?: string }
+): Promise<YouTubeTopVideosResponse> => {
+  try {
+    const response = await api.get<YouTubeTopVideosResponse>(
+      `/clients/${clientId}/youtube/videos/top`,
+      {
+        params: {
+          metric: params?.metric || "views",
+          limit: params?.limit || 10,
+          period: params?.period || "30d",
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+      axiosError.response?.data?.error ||
+      "Failed to fetch top videos"
+    );
+  }
+};
+
+/**
+ * 6. Channel Info
+ * GET /api/clients/:clientId/youtube/channel
  */
 export const getYouTubeChannel = async (
   clientId: number
@@ -214,14 +407,14 @@ export const getYouTubeChannel = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to fetch YouTube channel"
+      axiosError.response?.data?.error ||
+      "Failed to fetch YouTube channel"
     );
   }
 };
 
 /**
- * STEP 4: Manual sync for YouTube data
+ * Manual sync for YouTube data
  * POST /clients/:clientId/youtube/sync
  */
 export const syncYouTube = async (
@@ -236,28 +429,27 @@ export const syncYouTube = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to sync YouTube data"
+      axiosError.response?.data?.error ||
+      "Failed to sync YouTube data"
     );
   }
 };
 
 /**
- * STEP 5: Get paginated videos list
- * GET /clients/:clientId/youtube/videos
+ * 7. Subscribers Growth
+ * GET /api/clients/:clientId/youtube/subscribers/growth
  */
-export const getYouTubeVideos = async (
+export const getYouTubeSubscribersGrowth = async (
   clientId: number,
-  params?: YouTubeVideosParams
-): Promise<YouTubeVideosResponse> => {
+  params?: { startDate?: string; endDate?: string }
+): Promise<YouTubeSubscribersGrowthResponse> => {
   try {
-    const response = await api.get<YouTubeVideosResponse>(
-      `/clients/${clientId}/youtube/videos`,
+    const response = await api.get<YouTubeSubscribersGrowthResponse>(
+      `/clients/${clientId}/youtube/subscribers/growth`,
       {
         params: {
-          page: params?.page || 1,
-          pageSize: params?.pageSize || 20,
-          search: params?.search || "",
+          startDate: params?.startDate,
+          endDate: params?.endDate,
         },
       }
     );
@@ -266,73 +458,80 @@ export const getYouTubeVideos = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to fetch YouTube videos"
+      axiosError.response?.data?.error ||
+      "Failed to fetch subscribers growth"
     );
   }
 };
 
 /**
- * STEP 6: Get analytics summary
- * GET /clients/:clientId/youtube/analytics
+ * 8. Watch Time Breakdown
+ * GET /api/clients/:clientId/youtube/watch-time
  */
-export const getYouTubeAnalytics = async (
-  clientId: number,
-  params: YouTubeAnalyticsParams
-): Promise<YouTubeAnalyticsResponse> => {
+export const getYouTubeWatchTime = async (
+  clientId: number
+): Promise<YouTubeWatchTimeResponse> => {
   try {
-    const response = await api.get<YouTubeAnalyticsResponse>(
-      `/clients/${clientId}/youtube/analytics`,
-      {
-        params: {
-          from: params.from,
-          to: params.to,
-        },
-      }
+    const response = await api.get<YouTubeWatchTimeResponse>(
+      `/clients/${clientId}/youtube/watch-time`
     );
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to fetch YouTube analytics summary"
+      axiosError.response?.data?.error ||
+      "Failed to fetch watch time breakdown"
     );
   }
 };
 
 /**
- * STEP 7: Get per-video analytics
- * GET /clients/:clientId/youtube/analytics/per-video
+ * 9. Engagement Metrics
+ * GET /api/clients/:clientId/youtube/engagement
  */
-export const getYouTubePerVideoAnalytics = async (
-  clientId: number,
-  params: YouTubePerVideoAnalyticsParams
-): Promise<YouTubePerVideoAnalyticsResponse> => {
+export const getYouTubeEngagement = async (
+  clientId: number
+): Promise<YouTubeEngagementResponse> => {
   try {
-    const response = await api.get<YouTubePerVideoAnalyticsResponse>(
-      `/clients/${clientId}/youtube/analytics/per-video`,
-      {
-        params: {
-          videoId: params.videoId,
-          from: params.from,
-          to: params.to,
-        },
-      }
+    const response = await api.get<YouTubeEngagementResponse>(
+      `/clients/${clientId}/youtube/engagement`
     );
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to fetch video analytics"
+      axiosError.response?.data?.error ||
+      "Failed to fetch engagement metrics"
     );
   }
 };
 
 /**
- * STEP 8: Generate reconnect URL
+ * 10. Meta (Summary Alias)
+ * GET /api/clients/:clientId/youtube/meta
+ */
+export const getYouTubeMeta = async (
+  clientId: number
+): Promise<YouTubeSummaryResponse> => {
+  try {
+    const response = await api.get<YouTubeSummaryResponse>(
+      `/clients/${clientId}/youtube/meta`
+    );
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+      axiosError.response?.data?.error ||
+      "Failed to fetch YouTube meta summary"
+    );
+  }
+};
+
+/**
+ * Generate reconnect URL
  * GET /clients/:clientId/youtube/reconnect
  */
 export const reconnectYouTube = async (
@@ -347,14 +546,14 @@ export const reconnectYouTube = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to generate YouTube reconnect URL"
+      axiosError.response?.data?.error ||
+      "Failed to generate YouTube reconnect URL"
     );
   }
 };
 
 /**
- * STEP 9: Disconnect YouTube integration
+ * Disconnect YouTube integration
  * POST /clients/:clientId/youtube/disconnect
  */
 export const disconnectYouTube = async (
@@ -369,8 +568,8 @@ export const disconnectYouTube = async (
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||
-        axiosError.response?.data?.error ||
-        "Failed to disconnect YouTube"
+      axiosError.response?.data?.error ||
+      "Failed to disconnect YouTube"
     );
   }
 };

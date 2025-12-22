@@ -44,8 +44,17 @@ const normalizeAccount = (account: any, type: IntegrationType): AvailableAccount
       identifier = account.accountId;
       break;
     case 'meta-insights':
-      name = account.platform || 'Meta Insights';
-      identifier = account.id;
+      // Handle platform-specific naming
+      if (account.platform === 'facebook') {
+        name = account.pageName || `Facebook Page`;
+        identifier = account.pageId || account.id;
+      } else if (account.platform === 'instagram') {
+        name = account.instagramUsername || `Instagram Account`;
+        identifier = account.instagramBusinessId || account.id;
+      } else {
+        name = `${account.platform || 'Meta'} Insights`;
+        identifier = account.id;
+      }
       break;
     default:
       name = account.name || 'Unknown Account';
@@ -64,14 +73,22 @@ const normalizeAccount = (account: any, type: IntegrationType): AvailableAccount
 
 export const getAvailableAccounts = async (integration: IntegrationType): Promise<AvailableAccount[]> => {
   try {
+    // Special handling for Meta Insights
+    if (integration === 'meta-insights') {
+      const { getMetaInsightsAccounts } = await import('../features/meta/API/metaInsightsApi');
+      const response = await getMetaInsightsAccounts();
+      // Map insights array to accounts
+      return response.insights.map((acc: any) => normalizeAccount(acc, integration));
+    }
+
     // API endpoints use hyphens (e.g. meta-ads), but types use underscores (e.g. meta-ads)
     const urlIntegration = integration.replace(/_/g, '-');
-    console.log("integrations/${urlIntegration}/available-accounts");
+    console.log(`integrations/${urlIntegration}/available-accounts`);
     const response = await api.get<any>(`/integrations/${urlIntegration}/available-accounts`);
     console.log("getAvailableAccounts", response.data);
     // Handle different response structures if necessary, but guide says { accounts: [] }
     const rawAccounts = response.data.accounts || response.data.properties || response.data.sites || [];
-    
+
     return rawAccounts.map((acc: any) => normalizeAccount(acc, integration));
   } catch (error) {
     console.error(`Error fetching accounts for ${integration}:`, error);

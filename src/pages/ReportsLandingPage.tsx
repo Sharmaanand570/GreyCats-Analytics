@@ -1,26 +1,99 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClients } from '../hooks/useClients';
-import { Building2, FileText } from 'lucide-react';
-import { FiSearch, FiBell } from "react-icons/fi";
-// import { Button } from '../components/ui/button';
+import { Building2, FileText, ArrowUpDown, Filter, Search } from 'lucide-react';
+import { FiBell } from "react-icons/fi";
 import { Input } from "../components/ui/input";
 import { Skeleton } from "../components/ui/skeleton";
+import { Badge } from "../components/ui/badge";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "../components/ui/table";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "../components/ui/select";
+import { cn } from "@/lib/utils";
+
+// Helper to determine status based on integrations
+const getClientHealth = (client: any) => {
+    const totalIntegrations =
+        (client._count?.metaBusinessAccounts || 0) +
+        (client._count?.metaAdsAccounts || 0) +
+        (client._count?.metaInsightsAccounts || 0) +
+        (client._count?.youtubeAccounts || 0) +
+        (client._count?.shopifyAccounts || 0) +
+        (client._count?.woocommerceAccounts || 0) +
+        (client._count?.googleSearchConsoleAccounts || 0) +
+        (client._count?.googleAnalyticsAccounts || 0);
+
+    if (totalIntegrations > 3) return 'healthy';
+    if (totalIntegrations > 0) return 'warning';
+    return 'critical'; // No integrations
+};
 
 const ReportsLandingPage: React.FC = () => {
     const navigate = useNavigate();
     const { data: clients, isLoading } = useClients();
     const [searchQuery, setSearchQuery] = useState("");
+    const [sortBy, setSortBy] = useState("name-asc");
+    const [filterStatus, setFilterStatus] = useState("all");
 
     const handleClientClick = (clientId: number) => {
         navigate(`/clients/${clientId}/reports`);
     };
 
-    const filteredClients = clients?.filter(client =>
-        client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        client.description?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const processedClients = useMemo(() => {
+        if (!clients) return [];
+
+        let result = clients.filter(client =>
+            client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            client.description?.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+
+        // Filter
+        if (filterStatus !== 'all') {
+            result = result.filter(client => {
+                const health = getClientHealth(client);
+                if (filterStatus === 'healthy') return health === 'healthy';
+                if (filterStatus === 'warning') return health === 'warning';
+                if (filterStatus === 'critical') return health === 'critical';
+                if (filterStatus === 'inactive') return !client.isActive;
+                return true;
+            });
+        }
+
+        // Sort
+        result.sort((a, b) => {
+            const healthA = getClientHealth(a);
+            const healthB = getClientHealth(b);
+            const integrationsA = (a._count?.metaBusinessAccounts || 0) + (a._count?.metaAdsAccounts || 0);
+            const integrationsB = (b._count?.metaBusinessAccounts || 0) + (b._count?.metaAdsAccounts || 0);
+
+            switch (sortBy) {
+                case 'name-asc': return a.name.localeCompare(b.name);
+                case 'name-desc': return b.name.localeCompare(a.name);
+                case 'date-new': return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                case 'date-old': return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+                case 'health-critical':
+                    // Critical first (no ints), then warning, then healthy
+                    const score = (h: string) => h === 'critical' ? 0 : h === 'warning' ? 1 : 2;
+                    return score(healthA) - score(healthB);
+                default: return 0;
+            }
+        });
+
+        return result;
+    }, [clients, searchQuery, sortBy, filterStatus]);
 
     return (
         <div className="w-full h-[2000vh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
@@ -30,8 +103,39 @@ const ReportsLandingPage: React.FC = () => {
                     <div className="w-full h-[4.8em] border-b flex justify-between items-center px-5 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
                         <span className="font-medium text-xl text-zinc-800">Reports</span>
                         <div className="flex items-center gap-4">
+                            {/* Controls */}
+                            <div className="hidden lg:flex items-center gap-2 mr-2">
+                                <Select value={sortBy} onValueChange={setSortBy}>
+                                    <SelectTrigger className="w-[140px] h-9 bg-white border-zinc-200">
+                                        <ArrowUpDown className="w-3.5 h-3.5 mr-2 text-zinc-400" />
+                                        <SelectValue placeholder="Sort by" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                                        <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+                                        <SelectItem value="date-new">Date (Newest)</SelectItem>
+                                        <SelectItem value="date-old">Date (Oldest)</SelectItem>
+                                        <SelectItem value="health-critical">Health (Critical Issues)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+
+                                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                                    <SelectTrigger className="w-[130px] h-9 bg-white border-zinc-200">
+                                        <Filter className="w-3.5 h-3.5 mr-2 text-zinc-400" />
+                                        <SelectValue placeholder="Filter" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Clients</SelectItem>
+                                        <SelectItem value="healthy">Healthy Only</SelectItem>
+                                        <SelectItem value="warning">Warnings</SelectItem>
+                                        <SelectItem value="critical">Critical Issues</SelectItem>
+                                        <SelectItem value="inactive">Inactive</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
                             <div className="relative hidden md:block w-64">
-                                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                                 <Input
                                     className="pl-9 h-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors"
                                     placeholder="Search clients..."
@@ -51,13 +155,13 @@ const ReportsLandingPage: React.FC = () => {
                     <div className="flex-1 overflow-y-auto p-6">
                         <div className="mb-6">
                             <h2 className="text-lg font-semibold text-zinc-900">Select a Client</h2>
-                            <p className="text-sm text-gray-500">Choose a client to view their reports.</p>
+                            <p className="text-sm text-gray-500">Choose a client to view and manage their reports.</p>
                         </div>
 
                         {isLoading ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {[1, 2, 3].map((i) => (
-                                    <Skeleton key={i} className="h-[200px] w-full rounded-xl" />
+                            <div className="space-y-4">
+                                {[1, 2, 3, 4, 5].map((i) => (
+                                    <Skeleton key={i} className="h-16 w-full rounded-xl" />
                                 ))}
                             </div>
                         ) : clients?.length === 0 ? (
@@ -70,35 +174,81 @@ const ReportsLandingPage: React.FC = () => {
                                     You need to have clients to view reports.
                                 </p>
                             </div>
+                        ) : processedClients.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-[40vh]">
+                                <h3 className="text-lg font-medium text-zinc-900 mb-2">No matching results</h3>
+                                <p className="text-gray-500 text-center">
+                                    Try adjusting your search or filters.
+                                </p>
+                            </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                {filteredClients?.map((client) => {
-                                    return (
-                                        <div
-                                            key={client.id}
-                                            onClick={() => handleClientClick(client.id)}
-                                            className="group relative flex flex-col justify-between p-5 h-40 bg-gradient-to-tr from-[#F3F3F3] to-white border border-gray-200/60 rounded-xl hover:border-zinc-300 transition-all duration-300 cursor-pointer"
-                                        >
-                                            <div className="flex flex-col items-start w-full">
-                                                <div className="flex justify-between w-full mb-3">
-                                                    <div className="h-10 w-10 rounded-md bg-zinc-50 border border-zinc-100 flex items-center justify-center text-zinc-900 group-hover:bg-zinc-100 transition-colors">
-                                                        <Building2 className="w-5 h-5 text-zinc-700" />
-                                                    </div>
-                                                </div>
+                            <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-sm">
+                                <Table>
+                                    <TableHeader className="bg-zinc-50/50">
+                                        <TableRow>
+                                            <TableHead className="w-[400px]">Client Name</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead>Integrations</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {processedClients.map((client) => {
+                                            const totalIntegrations =
+                                                (client._count?.metaBusinessAccounts || 0) +
+                                                (client._count?.metaAdsAccounts || 0) +
+                                                (client._count?.metaInsightsAccounts || 0) +
+                                                (client._count?.youtubeAccounts || 0) +
+                                                (client._count?.shopifyAccounts || 0) +
+                                                (client._count?.woocommerceAccounts || 0) +
+                                                (client._count?.googleSearchConsoleAccounts || 0) +
+                                                (client._count?.googleAnalyticsAccounts || 0);
 
-                                                <h3 className="font-bold text-lg text-zinc-900 leading-tight line-clamp-2 text-left w-full group-hover:text-black transition-colors">
-                                                    {client.name}
-                                                </h3>
-                                            </div>
+                                            const status = getClientHealth(client);
 
-                                            <div className="flex items-center justify-end w-full mt-2">
-                                                <span className="text-xs text-blue-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    View Reports &rarr;
-                                                </span>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                                            return (
+                                                <TableRow
+                                                    key={client.id}
+                                                    onClick={() => handleClientClick(client.id)}
+                                                    className="cursor-pointer hover:bg-zinc-50/80 transition-colors group"
+                                                >
+                                                    <TableCell className="font-medium">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="h-10 w-10 rounded-lg bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-500 group-hover:bg-white group-hover:shadow-sm transition-all">
+                                                                <Building2 className="w-5 h-5" />
+                                                            </div>
+                                                            <div>
+                                                                <div className="font-semibold text-zinc-900">{client.name}</div>
+                                                                <div className="text-xs text-zinc-500 line-clamp-1">{client.description || "No description"}</div>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline" className={cn(
+                                                            "font-medium border shadow-none",
+                                                            status === 'healthy' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                                                status === 'warning' ? "bg-amber-50 text-amber-700 border-amber-200" :
+                                                                    "bg-red-50 text-red-700 border-red-200"
+                                                        )}>
+                                                            {status === 'healthy' ? 'Healthy' : status === 'warning' ? 'Needs Attention' : 'Critical'}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-medium text-zinc-700">{totalIntegrations}</span>
+                                                            <span className="text-zinc-500 text-xs">Connected</span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <span className="text-sm font-medium text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            View Reports &rarr;
+                                                        </span>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
                             </div>
                         )}
                     </div>

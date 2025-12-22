@@ -3,22 +3,29 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   disconnectYouTube,
-  getYouTubeAnalytics,
   getYouTubeChannel,
-  getYouTubePerVideoAnalytics,
-  getYouTubeVideos,
+  getYouTubeVideoAnalytics,
+  getYouTubeVideosList,
   reconnectYouTube,
   syncYouTube,
-  type YouTubeAnalyticsParams,
-  type YouTubeAnalyticsResponse,
+  getYouTubeSummary,
+  getYouTubeTrends,
+  getYouTubeTopVideos,
+  getYouTubeSubscribersGrowth,
+  getYouTubeWatchTime,
+  getYouTubeEngagement,
   type YouTubeChannelResponse,
   type YouTubeDisconnectResponse,
-  type YouTubePerVideoAnalyticsParams,
-  type YouTubePerVideoAnalyticsResponse,
+  type YouTubeVideoAnalyticsResponse,
   type YouTubeReconnectResponse,
-  type YouTubeVideosParams,
-  type YouTubeVideosResponse,
+  type YouTubeVideosListResponse,
   type YouTubeSyncResponse,
+  type YouTubeSummaryResponse,
+  type YouTubeTrendsResponse,
+  type YouTubeTopVideosResponse,
+  type YouTubeSubscribersGrowthResponse,
+  type YouTubeWatchTimeResponse,
+  type YouTubeEngagementResponse,
 } from "../API/youtubeApi";
 
 const commonQueryOptions = {
@@ -50,37 +57,89 @@ export const useYouTubeSync = () => {
   });
 };
 
-export const useYouTubeVideos = (clientId: number, params?: YouTubeVideosParams) => {
-  return useQuery<YouTubeVideosResponse, Error>({
+export const useYouTubeVideos = (clientId: number, params?: { page?: number; limit?: number }) => {
+  return useQuery<YouTubeVideosListResponse, Error>({
     queryKey: ["youtube", "videos", clientId, params],
-    queryFn: () => getYouTubeVideos(clientId, params),
+    queryFn: () => getYouTubeVideosList(clientId, params),
     enabled: !!clientId,
-    ...commonQueryOptions,
-  });
-};
-
-export const useYouTubeAnalytics = (clientId: number, params: YouTubeAnalyticsParams) => {
-  return useQuery<YouTubeAnalyticsResponse, Error>({
-    queryKey: ["youtube", "analytics", clientId, params],
-    queryFn: () => getYouTubeAnalytics(clientId, params),
-    enabled: !!clientId && Boolean(params.from && params.to),
     ...commonQueryOptions,
   });
 };
 
 export const useYouTubePerVideoAnalytics = (
   clientId: number,
-  params?: YouTubePerVideoAnalyticsParams
+  params?: { videoId: string; from?: string; to?: string }
 ) => {
+  // Only run if we have a videoId. Dates are optional in some API versions but good to check.
   const queryEnabled = useMemo(
-    () => !!clientId && Boolean(params?.videoId && params?.from && params?.to),
-    [clientId, params?.videoId, params?.from, params?.to]
+    () => !!clientId && !!params?.videoId,
+    [clientId, params?.videoId]
   );
 
-  return useQuery<YouTubePerVideoAnalyticsResponse, Error>({
+  return useQuery<YouTubeVideoAnalyticsResponse, Error>({
     queryKey: ["youtube", "analytics", "video", clientId, params],
-    queryFn: () => getYouTubePerVideoAnalytics(clientId, params as YouTubePerVideoAnalyticsParams),
+    queryFn: () => getYouTubeVideoAnalytics(clientId, params!.videoId),
     enabled: queryEnabled,
+    ...commonQueryOptions,
+  });
+};
+
+export const useYouTubeSummary = (clientId: number) => {
+  return useQuery<YouTubeSummaryResponse, Error>({
+    queryKey: ["youtube", "summary", clientId],
+    queryFn: () => getYouTubeSummary(clientId),
+    enabled: !!clientId,
+    ...commonQueryOptions,
+  });
+};
+
+export const useYouTubeTrends = (clientId: number) => {
+  return useQuery<YouTubeTrendsResponse, Error>({
+    queryKey: ["youtube", "trends", clientId],
+    queryFn: () => getYouTubeTrends(clientId),
+    enabled: !!clientId,
+    ...commonQueryOptions,
+  });
+};
+
+export const useYouTubeTopVideos = (
+  clientId: number,
+  params?: { metric?: string; limit?: number; period?: string }
+) => {
+  return useQuery<YouTubeTopVideosResponse, Error>({
+    queryKey: ["youtube", "top-videos", clientId, params],
+    queryFn: () => getYouTubeTopVideos(clientId, params),
+    enabled: !!clientId,
+    ...commonQueryOptions,
+  });
+};
+
+export const useYouTubeSubscribersGrowth = (
+  clientId: number,
+  params?: { startDate?: string; endDate?: string }
+) => {
+  return useQuery<YouTubeSubscribersGrowthResponse, Error>({
+    queryKey: ["youtube", "subscribers-growth", clientId, params],
+    queryFn: () => getYouTubeSubscribersGrowth(clientId, params),
+    enabled: !!clientId,
+    ...commonQueryOptions,
+  });
+};
+
+export const useYouTubeWatchTime = (clientId: number) => {
+  return useQuery<YouTubeWatchTimeResponse, Error>({
+    queryKey: ["youtube", "watch-time", clientId],
+    queryFn: () => getYouTubeWatchTime(clientId),
+    enabled: !!clientId,
+    ...commonQueryOptions,
+  });
+};
+
+export const useYouTubeEngagement = (clientId: number) => {
+  return useQuery<YouTubeEngagementResponse, Error>({
+    queryKey: ["youtube", "engagement", clientId],
+    queryFn: () => getYouTubeEngagement(clientId),
+    enabled: !!clientId,
     ...commonQueryOptions,
   });
 };

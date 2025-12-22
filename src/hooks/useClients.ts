@@ -33,8 +33,9 @@ export const useClients = () => {
         setClients(clients);
         return clients;
       } catch (error: any) {
+
         console.error('Error fetching clients:', error);
-        
+
         // If backend is not available (development mode), return empty array
         // This prevents the error state from showing and allows the UI to render
         if (error.code === 'ERR_NETWORK' || error.response?.status === 404 || error.response?.status === 500) {
@@ -45,7 +46,7 @@ export const useClients = () => {
           setClients([]);
           return []; // Return empty array instead of throwing
         }
-        
+
         // For other errors, show error message but still return empty array
         toast.error(error.response?.data?.message || 'Failed to fetch clients');
         setClients([]);
@@ -60,20 +61,21 @@ export const useClients = () => {
 
 // Helper to normalize client data
 const normalizeClientData = (client: any): ClientWithIntegrations => {
-  console.log('normalizeClientData - Raw client data:', client);
-  console.log('Has metaInsights?', !!client.metaInsights, client.metaInsights);
-  console.log('Has shopifyAccounts?', !!client.shopifyAccounts, client.shopifyAccounts);
-  console.log('Has platformAccounts?', !!client.platformAccounts, client.platformAccounts);
-  
-  if (client.integrations && Array.isArray(client.integrations)) {
-    return client;
-  }
-
+  // If the backend already provides a normalized integrations array, process that first
   const integrations: any[] = [];
-  
+  const processedIds = new Set<string>();
+
+  // Helper to map accounts to standardized integration format
   const mapAccount = (account: any, type: IntegrationType) => {
     let name = 'Unknown';
     let identifier = 'unknown';
+
+    // IMPORTANT: Check for duplicate processing to prevent double-entries
+    // Construct a unique key for this integration instance
+    const uniqueKey = `${type}-${account.id}`;
+    if (processedIds.has(uniqueKey)) {
+      return null;
+    }
 
     switch (type) {
       case 'meta-business':
@@ -110,6 +112,7 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
         break;
     }
 
+    processedIds.add(uniqueKey);
     return {
       integrationType: type,
       accountId: account.id, // Internal DB ID
@@ -119,56 +122,161 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
     };
   };
 
-  // Map all legacy arrays
-  if (client.metaBusinessAccounts) {
-    client.metaBusinessAccounts.forEach((acc: any) => integrations.push(mapAccount(acc, 'meta-business')));
-  }
-  
-  // Handle both metaAdsAccounts (legacy) and metaAdAccounts (API)
-  const metaAds = client.metaAdsAccounts || client.metaAdAccounts;
-  if (metaAds) {
-    metaAds.forEach((acc: any) => integrations.push(mapAccount(acc, 'meta-ads')));
+  // 1. Backend-provided integrations array (Preferred Source)
+  if (client.integrations && Array.isArray(client.integrations)) {
+    client.integrations.forEach((integration: any) => {
+      // If it's the pre-calculated format { type, id, name, assignmentId }
+      if (integration.type && integration.assignmentId) {
+        const uniqueKey = `${integration.type}-${integration.assignmentId}`;
+
+        if (!processedIds.has(uniqueKey)) {
+          // Additional check: prevent duplicates if identifier matches (e.g. for GA properties)
+          const identifierKey = `${integration.type}-identifier-${integration.identifier || integration.name}`;
+          if (integration.identifier && processedIds.has(identifierKey)) return;
+
+          integrations.push({
+            integrationType: integration.type,
+            accountId: integration.assignmentId,
+            accountName: integration.name,
+            accountIdentifier: integration.identifier || 'unknown',
+            connectedAt: integration.connectedAt || new Date().toISOString(),
+          });
+          processedIds.add(uniqueKey);
+          if (integration.identifier) processedIds.add(identifierKey);
+          processedIds.add(`${integration.type}-name-${integration.name}`);
+        }
+      }
+      // If it's already in the normalized structure { integrationType, accountId... }
+      else if (integration.integrationType && integration.accountId) {
+        const uniqueKey = `${integration.integrationType}-${integration.accountId}`;
+        if (!processedIds.has(uniqueKey)) {
+          // Also check identifier/name to prevent duplicates from legacy arrays
+          const nameKey = `${integration.integrationType}-name-${integration.accountName}`;
+          const identifierKey = `${integration.integrationType}-identifier-${integration.accountIdentifier}`;
+
+          if (processedIds.has(nameKey) || (integration.accountIdentifier !== 'unknown' && processedIds.has(identifierKey))) {
+            return;
+          }
+
+          integrations.push(integration);
+          processedIds.add(uniqueKey);
+          processedIds.add(nameKey);
+          if (integration.accountIdentifier !== 'unknown') processedIds.add(identifierKey);
+        }
+      }
+    });
   }
 
-  // Handle metaInsights
+  // 2. Fallback / supplementary checks for specific arrays (Legacy support)
+  // Only process if not already found in the main integrations array
+
+  if (client.metaBusinessAccounts) {
+    client.metaBusinessAccounts.forEach((acc: any) => {
+      const result = mapAccount(acc, 'meta-business');
+      if (result) integrations.push(result);
+    });
+  }
+
+  const metaAds = client.metaAdsAccounts || client.metaAdAccounts;
+  if (metaAds) {
+    metaAds.forEach((acc: any) => {
+      const result = mapAccount(acc, 'meta-ads');
+      if (result) integrations.push(result);
+    });
+  }
+
   if (client.metaInsights) {
-    client.metaInsights.forEach((acc: any) => integrations.push(mapAccount(acc, 'meta-insights')));
+    client.metaInsights.forEach((acc: any) => {
+      const result = mapAccount(acc, 'meta-insights');
+      if (result) integrations.push(result);
+    });
   }
 
   if (client.youtubeAccounts) {
-    client.youtubeAccounts.forEach((acc: any) => integrations.push(mapAccount(acc, 'youtube')));
-  }
-  if (client.shopifyAccounts) {
-    client.shopifyAccounts.forEach((acc: any) => integrations.push(mapAccount(acc, 'shopify')));
-  }
-  if (client.woocommerceAccounts) {
-    client.woocommerceAccounts.forEach((acc: any) => integrations.push(mapAccount(acc, 'woocommerce')));
+    client.youtubeAccounts.forEach((acc: any) => {
+      const result = mapAccount(acc, 'youtube');
+      if (result) integrations.push(result);
+    });
   }
 
-  // Handle both googleSearchConsoleAccounts (legacy) and googleSearchConsoleProperties (API)
+  if (client.shopifyAccounts) {
+    client.shopifyAccounts.forEach((acc: any) => {
+      const result = mapAccount(acc, 'shopify');
+      if (result) integrations.push(result);
+    });
+  }
+
+  if (client.woocommerceAccounts) {
+    client.woocommerceAccounts.forEach((acc: any) => {
+      const result = mapAccount(acc, 'woocommerce');
+      if (result) integrations.push(result);
+    });
+  }
+
   const searchConsole = client.googleSearchConsoleAccounts || client.googleSearchConsoleProperties;
   if (searchConsole) {
-    searchConsole.forEach((acc: any) => integrations.push(mapAccount(acc, 'google-search-console')));
+    searchConsole.forEach((acc: any) => {
+      const result = mapAccount(acc, 'google-search-console');
+      if (result) integrations.push(result);
+    });
   }
 
   if (client.googleAnalyticsAccounts) {
-    client.googleAnalyticsAccounts.forEach((acc: any) => integrations.push(mapAccount(acc, 'google-analytics')));
+    client.googleAnalyticsAccounts.forEach((acc: any) => {
+      const result = mapAccount(acc, 'google-analytics');
+      if (result) integrations.push(result);
+    });
   }
 
-  // Handle platformAccounts (contains Google Analytics)
+  if (client.googleAnalyticsProperties) {
+    client.googleAnalyticsProperties.forEach((acc: any) => {
+      const uniqueKey = `google-analytics-${acc.platformAccountId}`;
+      const propertyNameKey = `google-analytics-name-${acc.platformAccount?.propertyName}`;
+      const propertyIdKey = `google-analytics-identifier-${acc.platformAccount?.propertyId}`;
+
+      // Check ALL possible existing keys to avoid duplication
+      if (!processedIds.has(uniqueKey) && !processedIds.has(propertyNameKey) && !processedIds.has(propertyIdKey)) {
+        const flatAcc = {
+          id: acc.platformAccountId,
+          propertyName: acc.platformAccount?.propertyName,
+          propertyId: acc.platformAccount?.propertyId,
+          platform: 'Google Analytics'
+        };
+        // Manually use mapAccount logic here or reuse mapAccount if adapted
+        // For now, manual check since mapAccount expects different structure
+        integrations.push({
+          integrationType: 'google-analytics',
+          accountId: acc.platformAccountId,
+          accountName: flatAcc.propertyName || 'Google Analytics',
+          accountIdentifier: flatAcc.propertyId || 'unknown',
+          connectedAt: acc.createdAt || new Date().toISOString()
+        });
+        processedIds.add(uniqueKey);
+        processedIds.add(propertyNameKey);
+        processedIds.add(propertyIdKey);
+      }
+    });
+  }
+
   if (client.platformAccounts) {
     client.platformAccounts.forEach((platformAcc: any) => {
-      if (platformAcc.account?.platform === 'GOOGLE') {
-        // Map to google-analytics
-        // IMPORTANT: Use platformAcc.id (the assignment ID) for deletion, not platformAcc.accountId
-        const gaAccount = {
-          id: platformAcc.id, // This is the platform account assignment ID used for deletion
-          platform: platformAcc.account.platform,
-          propertyName: platformAcc.account.propertyName,
-          propertyId: platformAcc.account.propertyId,
-          createdAt: platformAcc.createdAt,
-        };
-        integrations.push(mapAccount(gaAccount, 'google-analytics'));
+      if (platformAcc.account?.platform === 'GOOGLE' || platformAcc.account?.platform === 'google-analytics') {
+        const uniqueKey = `google-analytics-${platformAcc.id}`;
+        const propertyNameKey = `google-analytics-name-${platformAcc.account.propertyName}`;
+        const propertyIdKey = `google-analytics-identifier-${platformAcc.account.propertyId}`;
+
+        if (!processedIds.has(uniqueKey) && !processedIds.has(propertyNameKey) && !processedIds.has(propertyIdKey)) {
+          integrations.push({
+            integrationType: 'google-analytics',
+            accountId: platformAcc.id,
+            accountName: platformAcc.account.propertyName,
+            accountIdentifier: platformAcc.account.propertyId,
+            connectedAt: platformAcc.createdAt
+          });
+          processedIds.add(uniqueKey);
+          processedIds.add(propertyNameKey);
+          processedIds.add(propertyIdKey);
+        }
       }
     });
   }
@@ -185,8 +293,11 @@ export const useClient = (clientId: number | null) => {
     queryKey: clientKeys.detail(clientId!),
     queryFn: async (): Promise<ClientWithIntegrations> => {
       try {
+        console.log('Fetching client:', clientId);
         const response = await api.get<ClientDetailResponse>(`/clients/${clientId}`);
+        console.log('Client Data:', response.data)
         return normalizeClientData(response.data.client);
+
       } catch (error: any) {
         console.error('Error fetching client:', error);
         toast.error(error.response?.data?.message || 'Failed to fetch client details');

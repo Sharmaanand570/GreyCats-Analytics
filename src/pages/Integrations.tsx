@@ -35,6 +35,7 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
   const clientId = propClientId ?? (params.clientId ? parseInt(params.clientId) : null);
 
   const { data: client, isLoading, error } = useClient(clientId);
+  console.log("client", client);
   const removeAccount = useRemoveAccount();
   const [disconnectTarget, setDisconnectTarget] = useState<ConnectedIntegration | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -75,13 +76,13 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
     // Filter by search query if present
     const filtered = searchQuery.trim()
       ? integrations.filter(integration =>
-        integration.accountName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        integration.integrationType.toLowerCase().includes(searchQuery.toLowerCase())
+        (integration.accountName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (integration.integrationType || "").toLowerCase().includes(searchQuery.toLowerCase())
       )
       : integrations;
 
     return filtered.map((integration) => {
-      const platformKey = integration.integrationType.toLowerCase().replace(/_/g, "-");
+      const platformKey = (integration.integrationType || "").toLowerCase().replace(/_/g, "-");
       const platformConfig = getPlatformConfig(platformKey);
 
       // Prefer mapped link; otherwise fall back to data-sources/<platform>

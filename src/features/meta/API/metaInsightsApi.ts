@@ -39,6 +39,7 @@ export type FacebookPageInfoResponse = {
 export type FacebookPost = {
   id: string;
   message?: string;
+  full_picture?: string;
   created_time: string;
   permalink_url: string;
 };
@@ -159,6 +160,25 @@ export type InstagramSyncResponse = {
   insights: unknown;
 };
 
+// -------- Meta Insights Accounts --------
+
+export type MetaInsightsAccount = {
+  id: number;
+  platform: 'facebook' | 'instagram';
+  userId: number;
+  pageId?: string;
+  pageName?: string;
+  instagramBusinessId?: string;
+  instagramUsername?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MetaInsightsAccountsResponse = {
+  success: boolean;
+  insights: MetaInsightsAccount[];
+};
+
 // -------- Saved & Daily --------
 
 export type MetaSavedInsight = {
@@ -189,8 +209,8 @@ const handleMetaInsightsError = (
   const axiosError = error as AxiosError<MetaInsightsApiErrorResponse>;
   throw new Error(
     axiosError.response?.data?.message ||
-      axiosError.response?.data?.error ||
-      fallbackMessage
+    axiosError.response?.data?.error ||
+    fallbackMessage
   );
 };
 
@@ -198,7 +218,6 @@ const handleMetaInsightsError = (
 
 
 export const getFacebookPages = async (
-  clientId: number,
   params?: {
     limit?: number;
     after?: string;
@@ -207,7 +226,7 @@ export const getFacebookPages = async (
 ): Promise<FacebookPagesResponse> => {
   try {
     const response = await api.get<FacebookPagesResponse>(
-      `/clients/${clientId}/meta-insights/facebook/pages`,
+      '/meta-insights/facebook/pages',
       { params }
     );
     return response.data;
@@ -217,12 +236,11 @@ export const getFacebookPages = async (
 };
 
 export const getFacebookPageToken = async (
-  clientId: number,
   pageId: string
 ): Promise<FacebookPageTokenResponse> => {
   try {
     const response = await api.get<FacebookPageTokenResponse>(
-      `/clients/${clientId}/meta-insights/facebook/page-token`,
+      '/meta-insights/facebook/page-token',
       { params: { pageId } }
     );
     return response.data;
@@ -235,12 +253,11 @@ export const getFacebookPageToken = async (
 };
 
 export const getFacebookPageInfo = async (
-  clientId: number,
   pageId: string
 ): Promise<FacebookPageInfoResponse> => {
   try {
     const response = await api.get<FacebookPageInfoResponse>(
-      `/clients/${clientId}/meta-insights/facebook/page-info`,
+      '/meta-insights/facebook/page-info',
       { params: { pageId } }
     );
     return response.data;
@@ -250,13 +267,12 @@ export const getFacebookPageInfo = async (
 };
 
 export const getFacebookPagePosts = async (
-  clientId: number,
   pageId: string,
   limit?: number
 ): Promise<FacebookPagePostsResponse> => {
   try {
     const response = await api.get<FacebookPagePostsResponse>(
-      `/clients/${clientId}/meta-insights/facebook/page-posts`,
+      '/meta-insights/facebook/page-posts',
       { params: { pageId, limit } }
     );
     return response.data;
@@ -269,13 +285,12 @@ export const getFacebookPagePosts = async (
 };
 
 export const getFacebookPostInsights = async (
-  clientId: number,
   postId: string,
   pageId: string
 ): Promise<FacebookPostInsightsResponse> => {
   try {
     const response = await api.get<FacebookPostInsightsResponse>(
-      `/clients/${clientId}/meta-insights/facebook/post-insights`,
+      '/meta-insights/facebook/post-insights',
       { params: { postId, pageId } }
     );
     console.log("✅ Facebook Post Insights Response:", response.data);
@@ -290,12 +305,11 @@ export const getFacebookPostInsights = async (
 };
 
 export const syncFacebookInsights = async (
-  clientId: number,
   body: FacebookSyncBody
 ): Promise<FacebookSyncResponse> => {
   try {
     const response = await api.post<FacebookSyncResponse>(
-      `/clients/${clientId}/meta-insights/facebook/sync`,
+      '/meta-insights/facebook/sync',
       body
     );
     return response.data;
@@ -308,12 +322,11 @@ export const syncFacebookInsights = async (
 };
 
 export const getInstagramBusinessAccount = async (
-  clientId: number,
   pageId: string
 ): Promise<InstagramBusinessAccountResponse> => {
   try {
     const response = await api.get<InstagramBusinessAccountResponse>(
-      `/clients/${clientId}/meta-insights/instagram/business`,
+      '/meta-insights/instagram/business',
       { params: { pageId } }
     );
     return response.data;
@@ -365,6 +378,7 @@ export const getInstagramMedia = async (
     );
     return response.data;
   } catch (error) {
+    console.error("❌ Instagram Media Error:", error);
     return handleMetaInsightsError(error, "Failed to load Instagram media");
   }
 };
@@ -396,52 +410,35 @@ export const getInstagramMediaInsights = async (
   }
 };
 
-export const syncInstagramInsights = async (
-  clientId: number,
-  body: InstagramSyncBody
-): Promise<InstagramSyncResponse> => {
-  try {
-    const response = await api.post<InstagramSyncResponse>(
-      `/clients/${clientId}/meta-insights/instagram/sync`,
-      body
-    );
-    return response.data;
-  } catch (error) {
-    return handleMetaInsightsError(
-      error,
-      "Failed to sync Instagram insights"
-    );
-  }
+/**
+ * @deprecated This endpoint doesn't exist in Meta Insights API
+ * Use Meta Business sync endpoints instead
+ */
+export const syncInstagramInsights = async (): Promise<InstagramSyncResponse> => {
+  throw new Error("syncInstagramInsights is not available in Meta Insights API. Use Meta Business API instead.");
 };
 
-export const getMetaSavedInsights = async (
-  clientId: number,
-  platform?: string
-): Promise<MetaSavedInsightsResponse> => {
-  try {
-    const response = await api.get<MetaSavedInsightsResponse>(
-      `/clients/${clientId}/meta-insights/saved`,
-      { params: { platform } }
-    );
-    return response.data;
-  } catch (error) {
-    return handleMetaInsightsError(error, "Failed to load saved insights");
-  }
+/**
+ * @deprecated This endpoint doesn't exist in Meta Insights API
+ * Saved insights are accessed through /api/meta-insights/accounts
+ */
+export const getMetaSavedInsights = async (): Promise<MetaSavedInsightsResponse> => {
+  throw new Error("getMetaSavedInsights is not available. Use getMetaInsightsAccounts instead.");
 };
 
-export const getMetaDailyInsights = async (
-  clientId: number,
-  platform?: string
-): Promise<MetaDailyHistoryResponse> => {
-  try {
-    const response = await api.get<MetaDailyHistoryResponse>(
-      `/clients/${clientId}/meta-insights/daily`,
-      { params: { platform } }
-    );
-    return response.data;
-  } catch (error) {
-    return handleMetaInsightsError(error, "Failed to load daily insights");
-  }
+/**
+ * @deprecated This endpoint doesn't exist in Meta Insights API
+ */
+export const getMetaDailyInsights = async (): Promise<MetaDailyHistoryResponse> => {
+  throw new Error("getMetaDailyInsights is not available in Meta Insights API.");
 };
 
 
+export const getMetaInsightsAccounts = async (): Promise<MetaInsightsAccountsResponse> => {
+  try {
+    const response = await api.get<MetaInsightsAccountsResponse>("/meta-insights/accounts");
+    return response.data;
+  } catch (error) {
+    return handleMetaInsightsError(error, "Failed to load Meta Insights accounts");
+  }
+};

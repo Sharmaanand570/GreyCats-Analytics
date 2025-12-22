@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  useYouTubeAnalytics,
   useYouTubeChannel,
   useYouTubePerVideoAnalytics,
   useYouTubeReconnect,
   useYouTubeDisconnect,
   useYouTubeSync,
   useYouTubeVideos,
+  useYouTubeSummary,
+  useYouTubeTrends,
+  useYouTubeTopVideos,
+  useYouTubeEngagement,
+  useYouTubeWatchTime,
 } from "@/features/YouTube/hooks/useYouTubeData";
 import {
   Card,
@@ -42,34 +46,16 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Loader2, RefreshCw, Youtube } from "lucide-react";
+import { Loader2, RefreshCw, Youtube, Eye, ThumbsUp, Clock, Users, TrendingUp } from "lucide-react";
 import { FaYoutube } from "react-icons/fa6";
-import { format, formatDistanceToNow, formatISO, subDays } from "date-fns";
-
-type DateRangeOption = "7" | "30" | "90";
-
-const analyticsRanges: { label: string; value: DateRangeOption }[] = [
-  { label: "Last 7 days", value: "7" },
-  { label: "Last 30 days", value: "30" },
-  { label: "Last 90 days", value: "90" },
-];
-
-const getDateRange = (days: number) => {
-  const endDate = new Date();
-  const startDate = subDays(endDate, days - 1);
-  return {
-    from: formatISO(startDate, { representation: "date" }),
-    to: formatISO(endDate, { representation: "date" }),
-  };
-};
+import { format } from "date-fns";
+import { useParams } from "react-router-dom";
+import type { YouTubeVideoItem } from "@/features/YouTube/API/youtubeApi";
 
 const buildChartData = (series?: Array<Record<string, unknown>>) => {
   if (!series) return [];
   return series.map((point, index) => {
-    const date =
-      typeof point.date === "string"
-        ? point.date
-        : `Point ${index + 1}`;
+    const date = point.date as string || `Point ${index + 1}`;
 
     const numericEntry = Object.entries(point).find(
       ([key, value]) => key !== "date" && typeof value === "number"
@@ -83,182 +69,119 @@ const buildChartData = (series?: Array<Record<string, unknown>>) => {
 };
 
 function YouTubeDetailPage() {
-  const [analyticsRange, setAnalyticsRange] = useState<DateRangeOption>("7");
+  const { clientId } = useParams();
+  const numericClientId = Number(clientId);
+
   const [videosPage, setVideosPage] = useState(1);
   const [videosSearch, setVideosSearch] = useState("");
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
 
-  const analyticsParams = useMemo(() => {
-    const range = getDateRange(Number(analyticsRange));
-    return range;
-  }, [analyticsRange]);
-
   const videoParams = useMemo(
     () => ({
       page: videosPage,
-      pageSize: 10,
-      search: videosSearch || undefined,
+      limit: 10,
     }),
-    [videosPage, videosSearch]
+    [videosPage]
   );
 
-  const {
-    data: channelData,
-    isLoading: isLoadingChannel,
-    error: channelError,
-  } = useYouTubeChannel();
+  // 1. Channel Info
+  const { data: channelData, isLoading: isLoadingChannel, error: channelError } = useYouTubeChannel(numericClientId);
 
-  const {
-    mutateAsync: syncYouTube,
-    isPending: isSyncing,
-  } = useYouTubeSync();
-  const {
-    mutateAsync: reconnectYouTube,
-    isPending: isReconnecting,
-  } = useYouTubeReconnect();
-  const {
-    mutateAsync: disconnectYouTube,
-    isPending: isDisconnecting,
-  } = useYouTubeDisconnect();
+  // 2. Summary Stats
+  const { data: summaryData, isLoading: isLoadingSummary } = useYouTubeSummary(numericClientId);
 
-  const {
-    data: videosData,
-    isLoading: isLoadingVideos,
-    error: videosError,
-  } = useYouTubeVideos(videoParams);
+  // 3. Trends
+  const { data: trendsData, isLoading: isLoadingTrends } = useYouTubeTrends(numericClientId);
 
-  useEffect(() => {
-    if (!selectedVideoId && videosData?.items?.length) {
-      setSelectedVideoId(videosData.items[0].videoId);
-    }
-  }, [videosData, selectedVideoId]);
+  // 4. Videos List
+  const { data: videosData, isLoading: isLoadingVideos, error: videosError } = useYouTubeVideos(numericClientId, videoParams);
 
-  const {
-    data: analyticsData,
-    isLoading: isLoadingAnalytics,
-    error: analyticsError,
-  } = useYouTubeAnalytics(analyticsParams);
+  // 5. Engagement
+  const { data: engagementData, isLoading: isLoadingEngagement } = useYouTubeEngagement(numericClientId);
 
+  // 6. Top Videos
+  const { data: topVideosData, isLoading: isLoadingTopVideos } = useYouTubeTopVideos(numericClientId, {
+    metric: "views",
+    limit: 5,
+    period: "30d"
+  });
+
+  // 7. Watch Time
+  const { data: watchTimeData, isLoading: isLoadingWatchTime } = useYouTubeWatchTime(numericClientId);
+
+  // Actions
+  const { mutateAsync: syncYouTube, isPending: isSyncing } = useYouTubeSync();
+  const { mutateAsync: reconnectYouTube, isPending: isReconnecting } = useYouTubeReconnect();
+  const { mutateAsync: disconnectYouTube, isPending: isDisconnecting } = useYouTubeDisconnect();
+
+  // Per Video Analytics
   const {
     data: perVideoAnalytics,
     isLoading: isLoadingPerVideoAnalytics,
     error: perVideoAnalyticsError,
   } = useYouTubePerVideoAnalytics(
+    numericClientId,
     selectedVideoId
       ? {
-          videoId: selectedVideoId,
-          from: analyticsParams.from,
-          to: analyticsParams.to,
-        }
+        videoId: selectedVideoId,
+      }
       : undefined
   );
 
+  useEffect(() => {
+    if (!selectedVideoId && videosData?.videos?.length) {
+      setSelectedVideoId(videosData.videos[0].videoId || videosData.videos[0].id);
+    }
+  }, [videosData, selectedVideoId]);
+
+
   const handleSync = async () => {
     try {
-      await syncYouTube();
+      await syncYouTube(numericClientId);
     } catch (error) {
       console.error(error);
     }
   };
 
-  const handleReconnect = async () => {
-    try {
-      await reconnectYouTube();
-    } catch (error) {
-      console.error(error);
-    }
-  };
+  // Convert dailyMetrics to chart format
+  const perVideoChartData = buildChartData(perVideoAnalytics?.analytics?.dailyMetrics as unknown as Array<Record<string, unknown>>);
+  const trendsChartData = trendsData?.trends || [];
 
-  const handleDisconnect = async () => {
-    try {
-      await disconnectYouTube();
-    } catch (error) {
-      console.error(error);
-    }
-  };
+  const summary = summaryData?.summary;
+  const engagement = engagementData?.engagement;
 
   const channelSnippet = channelData?.channel?.snippet;
-  const channelStats = channelData?.channel?.statistics;
-  const channelTitle =
-    channelSnippet?.title || channelData?.channel?.title || "YouTube Channel";
-  const channelDescription =
-    channelSnippet?.description || channelData?.channel?.description || "";
-  const channelCustomUrl =
-    channelSnippet?.customUrl || channelData?.channel?.customUrl;
-  const channelId = channelData?.channel?.id || "N/A";
-  const channelPublishedAt =
-    channelSnippet?.publishedAt || channelData?.channel?.publishedAt;
-
-  const analyticsChartData = buildChartData(analyticsData?.series);
-  const perVideoChartData = buildChartData(perVideoAnalytics?.series);
-
-  const subscriberCount = Number(channelStats?.subscriberCount || 0);
-  const videoCount = Number(channelStats?.videoCount || 0);
-  const viewCount = Number(channelStats?.viewCount || 0);
+  const channelTitle = channelSnippet?.title || channelData?.channel?.channelTitle || "YouTube Channel";
+  const channelDescription = channelSnippet?.description || "";
+  const channelCustomUrl = channelSnippet?.customUrl || "";
+  const channelId = channelData?.channel?.channelId || "N/A";
+  const channelPublishedAt = channelSnippet?.publishedAt;
 
   return (
     <div className="w-full h-full flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
       <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
         <div className="w-full h-full flex flex-col">
-          <div className="w-full h-[4.8em]  border-b flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-5 py-3 lg:py-0">
+          {/* Header */}
+          <div className="w-full h-[4.8em] border-b flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-5 py-3 lg:py-0">
             <div className="flex items-center gap-3">
               <FaYoutube className="text-2xl text-red-600" />
-              <span className="font-medium text-xl">YouTube Overview</span>
+              <span className="font-medium text-xl">YouTube Analytics</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSync}
-                disabled={isSyncing}
-                className="gap-2"
-              >
-                {isSyncing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Syncing...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="w-4 h-4" />
-                    Manual Sync
-                  </>
-                )}
+              <Button variant="outline" size="sm" onClick={handleSync} disabled={isSyncing} className="gap-2">
+                {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                Sync
               </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleReconnect}
-                disabled={isReconnecting}
-              >
-                {isReconnecting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Reconnecting...
-                  </>
-                ) : (
-                  "Reconnect"
-                )}
+              <Button variant="secondary" size="sm" onClick={() => reconnectYouTube(numericClientId)} disabled={isReconnecting}>
+                {isReconnecting ? "Reconnecting..." : "Reconnect"}
               </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleDisconnect}
-                disabled={isDisconnecting}
-              >
-                {isDisconnecting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Disconnecting...
-                  </>
-                ) : (
-                  "Disconnect"
-                )}
+              <Button variant="destructive" size="sm" onClick={() => disconnectYouTube(numericClientId)} disabled={isDisconnecting}>
+                {isDisconnecting ? "Disconnecting..." : "Disconnect"}
               </Button>
             </div>
           </div>
 
-          <div className="w-full px-5 pt-4">
+          <div className="w-full px-5 pt-4 pb-2">
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
@@ -272,365 +195,300 @@ function YouTubeDetailPage() {
             </Breadcrumb>
           </div>
 
-          <div className="w-full px-5 py-6 space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <Card className="col-span-1 lg:col-span-2">
-                <CardHeader>
-                  <CardTitle>Channel Information</CardTitle>
-                  <CardDescription>
-                    Details about your connected YouTube channel.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoadingChannel ? (
-                    <div className="space-y-4">
-                      <Skeleton className="h-10 w-64" />
-                      <Skeleton className="h-4 w-48" />
-                      <Skeleton className="h-4 w-32" />
-                    </div>
-                  ) : channelError ? (
-                    <div className="text-destructive">
-                      <p className="font-semibold">
-                        Failed to load channel information
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {channelError.message}
-                      </p>
-                    </div>
-                  ) : channelData?.channel ? (
-                    <div className="flex flex-col gap-6 md:flex-row md:items-center">
+          <div className="w-full px-5 py-6 space-y-6 overflow-y-auto pb-20">
+            {/* 1. Channel Info & Summary Cards */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Channel Profile */}
+              <div className="col-span-1 lg:col-span-3">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Channel Information</CardTitle>
+                    <CardDescription>
+                      Connected channel details.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoadingChannel ? (
                       <div className="flex items-center gap-4">
-                        <div className="w-20 h-20 rounded-full overflow-hidden border">
+                        <Skeleton className="w-16 h-16 rounded-full" />
+                        <div className="space-y-2">
+                          <Skeleton className="w-48 h-5" />
+                          <Skeleton className="w-32 h-4" />
+                        </div>
+                      </div>
+                    ) : channelError ? (
+                      <div className="text-destructive">Failed to load channel info</div>
+                    ) : (
+                      <div className="flex flex-col md:flex-row md:items-center gap-6">
+                        <div className="w-16 h-16 rounded-full overflow-hidden border shrink-0">
                           {channelSnippet?.thumbnails?.high?.url ? (
-                            <img
-                              src={channelSnippet.thumbnails.high.url}
-                              alt={channelTitle}
-                              className="w-full h-full object-cover"
-                            />
+                            <img src={channelSnippet.thumbnails.high.url} alt={channelTitle} className="w-full h-full object-cover" />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-red-50 text-red-500">
-                              <Youtube className="w-8 h-8" />
-                            </div>
+                            <div className="w-full h-full bg-red-50 flex items-center justify-center"><Youtube className="text-red-500" /></div>
                           )}
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-semibold">
-                              {channelTitle}
-                            </h3>
-                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-700">
-                              Connected
-                            </span>
+                            <h2 className="text-xl font-bold">{channelTitle}</h2>
+                            <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium">Connected</span>
                           </div>
-                          {channelCustomUrl && (
-                            <p className="text-sm text-muted-foreground">
-                              {channelCustomUrl}
-                            </p>
-                          )}
-                          <p className="text-xs text-gray-500">
-                            Channel ID: {channelId}
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {channelCustomUrl} • ID: {channelId}
+                            {channelPublishedAt && ` • Since ${format(new Date(channelPublishedAt), "MMM yyyy")}`}
                           </p>
-                          {channelPublishedAt && (
-                            <p className="text-xs text-gray-500">
-                              Since {format(new Date(channelPublishedAt), "PPP")}
-                              {" • "}
-                              {formatDistanceToNow(
-                                new Date(channelPublishedAt),
-                                { addSuffix: true }
-                              )}
-                            </p>
-                          )}
+                          {channelDescription && <p className="text-sm text-gray-500 mt-2 line-clamp-2">{channelDescription}</p>}
                         </div>
                       </div>
-                      {channelDescription && (
-                        <p className="text-sm text-gray-600 max-w-2xl">
-                          {channelDescription}
-                        </p>
-                      )}
-                    </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Summary Metrics */}
+              <SummaryCard
+                title="Total Views"
+                value={summary?.totalViews}
+                loading={isLoadingSummary}
+                icon={<Eye className="w-4 h-4 text-blue-500" />}
+                subtext={`Avg ${summary?.averageViewsPerDay?.toLocaleString() ?? 0}/day`}
+              />
+              <SummaryCard
+                title="Subscribers"
+                value={summary?.totalSubscribers}
+                loading={isLoadingSummary}
+                icon={<Users className="w-4 h-4 text-green-500" />}
+                subtext="Total Subscribers"
+              />
+              <SummaryCard
+                title="Watch Time (Hrs)"
+                value={watchTimeData?.totalWatchTimeHours ? Math.round(Number(watchTimeData.totalWatchTimeHours)) : 0}
+                loading={isLoadingWatchTime || isLoadingSummary}
+                icon={<Clock className="w-4 h-4 text-amber-500" />}
+                subtext="Last 30 Days"
+              />
+              <SummaryCard
+                title="Engagement Rate"
+                value={engagement?.engagementRate}
+                isString
+                loading={isLoadingEngagement}
+                icon={<TrendingUp className="w-4 h-4 text-purple-500" />}
+                subtext={`${engagement?.likesPerView ?? 0} Likes/View`}
+              />
+            </div>
+
+            {/* 2. Trends Chart */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <Card className="col-span-1 lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>Performance Trends</CardTitle>
+                  <CardDescription>Daily views for the last 30 days.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingTrends ? (
+                    <Skeleton className="h-[300px] w-full" />
                   ) : (
-                    <p className="text-sm text-muted-foreground">
-                      No channel information available.
-                    </p>
+                    <div className="h-[300px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={trendsChartData}>
+                          <defs>
+                            <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#ef4444" stopOpacity={0.1} />
+                              <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={(value: string) => format(new Date(value), "MMM d")}
+                            tick={{ fontSize: 12, fill: '#888' }}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <YAxis
+                            tick={{ fontSize: 12, fill: '#888' }}
+                            axisLine={false}
+                            tickLine={false}
+                            tickFormatter={(value: number) => value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(value)}
+                          />
+                          <Tooltip
+                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="views"
+                            stroke="#ef4444"
+                            strokeWidth={2}
+                            fillOpacity={1}
+                            fill="url(#colorViews)"
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
                   )}
                 </CardContent>
               </Card>
 
-              <Card>
+              {/* Top Videos */}
+              <Card className="col-span-1">
                 <CardHeader>
-                  <CardTitle>Channel Stats</CardTitle>
+                  <CardTitle>Top Performing Videos</CardTitle>
+                  <CardDescription>Based on views (Last 30 days)</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {isLoadingChannel ? (
-                    <div className="space-y-3">
-                      <Skeleton className="h-6 w-full" />
-                      <Skeleton className="h-6 w-full" />
-                      <Skeleton className="h-6 w-full" />
+                <CardContent>
+                  {isLoadingTopVideos ? (
+                    <div className="space-y-4">
+                      {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
                     </div>
                   ) : (
-                    <div className="space-y-4 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">Subscribers</p>
-                        <p className="text-2xl font-semibold">
-                          {subscriberCount.toLocaleString()}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Views</p>
-                        <p className="text-2xl font-semibold">
-                          {viewCount.toLocaleString()}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Videos</p>
-                        <p className="text-2xl font-semibold">
-                          {videoCount.toLocaleString()}
-                        </p>
-                      </div>
+                    <div className="space-y-4">
+                      {topVideosData?.topVideos?.map((video: YouTubeVideoItem, idx: number) => (
+                        <div key={video.id || idx} className="flex gap-3 items-start group">
+                          <div className="shrink-0 w-24 h-16 rounded-md overflow-hidden bg-gray-100 relative">
+                            {video.thumbnails?.default?.url && (
+                              <img src={video.thumbnails.default.url} alt="" className="w-full h-full object-cover" />
+                            )}
+                            <div className="absolute bottom-1 right-1 bg-black/70 text-white text-[10px] px-1 rounded">
+                              {idx + 1}
+                            </div>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="text-sm font-medium line-clamp-2 leading-tight group-hover:text-red-600 transition-colors">
+                              {video.title}
+                            </h4>
+                            <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Eye className="w-3 h-3" />
+                                {video.views?.toLocaleString()}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <ThumbsUp className="w-3 h-3" />
+                                {video.likes?.toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </CardContent>
               </Card>
             </div>
 
-            {analyticsError && (
-              <Card className="border border-destructive/50 bg-destructive/5">
-                <CardContent className="py-4 text-sm text-destructive">
-                  Failed to load analytics: {analyticsError.message}
-                </CardContent>
-              </Card>
-            )}
-
+            {/* Videos Table */}
             <Card>
-              <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <CardTitle>Channel Analytics</CardTitle>
-                  <CardDescription>
-                    Performance trend for the selected date range.
-                  </CardDescription>
+                  <CardTitle>Video Library</CardTitle>
+                  <CardDescription>Manage and track performance of all your videos.</CardDescription>
                 </div>
-                <Select
-                  value={analyticsRange}
-                  onValueChange={(value) =>
-                    setAnalyticsRange(value as DateRangeOption)
-                  }
-                >
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Select range" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {analyticsRanges.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </CardHeader>
-              <CardContent>
-                {isLoadingAnalytics ? (
-                  <Skeleton className="h-64 w-full" />
-                ) : analyticsChartData.length === 0 ? (
-                  <div className="h-64 flex items-center justify-center text-sm text-muted-foreground">
-                    No analytics data available for this range.
-                  </div>
-                ) : (
-                  <div className="w-full h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={analyticsChartData}>
-                        <defs>
-                          <linearGradient id="youtubeAnalytics" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#ff4d4f" stopOpacity={0.35} />
-                            <stop offset="95%" stopColor="#ff4d4f" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                        <YAxis tick={{ fontSize: 12 }} />
-                        <Tooltip
-                          formatter={(value: number) => [
-                            value.toLocaleString(),
-                            "Metric",
-                          ]}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="value"
-                          stroke="#ff4d4f"
-                          strokeWidth={2}
-                          fill="url(#youtubeAnalytics)"
-                          dot={false}
-                          activeDot={{ r: 4, fill: "#ff4d4f" }}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {videosError && (
-              <Card className="border border-destructive/50 bg-destructive/5">
-                <CardContent className="py-4 text-sm text-destructive">
-                  Failed to load videos: {videosError.message}
-                </CardContent>
-              </Card>
-            )}
-
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <CardTitle>Videos</CardTitle>
-                    <CardDescription>
-                      Recently synced videos from your channel.
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      placeholder="Search videos..."
-                      value={videosSearch}
-                      onChange={(event) => {
-                        setVideosSearch(event.target.value);
-                        setVideosPage(1);
-                      }}
-                      className="w-64"
-                    />
-                  </div>
-                </div>
+                <Input
+                  placeholder="Search videos..."
+                  value={videosSearch}
+                  onChange={(e) => setVideosSearch(e.target.value)}
+                  className="w-full md:w-64"
+                />
               </CardHeader>
               <CardContent>
                 {isLoadingVideos ? (
-                  <div className="space-y-3">
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
+                  <div className="space-y-2">
+                    {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-12 w-full" />)}
                   </div>
-                ) : videosData?.items?.length ? (
-                  <div className="space-y-4">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="text-left text-xs text-muted-foreground border-b">
-                            <th className="py-2 pr-4 font-medium">Title</th>
-                            <th className="py-2 pr-4 font-medium">Published</th>
-                            <th className="py-2 pr-4 font-medium">Views</th>
-                            <th className="py-2 pr-4 font-medium">Likes</th>
-                            <th className="py-2 pr-4 font-medium">Comments</th>
-                            <th className="py-2 pr-4 font-medium">Duration</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {videosData.items.map((video) => (
-                            <tr
-                              key={video.videoId}
-                              className="border-b last:border-b-0"
-                            >
-                              <td className="py-3 pr-4">
-                                <div className="flex items-center gap-3">
-                                  {video.thumbnails ? (
-                                    <img
-                                      src={
-                                        video.thumbnails.high?.url ||
-                                        video.thumbnails.medium?.url ||
-                                        video.thumbnails.default?.url
-                                      }
-                                      alt={video.title}
-                                      className="w-14 h-9 rounded object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-14 h-9 rounded bg-muted flex items-center justify-center text-xs text-muted-foreground">
-                                      N/A
-                                    </div>
+                ) : videosError ? (
+                  <div className="text-destructive">Failed to load videos: {videosError.message}</div>
+                ) : (
+                  <div className="rounded-md border">
+                    <table className="w-full text-sm">
+                      <thead className="bg-[#f9fafb]">
+                        <tr className="text-left">
+                          <th className="h-12 px-4 font-medium text-muted-foreground">Video</th>
+                          <th className="h-12 px-4 font-medium text-muted-foreground">Published</th>
+                          <th className="h-12 px-4 font-medium text-muted-foreground text-right">Views</th>
+                          <th className="h-12 px-4 font-medium text-muted-foreground text-right">Likes</th>
+                          <th className="h-12 px-4 font-medium text-muted-foreground text-right">Comments</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {videosData?.videos?.map((video: YouTubeVideoItem) => (
+                          <tr key={video.videoId || video.id} className="border-t hover:bg-gray-50/50 transition-colors">
+                            <td className="p-4 max-w-[300px]">
+                              <div className="flex gap-3">
+                                <div className="w-20 h-14 bg-gray-100 rounded overflow-hidden shrink-0">
+                                  {video.thumbnails?.default?.url && (
+                                    <img src={video.thumbnails.default.url} alt="" className="w-full h-full object-cover" />
                                   )}
-                                  <div>
-                                    <p className="font-medium text-gray-900">
-                                      {video.title}
-                                    </p>
-                                    <p className="text-xs text-gray-500">
-                                      {video.videoId}
-                                    </p>
-                                  </div>
                                 </div>
-                              </td>
-                              <td className="py-3 pr-4 text-gray-600">
-                                {format(new Date(video.publishedAt), "PP")}
-                              </td>
-                              <td className="py-3 pr-4 text-gray-600">
-                                {(video.viewCount || 0).toLocaleString()}
-                              </td>
-                              <td className="py-3 pr-4 text-gray-600">
-                                {(video.likeCount || 0).toLocaleString()}
-                              </td>
-                              <td className="py-3 pr-4 text-gray-600">
-                                {(video.commentCount || 0).toLocaleString()}
-                              </td>
-                              <td className="py-3 pr-4 text-gray-600">
-                                {video.durationISO || "N/A"}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    {videosData.totalPages > 1 && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">
-                          Page {videosData.page} of {videosData.totalPages}
-                        </span>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setVideosPage((prev) => Math.max(1, prev - 1))}
-                            disabled={videosPage === 1}
-                          >
-                            Previous
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              setVideosPage((prev) =>
-                                Math.min(videosData.totalPages, prev + 1)
-                              )
-                            }
-                            disabled={videosPage >= videosData.totalPages}
-                          >
-                            Next
-                          </Button>
-                        </div>
+                                <div className="space-y-1">
+                                  <p className="font-medium line-clamp-2">{video.title}</p>
+                                  <p className="text-xs text-muted-foreground line-clamp-1">{video.videoId || video.id}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="p-4 text-muted-foreground">
+                              {format(new Date(video.publishedAt), "MMM d, yyyy")}
+                            </td>
+                            <td className="p-4 text-right font-medium">
+                              {video.viewCount?.toLocaleString() ?? 0}
+                            </td>
+                            <td className="p-4 text-right text-muted-foreground">
+                              {video.likeCount?.toLocaleString() ?? 0}
+                            </td>
+                            <td className="p-4 text-right text-muted-foreground">
+                              {video.commentCount?.toLocaleString() ?? 0}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {videosData?.videos?.length === 0 && (
+                      <div className="p-8 text-center text-muted-foreground">
+                        No videos found matching your criteria.
                       </div>
                     )}
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No videos found for this channel.
-                  </p>
                 )}
+                {/* Pagination - Simplified for MVP */}
+                <div className="flex items-center justify-end gap-2 mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setVideosPage(p => Math.max(1, p - 1))}
+                    disabled={videosPage === 1 || isLoadingVideos}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setVideosPage(p => p + 1)}
+                    disabled={!videosData?.videos || !videosData.pagination || videosPage >= videosData.pagination.totalPages || isLoadingVideos}
+                  >
+                    Next
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
+            {/* Deep Dive Section */}
             <Card>
               <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <CardTitle>Per-Video Analytics</CardTitle>
-                  <CardDescription>
-                    Deep dive into performance for a single video.
-                  </CardDescription>
+                  <CardTitle>Video Deep Dive</CardTitle>
+                  <CardDescription>Detailed daily analytics for a specific video.</CardDescription>
                 </div>
                 <Select
                   value={selectedVideoId ?? ""}
                   onValueChange={(value) => setSelectedVideoId(value)}
-                  disabled={!videosData?.items?.length}
+                  disabled={!videosData?.videos?.length}
                 >
-                  <SelectTrigger className="w-64">
-                    <SelectValue placeholder="Select video" />
+                  <SelectTrigger className="w-full lg:w-[300px]">
+                    <SelectValue placeholder="Select a video to analyze" />
                   </SelectTrigger>
                   <SelectContent>
-                    {videosData?.items?.map((video) => (
-                      <SelectItem key={video.videoId} value={video.videoId}>
-                        {video.title}
+                    {videosData?.videos?.map((video: YouTubeVideoItem) => (
+                      <SelectItem key={video.videoId || video.id} value={video.videoId || video.id}>
+                        <div className="flex items-center gap-2 max-w-[280px]">
+                          <span className="truncate">{video.title}</span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -644,56 +502,45 @@ function YouTubeDetailPage() {
                   </div>
                 )}
                 {isLoadingPerVideoAnalytics ? (
-                  <Skeleton className="h-64 w-full" />
+                  <Skeleton className="h-[300px] w-full" />
                 ) : !selectedVideoId ? (
-                  <p className="text-sm text-muted-foreground">
-                    Select a video to view detailed analytics.
-                  </p>
-                ) : perVideoChartData.length === 0 ? (
-                  <div className="h-64 flex items-center justify-center text-sm text-muted-foreground">
-                    No analytics data available for this video.
+                  <div className="h-[300px] w-full flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg">
+                    <FaYoutube className="w-10 h-10 mb-2 opacity-20" />
+                    <p>Select a video from the dropdown above</p>
                   </div>
                 ) : (
-                  <div className="w-full h-64">
+                  <div className="h-[300px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={perVideoChartData}>
                         <defs>
-                          <linearGradient
-                            id="youtubePerVideo"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="5%"
-                              stopColor="#2563eb"
-                              stopOpacity={0.3}
-                            />
-                            <stop
-                              offset="95%"
-                              stopColor="#2563eb"
-                              stopOpacity={0}
-                            />
+                          <linearGradient id="colorVideo" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1} />
+                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                        <YAxis tick={{ fontSize: 12 }} />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                        <XAxis
+                          dataKey="date"
+                          tickFormatter={(value: string) => format(new Date(value), "MMM d")}
+                          tick={{ fontSize: 12, fill: '#888' }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 12, fill: '#888' }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
                         <Tooltip
-                          formatter={(value: number) => [
-                            value.toLocaleString(),
-                            "Metric",
-                          ]}
+                          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                         />
                         <Area
                           type="monotone"
                           dataKey="value"
-                          stroke="#2563eb"
+                          stroke="#3b82f6"
                           strokeWidth={2}
-                          fill="url(#youtubePerVideo)"
-                          dot={false}
-                          activeDot={{ r: 4, fill: "#2563eb" }}
+                          fillOpacity={1}
+                          fill="url(#colorVideo)"
                         />
                       </AreaChart>
                     </ResponsiveContainer>
@@ -701,6 +548,7 @@ function YouTubeDetailPage() {
                 )}
               </CardContent>
             </Card>
+
           </div>
         </div>
       </div>
@@ -708,5 +556,31 @@ function YouTubeDetailPage() {
   );
 }
 
-export default YouTubeDetailPage;
+function SummaryCard({ title, value, loading, icon, subtext, isString }: any) {
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex justify-between items-start">
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-muted-foreground">{title}</p>
+            {loading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <div className="flex items-baseline gap-2">
+                <h3 className="text-2xl font-bold">
+                  {isString ? value : (value?.toLocaleString() ?? 0)}
+                </h3>
+              </div>
+            )}
+            {loading ? <Skeleton className="h-3 w-16 mt-1" /> : <p className="text-xs text-muted-foreground mt-1">{subtext}</p>}
+          </div>
+          <div className="p-2 bg-gray-50 rounded-full">
+            {icon}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
+export default YouTubeDetailPage;

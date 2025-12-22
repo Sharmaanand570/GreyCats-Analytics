@@ -1,5 +1,5 @@
 import { SiBaremetrics } from "react-icons/si";
-import {  LuGauge, LuPlug, LuTarget } from "react-icons/lu";
+import { LuPlug } from "react-icons/lu";
 import { MdOutlineBrokenImage } from "react-icons/md";
 import { ImEmbed2 } from "react-icons/im";
 
@@ -7,7 +7,7 @@ import { TbLetterCase } from "react-icons/tb";
 import type { IconType } from "react-icons";
 
 import { type ReportWidgetType } from "./reportTypes";
-import type { WidgetFormState } from "./ReportBuilder";
+import type { WidgetFormState } from "../pages/ReportBuilder";
 
 type ReportElementDefinition = {
   id: string;
@@ -46,13 +46,6 @@ const reportElements: ReportElementDefinition[] = [
     icon: SiBaremetrics,
     widgetType: "metric",
   },
-  {
-    id: "benchmarks",
-    label: "Benchmarks",
-    icon: LuGauge,
-    widgetType: "custom",
-  },
-  { id: "goals", label: "Goals", icon: LuTarget, widgetType: "custom" },
 ];
 
 type ReportElementsType = {
@@ -65,7 +58,7 @@ function ReportElements({ setRightPanelTitle, setWidgetFormState }: ReportElemen
 
   return (
     <div className="w-16 md:w-20 lg:w-24 h-full border-l">
-      {reportElements.map(({ id, label, icon: Icon, widgetType }) => (
+      {reportElements.map(({ id, label, icon: Icon }) => (
         <div
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
@@ -77,7 +70,7 @@ function ReportElements({ setRightPanelTitle, setWidgetFormState }: ReportElemen
                 widgetType: "",
               });
               setRightPanelTitle((prev) => (prev === label ? "" : label));
-              
+
             }
           }}
           onClick={() => {

@@ -16,13 +16,22 @@ export default function WidgetCard({
   onDelete,
   children,
 }: WidgetCardProps) {
+  // Only hide borders and headers for title and image widgets
+  const shouldHideBorder = widget.widgetType === 'title' || widget.widgetType === 'image';
+
   return (
     <div
-      className="rounded-lg md:rounded-xl shadow-sm border border-gray-200 overflow-hidden h-full"
+      className={`group rounded-lg md:rounded-xl shadow-sm overflow-hidden h-full transition-all duration-200 ${shouldHideBorder
+          ? 'border border-transparent hover:border-gray-200'
+          : 'border border-gray-200'
+        }`}
       style={{ position: "relative", zIndex: 1 }}
     >
       <div
-        className="drag-handle cursor-grab active:cursor-grabbing flex items-center justify-between px-2 md:px-3 py-1.5 md:py-2 bg-gray-50 border-b"
+        className={`drag-handle cursor-grab active:cursor-grabbing flex items-center justify-between px-2 md:px-3 py-1.5 md:py-2 transition-all duration-200 ${shouldHideBorder
+            ? 'bg-transparent group-hover:bg-gray-50 border-b border-transparent group-hover:border-gray-200 opacity-0 group-hover:opacity-100'
+            : 'bg-gray-50 border-b border-gray-200'
+          }`}
         aria-label="Drag widget to reposition"
       >
         <span className="text-xs md:text-sm font-medium text-gray-600">
@@ -58,4 +67,3 @@ export default function WidgetCard({
     </div>
   );
 }
-

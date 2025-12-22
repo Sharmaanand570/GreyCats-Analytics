@@ -168,8 +168,8 @@ const handleApiError = (error: unknown, fallbackMessage: string): never => {
   const axiosError = error as AxiosError<ApiErrorResponse>;
   throw new Error(
     axiosError.response?.data?.message ||
-      axiosError.response?.data?.error ||
-      fallbackMessage
+    axiosError.response?.data?.error ||
+    fallbackMessage
   );
 };
 
@@ -346,5 +346,153 @@ export const reconnectShopify = async (
     return handleApiError(error, "Failed to initiate Shopify reconnect");
   }
 };
+
+// ============================================================================
+// NEW CLIENT-SPECIFIC ENDPOINTS (matching WooCommerce pattern)
+// Backend automatically finds assigned account based on clientId
+// ============================================================================
+
+// Summary/Analytics Types
+export type ShopifySummaryResponse = {
+  success: boolean;
+  message?: string;
+  shopDomain?: string;
+  summary: {
+    totalRevenue: number;
+    totalOrders: number;
+    fulfilledOrders: number;
+    averageOrderValue: number;
+  };
+};
+
+// Product Types (simplified for client-specific endpoint)
+export type ShopifySimpleProduct = {
+  id: number;
+  title: string;
+  price: string;
+  compareAtPrice: string | null;
+  inventoryQuantity: number;
+  sku: string;
+  status: string;
+  productType: string;
+};
+
+export type ShopifyProductsResponse = {
+  success: boolean;
+  products: ShopifySimpleProduct[];
+};
+
+// Order Types (simplified for client-specific endpoint)
+export type ShopifySimpleOrder = {
+  id: number;
+  orderNumber: number;
+  financialStatus: string;
+  fulfillmentStatus: string | null;
+  totalPrice: string;
+  currency: string;
+  createdAt: string;
+  customerName: string;
+  itemCount: number;
+};
+
+export type ShopifyOrdersResponse = {
+  success: boolean;
+  orders: ShopifySimpleOrder[];
+};
+
+// Trends Types
+export type ShopifyTrendDataPoint = {
+  date: string;
+  revenue: number;
+  orders: number;
+};
+
+export type ShopifyTrendsResponse = {
+  success: boolean;
+  message?: string;
+  trends: ShopifyTrendDataPoint[];
+};
+
+// ============================================================================
+// NEW API FUNCTIONS - Client-Specific Endpoints
+// ============================================================================
+
+/**
+ * Get Shopify summary/analytics for a client
+ * GET /api/clients/:clientId/shopify/summary
+ */
+export const getShopifySummary = async (clientId: number): Promise<ShopifySummaryResponse> => {
+  try {
+    const response = await api.get<ShopifySummaryResponse>(`/clients/${clientId}/shopify/summary`);
+    return response.data;
+  } catch (error) {
+    return handleApiError(error, "Failed to fetch Shopify summary");
+  }
+};
+
+/**
+ * Get Shopify products for a client
+ * GET /api/clients/:clientId/shopify/products
+ */
+export const getShopifyProducts = async (
+  clientId: number,
+  params?: { limit?: number }
+): Promise<ShopifyProductsResponse> => {
+  try {
+    const response = await api.get<ShopifyProductsResponse>(
+      `/clients/${clientId}/shopify/products`,
+      { params }
+    );
+    return response.data;
+  } catch (error) {
+    return handleApiError(error, "Failed to fetch Shopify products");
+  }
+};
+
+/**
+ * Get Shopify orders for a client
+ * GET /api/clients/:clientId/shopify/orders
+ */
+export const getShopifyOrders = async (
+  clientId: number,
+  params?: { limit?: number }
+): Promise<ShopifyOrdersResponse> => {
+  try {
+    const response = await api.get<ShopifyOrdersResponse>(
+      `/clients/${clientId}/shopify/orders`,
+      { params }
+    );
+    return response.data;
+  } catch (error) {
+    return handleApiError(error, "Failed to fetch Shopify orders");
+  }
+};
+
+/**
+ * Get Shopify trends for a client
+ * GET /api/clients/:clientId/shopify/trends
+ */
+export const getShopifyTrends = async (clientId: number): Promise<ShopifyTrendsResponse> => {
+  try {
+    const response = await api.get<ShopifyTrendsResponse>(`/clients/${clientId}/shopify/trends`);
+    return response.data;
+  } catch (error) {
+    return handleApiError(error, "Failed to fetch Shopify trends");
+  }
+};
+
+/**
+ * Get Shopify meta (same as summary)
+ * GET /api/clients/:clientId/shopify/meta
+ */
+export const getShopifyMeta = async (clientId: number): Promise<ShopifySummaryResponse> => {
+  try {
+    const response = await api.get<ShopifySummaryResponse>(`/clients/${clientId}/shopify/meta`);
+    return response.data;
+  } catch (error) {
+    return handleApiError(error, "Failed to fetch Shopify meta");
+  }
+};
+
 
 

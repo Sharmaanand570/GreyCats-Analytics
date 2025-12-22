@@ -29,4 +29,3 @@ export default function SlideContainer({ title, containerRef, children, id, date
     </div>
   );
 }
-

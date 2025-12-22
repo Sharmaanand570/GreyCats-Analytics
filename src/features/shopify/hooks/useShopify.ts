@@ -170,3 +170,83 @@ export const useShopifyReconnect = () => {
   });
 };
 
+// ============================================================================
+// NEW HOOKS - Client-Specific Endpoints (matching WooCommerce pattern)
+// ============================================================================
+
+/**
+ * Hook to fetch Shopify summary/analytics for a client
+ */
+export const useShopifySummary = (clientId: number) => {
+  return useQuery({
+    queryKey: ["shopify", "summary", clientId],
+    queryFn: async () => {
+      const { getShopifySummary } = await import("../API/shopifyApi");
+      return getShopifySummary(clientId);
+    },
+    enabled: !!clientId,
+    ...commonQueryOptions,
+  });
+};
+
+/**
+ * Hook to fetch Shopify products for a client
+ */
+export const useShopifySimpleProducts = (clientId: number, limit?: number) => {
+  return useQuery({
+    queryKey: ["shopify", "simple-products", clientId, limit],
+    queryFn: async () => {
+      const { getShopifyProducts } = await import("../API/shopifyApi");
+      return getShopifyProducts(clientId, limit ? { limit } : undefined);
+    },
+    enabled: !!clientId,
+    ...commonQueryOptions,
+  });
+};
+
+/**
+ * Hook to fetch Shopify orders for a client
+ */
+export const useShopifySimpleOrders = (clientId: number, limit?: number) => {
+  return useQuery({
+    queryKey: ["shopify", "simple-orders", clientId, limit],
+    queryFn: async () => {
+      const { getShopifyOrders } = await import("../API/shopifyApi");
+      return getShopifyOrders(clientId, limit ? { limit } : undefined);
+    },
+    enabled: !!clientId,
+    ...commonQueryOptions,
+  });
+};
+
+/**
+ * Hook to fetch Shopify trends for a client
+ */
+export const useShopifyTrends = (clientId: number) => {
+  return useQuery({
+    queryKey: ["shopify", "trends", clientId],
+    queryFn: async () => {
+      const { getShopifyTrends } = await import("../API/shopifyApi");
+      return getShopifyTrends(clientId);
+    },
+    enabled: !!clientId,
+    ...commonQueryOptions,
+  });
+};
+
+/**
+ * Hook to fetch Shopify meta (same as summary)
+ */
+export const useShopifyMeta = (clientId: number) => {
+  return useQuery({
+    queryKey: ["shopify", "meta", clientId],
+    queryFn: async () => {
+      const { getShopifyMeta } = await import("../API/shopifyApi");
+      return getShopifyMeta(clientId);
+    },
+    enabled: !!clientId,
+    ...commonQueryOptions,
+  });
+};
+
+

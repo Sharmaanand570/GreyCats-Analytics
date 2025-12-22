@@ -27,13 +27,13 @@
 } */
 
 /* Force RGB colors when exporting to avoid html2canvas oklch() errors */
-.pdf-safe,
-.pdf-safe * {
+/* .pdf-safe, */
+/* .pdf-safe * { */
   /* Override ALL oklch() usage with RGB - use universal selector for maximum coverage */
-  color: rgb(36 36 36) !important;
+  /* color: rgb(36 36 36) !important;
   background-color: rgb(255 255 255) !important;
   border-color: rgb(235 235 235) !important;
-}
+} */
 
 .pdf-safe {
   /* Core theme colors - converted from oklch() to RGB */

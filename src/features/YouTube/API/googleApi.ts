@@ -117,8 +117,8 @@ const handleGoogleApiError = (error: unknown, fallbackMessage: string): never =>
   const axiosError = error as AxiosError<GoogleApiErrorResponse>;
   throw new Error(
     axiosError.response?.data?.message ||
-      axiosError.response?.data?.error ||
-      fallbackMessage
+    axiosError.response?.data?.error ||
+    fallbackMessage
   );
 };
 
@@ -171,12 +171,15 @@ export const reconnectGoogle = async (
 export const disconnectGoogle = async (
   clientId: number
 ): Promise<GoogleDisconnectResponse> => {
+  console.log("Disconnecting Google Analytics for client:", clientId);
   try {
-    const response = await api.post<GoogleDisconnectResponse>(
+
+    const response = await api.delete<GoogleDisconnectResponse>(
       `/clients/${clientId}/google-analytics/disconnect`
     );
     return response.data;
   } catch (error) {
+    console.log("Error disconnecting Google Analytics:", error);
     return handleGoogleApiError(error, "Failed to disconnect Google Analytics");
   }
 };

@@ -108,6 +108,71 @@ export type GoogleConsoleApiErrorResponse = {
   error?: string;
 };
 
+// ==================== OVERVIEW ENDPOINTS TYPES ====================
+
+export type GoogleConsoleSummaryMetrics = {
+  totalClicks: number;
+  totalImpressions: number;
+  avgCTR: number;
+  avgPosition: number;
+};
+
+export type GoogleConsoleSummaryResponse = {
+  success: boolean;
+  message?: string;
+  propertyUrl?: string;
+  summary: GoogleConsoleSummaryMetrics;
+};
+
+export type GoogleConsoleTrendDataPoint = {
+  date: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+};
+
+export type GoogleConsoleTrendsResponse = {
+  success: boolean;
+  trends: GoogleConsoleTrendDataPoint[];
+  period: string;
+};
+
+export type GoogleConsoleTopPage = {
+  page: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+};
+
+export type GoogleConsoleTopPagesResponse = {
+  success: boolean;
+  topPages: GoogleConsoleTopPage[];
+  period?: string;
+};
+
+export type GoogleConsoleTopQuery = {
+  query: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+};
+
+export type GoogleConsoleTopQueriesResponse = {
+  success: boolean;
+  topQueries: GoogleConsoleTopQuery[];
+  period?: string;
+};
+
+export type GoogleConsoleMetaResponse = {
+  success: boolean;
+  connected: boolean;
+  propertyUrl?: string;
+  lastSync?: string;
+};
+
 
 
 const seoHeaders = { "ngrok-skip-browser-warning": "true" };
@@ -136,7 +201,7 @@ export const connectGoogleConsole =
       const response = await api.post<ConnectGoogleConsoleResponse>(
         "/google-seo/connect",
         {
-          baseURL:import.meta.env.VITE_NGROK_URL,
+          baseURL: import.meta.env.VITE_NGROK_URL,
           headers: seoHeaders,
         }
       );
@@ -301,4 +366,122 @@ export const getGoogleConsoleUnifiedMetrics = async (
     );
   }
 };
+
+// ==================== OVERVIEW ENDPOINTS ====================
+
+/**
+ * 8) GET SUMMARY METRICS
+ * GET /clients/:clientId/google-search-console/summary
+ */
+export const getGoogleConsoleSummary = async (
+  clientId: number
+): Promise<GoogleConsoleSummaryResponse> => {
+  try {
+    const response = await api.get<GoogleConsoleSummaryResponse>(
+      `/clients/${clientId}/google-search-console/summary`,
+      {
+        headers: seoHeaders,
+      }
+    );
+    return response.data;
+  } catch (error) {
+    return handleGoogleConsoleApiError(
+      error,
+      "Failed to load Google Search Console summary"
+    );
+  }
+};
+
+/**
+ * 9) GET TRENDS DATA
+ * GET /clients/:clientId/google-search-console/trends
+ */
+export const getGoogleConsoleTrends = async (
+  clientId: number
+): Promise<GoogleConsoleTrendsResponse> => {
+  try {
+    const response = await api.get<GoogleConsoleTrendsResponse>(
+      `/clients/${clientId}/google-search-console/trends`,
+      {
+        headers: seoHeaders,
+      }
+    );
+    return response.data;
+  } catch (error) {
+    return handleGoogleConsoleApiError(
+      error,
+      "Failed to load Google Search Console trends"
+    );
+  }
+};
+
+/**
+ * 10) GET TOP PAGES
+ * GET /clients/:clientId/google-search-console/top-pages
+ */
+export const getGoogleConsoleTopPages = async (
+  clientId: number
+): Promise<GoogleConsoleTopPagesResponse> => {
+  try {
+    const response = await api.get<GoogleConsoleTopPagesResponse>(
+      `/clients/${clientId}/google-search-console/top-pages`,
+      {
+        headers: seoHeaders,
+      }
+    );
+    return response.data;
+  } catch (error) {
+    return handleGoogleConsoleApiError(
+      error,
+      "Failed to load Google Search Console top pages"
+    );
+  }
+};
+
+/**
+ * 11) GET TOP QUERIES
+ * GET /clients/:clientId/google-search-console/top-queries
+ */
+export const getGoogleConsoleTopQueries = async (
+  clientId: number
+): Promise<GoogleConsoleTopQueriesResponse> => {
+  try {
+    const response = await api.get<GoogleConsoleTopQueriesResponse>(
+      `/clients/${clientId}/google-search-console/top-queries`,
+      {
+        headers: seoHeaders,
+      }
+    );
+    return response.data;
+  } catch (error) {
+    return handleGoogleConsoleApiError(
+      error,
+      "Failed to load Google Search Console top queries"
+    );
+  }
+};
+
+/**
+ * 12) GET META/CONNECTION STATUS
+ * GET /clients/:clientId/google-search-console/meta
+ */
+export const getGoogleConsoleMeta = async (
+  clientId: number
+): Promise<GoogleConsoleMetaResponse> => {
+  try {
+    const response = await api.get<GoogleConsoleMetaResponse>(
+      `/clients/${clientId}/google-search-console/meta`,
+      {
+        headers: seoHeaders,
+      }
+    );
+    return response.data;
+  } catch (error) {
+    return handleGoogleConsoleApiError(
+      error,
+      "Failed to load Google Search Console connection status"
+    );
+  }
+};
+
 
