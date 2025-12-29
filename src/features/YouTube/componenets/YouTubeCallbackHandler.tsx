@@ -5,12 +5,27 @@ import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { AccountSelectionModal } from "@/components/clients/AccountSelectionModal";
+import type { IntegrationType } from "@/types/client.types";
 
 function YouTubeCallbackHandler() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [clientId, setClientId] = useState<number | null>(null);
+  const [integrationType, setIntegrationType] = useState<IntegrationType | null>(null);
   const { mutateAsync: handleCallback } = useYouTubeCallback();
 
   useEffect(() => {
@@ -35,8 +50,28 @@ function YouTubeCallbackHandler() {
       }
 
       // Handle successful OAuth callback
+      // If status is "success", we assume the backend handled the exchange or it's a confirmation redirect.
+      // If code & state are present, we process them.
+      if (status === "success") {
+        const storedClientId = localStorage.getItem('pending_oauth_client_id');
+        const storedIntegration = localStorage.getItem('pending_oauth_integration');
+
+        if (storedClientId && storedIntegration) {
+          setClientId(parseInt(storedClientId));
+          setIntegrationType(storedIntegration as IntegrationType);
+          setIsProcessing(false);
+          setShowAccountModal(true);
+        } else {
+          setIsProcessing(false);
+          setShowSuccessDialog(true);
+        }
+        return;
+      }
+
       if (!code || !state) {
-        toast.error("Missing OAuth parameters. Please try connecting again.");
+        const msg = "Missing OAuth parameters. Please try connecting again.";
+        setErrorMessage(msg);
+        toast.error(msg);
         setIsProcessing(false);
         setTimeout(() => {
           navigate("/data-sources");
@@ -48,80 +83,140 @@ function YouTubeCallbackHandler() {
         const response = await handleCallback({ code, state });
         console.log("response", response);
 
-        if (response.success && response.channel) {
-          toast.success(
-            `Successfully connected to ${response.channel.title}!`
-          );
-          // Redirect to YouTube detail page after a short delay
-          setTimeout(() => {
-            const storedClientId = localStorage.getItem('pending_oauth_client_id');
-            if (storedClientId) {
-              navigate(`/clients/${storedClientId}`);
-            } else {
-              navigate('/data-sources/youtube');
-            }
-          }, 1500);
+        if (response.success) {
+          const storedClientId = localStorage.getItem('pending_oauth_client_id');
+          const storedIntegration = localStorage.getItem('pending_oauth_integration');
+
+          if (storedClientId && storedIntegration) {
+            setClientId(parseInt(storedClientId));
+            setIntegrationType(storedIntegration as IntegrationType);
+            setIsProcessing(false);
+            setShowAccountModal(true);
+          } else {
+            setIsProcessing(false);
+            setShowSuccessDialog(true);
+          }
+
+          if (response.channel) {
+            toast.success(`Connected to ${response.channel.channelTitle}!`);
+          }
         }
       } catch (error) {
         const errorMessage =
           error instanceof Error
             ? error.message
             : "Failed to complete YouTube connection";
+        setErrorMessage(errorMessage); // Fix: Set localized error state so UI updates
         toast.error(errorMessage);
         setIsProcessing(false);
         // Redirect to data sources page after error
         setTimeout(() => {
           navigate("/data-sources");
         }, 3000);
-      } finally {
-        setIsProcessing(false);
       }
     };
 
     processCallback();
   }, [searchParams, handleCallback, navigate]);
 
+  const handleAccountSelectionSuccess = () => {
+    setShowAccountModal(false);
+    setShowSuccessDialog(true);
+
+    // Cleanup storage now
+    localStorage.removeItem('pending_oauth_client_id');
+    localStorage.removeItem('pending_oauth_integration');
+  };
+
+  const handleContinue = () => {
+    if (clientId) {
+      navigate(`/clients/${clientId}`);
+    } else {
+      navigate('/data-sources/youtube');
+    }
+  };
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>
-            {errorMessage ? "Connection Failed" : "Connecting YouTube"}
-          </CardTitle>
-          <CardDescription>
-            {errorMessage
-              ? "There was an issue completing the connection"
-              : "Please wait while we complete the connection..."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {isProcessing ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm">Processing OAuth callback...</span>
+      {!showAccountModal && !showSuccessDialog && (
+        <Card className="w-full max-w-md bg-black/40 border-white/10 text-white">
+          <CardHeader>
+            <CardTitle>
+              {errorMessage ? "Connection Failed" : "Connecting YouTube"}
+            </CardTitle>
+            <CardDescription className="text-zinc-300">
+              {errorMessage
+                ? "There was an issue completing the connection"
+                : "Please wait while we complete the connection..."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isProcessing ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm text-zinc-300">Processing OAuth callback...</span>
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-full /5" />
+                  <Skeleton className="h-4 w-3/4 /5" />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-3/4" />
+            ) : errorMessage ? (
+              <div className="space-y-3">
+                <div className="text-sm text-red-400 font-medium">
+                  {errorMessage}
+                </div>
+                <div className="text-sm text-zinc-400">
+                  Redirecting to data sources...
+                </div>
               </div>
-            </div>
-          ) : errorMessage ? (
-            <div className="space-y-3">
-              <div className="text-sm text-destructive font-medium">
-                {errorMessage}
+            ) : (
+              <div className="text-sm text-zinc-400">
+                Connection process completed.
               </div>
-              <div className="text-sm text-muted-foreground">
-                Redirecting to data sources...
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {clientId && integrationType && (
+        <AccountSelectionModal
+          open={showAccountModal}
+          onOpenChange={setShowAccountModal}
+          clientId={clientId}
+          integration={integrationType}
+          onSuccess={handleAccountSelectionSuccess}
+        />
+      )}
+
+      <AlertDialog open={showSuccessDialog} onOpenChange={handleContinue}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Connection Successful! 🎉</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Your data source has been connected successfully.
+              </p>
+              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-blue-700 text-sm">
+                <p className="font-medium flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Syncing Data...
+                </p>
+                <p className="mt-1">
+                  Please allow up to 5 minutes for your historical data to be fully fetched and processed.
+                  You can start building reports, but some metrics might be processing.
+                </p>
               </div>
-            </div>
-          ) : (
-            <div className="text-sm text-muted-foreground">
-              Connection process completed. Redirecting...
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={handleContinue}>
+              Got it, continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

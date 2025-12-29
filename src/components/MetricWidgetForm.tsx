@@ -58,6 +58,48 @@ function MetricWidgetForm({
             placeholder="e.g. USD, %, orders"
           />
         </div>
+
+        <div>
+          <Label className="block text-xs text-gray-600 mb-2">
+            Comparison Value (Previous Period)
+          </Label>
+          <Input
+            value={data?.comparisonValue ?? ""}
+            onChange={(e) => handleChange({ comparisonValue: e.target.value })}
+            placeholder="e.g. 10500"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="block text-xs text-gray-600 mb-2">
+              Trend %
+            </Label>
+            <Input
+              value={data?.trendValue ?? ""}
+              onChange={(e) => handleChange({ trendValue: e.target.value })}
+              placeholder="e.g. 12%"
+            />
+          </div>
+          <div>
+            <Label className="block text-xs text-gray-600 mb-2">
+              Trend Direction
+            </Label>
+            <select
+              className="w-full text-xs border rounded-md h-9 px-2"
+              value={data?.trendDirection ?? "neutral"}
+              onChange={(e) =>
+                handleChange({
+                  trendDirection: e.target.value as "up" | "down" | "neutral",
+                })
+              }
+            >
+              <option value="neutral">Neutral (-)</option>
+              <option value="up">Up (Green)</option>
+              <option value="down">Down (Red)</option>
+            </select>
+          </div>
+        </div>
       </div>
     </div>
   );

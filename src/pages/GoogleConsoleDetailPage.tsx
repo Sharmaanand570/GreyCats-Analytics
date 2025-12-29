@@ -34,14 +34,14 @@ import {
 } from "@/components/ui/select";
 import { useClients } from "@/hooks/useClients";
 import {
-  useGoogleConsoleDisconnect,
-  useGoogleConsoleProperties,
-  useGoogleConsoleReconnect,
   useGoogleConsoleSelectProperty,
   useGoogleConsoleSummary,
   useGoogleConsoleTopPages,
   useGoogleConsoleTopQueries,
+  useGoogleConsoleProperties,
 } from "@/features/YouTube/hooks/google/useGoogleConsoleData";
+import { useRemoveAccount } from "@/hooks/useIntegrations";
+import { useClient } from "@/hooks/useClients";
 import {
   Loader2,
   MousePointer2,
@@ -51,6 +51,7 @@ import {
   ArrowUpRight,
   TrendingUp
 } from "lucide-react";
+import { DataSyncBanner } from "@/components/DataSyncBanner";
 
 function GoogleConsoleDetailPage() {
   const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
@@ -61,6 +62,7 @@ function GoogleConsoleDetailPage() {
 
   // Fetch all clients for selector
   const { data: clients } = useClients();
+  const { data: client } = useClient(selectedClientId);
 
   // Handle client selection - update URL
   const handleClientChange = (newClientId: string) => {
@@ -72,8 +74,9 @@ function GoogleConsoleDetailPage() {
   const {
     data: propertiesData,
     isLoading: isLoadingProperties,
-    error: propertiesError,
   } = useGoogleConsoleProperties(clientId);
+
+  const properties = propertiesData?.properties || [];
 
   console.log("propertiesData", propertiesData);
 
@@ -83,6 +86,13 @@ function GoogleConsoleDetailPage() {
     isLoading: isLoadingSummary,
     error: summaryError,
   } = useGoogleConsoleSummary(clientId);
+
+  const summaryMetrics = summaryData?.summary || {
+    totalClicks: 0,
+    totalImpressions: 0,
+    avgCTR: 0,
+    avgPosition: 0
+  };
 
   const {
     data: topPagesData,
@@ -99,45 +109,25 @@ function GoogleConsoleDetailPage() {
     isPending: isSelectingProperty,
   } = useGoogleConsoleSelectProperty();
 
-  const {
-    mutateAsync: reconnectConsole,
-    isPending: isReconnecting,
-  } = useGoogleConsoleReconnect();
-
-  const {
-    mutateAsync: disconnectConsole,
-    isPending: isDisconnecting,
-  } = useGoogleConsoleDisconnect();
-
-  const tokenExpired =
-    (propertiesError &&
-      propertiesError.message.toLowerCase().includes("token expired")) ||
-    (summaryError &&
-      summaryError.message.toLowerCase().includes("token expired"));
-
-  const properties = propertiesData?.properties ?? [];
-
-  // Summary metrics from new endpoint
-  const summaryMetrics = summaryData?.summary || {
-    totalClicks: 0,
-    totalImpressions: 0,
-    avgCTR: 0,
-    avgPosition: 0,
-  };
-
-  const handleReconnect = async () => {
-    try {
-      await reconnectConsole(clientId);
-    } catch {
-      // handled in hook via toast
-    }
-  };
-
+  const removeAccount = useRemoveAccount();
   const handleDisconnect = async () => {
+    if (!client?.integrations || !selectedClientId) return;
+
+    // Find the Google Console integration/account
+    // Note: IntegrationType 'google-search-console' needs to vary based on how it's stored.
+    // Assuming 'google-search-console' or similar. I'll check integration types first if unsafe.
+    // Based on previous files, let's assume 'google-search-console'.
+    const integration = client.integrations.find(i => i.integrationType === 'google-search-console');
+    if (!integration) return;
+
     try {
-      await disconnectConsole(clientId);
+      await removeAccount.mutateAsync({
+        clientId: selectedClientId,
+        integrationType: 'google-search-console',
+        accountId: integration.accountId
+      });
     } catch {
-      // handled in hook via toast
+      // handled in hook
     }
   };
 
@@ -179,28 +169,14 @@ function GoogleConsoleDetailPage() {
                   </SelectContent>
                 </Select>
               )}
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleReconnect}
-                disabled={isReconnecting}
-              >
-                {isReconnecting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Reconnecting...
-                  </>
-                ) : (
-                  "Reconnect"
-                )}
-              </Button>
+              <DataSyncBanner compact={true} />
               <Button
                 variant="destructive"
                 size="sm"
                 onClick={handleDisconnect}
-                disabled={isDisconnecting}
+                disabled={removeAccount.isPending}
               >
-                {isDisconnecting ? (
+                {removeAccount.isPending ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Disconnecting...
@@ -229,20 +205,8 @@ function GoogleConsoleDetailPage() {
           </div>
 
           <div className="w-full px-5 py-6 space-y-6">
-            {tokenExpired && (
-              <Card className="border border-destructive/40 bg-destructive/5">
-                <CardContent className="py-4 text-sm text-destructive space-y-1">
-                  <p>
-                    Google Search Console token expired or permissions were
-                    revoked.
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Click <span className="font-semibold">Reconnect</span> to
-                    re-authorize access.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+            {!isLoadingSummary && !summaryData?.summary && <DataSyncBanner />}
+
 
             {/* Error display removed for properties error as requested */}
             {summaryError && (

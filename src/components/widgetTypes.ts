@@ -42,6 +42,9 @@ export interface MetricWidgetData {
   label: string;
   value: string | number;
   unit?: string;
+  comparisonValue?: string | number; // e.g. "Previous Month: 120"
+  trendValue?: string; // e.g. "12%"
+  trendDirection?: "up" | "down" | "neutral";
   widgetImageUrl?: string; // Base64 image URL from html2canvas conversion
 }
 

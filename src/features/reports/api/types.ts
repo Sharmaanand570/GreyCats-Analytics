@@ -40,21 +40,6 @@ export type DebugMetricsResponse = ApiSuccessResponse<{
   rows: DebugMetric[];
 }>;
 
-export interface ResolveWidgetsPayload {
-  dateFrom: string;
-  dateTo: string;
-  widgets: Array<{
-    id: string;
-    type: string;
-    metricKey: string;
-    groupBy?: string;
-    aggregation?: string;
-    integration?: string;
-    accountId?: string;
-    [key: string]: unknown;
-  }>;
-}
-
 export interface WidgetSeriesPoint {
   x: string;
   y: number;
@@ -69,9 +54,6 @@ export type ResolvedWidgetData =
   }
   | Record<string, unknown>;
 
-export type ResolveWidgetsResponse = ApiSuccessResponse<{
-  data: Record<string, ResolvedWidgetData>;
-}>;
 
 export interface ReportWidgetDefinition {
   id: string;
@@ -232,21 +214,7 @@ export type GetTemplateResponse = ApiSuccessResponse<{
   template: ReportTemplate;
 }>;
 
-export interface RunReportPayload {
-  templateId: number;
-  dateFrom: string;
-  dateTo: string;
-}
 
-export type RunReportResponse = ApiSuccessResponse<{
-  data: Record<string, ResolvedWidgetData>;
-  meta?: {
-    templateId: number;
-    from: string;
-    to: string;
-    widgetsResolved: number;
-  };
-}>;
 
 export interface GeneratePdfPayload {
   templateId: number;
@@ -327,7 +295,8 @@ export type DashboardWidget = {
   accountId?: string;
   groupBy: string;
   aggregation: string;
-  type?: string;
+  // type is optional in older definitions but we should standardize
+  type?: "line_chart" | "area_chart" | "bar_chart" | "metric_card" | string;
   source?: string;
   layout?: {
     x: number;
@@ -341,6 +310,7 @@ export type DashboardWidget = {
 export interface Dashboard {
   id: number;
   userId: number;
+  clientId?: number;
   name: string;
   widgets: Record<string, DashboardWidget>;
   createdAt?: string;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import Dashboard from '../components/Dashboard';
 import { Button } from '../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
@@ -10,15 +10,17 @@ import { AccountSelectionModal } from '../components/clients/AccountSelectionMod
 import type { IntegrationType } from '../types/integration.types';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Loader2, LayoutDashboard, FileBarChart, Database } from 'lucide-react';
-import { FiSearch, FiBell } from "react-icons/fi";
-import { Input } from "../components/ui/input";
+import { FiBell } from "react-icons/fi";
+
+import { clientKeys } from '../hooks/useClients';
 
 const ClientDetailPage: React.FC = () => {
     const { clientId } = useParams<{ clientId: string }>();
     const navigate = useNavigate();
     const parsedClientId = clientId ? parseInt(clientId) : null;
     const { data: client, isLoading, error } = useClient(parsedClientId);
-    const [activeTab, setActiveTab] = useState('overview');
+    const [searchParams] = useSearchParams();
+    const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
     const [accountModalOpen, setAccountModalOpen] = useState(false);
     const [pendingIntegration, setPendingIntegration] = useState<IntegrationType | null>(null);
     const queryClient = useQueryClient();
@@ -40,10 +42,10 @@ const ClientDetailPage: React.FC = () => {
     }, [parsedClientId]);
 
     const handleAccountConnected = () => {
-        // Refresh integrations
-        queryClient.invalidateQueries({ queryKey: ["integrations", parsedClientId] });
-        // Also refresh client details just in case
-        queryClient.invalidateQueries({ queryKey: ["client", parsedClientId] });
+        if (!parsedClientId) return;
+        // Refresh client details to update integrations list
+        // Use the standardized key factory to ensure matches
+        queryClient.invalidateQueries({ queryKey: clientKeys.detail(parsedClientId) });
     };
 
     if (isLoading) {
@@ -93,13 +95,7 @@ const ClientDetailPage: React.FC = () => {
                         </div>
 
                         <div className="flex items-center gap-4">
-                            <div className="relative hidden md:block w-64">
-                                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                <Input
-                                    className="pl-9 h-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors"
-                                    placeholder="Search details..."
-                                />
-                            </div>
+
                             <div className="flex items-center border-l pl-4 gap-3">
                                 <button className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
                                     <FiBell className="text-lg" />

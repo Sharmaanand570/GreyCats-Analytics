@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FaGoogle } from "react-icons/fa6";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,15 +19,53 @@ import { useRegisterMutation } from "../hooks/useRegisterMutation";
 // --------------------------
 // ZOD SCHEMAS
 // --------------------------
+// Strong password validation: at least 8 characters, 1 uppercase, 1 lowercase, 1 number, 1 special character
+const passwordValidation = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .regex(
+    /[a-z]/,
+    "Password must contain at least one lowercase letter"
+  )
+  .regex(
+    /[A-Z]/,
+    "Password must contain at least one uppercase letter"
+  )
+  .regex(/\d/, "Password must contain at least one number")
+  .regex(
+    /[@$!%*?&]/,
+    "Password must contain at least one special character (@$!%*?&)"
+  );
+
+// Name validation: 2-50 characters, letters, spaces, hyphens, and apostrophes only
+const nameValidation = z
+  .string()
+  .min(2, "Name must be at least 2 characters")
+  .max(50, "Name must not exceed 50 characters")
+  .regex(
+    /^[a-zA-Z\s'-]+$/,
+    "Name can only contain letters, spaces, hyphens, and apostrophes"
+  )
+  .refine(
+    (val) => val.trim().length >= 2,
+    "Name cannot be only spaces"
+  );
+
 const LoginSchema = z.object({
-  email: z.string().email("Enter a valid email"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  email: z
+    .string()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
 });
 
 const SignupSchema = z.object({
-  email: z.string().email("Enter a valid email"),
-  fullName: z.string().min(2, "Name must be at least 2 characters"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  email: z
+    .string()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  fullName: nameValidation,
+  password: passwordValidation,
 });
 
 type LoginFormValues = z.infer<typeof LoginSchema>;
@@ -193,6 +230,11 @@ export default function AuthPage() {
                     {errors.fullName.message}
                   </p>
                 )}
+                {!errors.fullName && (
+                  <p className="text-xs text-muted-foreground">
+                    Enter your full name (2-50 characters, letters only)
+                  </p>
+                )}
               </div>
             )}
 
@@ -205,11 +247,16 @@ export default function AuthPage() {
                 placeholder="••••••••"
                 {...register("password")}
                 className="px-4 py-6 rounded-[0.4rem]"
-                autoComplete="current-password"
+                autoComplete={isLogin ? "current-password" : "new-password"}
               />
               {errors.password && (
                 <p className="text-xs text-red-500">
                   {errors.password.message}
+                </p>
+              )}
+              {!isLogin && !errors.password && (
+                <p className="text-xs text-muted-foreground">
+                  Must be at least 8 characters with uppercase, lowercase, number, and special character (@$!%*?&)
                 </p>
               )}
             </div>
@@ -243,8 +290,8 @@ export default function AuthPage() {
             )}
           </form>
 
-          {/* Separator */}
-          <div className="relative">
+          {/* Separator - Hidden */}
+          {/* <div className="relative">
             <div className="absolute inset-0 flex items-center">
               <Separator />
             </div>
@@ -253,16 +300,16 @@ export default function AuthPage() {
                 Or continue with
               </span>
             </div>
-          </div>
+          </div> */}
 
-          {/* Google */}
-          <Button
+          {/* Google - Hidden */}
+          {/* <Button
             variant="outline"
             className="w-full px-4 py-6 rounded-[0.4rem] flex items-center justify-center gap-2"
           >
             <FaGoogle className="h-4 w-4" />
             Google
-          </Button>
+          </Button> */}
 
           {/* Toggle Login/Signup */}
           <p className="px-4 text-center text-xs text-muted-foreground">

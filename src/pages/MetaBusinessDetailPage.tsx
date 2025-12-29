@@ -21,6 +21,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { DataSyncBanner } from "@/components/DataSyncBanner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -188,22 +189,25 @@ function MetaBusinessDetailPage() {
                         </h1>
                     </div>
 
-                    <div className="w-full md:w-[320px]">
-                        <Select value={selectedClientId?.toString() || ""} onValueChange={(v) => setSelectedClientId(Number(v))}>
-                            <SelectTrigger className="h-10 bg-card border-border shadow-sm transition-all focus:ring-primary/20">
-                                <SelectValue placeholder="Select Client Account" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {clients?.map((client) => (
-                                    <SelectItem key={client.id} value={client.id.toString()}>
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-primary" />
-                                            {client.name}
-                                        </div>
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                    <div className="flex items-center gap-4 md:items-center">
+                        <DataSyncBanner compact={true} />
+                        <div className="w-full md:w-[320px]">
+                            <Select value={selectedClientId?.toString() || ""} onValueChange={(v) => setSelectedClientId(Number(v))}>
+                                <SelectTrigger className="h-10 bg-card border-border shadow-sm transition-all focus:ring-primary/20">
+                                    <SelectValue placeholder="Select Client Account" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {clients?.map((client) => (
+                                        <SelectItem key={client.id} value={client.id.toString()}>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 rounded-full bg-primary" />
+                                                {client.name}
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
                 </div>
 
@@ -327,6 +331,7 @@ function MetaBusinessDetailPage() {
                         {/* --- 3. Main Data Area --- */}
                         {selectedPageId && (
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+
                                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                                     <div className="flex items-center justify-between mb-6">
                                         <TabsList className="bg-card border border-border p-1 shadow-sm h-11">

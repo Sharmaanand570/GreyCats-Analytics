@@ -31,11 +31,11 @@ import {
   useGoogleAnalyticsTopPages,
   useGoogleAnalyticsTrends,
   useGoogleAnalyticsMeta,
-  useGoogleDisconnect,
-  useGoogleReconnect,
   useGoogleProperties,
   useGoogleSelectProperty,
 } from "@/features/YouTube/hooks/google/useGoogleAnalyticsData";
+import { useRemoveAccount } from "@/hooks/useIntegrations";
+import { useClient } from "@/hooks/useClients";
 import { useClients } from "@/hooks/useClients";
 import {
   Select,
@@ -45,6 +45,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+import { DataSyncBanner } from "@/components/DataSyncBanner";
 import {
   Area,
   AreaChart,
@@ -64,6 +65,7 @@ function GoogleAnalyticsDetailPage() {
 
   // Fetch all clients for selector
   const { data: clients } = useClients();
+  const { data: client } = useClient(selectedClientId);
 
   // Handle client selection - update URL
   const handleClientChange = (newClientId: string) => {
@@ -103,27 +105,20 @@ function GoogleAnalyticsDetailPage() {
     error: metaError,
   } = useGoogleAnalyticsMeta(selectedClientId || 0);
 
-  const {
-    mutateAsync: reconnectGoogle,
-    isPending: isReconnecting,
-  } = useGoogleReconnect();
-
-  const {
-    mutateAsync: disconnectGoogle,
-    isPending: isDisconnecting,
-  } = useGoogleDisconnect();
-
-  const handleReconnect = async () => {
-    try {
-      await reconnectGoogle(selectedClientId || 0);
-    } catch {
-      // handled in hook
-    }
-  };
-
+  const removeAccount = useRemoveAccount();
   const handleDisconnect = async () => {
+    if (!client?.integrations || !selectedClientId) return;
+
+    // Find the GA integration
+    const integration = client.integrations.find(i => i.integrationType === 'google-analytics');
+    if (!integration) return;
+
     try {
-      await disconnectGoogle(selectedClientId || 0);
+      await removeAccount.mutateAsync({
+        clientId: selectedClientId,
+        integrationType: 'google-analytics',
+        accountId: integration.accountId
+      });
     } catch {
       // handled in hook
     }
@@ -166,6 +161,7 @@ function GoogleAnalyticsDetailPage() {
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <DataSyncBanner compact={true} />
               <Select
                 value={selectedClientId?.toString() || ""}
                 onValueChange={handleClientChange}
@@ -182,27 +178,12 @@ function GoogleAnalyticsDetailPage() {
                 </SelectContent>
               </Select>
               <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleReconnect}
-                disabled={isReconnecting}
-              >
-                {isReconnecting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Reconnecting...
-                  </>
-                ) : (
-                  "Reconnect"
-                )}
-              </Button>
-              <Button
                 variant="destructive"
                 size="sm"
                 onClick={handleDisconnect}
-                disabled={isDisconnecting}
+                disabled={removeAccount.isPending}
               >
-                {isDisconnecting ? (
+                {removeAccount.isPending ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Disconnecting...
@@ -229,6 +210,7 @@ function GoogleAnalyticsDetailPage() {
           </div>
 
           <div className="w-full px-5 py-6 space-y-6">
+
             {!selectedClientId ? (
               <Card>
                 <CardContent className="py-8 text-center">

@@ -10,8 +10,7 @@ import type {
 const normalizeAccount = (account: any, type: IntegrationType): AvailableAccount => {
   let name = '';
   let identifier = '';
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars, prefer-const
-  let id = account.id;
+
 
   switch (type) {
     case 'meta-business':
@@ -21,7 +20,7 @@ const normalizeAccount = (account: any, type: IntegrationType): AvailableAccount
     case 'youtube':
       name = account.channelTitle;
       identifier = account.channelId;
-      id = account.id; // Using internal ID for assignment? Or connection ID? Usually internal DB ID.
+
       break;
     case 'shopify':
       name = account.shopDomain;

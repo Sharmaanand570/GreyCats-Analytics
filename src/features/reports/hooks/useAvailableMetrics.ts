@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchDebugMetrics, fetchUnifiedMetricsList } from "../api/reportingApi";
+import { fetchUnifiedMetricsList } from "../api/reportingApi";
 import type { DebugMetric } from "../api/types";
 import { useMemo } from "react";
 
@@ -53,54 +53,49 @@ const getMetricCategory = (metricKey: string): string => {
 export const useAvailableMetrics = (clientId: number | null) => {
   const { data, isLoading, error } = useQuery({
     queryKey: ["available-metrics", clientId],
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    staleTime: 5 * 60 * 1000,
     enabled: !!clientId,
     queryFn: async () => {
       if (!clientId) throw new Error("Client ID is required");
 
-      let lastError: unknown;
-
-      // Try live unified metrics first (matches what Apidog is calling)
-      // Use a wide date range (last 90 days) to discover all available metrics
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - 90);
-
-      const formatDate = (date: Date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, "0");
-        const day = String(date.getDate()).padStart(2, "0");
-        return `${year}-${month}-${day}`;
-      };
-
       try {
-        const unified = await fetchUnifiedMetricsList(clientId, {
-          limit: 1000, // Increased to fetch all metrics at once
-          startDate: formatDate(startDate),
-          endDate: formatDate(endDate),
-        });
-        if (unified?.rows?.length) {
-          return unified;
-        }
-        console.warn(
-          "No rows from /unified-metrics; falling back to debug list"
-        );
-      } catch (err) {
-        lastError = err;
-        console.warn(
-          "Failed to fetch /unified-metrics; falling back to debug list",
-          err
-        );
-      }
+        console.log("🔍 Fetching available metrics from /unified-metrics...");
 
-      // Fallback to debug list (seeded data)
-      try {
-        return await fetchDebugMetrics(clientId, 1000);
+        let allRows: DebugMetric[] = [];
+        let page = 1;
+        let totalPages = 1;
+
+        // Recursive fetching loop
+        do {
+          const response = await fetchUnifiedMetricsList(clientId!, {
+            limit: 1000, // Fetch in large chunks
+            page
+          });
+
+          if (response.rows) {
+            allRows = [...allRows, ...response.rows];
+          }
+
+          totalPages = response.pagination?.totalPages || 1;
+          page++;
+
+        } while (page <= totalPages);
+
+        console.log(`📡 Fetched total ${allRows.length} metrics from ${totalPages} pages`);
+
+        return {
+          success: true,
+          rows: allRows,
+          pagination: {
+            page: 1,
+            limit: allRows.length,
+            total: allRows.length,
+            totalPages: 1
+          }
+        };
       } catch (err) {
-        // Surface the most recent error to React Query
-        throw err ??
-        lastError ??
-        new Error("Failed to fetch available metrics");
+        console.error("Failed to fetch available metrics:", err);
+        throw new Error("Failed to fetch available metrics from /unified-metrics");
       }
     },
   });
@@ -148,6 +143,12 @@ export const useAvailableMetrics = (clientId: number | null) => {
           a.displayName.localeCompare(b.displayName)
         );
       });
+    });
+
+    console.log('📊 useAvailableMetrics debug:', {
+      totalRows: data?.rows?.length,
+      integrations: Object.keys(grouped),
+      youtubeAccounts: grouped['youtube'] ? Object.keys(grouped['youtube']) : 'none',
     });
 
     return grouped;

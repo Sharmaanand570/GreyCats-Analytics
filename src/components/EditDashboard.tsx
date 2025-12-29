@@ -1,13 +1,7 @@
-import { FiBell, FiSearch } from "react-icons/fi";
+import { FiPlus, FiTrash2, FiArrowUp, FiArrowDown } from "react-icons/fi";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "./ui/accordion";
 import {
   Select,
   SelectContent,
@@ -28,163 +22,342 @@ import type {
 } from "@/features/reports/api/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { Badge } from "./ui/badge";
+import { Checkbox } from "./ui/checkbox";
+import { Label } from "./ui/label";
+import { useParams } from "react-router-dom";
 
-const DataSourcesSidebar = memo(
-  ({
-    searchQuery,
-    onSearchChange,
-    filteredCategories,
-    expandedCategories,
-    onValueChange,
-    isMobile = false,
-  }: {
-    searchQuery: string;
-    onSearchChange: (value: string) => void;
-    filteredCategories: string[];
-    expandedCategories: string[];
-    onValueChange: (value: string[]) => void;
-    isMobile?: boolean;
-  }) => {
-    const sidebarContent = (
-      <>
-        <div className="p-3 sm:p-4 border-b sticky top-0  z-10">
-          <Input
-            type="text"
-            placeholder="Search data sources..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full rounded-[0.5rem] focus-visible:ring-2 focus-visible:ring-primary text-sm sm:text-base"
-            aria-label="Search data sources"
-          />
-        </div>
-        <div className="flex-1 p-2 overflow-y-auto">
-          <div className="text-xs uppercase tracking-wider text-gray-500 px-2 py-2 font-medium">
-            DATA SOURCES
-          </div>
-          {filteredCategories.length === 0 ? (
-            <div className="px-2 py-4 text-sm text-gray-500 text-center">
-              No data sources found
-            </div>
-          ) : (
-            <Accordion
-              type="multiple"
-              value={expandedCategories}
-              onValueChange={onValueChange}
-              className="w-full"
-            >
-              <div className="space-y-0.5">
-                {filteredCategories.map((category) => (
-                  <AccordionItem
-                    key={category}
-                    value={category}
-                    className="border-none"
-                  >
-                    <AccordionTrigger className="px-2 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-md hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1">
-                      <span className="truncate">{category}</span>
-                    </AccordionTrigger>
-                    <AccordionContent className="px-2 py-1">
-                      <div className="pl-4 py-1 text-xs text-gray-600">
-                        <div className="py-1 text-gray-500">No items</div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </div>
-            </Accordion>
-          )}
-        </div>
-      </>
-    );
-
-    if (isMobile) {
-      return sidebarContent;
-    }
-
-    return (
-      <div className="w-full sm:w-[14rem] md:w-[15.5rem]  border-r flex flex-col sticky top-[calc(4.8em+3.5em)] h-[calc(100vh-8.3em)] overflow-y-auto z-30">
-        {sidebarContent}
-      </div>
-    );
-  }
-);
-DataSourcesSidebar.displayName = "DataSourcesSidebar";
-
-const DATA_SOURCE_CATEGORIES = [
-  "SEO",
-  "Analytics",
-  "Social",
-  "Paid Ads",
-  "Call Tracking",
-  "Email",
-  "Local",
-  "Ecommerce",
-] as const;
-
-const DEFAULT_LAYOUT_WIDTH = 12;
-const DEFAULT_WIDGET_WIDTH = 6;
-const DEFAULT_WIDGET_HEIGHT = 4;
-
-const createDashboardWidgetsFromMetrics = (
-  groupedMetrics: Record<
-    string,
-    Record<
-      string,
-      Array<{
-        metricKey: string;
-        integration: string;
-        accountId: string;
-        displayName: string;
-        category: string;
-      }>
-    >
-  >
+// Helper to create initial default widgets for a newly added integration
+const createDefaultWidgetsForIntegration = (
+  integration: string,
+  accountId: string,
+  metrics: Array<{ metricKey: string }>
 ): DashboardWidget[] => {
   const widgets: DashboardWidget[] = [];
-  let widgetId = 1;
+  let widgetId = Date.now();
 
-  for (const integration of Object.keys(groupedMetrics)) {
-    for (const accountId of Object.keys(groupedMetrics[integration])) {
-      const metrics = groupedMetrics[integration][accountId];
+  if (metrics.length === 0) return [];
 
-      for (const metric of metrics.slice(0, 6 - widgets.length)) {
-        const widget: DashboardWidget & { accountId?: string } = {
-          id: `dw${widgetId++}`,
-          metricKey: metric.metricKey,
-          integration: metric.integration,
-          groupBy: "none",
-          aggregation: "sum",
-          type: "metric_card",
-        };
-        widget.accountId = metric.accountId;
-        widgets.push(widget);
-      }
+  // 1. Main Chart (First metric)
+  widgets.push({
+    id: `dw${widgetId++}`,
+    metricKey: metrics[0].metricKey,
+    integration,
+    accountId, // Important: keep accountId context
+    groupBy: "day",
+    aggregation: "sum",
+    type: "line_chart",
+  });
 
-      if (widgets.length >= 6) break;
-    }
-    if (widgets.length >= 6) break;
+  // 2. Metric Cards (Next 8 distinct metrics)
+  // Ensure we don't duplicate the main chart metric if possible?
+  // Current Dashboard logic roughly takes the first 8. Let's do unique ones.
+  const cardMetrics = metrics.slice(0, 8);
+  for (const m of cardMetrics) {
+    widgets.push({
+      id: `dw${widgetId++}`,
+      metricKey: m.metricKey,
+      integration,
+      accountId,
+      groupBy: "day",
+      aggregation: "sum",
+      type: "metric_card",
+    });
   }
 
   return widgets;
 };
 
+// UI Component for an Active Integration Section
+const IntegrationEditorCard = memo(
+  ({
+    integration,
+    accountId, // Distinct integrations might share a platform name but have different accounts
+    sectionWidgets,
+    allAvailableMetrics,
+    onMoveUp,
+    onMoveDown,
+    onRemove,
+    onUpdateWidgets,
+    isFirst,
+    isLast,
+  }: {
+    integration: string;
+    accountId: string;
+    sectionWidgets: DashboardWidget[];
+    allAvailableMetrics: Array<{ metricKey: string; displayName: string }>;
+    onMoveUp: () => void;
+    onMoveDown: () => void;
+    onRemove: () => void;
+    onUpdateWidgets: (newWidgets: DashboardWidget[]) => void;
+    isFirst: boolean;
+    isLast: boolean;
+  }) => {
+    // Identify Main Chart Widget
+    const mainChartWidget = sectionWidgets.find((w) => ['line_chart', 'area_chart', 'bar_chart'].includes(w.type || ''));
+    // Identify Active Card Widgets
+    const cardWidgets = sectionWidgets.filter((w) => w.type === "metric_card");
+    const activeMetricKeys = new Set(cardWidgets.map((w) => w.metricKey));
+
+    const handleMainMetricChange = (metricKey: string) => {
+      // If we already have a main chart, update it. If not (shouldn't happen), create it.
+      if (mainChartWidget) {
+        const updated = sectionWidgets.map((w) =>
+          w.id === mainChartWidget.id ? { ...w, metricKey } : w
+        );
+        onUpdateWidgets(updated);
+      } else {
+        // Create new main chart
+        const newWidget: DashboardWidget = {
+          id: `dw${Date.now()}`,
+          metricKey,
+          integration,
+          accountId,
+          groupBy: "day",
+          aggregation: "sum",
+          type: "line_chart",
+        };
+        onUpdateWidgets([newWidget, ...sectionWidgets]);
+      }
+    };
+
+    const toggleCardMetric = (metricKey: string, checked: boolean) => {
+      if (checked) {
+        // Add
+        if (cardWidgets.length >= 8) {
+          toast.error("Maximum 8 metric cards per section");
+          return;
+        }
+        const newWidget: DashboardWidget = {
+          id: `dw${Date.now()}-${metricKey}`, // Unique ID
+          metricKey,
+          integration,
+          accountId,
+          groupBy: "day",
+          aggregation: "sum",
+          type: "metric_card",
+        };
+        onUpdateWidgets([...sectionWidgets, newWidget]);
+      } else {
+        // Remove
+        const updated = sectionWidgets.filter(
+          (w) => !(w.type === "metric_card" && w.metricKey === metricKey)
+        );
+        onUpdateWidgets(updated);
+      }
+    };
+
+    return (
+      <div className="bg-white border rounded-lg shadow-sm overflow-hidden">
+        {/* Header */}
+        <div className="bg-gray-50 px-4 py-3 border-b flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h3 className="font-semibold text-gray-800 capitalize">
+              {integration.replace(/-/g, " ")}
+            </h3>
+            {accountId && (
+              <Badge variant="outline" className="text-xs font-normal bg-white text-gray-500">
+                {accountId}
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon-sm"
+              className="h-8 w-8 text-gray-500"
+              onClick={onMoveUp}
+              disabled={isFirst}
+              title="Move Section Up"
+            >
+              <FiArrowUp />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              className="h-8 w-8 text-gray-500"
+              onClick={onMoveDown}
+              disabled={isLast}
+              title="Move Section Down"
+            >
+              <FiArrowDown />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+              onClick={onRemove}
+              title="Remove Integration Section"
+            >
+              <FiTrash2 />
+            </Button>
+          </div>
+        </div>
+
+        <div className="p-4 space-y-6">
+          {/* Main Chart Selection */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 space-y-2">
+              <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Main Chart Metric
+              </Label>
+              <Select
+                value={mainChartWidget?.metricKey}
+                onValueChange={handleMainMetricChange}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select Metric" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allAvailableMetrics.map((m) => (
+                    <SelectItem key={m.metricKey} value={m.metricKey}>
+                      {m.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="w-full sm:w-[180px] space-y-2">
+              <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Chart Type
+              </Label>
+              <Select
+                value={mainChartWidget?.type || "line_chart"}
+                onValueChange={(type) => {
+                  if (!mainChartWidget) return;
+                  const updated = sectionWidgets.map((w) =>
+                    w.id === mainChartWidget.id ? { ...w, type } : w
+                  );
+                  onUpdateWidgets(updated);
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="line_chart">Line Chart</SelectItem>
+                  <SelectItem value="area_chart">Area Chart</SelectItem>
+                  <SelectItem value="bar_chart">Bar Chart</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Sparkline Selection */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Sparkline Cards ({cardWidgets.length}/8)
+              </Label>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 bg-gray-50/50 p-4 rounded-lg border">
+              {allAvailableMetrics.map((m) => {
+                const isSelected = activeMetricKeys.has(m.metricKey);
+                // Unique key for loop
+                const key = `${integration}-${accountId}-${m.metricKey}`;
+                return (
+                  <div
+                    key={key}
+                    className="flex items-center space-x-2"
+                  >
+                    <Checkbox
+                      id={`chk-${key}`}
+                      checked={isSelected}
+                      onCheckedChange={(c) =>
+                        toggleCardMetric(m.metricKey, c === true)
+                      }
+                    />
+                    <label
+                      htmlFor={`chk-${key}`}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      {m.displayName}
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+);
+IntegrationEditorCard.displayName = "IntegrationEditorCard";
+
+const SidebarAddIntegration = memo(
+  ({
+    availableIntegrations,
+    onAdd,
+  }: {
+    availableIntegrations: Array<{
+      integration: string;
+      accountId: string;
+      metricsCount: number;
+    }>;
+    onAdd: (integration: string, accountId: string) => void;
+  }) => {
+    return (
+      <div className="w-full sm:w-[15rem] md:w-[16rem] border-r flex flex-col sticky top-[4.8em] h-[calc(100vh-8.3em)] bg-white overflow-hidden z-20">
+        <div className="p-4 border-b bg-gray-50/80">
+          <h3 className="text-sm font-semibold text-gray-900">Add Data Sources</h3>
+          <p className="text-xs text-gray-500 mt-1">
+            Connect connected sources to your dashboard.
+          </p>
+        </div>
+        <div className="flex-1 overflow-y-auto p-2 space-y-2">
+          {availableIntegrations.length === 0 ? (
+            <div className="px-4 py-8 text-center bg-gray-50 rounded-lg border border-dashed mx-2 mt-4">
+              <p className="text-xs text-gray-500">All available sources are added!</p>
+            </div>
+          ) : (
+            availableIntegrations.map((item) => (
+              <button
+                key={`${item.integration}-${item.accountId}`}
+                onClick={() => onAdd(item.integration, item.accountId)}
+                className="w-full flex items-center justify-between p-3 bg-white border rounded-lg hover:border-primary hover:shadow-sm hover:bg-blue-50/10 transition-all group text-left"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-800 capitalize truncate">
+                    {item.integration.replace(/-/g, " ")}
+                  </div>
+                  <div className="text-xs text-gray-500 truncate">
+                    {item.accountId} • {item.metricsCount} Metrics
+                  </div>
+                </div>
+                <FiPlus className="text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
+);
+SidebarAddIntegration.displayName = "SidebarAddIntegration";
+
+
 function EditDashboard() {
-  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
   const [dashboardName, setDashboardName] = useState("My Dashboard");
   const [widgets, setWidgets] = useState<DashboardWidget[]>([]);
-  const [selectedMetricId, setSelectedMetricId] = useState<string>("");
-  const [selectedType, setSelectedType] = useState<"metric_card" | "line_chart" | "chart">("metric_card");
-
   const queryClient = useQueryClient();
 
-  const { groupedMetrics, isLoading: isLoadingMetrics } = useAvailableMetrics();
+  const params = useParams<{ clientId?: string }>();
+  const clientId = params.clientId ? parseInt(params.clientId, 10) : null;
 
+  // Metrics hook
+  const { groupedMetrics } = useAvailableMetrics(clientId);
+
+  // Fetch Dashboard
   const dashboardsQuery = useQuery<Dashboard[], ApiError>({
-    queryKey: ["dashboards"],
+    queryKey: ["dashboards", clientId],
     queryFn: async () => {
-      const response = await listDashboards();
+      if (!clientId) return [];
+      const response = await listDashboards(clientId);
       return response.dashboards;
     },
+    enabled: !!clientId,
   });
 
   const dashboards = (dashboardsQuery.data ?? []) as Dashboard[];
@@ -204,128 +377,179 @@ function EditDashboard() {
             id,
           }))
         );
-        return;
       }
     }
+  }, [activeDashboard]); // Only run on first load of dashboard data
 
-    if (!activeDashboard && widgets.length === 0 && Object.keys(groupedMetrics).length > 0) {
-      setWidgets(createDashboardWidgetsFromMetrics(groupedMetrics as any));
+
+  // --- Derived State: Distinct Sections ---
+  // To handle reordering, we need to know the order of "Sections".
+  // A section is defined by (integration + accountId).
+  // We infer the order from the `widgets` array.
+  const sections = useMemo(() => {
+    const sectionMap = new Map<string, DashboardWidget[]>();
+    const sectionOrder: string[] = [];
+
+    widgets.forEach((w) => {
+      // Fallback for missing accountId (e.g. legacy widgets)
+      const acc = (w as any).accountId || 'default';
+      const key = `${w.integration}|${acc}`;
+
+      if (!sectionMap.has(key)) {
+        sectionMap.set(key, []);
+        sectionOrder.push(key);
+      }
+      sectionMap.get(key)!.push(w);
+    });
+
+    return sectionOrder.map((key) => {
+      const parts = key.split('|');
+      // Handle case where split might have more parts if | in name? Unlikely.
+      const integration = parts[0];
+      const accountId = parts.slice(1).join('|');
+
+      // Handle 'default' accountId restoration if needed, though most should have it
+      const finalAccountId = accountId === 'default' ? '' : accountId;
+
+      return {
+        key,
+        integration,
+        accountId: finalAccountId,
+        widgets: sectionMap.get(key) || []
+      };
+    });
+  }, [widgets]);
+
+  // --- Derived State: Available Integrations (for Sidebar) ---
+  const availableIntegrations = useMemo(() => {
+    if (!groupedMetrics) {
+      console.log('🔍 [EditDashboard] groupedMetrics is empty/null');
+      return [];
     }
-  }, [activeDashboard, groupedMetrics, widgets.length]);
 
-  const availableMetricOptions = useMemo(() => {
-    const items: Array<{
-      id: string;
-      label: string;
-      metricKey: string;
+    const available: Array<{
       integration: string;
       accountId: string;
+      metricsCount: number;
     }> = [];
 
-    Object.entries(groupedMetrics).forEach(([integration, accounts]) => {
-      Object.entries(accounts).forEach(([accountId, metrics]) => {
-        metrics.forEach((metric) => {
-          items.push({
-            id: `${integration}:${accountId}:${metric.metricKey}`,
-            label: `${metric.displayName} (${integration} – ${accountId})`,
-            metricKey: metric.metricKey,
+    console.log('🔍 [EditDashboard] Calculating availableIntegrations:', {
+      groupedMetricsKeys: Object.keys(groupedMetrics),
+      sectionsCount: sections.length,
+      sectionsKeys: sections.map(s => s.key)
+    });
+
+    Object.keys(groupedMetrics).forEach((integration) => {
+      const accounts = groupedMetrics[integration];
+      Object.keys(accounts).forEach((accountId) => {
+        const key = `${integration}|${accountId || 'default'}`;
+        const isInSections = sections.find(s => s.key === key);
+        
+        console.log('🔍 [EditDashboard] Checking integration:', {
+          integration,
+          accountId,
+          key,
+          isInSections: !!isInSections,
+          metricsCount: accounts[accountId].length
+        });
+
+        // If NOT already in sections, it's available
+        if (!isInSections) {
+          available.push({
             integration,
             accountId,
+            metricsCount: accounts[accountId].length
           });
-        });
+        }
       });
     });
 
-    return items;
+    console.log('🔍 [EditDashboard] Final availableIntegrations:', available);
+    return available;
+  }, [groupedMetrics, sections]);
+
+  // --- Actions ---
+
+  const handleAddIntegration = useCallback((integration: string, accountId: string) => {
+    // Determine metrics
+    const metricsForAccount = groupedMetrics[integration]?.[accountId] || [];
+    if (metricsForAccount.length === 0) {
+      toast.error("No metrics found for this integration");
+      return;
+    }
+
+    const newWidgets = createDefaultWidgetsForIntegration(integration, accountId, metricsForAccount);
+    setWidgets(prev => [...prev, ...newWidgets]);
+    toast.success(`${integration} added to dashboard`);
   }, [groupedMetrics]);
 
-  const handleSearchChange = useCallback((value: string) => {
-    setSearchQuery(value);
-  }, []);
-
-  const filteredCategories = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
-    if (!normalizedQuery) {
-      return [...DATA_SOURCE_CATEGORIES];
-    }
-    return DATA_SOURCE_CATEGORIES.filter((category) =>
-      category.toLowerCase().includes(normalizedQuery)
-    );
-  }, [searchQuery]);
-
-  const handleAccordionValueChange = useCallback((value: string[]) => {
-    setExpandedCategories(value);
-  }, []);
-
-  const handleAddWidget = useCallback(() => {
-    if (!selectedMetricId) {
-      toast.error("Select a metric to add a widget");
-      return;
-    }
-
-    const option = availableMetricOptions.find((item) => item.id === selectedMetricId);
-    if (!option) {
-      toast.error("Selected metric not found");
-      return;
-    }
-
-    const newId = `dw${Date.now()}`;
-    const widget: DashboardWidget & { accountId?: string } = {
-      id: newId,
-      metricKey: option.metricKey,
-      integration: option.integration,
-      groupBy: selectedType === "line_chart" ? "day" : "none",
-      aggregation: "sum",
-      type: selectedType,
-    };
-    widget.accountId = option.accountId;
-
-    setWidgets((prev) => [...prev, widget]);
-  }, [availableMetricOptions, selectedMetricId, selectedType]);
-
-  const handleRemoveWidget = useCallback((id: string) => {
-    setWidgets((prev) => prev.filter((widget) => widget.id !== id));
-  }, []);
-
-  const moveWidget = useCallback((index: number, direction: "up" | "down") => {
-    setWidgets((prev) => {
-      const next = [...prev];
-      const targetIndex = direction === "up" ? index - 1 : index + 1;
-      if (targetIndex < 0 || targetIndex >= next.length) return prev;
-      const temp = next[index];
-      next[index] = next[targetIndex];
-      next[targetIndex] = temp;
-      return next;
+  const handleRemoveSection = useCallback((key: string) => {
+    // Remove all widgets belonging to this section key
+    setWidgets(prev => {
+      return prev.filter(w => {
+        const acc = (w as any).accountId || 'default';
+        const wKey = `${w.integration}|${acc}`;
+        return wKey !== key;
+      });
     });
   }, []);
 
+  const handleMoveSection = useCallback((index: number, direction: 'up' | 'down') => {
+    // We rely on 'sections' state which is derived from 'widgets'.
+    // BUT 'widgets' is the source of truth.
+    // We need to reorder 'widgets' such that the widgets for specific SECTION move.
+
+    // Logic:
+    // 1. Get all sections (ordered)
+    // 2. Swap sections in the list
+    // 3. Flatten back to widget list
+
+    // We need access to current 'sections' inside the callback.
+    // Since 'sections' is a dependency, this callback updates when 'sections' update.
+    if (index < 0 || index >= sections.length) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= sections.length) return;
+
+    const newSections = [...sections];
+    const temp = newSections[index];
+    newSections[index] = newSections[targetIndex];
+    newSections[targetIndex] = temp;
+
+    const newWidgets = newSections.flatMap(s => s.widgets);
+    setWidgets(newWidgets);
+  }, [sections]);
+
+  const handleUpdateSectionWidgets = useCallback((key: string, updatedSectionWidgets: DashboardWidget[]) => {
+    // Update widgets for this section, preserving order of OTHER sections
+    setWidgets(() => {
+      // Re-derive sections from 'prev' to be safe? 
+      // Actually, we must rely on 'sections' memo stability or re-derive inside.
+      // Since 'sections' depends on 'widgets' (prev), and we are in setWidgets...
+      // We can't access 'sections' derived from 'prev' easily inside the updater unless we capture 'sections' from closure.
+      // BUT 'sections' in closure matches 'prev' if no other updates happened.
+
+      // Safer way: Iterate sections from closure.
+      return sections.flatMap(s => {
+        if (s.key === key) {
+          return updatedSectionWidgets;
+        }
+        return s.widgets;
+      });
+    });
+  }, [sections]);
+
+
   const saveMutation = useMutation<unknown, ApiError | Error, void>({
     mutationFn: async () => {
-      if (!widgets.length) {
-        throw new Error("Add at least one widget before saving");
-      }
+      if (!clientId) throw new Error("Client ID missing");
+      // if (!widgets.length) {
+      //   throw new Error("Add at least one widget before saving");
+      // }
 
+      // Convert flat array to map for API
       const widgetsMap: Record<string, DashboardWidget> = widgets.reduce(
-        (acc, widget, index) => {
-          const { id, ...rest } = widget;
-
-          const layout =
-            (rest as any).layout ?? {
-              x:
-                (index % (DEFAULT_LAYOUT_WIDTH / DEFAULT_WIDGET_WIDTH)) *
-                DEFAULT_WIDGET_WIDTH,
-              y:
-                Math.floor(
-                  index / (DEFAULT_LAYOUT_WIDTH / DEFAULT_WIDGET_WIDTH)
-                ) * DEFAULT_WIDGET_HEIGHT,
-              w: DEFAULT_WIDGET_WIDTH,
-              h: DEFAULT_WIDGET_HEIGHT,
-            };
-
-          acc[id] = {
-            ...(rest as DashboardWidget),
-            layout,
-          };
+        (acc, widget) => {
+          acc[widget.id] = widget;
           return acc;
         },
         {} as Record<string, DashboardWidget>
@@ -337,224 +561,100 @@ function EditDashboard() {
       };
 
       if (activeDashboard) {
-        return updateDashboard(activeDashboard.id, payload);
+        return updateDashboard(clientId, activeDashboard.id, payload);
       }
 
-      return createDashboard(payload);
+      return createDashboard(clientId, payload);
     },
     onSuccess: () => {
       toast.success("Dashboard saved");
-      queryClient.invalidateQueries({ queryKey: ["dashboards"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboards", clientId] });
     },
-    onError: (error) => {
-      const apiError = error as ApiError | Error;
-      const message =
-        (apiError as ApiError).message ||
-        (apiError as Error).message ||
-        "Failed to save dashboard";
-      toast.error(message);
+    onError: () => {
+      toast.error("Failed to save dashboard");
     },
   });
 
-  const isSaving = saveMutation.isPending;
+  if (!clientId) {
+    return <div className="p-10 text-center">Invalid Client ID</div>;
+  }
 
   return (
-    <div className="w-full  h-[2000vh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 ">
-      <div className="w-full  rounded-l-2xl overflow-hidden h-full   my-4 bg-[#fdfdfd] ">
-        <div className="w-full h-full relative flex flex-col">
-          <div className="w-full h-[4.8em]  border-b flex justify-between items-center px-5 ">
-            <span className="font-medium text-xl">Edit Dashboard</span>
-            <div className="flex items-center gap-3">
-              <span className="hidden sm:inline-flex items-center gap-2 text-sm text-gray-500">
-                <span className="mx-2 text-lg text-gray-500">
-                  <FiSearch />
-                </span>
-                <span className="mx-2 text-lg text-gray-500 ">
-                  <FiBell />
-                </span>
-              </span>
-              <span className="ml-2">
-                <Button
-                  className="rounded-[0.4rem]"
-                  disabled={isSaving || widgets.length === 0}
-                  onClick={() => saveMutation.mutate()}
-                >
-                  {isSaving ? "Saving..." : "Save Dashboard"}
-                </Button>
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-col md:flex-row h-full">
-            <DataSourcesSidebar
-              searchQuery={searchQuery}
-              onSearchChange={handleSearchChange}
-              filteredCategories={filteredCategories}
-              expandedCategories={expandedCategories}
-              onValueChange={handleAccordionValueChange}
-              isMobile={false}
-            />
-
-            <div className="flex-1 p-4 space-y-4">
-              <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
-                <div className="flex-1 max-w-md space-y-1">
-                  <label className="text-xs font-medium text-gray-700">
-                    Dashboard name
-                  </label>
-                  <Input
-                    value={dashboardName}
-                    onChange={(e) => setDashboardName(e.target.value)}
-                    placeholder="Enter dashboard name"
-                    className="h-9 text-sm"
-                  />
-                </div>
-                <div className="text-xs text-gray-500">
-                  {dashboardsQuery.isLoading
-                    ? "Loading dashboard..."
-                    : activeDashboard
-                    ? "Editing saved dashboard layout"
-                    : "New dashboard – will be created on save"}
-                </div>
-              </div>
-
-              <div className="border rounded-xl p-3 sm:p-4 bg-white space-y-3">
-  <div className="flex items-center justify-between gap-2">
-    <div className="space-y-1">
-      <p className="text-sm font-medium">Widgets</p>
-      <p className="text-xs text-gray-500">
-        Add, remove, and reorder widgets. Layout is saved when you click Save.
-      </p>
-    </div>
-    <span className="text-xs text-gray-400">
-      {widgets.length} widget{widgets.length === 1 ? "" : "s"}
-    </span>
-  </div>
-
-  <div className="space-y-2">
-    {widgets.length === 0 ? (
-      <div className="text-xs text-gray-500 border border-dashed rounded-lg p-4 text-center">
-        No widgets yet. Use the form below to add your first metric widget.
+    <div className="w-full h-screen flex flex-col overflow-hidden bg-white">
+      {/* Top Header */}
+      <div className="w-full h-[4.8em] border-b flex justify-between items-center px-6 bg-white shrink-0 z-30">
+        <div className="flex items-center gap-4">
+          {clientId && (
+            <Button
+              variant="ghost"
+              onClick={() => window.history.back()}
+              className="mr-2"
+            >
+              ← Back
+            </Button>
+          )}
+          <Input
+            value={dashboardName}
+            onChange={(e) => setDashboardName(e.target.value)}
+            className="text-lg font-semibold border-none shadow-none focus-visible:ring-0 px-0 w-[300px]"
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <Button
+            className="rounded-[0.4rem]"
+            disabled={saveMutation.isPending}
+            onClick={() => saveMutation.mutate()}
+          >
+            {saveMutation.isPending ? "Saving..." : "Save Dashboard"}
+          </Button>
+        </div>
       </div>
-    ) : (
-      widgets.map((widget, index) => (
-        <div
-          key={widget.id}
-          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border rounded-lg px-3 py-2 bg-gray-50"
-        >
-          <div className="space-y-0.5">
-            <p className="text-sm font-medium">{widget.metricKey}</p>
-            <p className="text-xs text-gray-500">
-              {widget.integration} •{" "}
-              {(widget as any).accountId ?? "Account"}
-            </p>
-            <p className="text-xs text-gray-400">
-              Type: {widget.type ?? "metric_card"} • Position: {index + 1}
-            </p>
-          </div>
-          <div className="flex items-center gap-1 self-stretch sm:self-auto">
-            <Button
-              variant="outline"
-              size="icon-sm"
-              className="text-xs"
-              type="button"
-              disabled={index === 0}
-              onClick={() => moveWidget(index, "up")}
-            >
-              ↑
-            </Button>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              className="text-xs"
-              type="button"
-              disabled={index === widgets.length - 1}
-              onClick={() => moveWidget(index, "down")}
-            >
-              ↓
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="ml-1 text-xs"
-              type="button"
-              onClick={() => handleRemoveWidget(widget.id)}
-            >
-              Remove
-            </Button>
-          </div>
-        </div>
-      ))
-    )}
-  </div>
-</div>
 
-              <div className="border rounded-xl p-3 sm:p-4 bg-white space-y-3">
-                <p className="text-sm font-medium">Add widget</p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-                  <div className="space-y-1 md:col-span-2">
-                    <label className="text-xs font-medium text-gray-700">
-                      Metric
-                    </label>
-                    <Select
-                      value={selectedMetricId}
-                      onValueChange={setSelectedMetricId}
-                      disabled={isLoadingMetrics || availableMetricOptions.length === 0}
-                    >
-                      <SelectTrigger className="w-full h-9 text-sm">
-                        <SelectValue
-                          placeholder={
-                            isLoadingMetrics
-                              ? "Loading metrics..."
-                              : availableMetricOptions.length === 0
-                              ? "No metrics available"
-                              : "Select a metric"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableMetricOptions.map((option) => (
-                          <SelectItem key={option.id} value={option.id}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-gray-700">
-                      Widget type
-                    </label>
-                    <Select
-                      value={selectedType}
-                      onValueChange={(value) =>
-                        setSelectedType(value as "metric_card" | "line_chart" | "chart")
-                      }
-                    >
-                      <SelectTrigger className="w-full h-9 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="metric_card">Metric card</SelectItem>
-                        <SelectItem value="line_chart">Line chart</SelectItem>
-                        <SelectItem value="chart">Pie / bar chart</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex justify-end md:justify-start">
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="mt-1"
-                      onClick={handleAddWidget}
-                    >
-                      Add widget
-                    </Button>
-                  </div>
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Sidebar - Add Data Sources */}
+        <SidebarAddIntegration
+          availableIntegrations={availableIntegrations}
+          onAdd={handleAddIntegration}
+        />
+
+        {/* Main Canvas - Sections List */}
+        <div className="flex-1 overflow-y-auto bg-gray-50/50 p-6">
+          <div className="max-w-4xl mx-auto space-y-6">
+            {sections.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+                <div className="bg-white p-4 rounded-full shadow-sm mb-4">
+                  <FiPlus className="w-8 h-8 text-gray-400" />
                 </div>
+                <h3 className="text-lg font-medium text-gray-900">Start building your dashboard</h3>
+                <p className="text-sm text-gray-500 mt-1 max-w-sm">
+                  Select data sources from the sidebar to add them to your dashboard.
+                </p>
               </div>
-            </div>
+            ) : (
+              sections.map((section, idx) => (
+                <IntegrationEditorCard
+                  key={section.key}
+                  integration={section.integration}
+                  accountId={section.accountId}
+                  sectionWidgets={section.widgets}
+                  allAvailableMetrics={
+                    groupedMetrics[section.integration]?.[section.accountId || ''] ||
+                    // Fallback: try to find metrics regardless of account if missing?
+                    // Actually groupedMetrics key structure is rigid.
+                    []
+                  }
+                  onMoveUp={() => handleMoveSection(idx, 'up')}
+                  onMoveDown={() => handleMoveSection(idx, 'down')}
+                  onRemove={() => handleRemoveSection(section.key)}
+                  onUpdateWidgets={(updated) => handleUpdateSectionWidgets(section.key, updated)}
+                  isFirst={idx === 0}
+                  isLast={idx === sections.length - 1}
+                />
+              ))
+            )}
           </div>
         </div>
+
       </div>
     </div>
   );

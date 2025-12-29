@@ -46,7 +46,6 @@ const ReportsLandingPage: React.FC = () => {
     const { data: clients, isLoading } = useClients();
     const [searchQuery, setSearchQuery] = useState("");
     const [sortBy, setSortBy] = useState("name-asc");
-    const [filterStatus, setFilterStatus] = useState("all");
 
     const handleClientClick = (clientId: number) => {
         navigate(`/clients/${clientId}/reports`);
@@ -60,40 +59,19 @@ const ReportsLandingPage: React.FC = () => {
             client.description?.toLowerCase().includes(searchQuery.toLowerCase())
         );
 
-        // Filter
-        if (filterStatus !== 'all') {
-            result = result.filter(client => {
-                const health = getClientHealth(client);
-                if (filterStatus === 'healthy') return health === 'healthy';
-                if (filterStatus === 'warning') return health === 'warning';
-                if (filterStatus === 'critical') return health === 'critical';
-                if (filterStatus === 'inactive') return !client.isActive;
-                return true;
-            });
-        }
-
         // Sort
         result.sort((a, b) => {
-            const healthA = getClientHealth(a);
-            const healthB = getClientHealth(b);
-            const integrationsA = (a._count?.metaBusinessAccounts || 0) + (a._count?.metaAdsAccounts || 0);
-            const integrationsB = (b._count?.metaBusinessAccounts || 0) + (b._count?.metaAdsAccounts || 0);
-
             switch (sortBy) {
                 case 'name-asc': return a.name.localeCompare(b.name);
                 case 'name-desc': return b.name.localeCompare(a.name);
                 case 'date-new': return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
                 case 'date-old': return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-                case 'health-critical':
-                    // Critical first (no ints), then warning, then healthy
-                    const score = (h: string) => h === 'critical' ? 0 : h === 'warning' ? 1 : 2;
-                    return score(healthA) - score(healthB);
                 default: return 0;
             }
         });
 
         return result;
-    }, [clients, searchQuery, sortBy, filterStatus]);
+    }, [clients, searchQuery, sortBy]);
 
     return (
         <div className="w-full h-[2000vh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
@@ -115,21 +93,6 @@ const ReportsLandingPage: React.FC = () => {
                                         <SelectItem value="name-desc">Name (Z-A)</SelectItem>
                                         <SelectItem value="date-new">Date (Newest)</SelectItem>
                                         <SelectItem value="date-old">Date (Oldest)</SelectItem>
-                                        <SelectItem value="health-critical">Health (Critical Issues)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-
-                                <Select value={filterStatus} onValueChange={setFilterStatus}>
-                                    <SelectTrigger className="w-[130px] h-9 bg-white border-zinc-200">
-                                        <Filter className="w-3.5 h-3.5 mr-2 text-zinc-400" />
-                                        <SelectValue placeholder="Filter" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Clients</SelectItem>
-                                        <SelectItem value="healthy">Healthy Only</SelectItem>
-                                        <SelectItem value="warning">Warnings</SelectItem>
-                                        <SelectItem value="critical">Critical Issues</SelectItem>
-                                        <SelectItem value="inactive">Inactive</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -178,7 +141,7 @@ const ReportsLandingPage: React.FC = () => {
                             <div className="flex flex-col items-center justify-center h-[40vh]">
                                 <h3 className="text-lg font-medium text-zinc-900 mb-2">No matching results</h3>
                                 <p className="text-gray-500 text-center">
-                                    Try adjusting your search or filters.
+                                    Try adjusting your search.
                                 </p>
                             </div>
                         ) : (
@@ -187,7 +150,6 @@ const ReportsLandingPage: React.FC = () => {
                                     <TableHeader className="bg-zinc-50/50">
                                         <TableRow>
                                             <TableHead className="w-[400px]">Client Name</TableHead>
-                                            <TableHead>Status</TableHead>
                                             <TableHead>Integrations</TableHead>
                                             <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
@@ -203,8 +165,6 @@ const ReportsLandingPage: React.FC = () => {
                                                 (client._count?.woocommerceAccounts || 0) +
                                                 (client._count?.googleSearchConsoleAccounts || 0) +
                                                 (client._count?.googleAnalyticsAccounts || 0);
-
-                                            const status = getClientHealth(client);
 
                                             return (
                                                 <TableRow
@@ -222,16 +182,6 @@ const ReportsLandingPage: React.FC = () => {
                                                                 <div className="text-xs text-zinc-500 line-clamp-1">{client.description || "No description"}</div>
                                                             </div>
                                                         </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge variant="outline" className={cn(
-                                                            "font-medium border shadow-none",
-                                                            status === 'healthy' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                                                                status === 'warning' ? "bg-amber-50 text-amber-700 border-amber-200" :
-                                                                    "bg-red-50 text-red-700 border-red-200"
-                                                        )}>
-                                                            {status === 'healthy' ? 'Healthy' : status === 'warning' ? 'Needs Attention' : 'Critical'}
-                                                        </Badge>
                                                     </TableCell>
                                                     <TableCell>
                                                         <div className="flex items-center gap-2">

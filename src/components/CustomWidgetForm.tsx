@@ -25,7 +25,7 @@ function CustomWidgetForm({
   const tocLines =
     isToc && data?.content
       ? data.content.split("\n").map((t) => t.trim())
-          .filter(Boolean)
+        .filter(Boolean)
       : [];
 
   const updateTocLine = (index: number, value: string) => {
@@ -128,17 +128,18 @@ function CustomWidgetForm({
         ) : (
           <>
             <div className="grid grid-cols-1 gap-3">
-              <div>
+              {/* Internal Type Field (Hidden) */}
+              {/* <div>
                 <Label className="block text-xs text-gray-600 mb-2">
                   Block type
                 </Label>
                 <Input
                   value={data?.type ?? ""}
                   onChange={(e) => handleChange({ type: e.target.value })}
-                  placeholder="e.g. text, tasks, ai-summary, toc"
+                  placeholder="e.g. text, tasks, toc"
                   className="text-xs"
                 />
-              </div>
+              </div> */}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -203,12 +204,91 @@ function CustomWidgetForm({
                 <Label className="block text-xs text-gray-600 mb-2">
                   Content
                 </Label>
+                <div className="flex items-center gap-1 mb-1 border rounded-t p-1 bg-gray-50">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = document.querySelector(
+                        "textarea[name='content-editor']"
+                      ) as HTMLTextAreaElement;
+                      if (!el) return;
+                      const start = el.selectionStart;
+                      const end = el.selectionEnd;
+                      const text = data?.content ?? "";
+                      const before = text.substring(0, start);
+                      const selected = text.substring(start, end);
+                      const after = text.substring(end);
+                      const newVal = `${before}**${selected}**${after}`;
+                      handleChange({ content: newVal });
+                    }}
+                    className="p-1 hover:bg-gray-200 rounded"
+                    title="Bold"
+                  >
+                    <span className="font-bold text-xs">B</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = document.querySelector(
+                        "textarea[name='content-editor']"
+                      ) as HTMLTextAreaElement;
+                      if (!el) return;
+                      const start = el.selectionStart;
+                      const end = el.selectionEnd;
+                      const text = data?.content ?? "";
+                      const before = text.substring(0, start);
+                      const selected = text.substring(start, end);
+                      const after = text.substring(end);
+                      const newVal = `${before}_${selected}_${after}`;
+                      handleChange({ content: newVal });
+                    }}
+                    className="p-1 hover:bg-gray-200 rounded"
+                    title="Italic"
+                  >
+                    <span className="italic text-xs">I</span>
+                  </button>
+                  <div className="w-px h-4 bg-gray-300 mx-1" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const text = data?.content ?? "";
+                      handleChange({ content: text + "\n# " });
+                    }}
+                    className="p-1 hover:bg-gray-200 rounded text-xs font-bold"
+                    title="Heading 1"
+                  >
+                    H1
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const text = data?.content ?? "";
+                      handleChange({ content: text + "\n## " });
+                    }}
+                    className="p-1 hover:bg-gray-200 rounded text-xs font-bold"
+                    title="Heading 2"
+                  >
+                    H2
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const text = data?.content ?? "";
+                      handleChange({ content: text + "\n- " });
+                    }}
+                    className="p-1 hover:bg-gray-200 rounded text-xs"
+                    title="Bullet List"
+                  >
+                    • List
+                  </button>
+                </div>
                 <Textarea
+                  name="content-editor"
                   rows={10}
                   value={data?.content ?? ""}
                   onChange={(e) => handleChange({ content: e.target.value })}
-                  placeholder={`Add your content here. For tasks, you can add one task per line:\n- Task 1\n- Task 2`}
-                  className="text-xs"
+                  placeholder={`Add your content here. Supported Markdown:\n**Bold**, _Italic_\n# H1, ## H2\n- List items`}
+                  className="text-xs rounded-t-none mt-0 pt-2"
                 />
               </div>
             </div>

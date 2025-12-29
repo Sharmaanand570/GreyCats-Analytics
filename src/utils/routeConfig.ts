@@ -49,6 +49,11 @@ const dynamicRoutePatterns = [
   /^\/clients\/[^/]+\/.+$/, // /clients/:id/sub-routes (like /clients/1/reports)
   /^\/data-sources\/google-analytics\/\d+$/, // /data-sources/google-analytics/:clientId
   /^\/data-sources\/google-console\/\d+$/, // /data-sources/google-console/:clientId
+  /^\/data-sources\/youtube\/\d+$/, // /data-sources/youtube/:clientId
+  /^\/data-sources\/meta-ads\/\d+$/, // /data-sources/meta-ads/:clientId
+  /^\/data-sources\/meta-business\/\d+$/, // /data-sources/meta-business/:clientId
+  /^\/data-sources\/meta-facebook\/\d+$/, // /data-sources/meta-facebook/:clientId
+  /^\/data-sources\/meta-instagram\/\d+$/, // /data-sources/meta-instagram/:clientId
 ];
 
 /**

@@ -3,6 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import type { IntegrationType } from '../types/client.types';
 import { Loader2 } from 'lucide-react';
 import { AccountSelectionModal } from '../components/clients/AccountSelectionModal';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const OAuthCallbackPage: React.FC = () => {
     const navigate = useNavigate();
@@ -41,10 +50,18 @@ const OAuthCallbackPage: React.FC = () => {
         }
     };
 
+    const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+
     const handleSuccess = () => {
         setShowAccountModal(false);
+        setShowSuccessDialog(true);
+    };
+
+    const handleContinue = () => {
         if (clientId) {
             navigate(`/clients/${clientId}/integrations`);
+        } else {
+            navigate('/clients');
         }
     };
 
@@ -58,10 +75,12 @@ const OAuthCallbackPage: React.FC = () => {
 
     return (
         <div className="flex items-center justify-center min-h-screen">
-            <div className="text-center">
-                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">Processing OAuth callback...</p>
-            </div>
+            {!showSuccessDialog && (
+                <div className="text-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">Processing OAuth callback...</p>
+                </div>
+            )}
 
             <AccountSelectionModal
                 open={showAccountModal}
@@ -70,6 +89,34 @@ const OAuthCallbackPage: React.FC = () => {
                 integration={integrationType}
                 onSuccess={handleSuccess}
             />
+
+            <AlertDialog open={showSuccessDialog} onOpenChange={handleContinue}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Connection Successful! 🎉</AlertDialogTitle>
+                        <AlertDialogDescription className="space-y-2">
+                            <p>
+                                Your data source has been connected successfully.
+                            </p>
+                            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-blue-700 text-sm">
+                                <p className="font-medium flex items-center gap-2">
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Syncing Data...
+                                </p>
+                                <p className="mt-1">
+                                    Please allow up to 5 minutes for your historical data to be fully fetched and processed.
+                                    You can start building reports, but some metrics might be processing.
+                                </p>
+                            </div>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogAction onClick={handleContinue}>
+                            Got it, continue
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 };

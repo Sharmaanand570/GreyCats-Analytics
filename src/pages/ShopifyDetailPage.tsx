@@ -42,20 +42,15 @@ import {
 } from "@/components/ui/dialog";
 import {
   useShopifyDelete,
-  useShopifyDisconnect,
   useShopifyOrder,
   useShopifyOrdersList,
   useShopifyProduct,
   useShopifyProductsList,
-  useShopifyReconnect,
   useShopifySyncProducts,
   // New client-specific hooks
   useShopifySummary,
-  useShopifySimpleProducts,
-  useShopifySimpleOrders,
   useShopifyTrends,
 } from "@/features/shopify/hooks/useShopify";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -63,7 +58,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useClients } from "@/hooks/useClients";
+import { DataSyncBanner } from "@/components/DataSyncBanner";
+import { useClients, useClient } from "@/hooks/useClients";
+import { useRemoveAccount } from "@/hooks/useIntegrations";
 
 function ShopifyDetailPage() {
   // Get clients and auto-select first client (matching WooCommerce pattern)
@@ -87,9 +84,6 @@ function ShopifyDetailPage() {
     null
   );
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [isReconnectDialogOpen, setIsReconnectDialogOpen] = useState(false);
-  const [reconnectShopDomain, setReconnectShopDomain] = useState("");
-  const [reconnectError, setReconnectError] = useState("");
 
   const productsParams = useMemo(
     () => ({
@@ -160,27 +154,31 @@ function ShopifyDetailPage() {
 
   const { data: orderDetailData, isLoading: isLoadingOrderDetail } = useShopifyOrder(clientId || 0, selectedOrderId);
   const { mutateAsync: syncProducts, isPending: isSyncing } = useShopifySyncProducts();
-  const { mutateAsync: disconnectShopify, isPending: isDisconnecting } = useShopifyDisconnect();
   const { mutateAsync: deleteShopify, isPending: isDeleting } = useShopifyDelete();
-  const { mutateAsync: reconnectShopify, isPending: isReconnecting } = useShopifyReconnect();
 
+  const removeAccount = useRemoveAccount();
 
+  // Find the Shopify integration to get the accountId
+  // We need to look up the integration for the current client
+  const { data: client } = useClient(clientId || 0);
+  const activeIntegration = client?.integrations?.find(
+    (i) => i.integrationType === "shopify"
+  );
 
-  const handleReconnectSubmit = async () => {
-    if (!reconnectShopDomain.trim()) {
-      setReconnectError("Shop domain is required");
-      return;
-    }
+  const handleDisconnect = async () => {
+    if (!clientId || !activeIntegration) return;
 
-    setReconnectError("");
     try {
-      await reconnectShopify({ clientId: clientId || 0, params: { shop: reconnectShopDomain.trim() } });
-      setIsReconnectDialogOpen(false);
-      setReconnectShopDomain("");
+      await removeAccount.mutateAsync({
+        clientId,
+        integrationType: 'shopify',
+        accountId: activeIntegration.accountId
+      });
     } catch (error) {
-      // Error handled in hook via toast
+      // handled in hook
     }
   };
+
 
   const revenueChartData: ShopifyRevenuePoint[] = useMemo(() => {
     if (!trendsData?.trends) return [];
@@ -210,6 +208,7 @@ function ShopifyDetailPage() {
                 <FiBell className="text-xl text-gray-500" />
                 <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
+              <DataSyncBanner compact={true} />
             </div>
           </div>
 
@@ -230,6 +229,7 @@ function ShopifyDetailPage() {
           </div>
 
           <div className="w-full px-5 py-6 space-y-6">
+            {!isLoadingAnalytics && !summaryData?.summary && <DataSyncBanner />}
             <Card className=" border rounded-2xl">
               <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -259,32 +259,13 @@ function ShopifyDetailPage() {
                     )}
                   </Button>
                   <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => setIsReconnectDialogOpen(true)}
-                    disabled={isReconnecting}
-                    className="gap-2"
-                  >
-                    {isReconnecting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Reconnecting...
-                      </>
-                    ) : (
-                      <>
-                        <Power className="w-4 h-4" />
-                        Reconnect
-                      </>
-                    )}
-                  </Button>
-                  <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => disconnectShopify(clientId || 0)}
-                    disabled={isDisconnecting}
+                    onClick={handleDisconnect}
+                    disabled={removeAccount.isPending}
                     className="gap-2"
                   >
-                    {isDisconnecting ? (
+                    {removeAccount.isPending ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
                         Disconnecting...
@@ -699,66 +680,7 @@ function ShopifyDetailPage() {
         </div>
       </div>
 
-      <Dialog
-        open={isReconnectDialogOpen}
-        onOpenChange={(open) => {
-          setIsReconnectDialogOpen(open);
-          if (!open) {
-            setReconnectShopDomain("");
-            setReconnectError("");
-          }
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Reconnect Shopify Store</DialogTitle>
-            <DialogDescription>
-              Enter your Shopify store domain (e.g.
-              greycats-store.myshopify.com)
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="shopify-reconnect-domain">Shop Domain</Label>
-              <Input
-                id="shopify-reconnect-domain"
-                placeholder="your-shop.myshopify.com"
-                value={reconnectShopDomain}
-                onChange={(event) =>
-                  setReconnectShopDomain(event.target.value.trim())
-                }
-                disabled={isReconnecting}
-              />
-              {reconnectError && (
-                <p className="text-sm text-destructive">{reconnectError}</p>
-              )}
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsReconnectDialogOpen(false);
-                  setReconnectShopDomain("");
-                  setReconnectError("");
-                }}
-                disabled={isReconnecting}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleReconnectSubmit} disabled={isReconnecting}>
-                {isReconnecting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Redirecting...
-                  </>
-                ) : (
-                  "Continue"
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+
 
       <Dialog
         open={selectedProductId !== null}

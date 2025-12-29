@@ -104,6 +104,7 @@ function App() {
               <Route path=":clientId/reports/new" element={<ReportBuilder />} />
               <Route path=":clientId/reports/:id" element={<ReportBuilder />} />
               <Route path=":clientId/reports" element={<Reports />} />
+              <Route path=":clientId/edit-dashboard" element={<EditDashboard />} />
               <Route path=":clientId" element={<ClientDetailPage />} />
             </Route>
 
@@ -112,7 +113,7 @@ function App() {
 
             <Route path="data-sources">
               <Route index element={<Integrations />} />
-              <Route path="youtube" element={<YouTubeDetailPage />} />
+              <Route path="youtube/:clientId?" element={<YouTubeDetailPage />} />
               <Route path="woocommerce" element={<WooCommerceDetailPage />} />
               <Route path="shopify" element={<ShopifyDetailPage />} />
               <Route
@@ -123,11 +124,11 @@ function App() {
                 path="google-console/:clientId?"
                 element={<GoogleConsoleDetailPage />}
               />
-              <Route path="meta-ads" element={<MetaDetailPage />} />
-              <Route path="meta-business" element={<MetaBusinessDetailPage />} />
-              <Route path="meta-facebook" element={<FacebookInsightsPage />} />
+              <Route path="meta-ads/:clientId?" element={<MetaDetailPage />} />
+              <Route path="meta-business/:clientId?" element={<MetaBusinessDetailPage />} />
+              <Route path="meta-facebook/:clientId?" element={<FacebookInsightsPage />} />
               <Route
-                path="meta-instagram"
+                path="meta-instagram/:clientId?"
                 element={<InstagramInsightsPage />}
               />
               <Route path="*" element={<NotFoundPage />} />

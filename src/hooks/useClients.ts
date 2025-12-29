@@ -237,7 +237,7 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
       // Check ALL possible existing keys to avoid duplication
       if (!processedIds.has(uniqueKey) && !processedIds.has(propertyNameKey) && !processedIds.has(propertyIdKey)) {
         const flatAcc = {
-          id: acc.platformAccountId,
+          id: acc.id,
           propertyName: acc.platformAccount?.propertyName,
           propertyId: acc.platformAccount?.propertyId,
           platform: 'Google Analytics'
@@ -246,7 +246,7 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
         // For now, manual check since mapAccount expects different structure
         integrations.push({
           integrationType: 'google-analytics',
-          accountId: acc.platformAccountId,
+          accountId: acc.id,
           accountName: flatAcc.propertyName || 'Google Analytics',
           accountIdentifier: flatAcc.propertyId || 'unknown',
           connectedAt: acc.createdAt || new Date().toISOString()

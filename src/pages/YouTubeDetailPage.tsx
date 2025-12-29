@@ -2,16 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import {
   useYouTubeChannel,
   useYouTubePerVideoAnalytics,
-  useYouTubeReconnect,
-  useYouTubeDisconnect,
   useYouTubeSync,
   useYouTubeVideos,
   useYouTubeSummary,
   useYouTubeTrends,
-  useYouTubeTopVideos,
-  useYouTubeEngagement,
   useYouTubeWatchTime,
+  useYouTubeEngagement,
+  useYouTubeTopVideos,
 } from "@/features/YouTube/hooks/useYouTubeData";
+import { useRemoveAccount } from "@/hooks/useIntegrations";
+import { useClient } from "@/hooks/useClients";
 import {
   Card,
   CardContent,
@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DataSyncBanner } from "@/components/DataSyncBanner";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -48,14 +49,16 @@ import {
 } from "recharts";
 import { Loader2, RefreshCw, Youtube, Eye, ThumbsUp, Clock, Users, TrendingUp } from "lucide-react";
 import { FaYoutube } from "react-icons/fa6";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 import { useParams } from "react-router-dom";
 import type { YouTubeVideoItem } from "@/features/YouTube/API/youtubeApi";
+import { DateRangePicker } from "@/components/DateRangePicker";
+import type { DateRange } from "react-day-picker";
 
 const buildChartData = (series?: Array<Record<string, unknown>>) => {
-  if (!series) return [];
-  return series.map((point, index) => {
-    const date = point.date as string || `Point ${index + 1}`;
+  if (!series || !Array.isArray(series)) return [];
+  return series.map((point) => {
+    const date = point.date as string || "";
 
     const numericEntry = Object.entries(point).find(
       ([key, value]) => key !== "date" && typeof value === "number"
@@ -71,6 +74,12 @@ const buildChartData = (series?: Array<Record<string, unknown>>) => {
 function YouTubeDetailPage() {
   const { clientId } = useParams();
   const numericClientId = Number(clientId);
+
+  // Default to last 30 days
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: subDays(new Date(), 29),
+    to: new Date(),
+  });
 
   const [videosPage, setVideosPage] = useState(1);
   const [videosSearch, setVideosSearch] = useState("");
@@ -88,31 +97,57 @@ function YouTubeDetailPage() {
   const { data: channelData, isLoading: isLoadingChannel, error: channelError } = useYouTubeChannel(numericClientId);
 
   // 2. Summary Stats
-  const { data: summaryData, isLoading: isLoadingSummary } = useYouTubeSummary(numericClientId);
+  const { data: summaryData, isLoading: isLoadingSummary, error: summaryError } = useYouTubeSummary(numericClientId, dateRange as unknown as any); // Type assertion until hooks fully updated or inferred
 
   // 3. Trends
-  const { data: trendsData, isLoading: isLoadingTrends } = useYouTubeTrends(numericClientId);
+  const { data: trendsData, isLoading: isLoadingTrends, error: trendsError } = useYouTubeTrends(numericClientId, dateRange as unknown as any);
 
   // 4. Videos List
   const { data: videosData, isLoading: isLoadingVideos, error: videosError } = useYouTubeVideos(numericClientId, videoParams);
 
   // 5. Engagement
-  const { data: engagementData, isLoading: isLoadingEngagement } = useYouTubeEngagement(numericClientId);
+  const { data: engagementData, error: engagementError } = useYouTubeEngagement(numericClientId, dateRange as unknown as any);
 
-  // 6. Top Videos
-  const { data: topVideosData, isLoading: isLoadingTopVideos } = useYouTubeTopVideos(numericClientId, {
+  // 6. Watch Time
+  const { data: watchTimeData, isLoading: isLoadingWatchTime, error: watchTimeError } = useYouTubeWatchTime(numericClientId, dateRange as unknown as any);
+
+  // 7. Top Videos
+  const { data: topVideosData, isLoading: isLoadingTopVideos, error: topVideosError } = useYouTubeTopVideos(numericClientId, {
     metric: "views",
     limit: 5,
-    period: "30d"
+    period: "30d",
+    dateRange: dateRange as unknown as any // Pass dateRange to override/supplement period
   });
-
-  // 7. Watch Time
-  const { data: watchTimeData, isLoading: isLoadingWatchTime } = useYouTubeWatchTime(numericClientId);
 
   // Actions
   const { mutateAsync: syncYouTube, isPending: isSyncing } = useYouTubeSync();
-  const { mutateAsync: reconnectYouTube, isPending: isReconnecting } = useYouTubeReconnect();
-  const { mutateAsync: disconnectYouTube, isPending: isDisconnecting } = useYouTubeDisconnect();
+
+  const { data: client } = useClient(numericClientId);
+
+  const removeAccount = useRemoveAccount();
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+
+  const handleDisconnect = async () => {
+    if (!client?.integrations) return;
+
+    // Find the YouTube integration
+    const integration = client.integrations.find(i => i.integrationType === 'youtube');
+    if (!integration) return;
+
+    try {
+      setIsDisconnecting(true);
+      await removeAccount.mutateAsync({
+        clientId: numericClientId,
+        integrationType: 'youtube',
+        accountId: integration.accountId
+      });
+      // Navigation or other state updates will be handled by query invalidation/reactivity
+    } catch (error) {
+      console.error("Failed to disconnect", error);
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
 
   // Per Video Analytics
   const {
@@ -130,7 +165,7 @@ function YouTubeDetailPage() {
 
   useEffect(() => {
     if (!selectedVideoId && videosData?.videos?.length) {
-      setSelectedVideoId(videosData.videos[0].videoId || videosData.videos[0].id);
+      setSelectedVideoId(String(videosData.videos[0].id));
     }
   }, [videosData, selectedVideoId]);
 
@@ -150,33 +185,43 @@ function YouTubeDetailPage() {
   const summary = summaryData?.summary;
   const engagement = engagementData?.engagement;
 
-  const channelSnippet = channelData?.channel?.snippet;
-  const channelTitle = channelSnippet?.title || channelData?.channel?.channelTitle || "YouTube Channel";
-  const channelDescription = channelSnippet?.description || "";
-  const channelCustomUrl = channelSnippet?.customUrl || "";
-  const channelId = channelData?.channel?.channelId || "N/A";
-  const channelPublishedAt = channelSnippet?.publishedAt;
+  const channelTitle = channelData?.channel?.channelTitle || "";
+  const channelHandle = channelData?.channel?.channelHandle || "";
+  const channelId = channelData?.channel?.channelId || "";
+  const channelPublishedAt = channelData?.channel?.publishedAt;
+  const channelThumb = channelData?.channel?.thumbnails?.high?.url || "";
+
+  // Check if we have any metrics to show in the table
+  const hasViews = videosData?.videos?.some(v => v.views !== undefined);
+  const hasLikes = videosData?.videos?.some(v => v.likes !== undefined);
+  const hasComments = videosData?.videos?.some(v => v.comments !== undefined);
+
 
   return (
     <div className="w-full h-full flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
       <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
         <div className="w-full h-full flex flex-col">
           {/* Header */}
-          <div className="w-full h-[4.8em] border-b flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-5 py-3 lg:py-0">
+          <div className="w-full min-h-[4.8em] h-auto border-b flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-5 py-3 lg:py-2">
             <div className="flex items-center gap-3">
               <FaYoutube className="text-2xl text-red-600" />
               <span className="font-medium text-xl">YouTube Analytics</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <DateRangePicker
+                value={dateRange}
+                onChange={(range: DateRange) => setDateRange(range)}
+                className="w-[240px]"
+              />
+              <DataSyncBanner
+                compact={true}
+              />
               <Button variant="outline" size="sm" onClick={handleSync} disabled={isSyncing} className="gap-2">
                 {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                 Sync
               </Button>
-              <Button variant="secondary" size="sm" onClick={() => reconnectYouTube(numericClientId)} disabled={isReconnecting}>
-                {isReconnecting ? "Reconnecting..." : "Reconnect"}
-              </Button>
-              <Button variant="destructive" size="sm" onClick={() => disconnectYouTube(numericClientId)} disabled={isDisconnecting}>
-                {isDisconnecting ? "Disconnecting..." : "Disconnect"}
+              <Button variant="destructive" size="sm" onClick={handleDisconnect} disabled={isDisconnecting || removeAccount.isPending}>
+                {isDisconnecting || removeAccount.isPending ? "Disconnecting..." : "Disconnect"}
               </Button>
             </div>
           </div>
@@ -196,6 +241,7 @@ function YouTubeDetailPage() {
           </div>
 
           <div className="w-full px-5 py-6 space-y-6 overflow-y-auto pb-20">
+            {!isLoadingSummary && !summaryData?.summary && <DataSyncBanner autoHide={false} />}
             {/* 1. Channel Info & Summary Cards */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Channel Profile */}
@@ -220,11 +266,11 @@ function YouTubeDetailPage() {
                       <div className="text-destructive">Failed to load channel info</div>
                     ) : (
                       <div className="flex flex-col md:flex-row md:items-center gap-6">
-                        <div className="w-16 h-16 rounded-full overflow-hidden border shrink-0">
-                          {channelSnippet?.thumbnails?.high?.url ? (
-                            <img src={channelSnippet.thumbnails.high.url} alt={channelTitle} className="w-full h-full object-cover" />
+                        <div className="w-16 h-16 rounded-full overflow-hidden border shrink-0 bg-gray-100">
+                          {channelThumb ? (
+                            <img src={channelThumb} alt={channelTitle} className="w-full h-full object-cover" />
                           ) : (
-                            <div className="w-full h-full bg-red-50 flex items-center justify-center"><Youtube className="text-red-500" /></div>
+                            <div className="w-full h-full flex items-center justify-center"><Youtube className="text-red-500 w-8 h-8" /></div>
                           )}
                         </div>
                         <div>
@@ -233,10 +279,26 @@ function YouTubeDetailPage() {
                             <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium">Connected</span>
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">
-                            {channelCustomUrl} • ID: {channelId}
-                            {channelPublishedAt && ` • Since ${format(new Date(channelPublishedAt), "MMM yyyy")}`}
+                            {channelHandle} • ID: {channelId}
+                            {channelPublishedAt && ` • Published ${format(new Date(channelPublishedAt), "MMM d, yyyy")}`}
                           </p>
-                          {channelDescription && <p className="text-sm text-gray-500 mt-2 line-clamp-2">{channelDescription}</p>}
+                          <div className="flex gap-4 mt-2 text-sm">
+                            <div>
+                              <span className="font-semibold">
+                                {(channelData?.channel?.videoCount || summaryData?.summary?.totalVideos || 0).toLocaleString()}
+                              </span> Videos
+                            </div>
+                            <div>
+                              <span className="font-semibold">
+                                {(channelData?.channel?.viewCount || summaryData?.summary?.totalViews || 0).toLocaleString()}
+                              </span> Views
+                            </div>
+                            <div>
+                              <span className="font-semibold">
+                                {(channelData?.channel?.subscriberCount || summaryData?.summary?.totalSubscribers || 0).toLocaleString()}
+                              </span> Subscribers
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -249,6 +311,7 @@ function YouTubeDetailPage() {
                 title="Total Views"
                 value={summary?.totalViews}
                 loading={isLoadingSummary}
+                error={summaryError}
                 icon={<Eye className="w-4 h-4 text-blue-500" />}
                 subtext={`Avg ${summary?.averageViewsPerDay?.toLocaleString() ?? 0}/day`}
               />
@@ -256,6 +319,7 @@ function YouTubeDetailPage() {
                 title="Subscribers"
                 value={summary?.totalSubscribers}
                 loading={isLoadingSummary}
+                error={summaryError}
                 icon={<Users className="w-4 h-4 text-green-500" />}
                 subtext="Total Subscribers"
               />
@@ -263,14 +327,16 @@ function YouTubeDetailPage() {
                 title="Watch Time (Hrs)"
                 value={watchTimeData?.totalWatchTimeHours ? Math.round(Number(watchTimeData.totalWatchTimeHours)) : 0}
                 loading={isLoadingWatchTime || isLoadingSummary}
+                error={watchTimeError}
                 icon={<Clock className="w-4 h-4 text-amber-500" />}
                 subtext="Last 30 Days"
               />
               <SummaryCard
                 title="Engagement Rate"
                 value={engagement?.engagementRate}
-                isString
-                loading={isLoadingEngagement}
+                isString={true}
+                loading={isLoadingSummary}
+                error={engagementError}
                 icon={<TrendingUp className="w-4 h-4 text-purple-500" />}
                 subtext={`${engagement?.likesPerView ?? 0} Likes/View`}
               />
@@ -286,6 +352,10 @@ function YouTubeDetailPage() {
                 <CardContent>
                   {isLoadingTrends ? (
                     <Skeleton className="h-[300px] w-full" />
+                  ) : trendsError ? (
+                    <div className="h-[300px] w-full flex items-center justify-center text-destructive">
+                      Failed to load trends
+                    </div>
                   ) : (
                     <div className="h-[300px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
@@ -339,40 +409,189 @@ function YouTubeDetailPage() {
                     <div className="space-y-4">
                       {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
                     </div>
+                  ) : topVideosError ? (
+                    <div className="text-destructive text-sm">Failed to load top videos</div>
                   ) : (
                     <div className="space-y-4">
-                      {topVideosData?.topVideos?.map((video: YouTubeVideoItem, idx: number) => (
-                        <div key={video.id || idx} className="flex gap-3 items-start group">
-                          <div className="shrink-0 w-24 h-16 rounded-md overflow-hidden bg-gray-100 relative">
-                            {video.thumbnails?.default?.url && (
-                              <img src={video.thumbnails.default.url} alt="" className="w-full h-full object-cover" />
-                            )}
-                            <div className="absolute bottom-1 right-1 bg-black/70 text-white text-[10px] px-1 rounded">
-                              {idx + 1}
+                      {topVideosData?.topVideos?.map((video: YouTubeVideoItem, idx: number) => {
+                        return (
+                          <div key={video.id} className="flex gap-3 items-start group">
+                            <div className="shrink-0 w-24 h-16 rounded-md overflow-hidden bg-gray-100 relative">
+                              {video.thumbnails?.default?.url && (
+                                <img src={video.thumbnails.default.url} alt="" className="w-full h-full object-cover" />
+                              )}
+                              <div className="absolute bottom-1 right-1 bg-black/70 text-white text-[10px] px-1 rounded">
+                                {idx + 1}
+                              </div>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h4 className="text-sm font-medium line-clamp-2 leading-tight group-hover:text-red-600 transition-colors">
+                                {video.title}
+                              </h4>
+                              <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Eye className="w-3 h-3" />
+                                  {video.views?.toLocaleString() ?? 0}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <ThumbsUp className="w-3 h-3" />
+                                  {video.likes?.toLocaleString() ?? 0}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <h4 className="text-sm font-medium line-clamp-2 leading-tight group-hover:text-red-600 transition-colors">
-                              {video.title}
-                            </h4>
-                            <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <Eye className="w-3 h-3" />
-                                {video.views?.toLocaleString()}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <ThumbsUp className="w-3 h-3" />
-                                {video.likes?.toLocaleString()}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
               </Card>
             </div>
+
+
+
+            {/* Deep Dive Section */}
+            <Card>
+              <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <CardTitle>Video Deep Dive</CardTitle>
+                  <CardDescription>Detailed daily analytics for a specific video.</CardDescription>
+                </div>
+                <Select
+                  value={selectedVideoId ?? ""}
+                  onValueChange={(value) => setSelectedVideoId(value)}
+                  disabled={!videosData?.videos?.length}
+                >
+                  <SelectTrigger className="w-full lg:w-[300px]">
+                    <SelectValue placeholder="Select a video to analyze" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {videosData?.videos?.map((video: YouTubeVideoItem) => (
+                      <SelectItem key={video.id} value={String(video.id)}>
+                        {video.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardHeader>
+              <CardContent>
+                {perVideoAnalyticsError && (
+                  <div className="text-sm text-destructive mb-4">
+                    Failed to load per-video analytics:{" "}
+                    {perVideoAnalyticsError.message}
+                  </div>
+                )}
+                {isLoadingPerVideoAnalytics ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : !selectedVideoId ? (
+                  <div className="h-[300px] w-full flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg">
+                    <FaYoutube className="w-10 h-10 mb-2 opacity-20" />
+                    <p>Select a video from the dropdown above</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Video Metadata & Totals */}
+                    {perVideoAnalytics?.video && perVideoAnalytics.analytics && (
+                      <div className="bg-muted/30 rounded-lg p-4 border border-border">
+                        <div className="flex flex-col md:flex-row gap-6">
+                          {/* Left: Video Thumbnail & Info */}
+                          <div className="flex gap-4 md:w-1/3 shrink-0">
+                            <div className="w-32 h-20 bg-black/10 rounded-md overflow-hidden shrink-0 border border-border">
+                              {perVideoAnalytics.video.thumbnails?.medium?.url && (
+                                <img
+                                  src={perVideoAnalytics.video.thumbnails.medium.url}
+                                  alt=""
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+                            </div>
+                            <div className="space-y-1 overflow-hidden">
+                              <h3 className="font-semibold text-sm line-clamp-2" title={perVideoAnalytics.video.title}>
+                                {perVideoAnalytics.video.title}
+                              </h3>
+                              <p className="text-xs text-muted-foreground">
+                                Published: {format(new Date(perVideoAnalytics.video.publishedAt), "MMM d, yyyy")}
+                              </p>
+                              <a
+                                href={`https://www.youtube.com/watch?v=${perVideoAnalytics.video.id}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs text-blue-500 hover:underline inline-flex items-center gap-1 mt-1"
+                              >
+                                View on YouTube <Eye className="w-3 h-3" />
+                              </a>
+                            </div>
+                          </div>
+
+                          {/* Right: Summary Stats Grid */}
+                          <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="bg-background rounded p-3 border shadow-sm">
+                              <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><Eye className="w-3 h-3" /> Total Views</p>
+                              <p className="text-lg font-bold">{perVideoAnalytics.analytics.totalViews?.toLocaleString() ?? 0}</p>
+                            </div>
+                            <div className="bg-background rounded p-3 border shadow-sm">
+                              <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><Clock className="w-3 h-3" /> Watch Time</p>
+                              <p className="text-lg font-bold">
+                                {perVideoAnalytics.analytics.totalWatchTime
+                                  ? Math.round(perVideoAnalytics.analytics.totalWatchTime / 60).toLocaleString()
+                                  : 0} <span className="text-xs font-normal text-muted-foreground">mins</span>
+                              </p>
+                            </div>
+                            <div className="bg-background rounded p-3 border shadow-sm">
+                              <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><ThumbsUp className="w-3 h-3" /> Likes</p>
+                              <p className="text-lg font-bold">{perVideoAnalytics.analytics.totalLikes?.toLocaleString() ?? 0}</p>
+                            </div>
+                            <div className="bg-background rounded p-3 border shadow-sm">
+                              <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><Users className="w-3 h-3" /> Comments</p>
+                              <p className="text-lg font-bold">{perVideoAnalytics.analytics.totalComments?.toLocaleString() ?? 0}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="h-[300px] w-full">
+                      <h4 className="text-sm font-medium mb-4 text-muted-foreground">Daily Views Performance</h4>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={perVideoChartData}>
+                          <defs>
+                            <linearGradient id="colorVideo" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1} />
+                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={(value: string) => format(new Date(value), "MMM d")}
+                            tick={{ fontSize: 12, fill: '#888' }}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <YAxis
+                            tick={{ fontSize: 12, fill: '#888' }}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <Tooltip
+                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="value"
+                            name="Views"
+                            stroke="#3b82f6"
+                            strokeWidth={2}
+                            fillOpacity={1}
+                            fill="url(#colorVideo)"
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Videos Table */}
             <Card>
@@ -402,41 +621,49 @@ function YouTubeDetailPage() {
                         <tr className="text-left">
                           <th className="h-12 px-4 font-medium text-muted-foreground">Video</th>
                           <th className="h-12 px-4 font-medium text-muted-foreground">Published</th>
-                          <th className="h-12 px-4 font-medium text-muted-foreground text-right">Views</th>
-                          <th className="h-12 px-4 font-medium text-muted-foreground text-right">Likes</th>
-                          <th className="h-12 px-4 font-medium text-muted-foreground text-right">Comments</th>
+                          {hasViews && <th className="h-12 px-4 font-medium text-muted-foreground text-right">Views</th>}
+                          {hasLikes && <th className="h-12 px-4 font-medium text-muted-foreground text-right">Likes</th>}
+                          {hasComments && <th className="h-12 px-4 font-medium text-muted-foreground text-right">Comments</th>}
                         </tr>
                       </thead>
                       <tbody>
-                        {videosData?.videos?.map((video: YouTubeVideoItem) => (
-                          <tr key={video.videoId || video.id} className="border-t hover:bg-gray-50/50 transition-colors">
-                            <td className="p-4 max-w-[300px]">
-                              <div className="flex gap-3">
-                                <div className="w-20 h-14 bg-gray-100 rounded overflow-hidden shrink-0">
-                                  {video.thumbnails?.default?.url && (
-                                    <img src={video.thumbnails.default.url} alt="" className="w-full h-full object-cover" />
-                                  )}
+                        {videosData?.videos?.map((video: YouTubeVideoItem) => {
+                          return (
+                            <tr key={video.id} className="border-t hover:bg-gray-50/50 transition-colors">
+                              <td className="p-4 max-w-[300px]">
+                                <div className="flex gap-3">
+                                  <div className="w-20 h-14 bg-gray-100 rounded overflow-hidden shrink-0">
+                                    {video.thumbnails?.default?.url && (
+                                      <img src={video.thumbnails.default.url} alt="" className="w-full h-full object-cover" />
+                                    )}
+                                  </div>
+                                  <div className="space-y-1">
+                                    <p className="font-medium line-clamp-2">{video.title}</p>
+                                    <p className="text-xs text-muted-foreground line-clamp-1">{video.id}</p>
+                                  </div>
                                 </div>
-                                <div className="space-y-1">
-                                  <p className="font-medium line-clamp-2">{video.title}</p>
-                                  <p className="text-xs text-muted-foreground line-clamp-1">{video.videoId || video.id}</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="p-4 text-muted-foreground">
-                              {format(new Date(video.publishedAt), "MMM d, yyyy")}
-                            </td>
-                            <td className="p-4 text-right font-medium">
-                              {video.viewCount?.toLocaleString() ?? 0}
-                            </td>
-                            <td className="p-4 text-right text-muted-foreground">
-                              {video.likeCount?.toLocaleString() ?? 0}
-                            </td>
-                            <td className="p-4 text-right text-muted-foreground">
-                              {video.commentCount?.toLocaleString() ?? 0}
-                            </td>
-                          </tr>
-                        ))}
+                              </td>
+                              <td className="p-4 text-muted-foreground">
+                                {video.publishedAt ? format(new Date(video.publishedAt), "MMM d, yyyy") : "-"}
+                              </td>
+                              {hasViews && (
+                                <td className="p-4 text-right font-medium">
+                                  {video.views !== undefined ? video.views.toLocaleString() : "-"}
+                                </td>
+                              )}
+                              {hasLikes && (
+                                <td className="p-4 text-right text-muted-foreground">
+                                  {video.likes !== undefined ? video.likes.toLocaleString() : "-"}
+                                </td>
+                              )}
+                              {hasComments && (
+                                <td className="p-4 text-right text-muted-foreground">
+                                  {video.comments !== undefined ? video.comments.toLocaleString() : "-"}
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                     {videosData?.videos?.length === 0 && (
@@ -460,92 +687,11 @@ function YouTubeDetailPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setVideosPage(p => p + 1)}
-                    disabled={!videosData?.videos || !videosData.pagination || videosPage >= videosData.pagination.totalPages || isLoadingVideos}
+                    disabled={!videosData?.videos || videosPage >= (videosData.pagination?.totalPages || 1) || isLoadingVideos}
                   >
                     Next
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Deep Dive Section */}
-            <Card>
-              <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <CardTitle>Video Deep Dive</CardTitle>
-                  <CardDescription>Detailed daily analytics for a specific video.</CardDescription>
-                </div>
-                <Select
-                  value={selectedVideoId ?? ""}
-                  onValueChange={(value) => setSelectedVideoId(value)}
-                  disabled={!videosData?.videos?.length}
-                >
-                  <SelectTrigger className="w-full lg:w-[300px]">
-                    <SelectValue placeholder="Select a video to analyze" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {videosData?.videos?.map((video: YouTubeVideoItem) => (
-                      <SelectItem key={video.videoId || video.id} value={video.videoId || video.id}>
-                        <div className="flex items-center gap-2 max-w-[280px]">
-                          <span className="truncate">{video.title}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </CardHeader>
-              <CardContent>
-                {perVideoAnalyticsError && (
-                  <div className="text-sm text-destructive mb-4">
-                    Failed to load per-video analytics:{" "}
-                    {perVideoAnalyticsError.message}
-                  </div>
-                )}
-                {isLoadingPerVideoAnalytics ? (
-                  <Skeleton className="h-[300px] w-full" />
-                ) : !selectedVideoId ? (
-                  <div className="h-[300px] w-full flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg">
-                    <FaYoutube className="w-10 h-10 mb-2 opacity-20" />
-                    <p>Select a video from the dropdown above</p>
-                  </div>
-                ) : (
-                  <div className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={perVideoChartData}>
-                        <defs>
-                          <linearGradient id="colorVideo" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1} />
-                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                        <XAxis
-                          dataKey="date"
-                          tickFormatter={(value: string) => format(new Date(value), "MMM d")}
-                          tick={{ fontSize: 12, fill: '#888' }}
-                          axisLine={false}
-                          tickLine={false}
-                        />
-                        <YAxis
-                          tick={{ fontSize: 12, fill: '#888' }}
-                          axisLine={false}
-                          tickLine={false}
-                        />
-                        <Tooltip
-                          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="value"
-                          stroke="#3b82f6"
-                          strokeWidth={2}
-                          fillOpacity={1}
-                          fill="url(#colorVideo)"
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
@@ -556,7 +702,7 @@ function YouTubeDetailPage() {
   );
 }
 
-function SummaryCard({ title, value, loading, icon, subtext, isString }: any) {
+function SummaryCard({ title, value, loading, error, icon, subtext, isString, suffix = "" }: any) {
   return (
     <Card>
       <CardContent className="p-6">
@@ -565,14 +711,16 @@ function SummaryCard({ title, value, loading, icon, subtext, isString }: any) {
             <p className="text-sm font-medium text-muted-foreground">{title}</p>
             {loading ? (
               <Skeleton className="h-8 w-24" />
+            ) : error ? (
+              <span className="text-sm text-destructive">Error</span>
             ) : (
               <div className="flex items-baseline gap-2">
                 <h3 className="text-2xl font-bold">
-                  {isString ? value : (value?.toLocaleString() ?? 0)}
+                  {isString ? `${value}${suffix}` : (value?.toLocaleString() ?? 0)}
                 </h3>
               </div>
             )}
-            {loading ? <Skeleton className="h-3 w-16 mt-1" /> : <p className="text-xs text-muted-foreground mt-1">{subtext}</p>}
+            {loading ? <Skeleton className="h-3 w-16 mt-1" /> : !error && <p className="text-xs text-muted-foreground mt-1">{subtext}</p>}
           </div>
           <div className="p-2 bg-gray-50 rounded-full">
             {icon}

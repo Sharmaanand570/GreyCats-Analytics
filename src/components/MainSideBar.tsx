@@ -14,12 +14,12 @@ import {
 } from "./ui/sidebar";
 import type React from "react";
 import {
-
   Bell,
   FileText,
   Layers,
   Settings,
   CircleChevronRight,
+  LogOut,
 } from "lucide-react";
 import { FiMenu } from "react-icons/fi";
 import { useEffect, useState } from "react";
@@ -27,6 +27,7 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { Button } from "./ui/button";
 import { ClientSelector } from "./ClientSelector";
+import { removeAuthToken, StorageKey } from "@/utils/storage";
 
 
 
@@ -53,7 +54,17 @@ function MainSideBar(): React.JSX.Element {
 
   const navigate = useNavigate();
 
+  const handleLogout = () => {
+    removeAuthToken(StorageKey.ANALYTICS_TOKEN);
+    // Force a hard reload to clear any in-memory state or query caches, then go to login
+    window.location.href = "/auth/login";
+  };
+
   const handleChangeURL = (path: string): void => {
+    if (path === "logout") {
+      handleLogout();
+      return;
+    }
     navigate(path);
     setActive(path);
   };
@@ -106,6 +117,7 @@ function MainSideBar(): React.JSX.Element {
       label: "Settings",
       items: [
         { label: "Account Setup", path: "/account-setup", icon: <Settings /> },
+        { label: "Logout", path: "logout", icon: <LogOut /> },
       ],
     },
   ];

@@ -20,7 +20,11 @@ import {
 } from "../components/ui/alert-dialog";
 
 import { useParams } from "react-router-dom";
-import { useClient } from "../hooks/useClients";
+import { useClient, useClients } from "../hooks/useClients";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { useNavigate } from "react-router-dom";
+import { ScrollArea } from "../components/ui/scroll-area";
+import { Building2, ArrowRight } from "lucide-react";
 
 import type { ConnectedIntegration } from "@/types/client.types";
 
@@ -55,10 +59,66 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
     }
   };
 
+  const { data: clients, isLoading: isLoadingClients } = useClients();
+  const navigate = useNavigate();
+
   if (!clientId) {
+    if (isLoadingClients) {
+      return (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Skeleton className="h-[400px] w-[600px] rounded-xl" />
+        </div>
+      );
+    }
+
     return (
-      <div className="p-8 text-center text-muted-foreground">
-        Please select a client to view integrations.
+      <div className="flex flex-col items-center justify-center min-h-[80vh] bg-gradient-to-b from-gray-50 to-white">
+        <Card className="w-full max-w-2xl shadow-xl border-zinc-200">
+          <CardHeader className="text-center pb-8 border-b bg-white rounded-t-xl">
+            <div className="mx-auto w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mb-4">
+              <Building2 className="w-6 h-6 text-blue-600" />
+            </div>
+            <CardTitle className="text-2xl text-zinc-800">Select a Client</CardTitle>
+            <CardDescription className="text-base text-zinc-500 mt-2">
+              Choose a client to manage their data sources and integrations
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ScrollArea className="h-[400px]">
+              <div className="p-4 space-y-2">
+                {clients?.map((client) => (
+                  <button
+                    key={client.id}
+                    onClick={() => navigate(`/clients/${client.id}?tab=data-sources`)}
+                    className="w-full group flex items-center justify-between p-4 hover:bg-blue-50/50 rounded-xl border border-transparent hover:border-blue-100 transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                        <span className="font-semibold text-sm">
+                          {client.name.substring(0, 2).toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="text-left">
+                        <h3 className="font-semibold text-zinc-900 group-hover:text-blue-700 transition-colors">
+                          {client.name}
+                        </h3>
+                        <p className="text-sm text-zinc-500 truncate max-w-[300px]">
+                          {client.description || "No description"}
+                        </p>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-gray-300 group-hover:text-blue-500 transform group-hover:translate-x-1 transition-all" />
+                  </button>
+                ))}
+                {clients?.length === 0 && (
+                  <div className="text-center py-12 text-gray-500">
+                    No clients found. Create a client first.
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -87,6 +147,13 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
 
       // Prefer mapped link; otherwise fall back to data-sources/<platform>
       let link = platformConfig?.link || `/data-sources/${platformKey}`;
+
+      // Append Client ID for dynamic routes
+      // List of platforms that support /:clientId
+      const dynamicPlatforms = ['google-analytics', 'google-console', 'youtube', 'meta-ads', 'meta-business', 'meta-facebook', 'meta-instagram'];
+      if (clientId && dynamicPlatforms.includes(platformKey) && !link.endsWith(`/${clientId}`)) {
+        link = `${link}/${clientId}`;
+      }
 
       return {
         name: platformConfig?.name || integration.integrationType,

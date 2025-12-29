@@ -24,54 +24,34 @@ export type YouTubeDisconnectResponse = {
   message: string;
 };
 
+// Reverting to object based on latest raw response
 export type YouTubeThumbnail = {
   url: string;
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
 };
 
 export type YouTubeChannelResponse = {
   success: boolean;
+  message?: string;
   channel: {
     channelId: string;
     channelTitle: string;
-    channelHandle?: string;
+    channelHandle: string;
+    description: string;
+    customUrl: string;
+    publishedAt: string;
+    thumbnails: {
+      default: YouTubeThumbnail;
+      medium: YouTubeThumbnail;
+      high: YouTubeThumbnail;
+    };
+    country?: string;
+    viewCount: number;
+    subscriberCount: number;
     videoCount: number;
-    totalViews: number;
-    totalSubscribers: number;
+    // connectedAt might be absent, relying on publishedAt or backend
     connectedAt?: string;
-    // Legacy support (optional)
-    kind?: string;
-    etag?: string;
-    id?: string;
-    title?: string;
-    customUrl?: string;
-    description?: string;
-    publishedAt?: string;
-    snippet?: {
-      title: string;
-      description: string;
-      customUrl?: string;
-      publishedAt: string;
-      thumbnails: {
-        default?: YouTubeThumbnail;
-        medium?: YouTubeThumbnail;
-        high?: YouTubeThumbnail;
-      };
-      localized?: {
-        title: string;
-        description: string;
-      };
-    };
-    contentDetails?: {
-      relatedPlaylists?: Record<string, string>;
-    };
-    statistics?: {
-      viewCount?: string;
-      subscriberCount?: string;
-      hiddenSubscriberCount?: boolean;
-      videoCount?: string;
-    };
   };
 };
 
@@ -82,6 +62,7 @@ export type YouTubeSyncResponse = {
   message?: string;
 };
 
+// 1. Summary & 10. Meta
 export type YouTubeSummaryResponse = {
   success: boolean;
   message?: string;
@@ -89,7 +70,8 @@ export type YouTubeSummaryResponse = {
   channelId?: string;
   summary: {
     totalViews: number;
-    totalSubscribers: number;
+    totalSubscribers: number; // User example 1 says "totalSubscribers" (156). 
+    totalVideos: number;
     totalWatchTime: number;
     totalLikes: number;
     averageViewsPerDay: number;
@@ -97,32 +79,28 @@ export type YouTubeSummaryResponse = {
 };
 
 export type YouTubeVideoItem = {
-  id: string;
-  // Support both id structure and top videos structure
-  videoId?: string;
+  id: string; // User example 2 says "id": "dQw4w9WgXcQ"
   title: string;
   description?: string;
   publishedAt: string;
   thumbnails: {
-    default?: YouTubeThumbnail;
-    medium?: YouTubeThumbnail;
-    high?: YouTubeThumbnail;
-    [key: string]: YouTubeThumbnail | undefined;
+    default: YouTubeThumbnail;
+    medium: YouTubeThumbnail;
+    high: YouTubeThumbnail;
+    standard?: YouTubeThumbnail;
+    maxres?: YouTubeThumbnail;
   };
   privacyStatus?: string;
-  duration?: string;
-  // Metrics for Top Videos
+  duration?: string; // "PT10M30S"
+
+  // Metrics (Direct) - Example 5 has them
   views?: number;
   likes?: number;
   comments?: number;
   watchTime?: number;
-  // Legacy support
-  viewCount?: number;
-  likeCount?: number;
-  commentCount?: number;
-  durationISO?: string;
 };
 
+// 2. Videos List
 export type YouTubeVideosListResponse = {
   success: boolean;
   videos: YouTubeVideoItem[];
@@ -143,28 +121,39 @@ export type YouTubeTrendItem = {
   comments: number;
 };
 
+// 3. Trends
 export type YouTubeTrendsResponse = {
   success: boolean;
   message?: string;
   trends: YouTubeTrendItem[];
+  // Example 3 doesn't explicitly show a summary object in response? 
+  // Wait, Example 3 in Step 435 ONLY shows "trends" array!
+  // My previous code expected "summary". I will remove "summary" if it's not in Example 3.
+  // Actually, I should keep it optional just in case, but strictly the example has none.
+  summary?: {
+    totalDays: number;
+    totalViews: number;
+    averageViewsPerDay: number;
+    peakDay: string;
+    peakViews: number;
+  };
 };
 
+// 4. Per-Video Analytics
 export type YouTubeVideoAnalyticsResponse = {
   success: boolean;
+  message?: string;
   video: {
     id: string;
     title: string;
     publishedAt: string;
     thumbnails: {
-      default?: YouTubeThumbnail;
-      high?: YouTubeThumbnail;
+      default: YouTubeThumbnail;
+      medium: YouTubeThumbnail;
+      high: YouTubeThumbnail;
     };
   };
   analytics: {
-    totalViews: number;
-    totalLikes: number;
-    totalComments: number;
-    totalWatchTime: number;
     dailyMetrics: Array<{
       date: string;
       views: number;
@@ -172,9 +161,14 @@ export type YouTubeVideoAnalyticsResponse = {
       comments: number;
       watchTimeSec: number;
     }>;
+    totalViews: number;
+    totalLikes: number;
+    totalComments: number;
+    totalWatchTime: number;
   };
 };
 
+// 5. Top Videos
 export type YouTubeTopVideosResponse = {
   success: boolean;
   metric: string;
@@ -182,36 +176,49 @@ export type YouTubeTopVideosResponse = {
   topVideos: YouTubeVideoItem[];
 };
 
+// 7. Subscribers Growth
 export type YouTubeSubscribersGrowthResponse = {
   success: boolean;
   totalGained: number;
   growth: Array<{
     date: string;
     subscribersGained: number;
+    // Example 7 doesn't show cumulative?
+    // Wait, Example 7 in Step 435 shows: date, subscribersGained.
+    // It DOES NOT show cumulative.
+    cumulativeSubscribers?: number;
   }>;
 };
 
+// 8. Watch Time Breakdown
 export type YouTubeWatchTimeResponse = {
   success: boolean;
-  totalWatchTimeHours: string;
-  averageWatchTimePerDay: string;
+  totalWatchTimeHours: string; // "25.67"
+  averageWatchTimePerDay: string; // "0.86"
   dailyWatchTime: Array<{
     date: string;
     watchTimeSec: number;
     watchTimeHours: string;
   }>;
+  // Example 8 does NOT show "totals" object.
+  totals?: any;
 };
 
+// 9. Engagement Metrics
 export type YouTubeEngagementResponse = {
   success: boolean;
   engagement: {
     totalViews: number;
     totalLikes: number;
     totalComments: number;
-    engagementRate: string;
-    likesPerView: string;
-    commentsPerView: string;
+    engagementRate: string; // "2.79%"
+    likesPerView: string; // "2.22" (User example keys: likesPerView, commentsPerView)
+    commentsPerView: string; // "0.58"
+
+    // Optional compatibility if needed, but Example 9 only has above.
   };
+  // Example 9 does NOT show "daily" array.
+  daily?: any;
 };
 
 export type ApiErrorResponse = {
@@ -270,12 +277,23 @@ export const handleYouTubeCallback = async (
  * GET /api/clients/:clientId/youtube/summary
  */
 export const getYouTubeSummary = async (
-  clientId: number
+  clientId: number,
+  params?: { startDate?: string; endDate?: string }
 ): Promise<YouTubeSummaryResponse> => {
   try {
+    const requestParams = {
+      startDate: params?.startDate,
+      endDate: params?.endDate,
+    };
+    console.log(`[YouTube API] Fetching summary for client ${clientId}`, requestParams);
+
     const response = await api.get<YouTubeSummaryResponse>(
-      `/clients/${clientId}/youtube/summary`
+      `/clients/${clientId}/youtube/summary`,
+      {
+        params: requestParams,
+      }
     );
+    console.log(`[YouTube API] Summary response:`, response.data);
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
@@ -296,15 +314,19 @@ export const getYouTubeVideosList = async (
   params?: { page?: number; limit?: number }
 ): Promise<YouTubeVideosListResponse> => {
   try {
+    const requestParams = {
+      page: params?.page || 1,
+      limit: params?.limit || 25,
+    };
+    console.log(`[YouTube API] Fetching videos list for client ${clientId}`, requestParams);
+
     const response = await api.get<YouTubeVideosListResponse>(
-      `/clients/${clientId}/youtube/videos/list`,
+      `/clients/${clientId}/youtube/videos`,
       {
-        params: {
-          page: params?.page || 1,
-          limit: params?.limit || 25,
-        },
+        params: requestParams,
       }
     );
+    console.log(`[YouTube API] Videos list response:`, response.data);
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
@@ -321,12 +343,23 @@ export const getYouTubeVideosList = async (
  * GET /api/clients/:clientId/youtube/trends
  */
 export const getYouTubeTrends = async (
-  clientId: number
+  clientId: number,
+  params?: { startDate?: string; endDate?: string }
 ): Promise<YouTubeTrendsResponse> => {
   try {
+    const requestParams = {
+      startDate: params?.startDate,
+      endDate: params?.endDate,
+    };
+    console.log(`[YouTube API] Fetching trends for client ${clientId}`, requestParams);
+
     const response = await api.get<YouTubeTrendsResponse>(
-      `/clients/${clientId}/youtube/trends`
+      `/clients/${clientId}/youtube/trends`,
+      {
+        params: requestParams,
+      }
     );
+    console.log(`[YouTube API] Trends response:`, response.data);
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
@@ -347,9 +380,11 @@ export const getYouTubeVideoAnalytics = async (
   videoId: string
 ): Promise<YouTubeVideoAnalyticsResponse> => {
   try {
+    console.log(`[YouTube API] Fetching analytics for video ${videoId}`);
     const response = await api.get<YouTubeVideoAnalyticsResponse>(
       `/clients/${clientId}/youtube/videos/${videoId}/analytics`
     );
+    console.log(`[YouTube API] Video analytics response:`, response.data);
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
@@ -367,19 +402,39 @@ export const getYouTubeVideoAnalytics = async (
  */
 export const getYouTubeTopVideos = async (
   clientId: number,
-  params?: { metric?: string; limit?: number; period?: string }
+  params?: { metric?: string; limit?: number; period?: string; startDate?: string; endDate?: string }
 ): Promise<YouTubeTopVideosResponse> => {
   try {
+    // Helper to calculate period from date range
+    let derivedPeriod = params?.period || "30d";
+    if (params?.startDate && params?.endDate) {
+      const start = new Date(params.startDate);
+      const end = new Date(params.endDate);
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays <= 7) derivedPeriod = "7d";
+      else if (diffDays <= 30) derivedPeriod = "30d";
+      else if (diffDays <= 90) derivedPeriod = "90d";
+      else derivedPeriod = "365d";
+    }
+
+    const requestParams = {
+      metric: params?.metric || "views",
+      limit: params?.limit || 10,
+      period: derivedPeriod,
+      // User indicated endpoint does not support custom startDate/endDate
+      // so we rely on the mapped period.
+    };
+    console.log(`[YouTube API] Fetching top videos`, requestParams);
+
     const response = await api.get<YouTubeTopVideosResponse>(
       `/clients/${clientId}/youtube/videos/top`,
       {
-        params: {
-          metric: params?.metric || "views",
-          limit: params?.limit || 10,
-          period: params?.period || "30d",
-        },
+        params: requestParams,
       }
     );
+    console.log(`[YouTube API] Top videos response:`, response.data);
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
@@ -399,9 +454,11 @@ export const getYouTubeChannel = async (
   clientId: number
 ): Promise<YouTubeChannelResponse> => {
   try {
+    console.log(`[YouTube API] Fetching channel info for client ${clientId}`);
     const response = await api.get<YouTubeChannelResponse>(
       `/clients/${clientId}/youtube/channel`
     );
+    console.log(`[YouTube API] Channel info response:`, response.data);
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
@@ -444,15 +501,19 @@ export const getYouTubeSubscribersGrowth = async (
   params?: { startDate?: string; endDate?: string }
 ): Promise<YouTubeSubscribersGrowthResponse> => {
   try {
+    const requestParams = {
+      startDate: params?.startDate,
+      endDate: params?.endDate,
+    };
+    console.log(`[YouTube API] Fetching subscribers growth for client ${clientId}`, requestParams);
+
     const response = await api.get<YouTubeSubscribersGrowthResponse>(
       `/clients/${clientId}/youtube/subscribers/growth`,
       {
-        params: {
-          startDate: params?.startDate,
-          endDate: params?.endDate,
-        },
+        params: requestParams,
       }
     );
+    console.log(`[YouTube API] Subscribers growth response:`, response.data);
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
@@ -469,12 +530,23 @@ export const getYouTubeSubscribersGrowth = async (
  * GET /api/clients/:clientId/youtube/watch-time
  */
 export const getYouTubeWatchTime = async (
-  clientId: number
+  clientId: number,
+  params?: { startDate?: string; endDate?: string }
 ): Promise<YouTubeWatchTimeResponse> => {
   try {
+    const requestParams = {
+      startDate: params?.startDate,
+      endDate: params?.endDate,
+    };
+    console.log(`[YouTube API] Fetching watch time breakdown for client ${clientId}`, requestParams);
+
     const response = await api.get<YouTubeWatchTimeResponse>(
-      `/clients/${clientId}/youtube/watch-time`
+      `/clients/${clientId}/youtube/watch-time`,
+      {
+        params: requestParams,
+      }
     );
+    console.log(`[YouTube API] Watch time response:`, response.data);
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
@@ -491,12 +563,23 @@ export const getYouTubeWatchTime = async (
  * GET /api/clients/:clientId/youtube/engagement
  */
 export const getYouTubeEngagement = async (
-  clientId: number
+  clientId: number,
+  params?: { startDate?: string; endDate?: string }
 ): Promise<YouTubeEngagementResponse> => {
   try {
+    const requestParams = {
+      startDate: params?.startDate,
+      endDate: params?.endDate,
+    };
+    console.log(`[YouTube API] Fetching engagement metrics for client ${clientId}`, requestParams);
+
     const response = await api.get<YouTubeEngagementResponse>(
-      `/clients/${clientId}/youtube/engagement`
+      `/clients/${clientId}/youtube/engagement`,
+      {
+        params: requestParams,
+      }
     );
+    console.log(`[YouTube API] Engagement response:`, response.data);
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;

@@ -110,6 +110,11 @@ function EmbedWidgetForm({ data, onChange }: EmbedWidgetFormProps): React.JSX.El
             onChange={(e) => handleChange({ url: e.target.value })}
             placeholder="Enter URL"
           />
+          <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-[11px] text-yellow-800">
+            <strong>Note:</strong> Many websites (like Google, Facebook, or specific business sites) block being embedded for security reasons (X-Frame-Options).
+            <br />
+            If your embed doesn't load, try using a Screenshot (Image Widget) instead.
+          </div>
         </div>
 
         {/* Helpful Guides */}

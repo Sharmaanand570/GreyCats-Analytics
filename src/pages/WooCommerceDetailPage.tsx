@@ -21,8 +21,6 @@ import {
   useWooCommerceSyncStatus,
   useWooCommerceSyncProducts,
   useWooCommerceSyncOrders,
-  useWooCommerceDisconnect,
-  useWooCommerceReconnect,
   useWooCommerceAccounts,
   useWooCommerceProducts,
   useWooCommerceProduct,
@@ -31,6 +29,7 @@ import {
   useWooCommerceTrends,
   useWooCommerceAccountInfo,
 } from "@/features/woocommerce/hooks/useWooCommerce";
+import { useRemoveAccount } from "@/hooks/useIntegrations";
 import { useClients } from "@/hooks/useClients";
 import {
   Table,
@@ -42,7 +41,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getStatusBadgeClass } from "@/utils/statusColors";
-import { MoreVertical, ExternalLink, RefreshCw, Loader2, Power, PowerOff, Eye } from "lucide-react";
+import { MoreVertical, ExternalLink, RefreshCw, Loader2, PowerOff, Eye } from "lucide-react";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import {
@@ -60,6 +59,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { DataSyncBanner } from "@/components/DataSyncBanner";
 
 const WooCommerceDetailPage = () => {
   // Get clients list and auto-select first client (matching pattern from MetaDetailPage, GoogleAnalyticsDetailPage)
@@ -92,10 +92,8 @@ const WooCommerceDetailPage = () => {
     useWooCommerceSyncProducts();
   const { mutateAsync: syncOrders, isPending: isSyncingOrders } =
     useWooCommerceSyncOrders();
-  const { mutateAsync: disconnect, isPending: isDisconnecting } =
-    useWooCommerceDisconnect();
-  const { mutateAsync: reconnect, isPending: isReconnecting } =
-    useWooCommerceReconnect();
+
+  const removeAccount = useRemoveAccount();
 
   // Derive account info from accountsData instead of making a separate API call
   // Fetch detailed account info including currency, version etc
@@ -231,18 +229,13 @@ const WooCommerceDetailPage = () => {
   };
 
   const handleDisconnect = async () => {
-    if (!accountId) return;
+    if (!accountId || !selectedClientId) return;
     try {
-      await disconnect();
-    } catch (error) {
-      // Error is handled in the hook with toast
-    }
-  };
-
-  const handleReconnect = async () => {
-    if (!accountId) return;
-    try {
-      await reconnect();
+      await removeAccount.mutateAsync({
+        clientId: selectedClientId,
+        integrationType: 'woocommerce',
+        accountId: accountId
+      });
     } catch (error) {
       // Error is handled in the hook with toast
     }
@@ -336,6 +329,7 @@ const WooCommerceDetailPage = () => {
               </span>
             </div>
             <div className="flex items-center gap-4">
+              <DataSyncBanner compact={true} />
               {/* Account Selector */}
               {accountsData && accountsData.length > 0 && (
                 <div className="flex items-center gap-2">
@@ -387,6 +381,8 @@ const WooCommerceDetailPage = () => {
 
           {/* Content */}
           <div className="w-full px-5 py-6 space-y-6">
+            {/* Show banner if no analytics data found (likely specific to selected client) */}
+
             {/* Account Info & Actions Card */}
             {accountId && (
               <Card className=" border rounded-2xl">
@@ -399,14 +395,14 @@ const WooCommerceDetailPage = () => {
                       </CardDescription>
                     </div>
                     <div className="flex items-center gap-2">
-                      {accountInfo?.account?.isActive ? (
+                      {accountInfo?.account?.isActive && (
                         <Button
                           variant="destructive"
                           size="sm"
                           onClick={handleDisconnect}
-                          disabled={isDisconnecting}
+                          disabled={removeAccount.isPending}
                         >
-                          {isDisconnecting ? (
+                          {removeAccount.isPending ? (
                             <>
                               <Loader2 className="w-4 h-4 animate-spin" />
                               Disconnecting...
@@ -415,25 +411,6 @@ const WooCommerceDetailPage = () => {
                             <>
                               <PowerOff className="w-4 h-4" />
                               Disconnect
-                            </>
-                          )}
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={handleReconnect}
-                          disabled={isReconnecting}
-                        >
-                          {isReconnecting ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Reconnecting...
-                            </>
-                          ) : (
-                            <>
-                              <Power className="w-4 h-4" />
-                              Reconnect
                             </>
                           )}
                         </Button>

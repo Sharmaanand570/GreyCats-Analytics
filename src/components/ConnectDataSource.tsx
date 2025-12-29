@@ -25,6 +25,17 @@ import { useMetaBusinessConnect } from "@/features/meta/hooks/useMetaBusinessDat
 import { useQueryClient } from "@tanstack/react-query";
 import { getPlatformConfig } from "@/utils/platformMapping";
 import { assignAccountToClient } from "@/api/integrationApi";
+import { clientKeys } from "@/hooks/useClients";
+import { Loader2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 
 type ConnectDataSourceType = {
@@ -110,6 +121,7 @@ function ConnectDataSource({
     name: "",
     icon: "",
   });
+  const [showSuccessDialog, setShowSuccessDialog] = React.useState(false);
 
   // Filter data sources based on search query
   const filteredDataSources = React.useMemo(() => {
@@ -154,7 +166,8 @@ function ConnectDataSource({
     queryClient: any,
     setNext: (value: any) => void,
     setOpen: (value: boolean) => void,
-    toast: any
+    toast: any,
+    setShowSuccessDialog: (value: boolean) => void
   ) {
     try {
       if (!clientId) {
@@ -172,9 +185,10 @@ function ConnectDataSource({
       if (response.success && response.account) {
         // Now assign it to the client
         await assignAccountToClient(clientId, 'woocommerce', response.account.id);
-        toast.success("WooCommerce connected successfully");
+        // toast.success("WooCommerce connected successfully");
         setNext(null);
         setOpen(false);
+        setShowSuccessDialog(true);
       } else {
         toast.error(response.message || "Failed to connect WooCommerce");
       }
@@ -182,7 +196,7 @@ function ConnectDataSource({
       // Refetch integrations and client details
       queryClient.invalidateQueries({ queryKey: ["integrations"] });
       if (clientId) {
-        queryClient.invalidateQueries({ queryKey: ["client", clientId] });
+        queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
       }
     } catch (error: unknown) {
       const errorMessage =
@@ -478,7 +492,8 @@ function ConnectDataSource({
                       queryClient,
                       setNext,
                       setOpen,
-                      toast
+                      toast,
+                      setShowSuccessDialog
                     );
 
                   }}
@@ -552,7 +567,13 @@ function ConnectDataSource({
                       }
 
                       queryClient.invalidateQueries({ queryKey: ["integrations"] });
-                      toast.success("Shopify connected successfully");
+                      if (clientId) {
+                        queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
+                      }
+                      // toast.success("Shopify connected successfully");
+                      setShowSuccessDialog(true);
+                      setOpen(false);
+                      setNext(null);
 
 
 
@@ -579,6 +600,34 @@ function ConnectDataSource({
           {/* -------------------------------------------------------------------------- */}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Connection Successful! 🎉</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Your data source has been connected successfully.
+              </p>
+              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-blue-700 text-sm">
+                <p className="font-medium flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Syncing Data...
+                </p>
+                <p className="mt-1">
+                  Please allow up to 5 minutes for your historical data to be fully fetched and processed.
+                  You can start building reports, but some metrics might be processing.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowSuccessDialog(false)}>
+              Got it, continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

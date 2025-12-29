@@ -17,10 +17,7 @@ import type {
   ListTemplatesResponse,
   ReportTemplate,
   ReportWidgetDefinition,
-  ResolveWidgetsPayload,
-  ResolveWidgetsResponse,
-  RunReportPayload,
-  RunReportResponse,
+
   UpdateTemplatePayload,
   DeleteTemplateResponse,
   CreateReportSchedulePayload,
@@ -178,17 +175,7 @@ const mapApiTemplateToReportTemplate = (
   };
 };
 
-export const fetchDebugMetrics = (limit?: number) =>
-  handleRequest(async () => {
-    const response = await api.get<DebugMetricsResponse>(
-      `/unified-metrics/debug/list`,
-      {
-        params: { ...(limit ? { limit } : {}) },
-      }
-    );
-    console.log("response fetchDebugMetrics", response.data);
-    return response.data;
-  });
+
 
 /**
  * Fetch unified metrics (production data) without resolving specific widgets.
@@ -208,36 +195,32 @@ export const fetchUnifiedMetricsList = (
   }
 ) =>
   handleRequest(async () => {
+    // Filter params to only keep allowed keys: integration, metricKey, startDate, endDate
+    const requestParams: Record<string, any> = {};
+    if (params?.integration) requestParams.integration = params.integration;
+    if (params?.metricKey) requestParams.metricKey = params.metricKey;
+    if (params?.startDate) requestParams.startDate = params.startDate;
+    if (params?.endDate) requestParams.endDate = params.endDate;
+    if (params?.page) requestParams.page = params.page;
+    if (params?.limit) requestParams.limit = params.limit;
+
     const response = await api.get<DebugMetricsResponse>(
       `/unified-metrics`,
       {
-        params: { ...params, clientId },
+        params: { ...requestParams, clientId },
       }
     );
     console.log("response fetchUnifiedMetricsList", response.data);
     return response.data;
   });
 
-export const resolveMetricWidgets = (
-  clientId: number,
-  payload: ResolveWidgetsPayload
-) =>
-  handleRequest(async () => {
-    const response = await api.post<ResolveWidgetsResponse>(
-      `/unified-metrics/resolve`,
-      { ...payload, clientId }
-    );
-    return response.data;
-  });
-
 // Fetch individual metric data with optional dimensional breakdown
+// Removed accountId and dimensionType from params - backend handles filtering
 export const fetchUnifiedMetric = (
   clientId: number,
   params: {
     integration: string;
-    accountId: string;
     metricKey: string;
-    dimensionType?: string;  // Made optional
     startDate: string;
     endDate: string;
   }
@@ -267,15 +250,8 @@ export const fetchUnifiedMetric = (
       endDate: params.endDate,
     };
 
-    // Only include dimensionType if provided
-    if (params.dimensionType) {
-      requestParams.dimensionType = params.dimensionType;
-    }
-
-    // Only include accountId if provided (skip for WooCommerce as it doesn't use accountId)
-    if (params.accountId && integrationName !== 'woo') {
-      requestParams.accountId = params.accountId;
-    }
+    // Removed dimensionType and accountId as requested by user
+    // Only keeping: clientId (passed separately), integration, metricKey, startDate, endDate
 
     console.log("requestParams", requestParams);
     const response = await api.get(`/unified-metrics`, {
@@ -406,20 +382,29 @@ export const deleteReportSchedule = (clientId: number, scheduleId: number) =>
     return response.data;
   });
 
-export const runReport = (clientId: number, payload: RunReportPayload) =>
-  handleRequest(async () => {
-    const response = await api.post<RunReportResponse>(
-      `/clients/${clientId}/report/run`,
-      payload
-    );
-    return response.data;
-  });
+
 
 export const generatePdf = (clientId: number, payload: GeneratePdfPayload) =>
   handleRequest(async () => {
     const response = await api.post<GeneratePdfResponse>(
       `/clients/${clientId}/reportpdf/pdf`,
       payload
+    );
+    return response.data;
+  });
+
+export const getDashboard = (clientId: number, dashboardId: number) =>
+  handleRequest(async () => {
+    const response = await api.get<CreateDashboardResponse>(
+      `/clients/${clientId}/dashboard/${dashboardId}`
+    );
+    return response.data;
+  });
+
+export const listDashboards = (clientId: number) =>
+  handleRequest(async () => {
+    const response = await api.get<GetDashboardsResponse>(
+      `/clients/${clientId}/dashboard`
     );
     return response.data;
   });
@@ -445,22 +430,6 @@ export const updateDashboard = (
     const response = await api.put<CreateDashboardResponse>(
       `/clients/${clientId}/dashboard/${dashboardId}`,
       payload
-    );
-    return response.data;
-  });
-
-export const getDashboard = (clientId: number, dashboardId: number) =>
-  handleRequest(async () => {
-    const response = await api.get<CreateDashboardResponse>(
-      `/clients/${clientId}/dashboard/${dashboardId}`
-    );
-    return response.data;
-  });
-
-export const listDashboards = (clientId: number) =>
-  handleRequest(async () => {
-    const response = await api.get<GetDashboardsResponse>(
-      `/clients/${clientId}/dashboard`
     );
     return response.data;
   });

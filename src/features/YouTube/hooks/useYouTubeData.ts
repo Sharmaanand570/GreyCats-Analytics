@@ -84,19 +84,33 @@ export const useYouTubePerVideoAnalytics = (
   });
 };
 
-export const useYouTubeSummary = (clientId: number) => {
+export const useYouTubeSummary = (
+  clientId: number,
+  dateRange?: { from?: Date; to?: Date }
+) => {
   return useQuery<YouTubeSummaryResponse, Error>({
-    queryKey: ["youtube", "summary", clientId],
-    queryFn: () => getYouTubeSummary(clientId),
+    queryKey: ["youtube", "summary", clientId, dateRange],
+    queryFn: () =>
+      getYouTubeSummary(clientId, {
+        startDate: dateRange?.from ? dateRange.from.toISOString().split("T")[0] : undefined,
+        endDate: dateRange?.to ? dateRange.to.toISOString().split("T")[0] : undefined,
+      }),
     enabled: !!clientId,
     ...commonQueryOptions,
   });
 };
 
-export const useYouTubeTrends = (clientId: number) => {
+export const useYouTubeTrends = (
+  clientId: number,
+  dateRange?: { from?: Date; to?: Date }
+) => {
   return useQuery<YouTubeTrendsResponse, Error>({
-    queryKey: ["youtube", "trends", clientId],
-    queryFn: () => getYouTubeTrends(clientId),
+    queryKey: ["youtube", "trends", clientId, dateRange],
+    queryFn: () =>
+      getYouTubeTrends(clientId, {
+        startDate: dateRange?.from ? dateRange.from.toISOString().split("T")[0] : undefined,
+        endDate: dateRange?.to ? dateRange.to.toISOString().split("T")[0] : undefined,
+      }),
     enabled: !!clientId,
     ...commonQueryOptions,
   });
@@ -104,11 +118,27 @@ export const useYouTubeTrends = (clientId: number) => {
 
 export const useYouTubeTopVideos = (
   clientId: number,
-  params?: { metric?: string; limit?: number; period?: string }
+  params?: {
+    metric?: string;
+    limit?: number;
+    period?: string;
+    dateRange?: { from?: Date; to?: Date };
+  }
 ) => {
   return useQuery<YouTubeTopVideosResponse, Error>({
     queryKey: ["youtube", "top-videos", clientId, params],
-    queryFn: () => getYouTubeTopVideos(clientId, params),
+    queryFn: () =>
+      getYouTubeTopVideos(clientId, {
+        metric: params?.metric,
+        limit: params?.limit,
+        period: params?.period,
+        startDate: params?.dateRange?.from
+          ? params.dateRange.from.toISOString().split("T")[0]
+          : undefined,
+        endDate: params?.dateRange?.to
+          ? params.dateRange.to.toISOString().split("T")[0]
+          : undefined,
+      }),
     enabled: !!clientId,
     ...commonQueryOptions,
   });
@@ -126,19 +156,33 @@ export const useYouTubeSubscribersGrowth = (
   });
 };
 
-export const useYouTubeWatchTime = (clientId: number) => {
+export const useYouTubeWatchTime = (
+  clientId: number,
+  dateRange?: { from?: Date; to?: Date }
+) => {
   return useQuery<YouTubeWatchTimeResponse, Error>({
-    queryKey: ["youtube", "watch-time", clientId],
-    queryFn: () => getYouTubeWatchTime(clientId),
+    queryKey: ["youtube", "watch-time", clientId, dateRange],
+    queryFn: () =>
+      getYouTubeWatchTime(clientId, {
+        startDate: dateRange?.from ? dateRange.from.toISOString().split("T")[0] : undefined,
+        endDate: dateRange?.to ? dateRange.to.toISOString().split("T")[0] : undefined,
+      }),
     enabled: !!clientId,
     ...commonQueryOptions,
   });
 };
 
-export const useYouTubeEngagement = (clientId: number) => {
+export const useYouTubeEngagement = (
+  clientId: number,
+  dateRange?: { from?: Date; to?: Date }
+) => {
   return useQuery<YouTubeEngagementResponse, Error>({
-    queryKey: ["youtube", "engagement", clientId],
-    queryFn: () => getYouTubeEngagement(clientId),
+    queryKey: ["youtube", "engagement", clientId, dateRange],
+    queryFn: () =>
+      getYouTubeEngagement(clientId, {
+        startDate: dateRange?.from ? dateRange.from.toISOString().split("T")[0] : undefined,
+        endDate: dateRange?.to ? dateRange.to.toISOString().split("T")[0] : undefined,
+      }),
     enabled: !!clientId,
     ...commonQueryOptions,
   });

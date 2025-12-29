@@ -1,131 +1,96 @@
+"use client"
 
 import * as React from "react"
-import { ResponsiveContainer } from "recharts"
-import { Label, Pie, PieChart, Sector, Tooltip, Cell } from "recharts"
-import type { PieSectorDataItem } from "recharts/types/polar/Pie"
+import { ResponsiveContainer, Label, Pie, PieChart, Sector, Tooltip, Cell } from "recharts"
+import type { WidgetSeriesPoint } from "@/features/reports/api/types"
 
-export const description = "An interactive pie chart"
+export const description = "A simple pie chart"
 
-const desktopData = [
-  { month: "january", desktop: 186, fill: "var(--color-january)" },
-  { month: "february", desktop: 305, fill: "var(--color-february)" },
-  { month: "march", desktop: 237, fill: "var(--color-march)" },
-  { month: "april", desktop: 173, fill: "var(--color-april)" },
-  { month: "may", desktop: 209, fill: "var(--color-may)" },
-]
+// Palette for pie slices
+const COLORS = [
+  "var(--chart-1, #3b82f6)",
+  "var(--chart-2, #10b981)",
+  "var(--chart-3, #f59e0b)",
+  "var(--chart-4, #ef4444)",
+  "var(--chart-5, #8b5cf6)",
+];
 
-type ChartConfig = Record<string, { label: string; color?: string }>
-const chartConfig: ChartConfig = {
-  visitors: {
-    label: "Visitors",
-  },
-  desktop: {
-    label: "Desktop",
-  },
-  mobile: {
-    label: "Mobile",
-  },
-  january: {
-    label: "January",
-    color: "var(--chart-1)",
-  },
-  february: {
-    label: "February",
-    color: "var(--chart-2)",
-  },
-  march: {
-    label: "March",
-    color: "var(--chart-3)",
-  },
-  april: {
-    label: "April",
-    color: "var(--chart-4)",
-  },
-  may: {
-    label: "May",
-    color: "var(--chart-5)",
-  },
-}
-
-type ChartPieInteractiveProps = {
+interface ChartPieInteractiveProps {
+  data: WidgetSeriesPoint[];
+  metricLabel?: string;
   onReady?: () => void;
 }
 
-export function ChartPieInteractive({ onReady }: ChartPieInteractiveProps = {}) {
-  const [activeMonth, setActiveMonth] = React.useState(desktopData[0].month)
+export function ChartPieInteractive({
+  data,
+  metricLabel = "Value",
+  onReady
+}: ChartPieInteractiveProps) {
   const hasCalledReady = React.useRef(false)
 
-  const activeIndex = React.useMemo(
-    () => desktopData.findIndex((item) => item.month === activeMonth),
-    [activeMonth]
-  )
-  const months = React.useMemo(() => desktopData.map((item) => item.month), [])
+  // Map data to Pie format
+  const parsedData = React.useMemo(() => {
+    return data.map((point, index) => ({
+      name: point.x,
+      value: point.y,
+      fill: COLORS[index % COLORS.length]
+    })).filter(d => d.value > 0); // Hide zero values
+  }, [data]);
 
-  // Handle chart ready callback - called once when animation completes
+  const [activeIndex, setActiveIndex] = React.useState(0);
+
+  // Handle chart ready callback
   const handleAnimationEnd = React.useCallback(() => {
     if (!hasCalledReady.current && onReady) {
       hasCalledReady.current = true
-      // Small delay to ensure SVG is fully rendered
       setTimeout(() => {
         onReady()
       }, 50)
     }
   }, [onReady])
 
-  return (
-    <div className="flex flex-col h-full  border  rounded-2xl ">
-      <div className="flex-row items-start space-y-0 pb-0 p-4 flex justify-between">
-        <div className="grid gap-1">
-          <div className="text-base md:text-sm font-semibold">Pie Chart - Interactive</div>
-          <div className="text-sm md:text-xs text-muted-foreground">January - June 2024</div>
-        </div>
-        <select
-          value={activeMonth}
-          onChange={(e) => setActiveMonth(e.target.value)}
-          aria-label="Select month"
-          className="ml-auto h-7 w-[130px] rounded-lg pl-2.5 border"
-        >
-          {months.map((key) => {
-            const config = chartConfig[key as keyof typeof chartConfig]
-            if (!config) return null
-            return (
-              <option key={key} value={key}>
-                {config.label}
-              </option>
-            )
-          })}
-        </select>
+  const onPieEnter = (_: unknown, index: number) => {
+    setActiveIndex(index);
+  };
+
+  if (parsedData.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+        No data to display
       </div>
-      <div className="flex flex-1 justify-center pb-0 p-4">
-        <div className="mx-auto aspect-square w-full max-w-[300px]">
+    );
+  }
+
+  // Calculate total for center label
+  const totalValue = React.useMemo(() => {
+    return parsedData.reduce((acc, curr) => acc + curr.value, 0);
+  }, [parsedData]);
+
+  // Use the active item for label
+  const activeItem = parsedData[activeIndex] || parsedData[0];
+
+  return (
+    <div className="w-full h-full min-h-[300px] flex flex-col justify-center items-center">
+      <div className="w-full h-[300px]">
         <ResponsiveContainer width="100%" height="100%">
-          <PieChart width={300} height={300}>
-            <Tooltip />
+          <PieChart>
+            <Tooltip formatter={(value: number) => [new Intl.NumberFormat("en-US").format(value), metricLabel]} />
             <Pie
-              data={desktopData}
-              dataKey="desktop"
-              nameKey="month"
+              data={parsedData}
+              cx="50%"
+              cy="50%"
               innerRadius={60}
-              strokeWidth={5}
+              outerRadius={80}
+              paddingAngle={5}
+              dataKey="value"
               activeIndex={activeIndex}
+              activeShape={renderActiveShape}
+              onMouseEnter={onPieEnter}
               onAnimationEnd={handleAnimationEnd}
-              activeShape={({ outerRadius = 0, ...props }: PieSectorDataItem) => (
-                <g>
-                  <Sector {...props} outerRadius={outerRadius + 10} />
-                  <Sector
-                    {...props}
-                    outerRadius={outerRadius + 25}
-                    innerRadius={outerRadius + 12}
-                  />
-                </g>
-              )}
             >
-              {desktopData.map((entry) => (
-                <Cell key={entry.month} fill={chartConfig[entry.month]?.color || "var(--chart-1)"} />
-              ))}
               <Label
                 content={({ viewBox }: { viewBox?: { cx?: number; cy?: number } }) => {
-                  if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                  if (viewBox && typeof viewBox.cx === 'number' && typeof viewBox.cy === 'number') {
                     return (
                       <text
                         x={viewBox.cx}
@@ -136,16 +101,16 @@ export function ChartPieInteractive({ onReady }: ChartPieInteractiveProps = {}) 
                         <tspan
                           x={viewBox.cx}
                           y={viewBox.cy}
-                          className="fill-foreground text-3xl font-bold"
+                          className="fill-foreground text-2xl font-bold"
                         >
-                          {desktopData[activeIndex].desktop.toLocaleString()}
+                          {new Intl.NumberFormat("en-US", { notation: "compact" }).format(activeItem.value)}
                         </tspan>
                         <tspan
                           x={viewBox.cx}
-                          y={(viewBox.cy || 0) + 24}
-                          className="fill-muted-foreground"
+                          y={(viewBox.cy || 0) + 20}
+                          className="fill-muted-foreground text-xs"
                         >
-                          Visitors
+                          {activeItem.name}
                         </tspan>
                       </text>
                     )
@@ -153,11 +118,43 @@ export function ChartPieInteractive({ onReady }: ChartPieInteractiveProps = {}) 
                   return null
                 }}
               />
+              {parsedData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.fill} />
+              ))}
             </Pie>
           </PieChart>
-          </ResponsiveContainer>
-        </div>
+        </ResponsiveContainer>
+      </div>
+      <div className="text-xs text-gray-500 mt-2 text-center">
+        Total: {new Intl.NumberFormat("en-US").format(totalValue)}
       </div>
     </div>
   )
 }
+
+const renderActiveShape = (props: any) => {
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+  return (
+    <g>
+      <text x={cx} y={cy} dy={8} textAnchor="middle" fill={fill} className="hidden" />
+      <Sector
+        cx={cx}
+        cy={cy}
+        innerRadius={innerRadius}
+        outerRadius={outerRadius + 6}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        fill={fill}
+      />
+      <Sector
+        cx={cx}
+        cy={cy}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        innerRadius={outerRadius + 10}
+        outerRadius={outerRadius + 12}
+        fill={fill}
+      />
+    </g>
+  );
+};
