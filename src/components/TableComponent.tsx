@@ -24,7 +24,7 @@ type IntegrationRow = {
   label: string;
   identifier: string;
   clientsConnected: number;
-  status: string;
+  status: string | React.ReactNode;
   onDisconnect?: () => void;
 };
 
@@ -103,7 +103,11 @@ function TableComponent({ header, bodyData }: TableType) {
     );
   };
 
-  const renderStatusChip = (status: string) => {
+  const renderStatusChip = (status: string | React.ReactNode) => {
+    if (typeof status !== 'string') {
+      return status;
+    }
+
     const colorClass = getStatusBadgeClass(status);
 
     return (

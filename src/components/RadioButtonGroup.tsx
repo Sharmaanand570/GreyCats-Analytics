@@ -24,7 +24,7 @@ export function RadioButtonGroup() {
         Live Data
       </ToggleGroupItem>
 
-      <ToggleGroupItem
+      {/* <ToggleGroupItem
         value="monthly"
         className={cn(
           "px-3 py-1 rounded-[0.6rem] border lg:text-xs font-medium transition-colors",
@@ -34,7 +34,7 @@ export function RadioButtonGroup() {
         )}
       >
         Sample Data
-      </ToggleGroupItem>
+      </ToggleGroupItem> */}
     </ToggleGroup>
   );
 }

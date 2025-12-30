@@ -136,7 +136,9 @@ const ClientDetailPage: React.FC = () => {
                             </TabsContent>
 
                             <TabsContent value="reports" className="space-y-4 focus-visible:outline-none">
-                                <Reports viewMode="embedded" />
+                                {parsedClientId && (
+                                    <Reports viewMode="embedded" clientId={parsedClientId} />
+                                )}
                             </TabsContent>
 
                             <TabsContent value="data-sources" className="space-y-4 focus-visible:outline-none">

@@ -27,6 +27,34 @@ import type {
 } from "./types";
 import { buildApiError, type AxiosApiError } from "./types";
 
+// Sync Status Types
+export interface SyncStatusAccount {
+  assignmentId: number;
+  accountId: number;
+  accountName: string;
+  initialSyncComplete: boolean;
+  lastSyncDate: string | null;
+}
+
+export interface SyncStatusIntegration {
+  hasAccounts: boolean;
+  allSynced: boolean;
+  accounts: SyncStatusAccount[];
+}
+
+export interface SyncStatusResponse {
+  success: boolean;
+  data: Record<string, SyncStatusIntegration>;
+}
+
+export const getSyncStatus = (clientId: number) =>
+  handleRequest<SyncStatusResponse>(async () => {
+    const response = await api.get<SyncStatusResponse>(
+      `/clients/${clientId}/sync-status`
+    );
+    return response.data;
+  });
+
 const handleRequest = async <T>(fn: () => Promise<T>): Promise<T> => {
   try {
     return await fn();
@@ -39,7 +67,8 @@ const handleRequest = async <T>(fn: () => Promise<T>): Promise<T> => {
 // Helpers to bridge between the backend "slides" model and the UI "widgets" model
 const buildSlidesFromWidgets = (
   widgets: ReportWidgetDefinition[] | undefined,
-  slidesMeta?: ReportTemplate["slidesMeta"]
+  slidesMeta?: ReportTemplate["slidesMeta"],
+  pageOrder?: number[]
 ): ApiReportTemplateSlide[] => {
   if (!widgets || widgets.length === 0) return [];
 
@@ -86,9 +115,24 @@ const buildSlidesFromWidgets = (
     slide.widgets.push(apiWidget);
   });
 
-  return Array.from(slideMap.values()).sort(
-    (a, b) => (a.id ?? 0) - (b.id ?? 0)
-  );
+  const slides = Array.from(slideMap.values());
+
+  if (pageOrder && pageOrder.length > 0) {
+    return slides.sort((a, b) => {
+      const idxA = pageOrder.indexOf(a.id ?? -1);
+      const idxB = pageOrder.indexOf(b.id ?? -1);
+      // If both are in pageOrder, sort by index
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      // If only A is in pageOrder, A comes first
+      if (idxA !== -1) return -1;
+      // If only B is in pageOrder, B comes first
+      if (idxB !== -1) return 1;
+      // If neither, fallback to ID sort
+      return (a.id ?? 0) - (b.id ?? 0);
+    });
+  }
+
+  return slides.sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
 };
 
 const mapApiTemplateToReportTemplate = (
@@ -105,9 +149,7 @@ const mapApiTemplateToReportTemplate = (
   apiTemplate.slides.forEach((slide, slideIndex) => {
     const slideId = slide.id ?? slideIndex;
 
-    if (!pageOrder.length) {
-      pageOrder.push(slideId);
-    }
+
 
     slidesMeta.push({
       id: slideId,
@@ -159,6 +201,11 @@ const mapApiTemplateToReportTemplate = (
       });
     });
   });
+
+  // Fallback: If no pageOrder from backend, use the order of slides
+  if (pageOrder.length === 0) {
+    pageOrder = apiTemplate.slides.map((s, i) => s.id ?? i);
+  }
 
   return {
     id: apiTemplate.id,
@@ -255,7 +302,7 @@ export const fetchUnifiedMetric = (
 
     console.log("requestParams", requestParams);
     const response = await api.get(`/unified-metrics`, {
-      params: { ...requestParams, clientId },
+      params: { ...requestParams, clientId, client_id: clientId },
     });
     console.log("response requestParams", response.data);
     return response.data;
@@ -266,7 +313,7 @@ export const createReportTemplate = (
   payload: CreateTemplatePayload
 ) =>
   handleRequest(async () => {
-    const slides = buildSlidesFromWidgets(payload.widgets, payload.slidesMeta);
+    const slides = buildSlidesFromWidgets(payload.widgets, payload.slidesMeta, payload.pageOrder);
 
     const body = {
       name: payload.name,
@@ -276,6 +323,7 @@ export const createReportTemplate = (
       pageOrder: payload.pageOrder,
       slides,
       clientId, // Include clientId in body instead of path
+      client_id: clientId, // Try snake_case too
     };
 
     const response = await api.post<CreateTemplateResponse>(
@@ -307,7 +355,7 @@ export const listReportTemplates = (clientId?: number) =>
     const response = await api.get<ListTemplatesResponse>(
       `/report-templates`,
       {
-        params: { clientId },
+        params: { clientId, client_id: clientId },
       }
     );
     return response.data;
@@ -319,7 +367,7 @@ export const updateReportTemplate = (
   payload: UpdateTemplatePayload
 ) =>
   handleRequest(async () => {
-    const slides = buildSlidesFromWidgets(payload.widgets, payload.slidesMeta);
+    const slides = buildSlidesFromWidgets(payload.widgets, payload.slidesMeta, payload.pageOrder);
 
     const body = {
       name: payload.name,
@@ -329,6 +377,7 @@ export const updateReportTemplate = (
       pageOrder: payload.pageOrder,
       slides,
       clientId, // Include clientId in body
+      client_id: clientId, // Try snake_case in case backend expects it
     };
 
     const response = await api.put<CreateTemplateResponse>(

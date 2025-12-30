@@ -111,6 +111,8 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -172,15 +174,15 @@ const getDefaultWidgetData = (
       return { text: "performance title", fontSize: "2xl", align: "center" };
     case "table":
       return {
-        title: "",
-        caption: "",
-        rows: [],
+        title: "New Table",
+        caption: "Enter a caption",
+        rows: [
+          { name: "Row 1", value: "Value 1" },
+          { name: "Row 2", value: "Value 2" },
+        ],
         columns: [
-          { name: "Report", width: "35%" },
-          { name: "Audience" },
-          { name: "Status" },
-          { name: "Last Run" },
-          { name: "Next Send" },
+          { name: "Name", width: "50%" },
+          { name: "Value" },
         ],
       };
     case "chart":
@@ -195,7 +197,7 @@ const getDefaultWidgetData = (
       return { url: "", type: "iframe" };
     case "custom":
       return {
-        content: "Custom Widget",
+        content: "Enter your text here...",
         type: "text",
         title: "",
         align: "left",
@@ -336,14 +338,8 @@ function pickDefaultMetricsForIntegration(
   notifyFallback: (msg: string) => void
 ): MetricOption[] {
   const normalized = integrationKey.toLowerCase().replace(/_/g, "-");
-
-  // DEBUG: Log what we're looking for and what's available
-  console.log('🔍 pickDefaultMetricsForIntegration:', {
-    integrationKey,
-    normalized,
-    accountId,
-    availableIntegrations: Object.keys(groupedMetrics),
-  });
+  // Special case: meta-business should pull metrics from BOTH meta-facebook AND meta-instagram
+  // logic...
 
   // Special case: meta-business should pull metrics from BOTH meta-facebook AND meta-instagram
   if (integrationKey === 'meta-business' || normalized === 'meta-business') {
@@ -380,11 +376,11 @@ function pickDefaultMetricsForIntegration(
         if (hit) {
           console.log('✅ Matched meta-business curated metric:', key, '→', hit.metricKey);
           // Add platform prefix to displayName to distinguish Facebook vs Instagram
-          const platformPrefix = hit.integration === 'meta-facebook' || hit.integration === 'meta_facebook' 
-            ? 'Facebook - ' 
+          const platformPrefix = hit.integration === 'meta-facebook' || hit.integration === 'meta_facebook'
+            ? 'Facebook - '
             : hit.integration === 'meta-instagram' || hit.integration === 'meta_instagram'
-            ? 'Instagram - '
-            : '';
+              ? 'Instagram - '
+              : '';
           curatedFound.push({
             ...hit,
             displayName: platformPrefix + (hit.displayName || hit.metricKey.split('.').pop() || hit.metricKey)
@@ -398,29 +394,29 @@ function pickDefaultMetricsForIntegration(
       // If we found curated metrics, use them but also include other available metrics
       const usedMetricKeys = new Set(curatedFound.map(m => m.metricKey));
       const remainingCandidates = combinedCandidates.filter(m => !usedMetricKeys.has(m.metricKey));
-      
+
       // Add remaining metrics with platform prefixes, prioritizing Facebook if we have few
-      const facebookRemaining = remainingCandidates.filter(m => 
+      const facebookRemaining = remainingCandidates.filter(m =>
         m.integration === 'meta-facebook' || m.integration === 'meta_facebook'
       );
-      const instagramRemaining = remainingCandidates.filter(m => 
+      const instagramRemaining = remainingCandidates.filter(m =>
         m.integration === 'meta-instagram' || m.integration === 'meta_instagram'
       );
-      
+
       // Ensure we have at least some Facebook metrics if available
-      const facebookCount = curatedFound.filter(m => 
+      const facebookCount = curatedFound.filter(m =>
         m.integration === 'meta-facebook' || m.integration === 'meta_facebook'
       ).length;
-      
+
       // If we have no Facebook metrics in the API but curated defaults include Facebook metrics,
       // create synthetic Facebook metrics from curated defaults
       let syntheticFacebookMetrics: MetricOption[] = [];
       if (facebookCount === 0 && facebookCandidates.length === 0) {
         // Find Facebook metrics from curated defaults that weren't matched
-        const facebookCuratedMetrics = curated.filter(key => 
+        const facebookCuratedMetrics = curated.filter(key =>
           key.startsWith('meta.page.') || key.startsWith('meta.facebook.') || key.includes('facebook')
         );
-        
+
         facebookCuratedMetrics.forEach(metricKey => {
           // Check if this metric wasn't already found (as Instagram)
           const alreadyFound = curatedFound.some(m => m.metricKey === metricKey);
@@ -433,43 +429,43 @@ function pickDefaultMetricsForIntegration(
             });
           }
         });
-        
+
         if (syntheticFacebookMetrics.length > 0) {
           console.log('✨ Created synthetic Facebook metrics from curated defaults:', syntheticFacebookMetrics.map(m => m.metricKey));
         }
       }
-      
+
       // If we have few/no Facebook metrics but Facebook metrics are available, prioritize them
       let additionalMetrics: MetricOption[] = [];
       if (facebookCount === 0 && facebookRemaining.length > 0) {
         // Add Facebook metrics first if we have none
         additionalMetrics.push(...facebookRemaining.slice(0, Math.min(2, facebookRemaining.length)));
       }
-      
+
       // Fill remaining slots with available metrics (both Facebook and Instagram)
       const remainingSlots = MAX_DEFAULT_WIDGETS - curatedFound.length - additionalMetrics.length - syntheticFacebookMetrics.length;
       if (remainingSlots > 0) {
-        const otherMetrics = remainingCandidates.filter(m => 
+        const otherMetrics = remainingCandidates.filter(m =>
           !additionalMetrics.some(am => am.metricKey === m.metricKey)
         );
         additionalMetrics.push(...otherMetrics.slice(0, remainingSlots));
       }
-      
+
       // Add platform prefixes to additional metrics
       const additionalWithPrefixes = additionalMetrics.map(metric => {
-        const platformPrefix = metric.integration === 'meta-facebook' || metric.integration === 'meta_facebook' 
-          ? 'Facebook - ' 
+        const platformPrefix = metric.integration === 'meta-facebook' || metric.integration === 'meta_facebook'
+          ? 'Facebook - '
           : metric.integration === 'meta-instagram' || metric.integration === 'meta_instagram'
-          ? 'Instagram - '
-          : '';
+            ? 'Instagram - '
+            : '';
         return {
           ...metric,
           displayName: platformPrefix + (metric.displayName || metric.metricKey.split('.').pop() || metric.metricKey)
         };
       });
-      
+
       const finalMetrics = [...curatedFound, ...syntheticFacebookMetrics, ...additionalWithPrefixes].slice(0, MAX_DEFAULT_WIDGETS);
-      
+
       if (finalMetrics.length > 0) {
         console.log('📋 Final Meta Business metrics selected:', {
           total: finalMetrics.length,
@@ -479,20 +475,20 @@ function pickDefaultMetricsForIntegration(
         });
         return finalMetrics;
       }
-      
+
       // Final fallback: if nothing worked, use all available metrics with prefixes
       const allWithPrefixes = combinedCandidates.slice(0, MAX_DEFAULT_WIDGETS).map(metric => {
-        const platformPrefix = metric.integration === 'meta-facebook' || metric.integration === 'meta_facebook' 
-          ? 'Facebook - ' 
+        const platformPrefix = metric.integration === 'meta-facebook' || metric.integration === 'meta_facebook'
+          ? 'Facebook - '
           : metric.integration === 'meta-instagram' || metric.integration === 'meta_instagram'
-          ? 'Instagram - '
-          : '';
+            ? 'Instagram - '
+            : '';
         return {
           ...metric,
           displayName: platformPrefix + (metric.displayName || metric.metricKey.split('.').pop() || metric.metricKey)
         };
       });
-      
+
       if (allWithPrefixes.length > 0) {
         console.log('📋 Using all available Meta Business metrics:', allWithPrefixes.map(m => m.metricKey));
         return allWithPrefixes;
@@ -503,11 +499,11 @@ function pickDefaultMetricsForIntegration(
     const curated = CURATED_DEFAULTS['meta-business'] ?? [];
     if (curated.length > 0) {
       console.log('✨ Using curated defaults as fallback for meta-business:', curated);
-      
+
       // Try to get the actual accountId from Instagram data if available
       const instagramAccountIds = Object.keys(instagramMetrics);
       const instagramAccountId = instagramAccountIds.length > 0 ? instagramAccountIds[0] : accountId;
-      
+
       const syntheticMetrics: MetricOption[] = curated.map(metricKey => {
         // Determine which integration this metric belongs to
         // Facebook metrics: include "facebook" OR start with "meta.page." or "meta.facebook." (Facebook metrics)
@@ -517,7 +513,7 @@ function pickDefaultMetricsForIntegration(
         // Use the actual accountId from the integration or from available data
         const metricAccountId = isInstagramMetric ? instagramAccountId : accountId;
         const integration = isFacebookMetric ? 'meta-facebook' : 'meta-instagram';
-        
+
         // Add platform prefix to displayName to distinguish Facebook vs Instagram
         const platformPrefix = isFacebookMetric ? 'Facebook - ' : 'Instagram - ';
         const baseDisplayName = metricKey.split('.').pop() || metricKey;
@@ -813,7 +809,7 @@ const buildDashboardMapFromTemplate = (
 
   widgets.forEach((widget, index) => {
     const layoutInfo = widget.layout;
-    const slideId = layoutInfo?.slideId ?? 0;
+    const slideId = Number(layoutInfo?.slideId ?? 0);
     ensureSlide(map, slideId);
 
     const widgetType = normalizeWidgetType(widget.type);
@@ -875,6 +871,11 @@ const widgetItems: {
       description: "Highlight completed tasks",
       type: "custom",
       customKind: "tasks",
+    },
+    {
+      title: "Table",
+      description: "Create a data table",
+      type: "table",
     },
   ];
 
@@ -1002,6 +1003,11 @@ const renderWidgetContent = (
         series.length > 0 ||
         typeof (resolvedData as ResolvedWidgetData)?.total === "number";
 
+      const chartTitle =
+        (widget.data as ChartWidgetData)?.title ||
+        widget.metricConfig?.metricKey?.split(".").pop()?.replace(/_/g, " ") ||
+        "Metric";
+
       const chartData = series.map((point) => ({
         label: point.x,
         value: point.y,
@@ -1009,28 +1015,95 @@ const renderWidgetContent = (
 
       return (
         <div className="h-full flex flex-col">
+          <div className="text-xs md:text-sm font-medium text-gray-700 mb-2 px-1 capitalize">
+            {chartTitle}
+          </div>
           <div className="flex-1">
             {hasData ? (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip
-                    formatter={(value: number) => value.toLocaleString()}
-                    labelFormatter={(label: string) => label}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="value"
-                    stroke="#2563EB"
-                    strokeWidth={2}
-                    fillOpacity={0.15}
-                    fill="#2563EB"
-                    dot={false}
-                    activeDot={{ r: 3, fill: "#2563EB" }}
-                  />
-                </AreaChart>
+                {(() => {
+                  const cType = (widget.data as ChartWidgetData)?.chartType?.toLowerCase() || (widget.widgetType === "pie_chart" ? "pie" : "area");
+                  if (cType === "column" || cType === "bar") {
+                    return (
+                      <BarChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 10 }} />
+                        <Tooltip
+                          formatter={(value: number) => value.toLocaleString()}
+                          labelFormatter={(label: string) => label}
+                        />
+                        <Bar dataKey="value" fill="#2563EB" />
+                      </BarChart>
+                    );
+                  }
+                  if (cType === "line") {
+                    return (
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 10 }} />
+                        <Tooltip
+                          formatter={(value: number) => value.toLocaleString()}
+                          labelFormatter={(label: string) => label}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="value"
+                          stroke="#2563EB"
+                          strokeWidth={2}
+                          dot={false}
+                          activeDot={{ r: 3, fill: "#2563EB" }}
+                        />
+                      </LineChart>
+                    );
+                  }
+                  if (cType === "pie") {
+                    // Use the existing interactive pie or Recharts pie? 
+                    // The existing code fell back to ChartPieInteractive if no data.
+                    // Here we have data. Let's use Recharts Pie for consistency with others if possible, or just default to Area/Pie placeholder logic if not fully implemented.
+                    // But for now, let's just stick to the requested types that work well.
+                    // Actually, if it's pie, let's return Area for now as a fallback if Pie isn't fully set up with Recharts here, 
+                    // OR better, render a simple Pie chart.
+                    return (
+                      <PieChart>
+                        <Pie
+                          data={chartData}
+                          dataKey="value"
+                          nameKey="label"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          fill="#2563EB"
+                          label
+                        />
+                        <Tooltip />
+                      </PieChart>
+                    );
+                  }
+                  // Default to Area
+                  return (
+                    <AreaChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 10 }} />
+                      <Tooltip
+                        formatter={(value: number) => value.toLocaleString()}
+                        labelFormatter={(label: string) => label}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="value"
+                        stroke="#2563EB"
+                        strokeWidth={2}
+                        fillOpacity={0.15}
+                        fill="#2563EB"
+                        dot={false}
+                        activeDot={{ r: 3, fill: "#2563EB" }}
+                      />
+                    </AreaChart>
+                  );
+                })()}
               </ResponsiveContainer>
             ) : (
               <ChartPieInteractive data={[]} />
@@ -1064,6 +1137,7 @@ const renderWidgetContent = (
         typeof (resolvedData as ResolvedWidgetData)?.total === "number";
 
       const chartTitle =
+        (widget.data as ChartWidgetData)?.title ||
         widget.metricConfig?.metricKey?.split(".").pop()?.replace(/_/g, " ") ||
         "Metric";
 
@@ -1395,7 +1469,8 @@ const renderWidgetContent = (
                                     ? (row as any).lastRun
                                     : col.name === "Next Send"
                                       ? (row as any).nextSend
-                                      : (row as Record<string, unknown>)[
+                                      : (row as Record<string, unknown>)[col.name] ??
+                                      (row as Record<string, unknown>)[
                                       col.name.toLowerCase().replace(/\s+/g, "")
                                       ] ?? "";
                         }
@@ -1921,7 +1996,10 @@ function ReportBuilder() {
 
   const { data: integrationsData } = useIntegrations(parsedClientId);
 
-  console.log(integrationsData, "integrationsData", parsedClientId)
+  // Debug log with safe handling of undefined
+  if (integrationsData) {
+    console.log(integrationsData, "integrationsData", parsedClientId);
+  }
 
   const {
     groupedMetrics,
@@ -2119,28 +2197,43 @@ function ReportBuilder() {
     const integrations = integrationsData.integrations;
 
     if (integrations.length === 0) {
-      // No integrations, show single empty slide
-      setDashboards(new Map([[0, []]]));
-      setPageOrder([0]);
+      // No integrations, start empty and let AutoPopulate fill in if data arrives later
+      setDashboards(new Map());
+      setPageOrder([]);
     } else {
       // Create one slide per integration
       const newDashboards = new Map<number, DashboardLayout[]>();
       const initialOrder: number[] = [];
+      const seenIds = new Set<number>();
+
       integrations.forEach((_, index) => {
-        newDashboards.set(index, []);
-        initialOrder.push(index);
+        if (!seenIds.has(index)) {
+          newDashboards.set(index, []);
+          initialOrder.push(index);
+          seenIds.add(index);
+        }
       });
       setDashboards(newDashboards);
-      setPageOrder(initialOrder);
+      // Force empty order to let Sidebar fallback execute (shows all integrations)
+      // AutoPopulate will eventually sort this out if needed, but safe default is empty.
+      setPageOrder([]);
     }
 
     setIsDashboardsInitialized(true);
   }, [integrationsData, templateQuery.data, isDashboardsInitialized]);
 
   // Ensure pageOrder always matches current slide IDs (integrations + custom pages)
+  // Skip this if we have template data with a saved pageOrder (to preserve template order)
+  // Ensure pageOrder always matches current slide IDs (integrations + custom pages)
   useEffect(() => {
+    // If we have template data with a saved pageOrder, don't auto-sync initially.
+    // However, if the user adds a new integration or page, dashboards will change,
+    // and we MUST update pageOrder to include the new ID.
+
+    // We rely on the fact that `dashboards` ref only changes when we actually add/remove slides.
+    const ids = Array.from(dashboards.keys());
+
     setPageOrder((prevOrder) => {
-      const ids = dashboardIds;
       if (ids.length === 0) return prevOrder;
 
       // If no existing order, just use current ids
@@ -2151,17 +2244,28 @@ function ReportBuilder() {
       // 1) Keep existing order but drop any ids that no longer exist
       const filtered = prevOrder.filter((id) => idSet.has(id));
 
-      // 2) Append any new ids that weren't in previous order
-      const existingSet = new Set(filtered);
+      // 2) Deduplicate just in case
+      const uniqueFiltered = Array.from(new Set(filtered));
+
+      // 3) Append any new ids that weren't in previous order
+      const existingSet = new Set(uniqueFiltered);
       ids.forEach((id) => {
         if (!existingSet.has(id)) {
-          filtered.push(id);
+          uniqueFiltered.push(id);
         }
       });
 
-      return filtered;
+      // Only update if the order actually changed (optimization)
+      if (
+        uniqueFiltered.length === prevOrder.length &&
+        uniqueFiltered.every((val, index) => val === prevOrder[index])
+      ) {
+        return prevOrder;
+      }
+
+      return uniqueFiltered;
     });
-  }, [dashboardIds]);
+  }, [dashboards]);
 
   // Map each slideId to its integration (if any) so we can restrict drops to the
   // matching integration page.
@@ -2232,8 +2336,18 @@ function ReportBuilder() {
       (templateQuery.data.widgets ?? []) as ReportWidgetDefinition[]
     );
 
+    // Ensure all custom pages (especially empty ones) are present in the map
+    if (Array.isArray(templateQuery.data.slidesMeta)) {
+      templateQuery.data.slidesMeta.forEach((slide) => {
+        const sId = Number(slide.id);
+        if (!map.has(sId)) {
+          map.set(sId, []);
+        }
+      });
+    }
+
     if (map.size === 0) {
-      // If template has no widgets, create slides based on integrations
+      // If template has no widgets AND no custom pages, create slides based on integrations
       if (
         integrationsData?.integrations &&
         integrationsData.integrations.length > 0
@@ -2256,9 +2370,11 @@ function ReportBuilder() {
       Array.isArray(templateQuery.data.pageOrder) &&
       templateQuery.data.pageOrder.length > 0
     ) {
-      setPageOrder(templateQuery.data.pageOrder);
+      // Deduplicate loaded order to fix any corrupted templates
+      setPageOrder(Array.from(new Set(templateQuery.data.pageOrder.map(Number))));
     }
 
+    // Mark dashboards as initialized after loading template data
     setIsDashboardsInitialized(true);
   }, [templateQuery.data, integrationsData]);
 
@@ -2320,13 +2436,22 @@ function ReportBuilder() {
   // If ENABLE_AUTO_DEFAULT_WIDGETS is true, pre-populate with default widgets.
   useEffect(() => {
     // If we are loading an existing template (params.id exists), do NOT run this
-    // auto-population logic until we are sure we don't have template data.
-    // If we have template data, it will be handled by the other useEffect (line 2061).
+    // auto-population logic if we have populated template data.
+    // However, if the template is effectively empty (newly created), allow auto-population.
+    const isTemplateEmpty = templateQuery.data &&
+      (!templateQuery.data.widgets || templateQuery.data.widgets.length === 0);
+
+    if (params.id && templateQuery.data && !isTemplateEmpty) {
+      return;
+    }
+
+    // If we are still loading an existing template, wait
     if (params.id && (isTemplateLoading || !templateQuery.data)) {
       return;
     }
 
     const integrationIds = integrationsData?.integrations?.map((_, idx) => idx) ?? [];
+
     if (!integrationIds.length || !isDashboardsInitialized) return;
 
     setDashboards((prev) => {
@@ -2385,6 +2510,8 @@ function ReportBuilder() {
 
     setPageOrder((prev) => {
       const base = prev.length ? [...prev] : Array.from(dashboards.keys());
+      console.log('[PageOrderDebug] Update start:', { prev, integrationIds });
+
       const existing = new Set(base);
       let changed = false;
       integrationIds.forEach((id) => {
@@ -2394,6 +2521,7 @@ function ReportBuilder() {
           changed = true;
         }
       });
+      console.log('[PageOrderDebug] Update end:', { changed, result: changed ? base : prev });
       return changed ? base : prev;
     });
   }, [
@@ -2421,6 +2549,7 @@ function ReportBuilder() {
   const reportDataQuery = useQuery<Record<string, ResolvedWidgetData>>({
     queryKey: ["report-data", templateId, dateRangeKey, widgetSignature],
     enabled: shouldResolveWidgets,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     queryFn: async () => {
       if (!dateRange?.from || !dateRange?.to) {
         return {};
@@ -2439,13 +2568,34 @@ function ReportBuilder() {
       const dateFrom = formatApiDate(dateRange.from);
       const dateTo = formatApiDate(dateRange.to);
 
+      // Group widgets by unique query parameters to deduplicate requests
+      const uniqueQueries = new Map<string, ReportWidgetDefinition[]>();
 
+      widgets.forEach((widget) => {
+        // Create a unique hash for the data requirements
+        // normalizedIntegration is calculated later, but strict inputs are enough for grouping
+        const queryHash = JSON.stringify({
+          i: widget.integration,
+          m: widget.metricKey,
+          a: widget.accountId,
+          f: widget.filters
+        });
 
-      // Fetch data for each widget using GET /unified-metrics
-      const promises = widgets.map(async (widget: ReportWidgetDefinition) => {
+        if (!uniqueQueries.has(queryHash)) {
+          uniqueQueries.set(queryHash, []);
+        }
+        uniqueQueries.get(queryHash)!.push(widget);
+      });
+
+      console.log(`🚀 Optimizing Data Fetch: Reduced ${widgets.length} widgets to ${uniqueQueries.size} unique API requests.`);
+
+      // Fetch data for each UNIQUE query signature
+      const queryPromises = Array.from(uniqueQueries.entries()).map(async ([hash, localWidgets]) => {
+        // Use the first widget in the group as the prototype for the request
+        const widget = localWidgets[0];
+
         try {
           // Normalize integration key to match backend schema
-          // Special case: Meta integrations keep underscores (meta-facebook, meta-instagram, meta-ads)
           let normalizedIntegration = widget.integration.toLowerCase();
 
           // Only replace underscores with hyphens for non-Meta integrations
@@ -2457,29 +2607,36 @@ function ReportBuilder() {
             normalizedIntegration = "google-analytics";
           } else if (normalizedIntegration === "woocommerce") {
             normalizedIntegration = "woo";
+          } else if (normalizedIntegration === "meta-business") {
+            // "meta-business" is a frontend container; route to underlying API integration
+            if (widget.metricKey.includes("facebook") || widget.metricKey.startsWith("meta.page") || widget.metricKey.startsWith("meta.facebook")) {
+              normalizedIntegration = "meta-facebook";
+            } else if (widget.metricKey.includes("instagram") || widget.metricKey.startsWith("meta.instagram")) {
+              normalizedIntegration = "meta-instagram";
+            }
           }
 
-          // Validate integration key (accept both hyphen and underscore variants for Meta integrations)
+          // Validate integration key
           const validIntegrations = [
             'google-analytics',
             'google-search-console',
             'google-console',
             'meta',
-            'meta-facebook',   // Facebook Pages organic
-            'meta-instagram',  // Instagram Business organic
-            'meta-ads',        // Meta Ads paid campaigns
-            'meta_facebook',   // Accept underscore variant for Meta Facebook
-            'meta_instagram',  // Accept underscore variant for Meta Instagram
-            'meta_ads',        // Accept underscore variant for Meta Ads
+            'meta-facebook',
+            'meta-instagram',
+            'meta-ads',
+            'meta_facebook',
+            'meta_instagram',
+            'meta_ads',
             'youtube', 'shopify', 'woo'
           ];
 
           if (!validIntegrations.includes(normalizedIntegration)) {
-            console.warn(`⚠️ Invalid integration key: ${normalizedIntegration} (original: ${widget.integration})`);
-            return { id: widget.id, widget, data: null };
+            // Return null for this whole group
+            return { hash, widgets: localWidgets, data: null };
           }
 
-          // Validate metric key format (should have platform prefix)
+          // Validate metric key format
           const hasValidPrefix =
             widget.metricKey.startsWith('google.') ||
             widget.metricKey.startsWith('google_seo.') ||
@@ -2490,28 +2647,16 @@ function ReportBuilder() {
             widget.metricKey.startsWith('woo.');
 
           if (!hasValidPrefix) {
-            console.warn(`⚠️ Invalid metric key format: ${widget.metricKey} (missing platform prefix)`);
-            return { id: widget.id, widget, data: null };
+            console.warn(`⚠️ Invalid metric key format: ${widget.metricKey}`);
+            return { hash, widgets: localWidgets, data: null };
           }
 
-          // Removed accountId and dimensionType as requested - backend will handle filtering
-          // Only sending: integration, metricKey, startDate, endDate (plus clientId separately)
           const params: Record<string, string> = {
-            integration: normalizedIntegration,  // Use normalized key
+            integration: normalizedIntegration,
             metricKey: widget.metricKey,
             startDate: dateFrom,
             endDate: dateTo,
           };
-
-          console.log(`📤 GET /unified-metrics params for ${widget.metricKey}:`, params);
-          console.log(`🔧 Widget config:`, {
-            id: widget.id,
-            metricKey: widget.metricKey,
-            integration: widget.integration,
-            accountId: widget.accountId,
-            accountIdType: typeof widget.accountId,
-            groupBy: widget.groupBy
-          });
 
           const data = await fetchUnifiedMetric(parsedClientId!, params as {
             integration: string;
@@ -2520,51 +2665,28 @@ function ReportBuilder() {
             endDate: string;
           });
 
-          // Log the full API response for debugging
-          console.log(`📡 GET /unified-metrics response for ${widget.metricKey}:`, data);
-
-          return { id: widget.id, widget, data };
+          return { hash, widgets: localWidgets, data };
         } catch (error) {
-          console.error(`❌ Failed to fetch data for widget ${widget.id}:`, error);
-          return { id: widget.id, widget, data: null };
+          console.error(`❌ Failed to fetch data for group [${widget.metricKey}]:`, error);
+          return { hash, widgets: localWidgets, data: null };
         }
       });
 
-      const results = await Promise.all(promises);
+      const responses = await Promise.all(queryPromises);
 
-      // Log all API responses for slides/pages
-      console.log('📊 ========== REPORT BUILDER API RESPONSES ==========');
-      console.log('📋 Total widgets fetched:', results.length);
-      console.log('📅 Date range:', { from: dateFrom, to: dateTo });
-
-      // Log each widget's API response
-      results.forEach(({ id, widget, data }, index) => {
-        console.log(`\n🔹 Widget ${index + 1}/${results.length} [${id}]:`);
-        console.log('  Type:', widget.type);
-        console.log('  Metric:', widget.metricKey);
-        console.log('  Integration:', widget.integration);
-        console.log('  Account ID:', widget.accountId);
-        console.log('  Group By:', widget.groupBy);
-        console.log('  📡 API Response:', data);
-        console.log('  Response rows count:', data?.rows?.length || 0);
+      // Flatten results back to individual widget IDs
+      const results = responses.flatMap(({ widgets: groupWidgets, data }) => {
+        return groupWidgets.map(w => ({
+          id: w.id,
+          widget: w,
+          data
+        }));
       });
-
-      console.log('\n📊 ========================================\n');
 
       // Process and format data for each widget type
       const merged: Record<string, ResolvedWidgetData> = {};
 
       results.forEach(({ id, widget, data }) => {
-        // DEBUG: Log the exact data structure we receive
-        console.log(`🔍 Processing widget ${id}:`, {
-          widgetType: widget.type,
-          hasData: !!data,
-          dataKeys: data ? Object.keys(data) : [],
-          dataStructure: data,
-          hasRows: data?.rows ? 'YES' : 'NO',
-          rowsLength: data?.rows?.length || 0
-        });
-
         if (!data || !data.rows || !Array.isArray(data.rows)) {
           console.warn(`⚠️ Widget ${id} has no valid data, using empty state`);
           merged[id] = { value: 0, total: 0, rawCount: 0, rows: [], series: [] };
@@ -2576,17 +2698,6 @@ function ReportBuilder() {
         // EXCEPTION: WooCommerce uses dimensionType="date" for time-series, which we want to include
         // EXCEPTION: meta-ads returns all campaigns, so we don't filter by accountId
         // For tables, keep dimensional data
-
-        // DEBUG: Log first row to see what accountId format the API returns
-        if (data.rows.length > 0) {
-          console.log(`🔍 DEBUG - Widget ${id} (${widget.metricKey}):`, {
-            widgetAccountId: widget.accountId,
-            apiAccountId: data.rows[0].accountId,
-            match: data.rows[0].accountId === widget.accountId,
-            totalRows: data.rows.length,
-            integration: widget.integration
-          });
-        }
 
         const isMetaIntegration =
           widget.integration === 'meta-ads' ||
@@ -2614,32 +2725,19 @@ function ReportBuilder() {
           const rowIntegration = normalizeIntegration(row.integration || '');
           const widgetIntegration = normalizeIntegration(widget.integration || '');
 
-          // DEBUG: Log WooCommerce filtering
-          if (widget.integration === 'woocommerce' || row.integration === 'woo') {
-            console.log('🛒 WooCommerce filtering:', {
-              rowIntegration: row.integration,
-              normalizedRowIntegration: rowIntegration,
-              widgetIntegration,
-              rowMetricKey: row.metricKey,
-              widgetMetricKey: widget.metricKey,
-              rowAccountId: row.accountId,
-              widgetAccountId: widget.accountId,
-              metricMatch: row.metricKey === widget.metricKey,
-              integrationMatch: rowIntegration === widgetIntegration,
-              accountMatch: row.accountId == widget.accountId,
-            });
-          }
-
-
           // For meta integrations and single-account integrations (woo/youtube), don't filter by accountId
+          // Also for meta-business (frontend container), skip account check as rows have specific FB/IG IDs
           const isSingleAccountIntegration =
             widget.integration === 'woocommerce' ||
-            widget.integration === 'youtube';
+            widget.integration === 'youtube' ||
+            widget.integration === 'meta-business';
+
+
 
           const matchesBasic = isMetaIntegration || isSingleAccountIntegration
-            ? (row.metricKey === widget.metricKey && rowIntegration === widgetIntegration)
+            ? (row.metricKey === widget.metricKey) // Relaxed check: trust metricKey for Meta Business routing
             : (row.metricKey === widget.metricKey &&
-              row.accountId == widget.accountId &&  // Use == to handle string/number mismatch
+              row.accountId == widget.accountId &&
               rowIntegration === widgetIntegration);
 
           // DEBUG: Log when accountId doesn't match (skip for meta/single-account integrations)
@@ -2668,13 +2766,6 @@ function ReportBuilder() {
 
           // Include if: not dimensional OR is WooCommerce date dimension OR is YouTube video dimension
           return matchesBasic && (!isDimensional || isWooDateDimension || isYouTubeDimension);
-        });
-
-        console.log(`📊 [ReportBuilder] Widget ${id} filtered rows:`, {
-          beforeFilter: data.rows.length,
-          afterFilter: filteredRows.length,
-          integration: widget.integration,
-          metricKey: widget.metricKey
         });
 
         // Calculate total value
@@ -2731,20 +2822,6 @@ function ReportBuilder() {
 
       });
 
-      // Log the final merged/processed data
-      console.log('✅ ========== FINAL MERGED WIDGET DATA ==========');
-      console.log('📦 Total widgets processed:', Object.keys(merged).length);
-      Object.entries(merged).forEach(([widgetId, resolvedData]) => {
-        console.log(`\n🔸 Widget [${widgetId}]:`, {
-          value: resolvedData.value,
-          total: resolvedData.total,
-          rawCount: resolvedData.rawCount,
-          seriesLength: (resolvedData as any).series?.length || 0,
-          rowsLength: (resolvedData as any).rows?.length || 0,
-        });
-      });
-      console.log('\n✅ ============================================\n');
-
       return merged;
     },
   });
@@ -2764,15 +2841,7 @@ function ReportBuilder() {
   // Merge resolved widgets with table widget data and WooCommerce data
   const resolvedWidgets = useMemo(() => {
     // All data is now fetched via reportDataQuery using GET /unified-metrics
-    const resolved = reportDataQuery.data ?? {};
-
-    // Log the final resolved widgets that will be used for rendering
-    console.log('🎨 ========== RESOLVED WIDGETS FOR RENDERING ==========');
-    console.log('📊 Total resolved widgets:', Object.keys(resolved).length);
-    console.log('📋 Resolved widgets data:', resolved);
-    console.log('🎨 ===================================================\n');
-
-    return resolved;
+    return reportDataQuery.data ?? {};
   }, [reportDataQuery.data]);
 
 
@@ -2888,6 +2957,7 @@ function ReportBuilder() {
       return {
         name: templateName,
         widgets,
+        pageOrder: effectivePageOrder,
         ...(slidesMeta ? { slidesMeta } : {}),
       };
     }, [
@@ -2896,6 +2966,7 @@ function ReportBuilder() {
       templateQuery.data?.slidesMeta,
       customPages,
       integrationsData,
+      effectivePageOrder,
     ]);
 
   const { mutate: saveTemplate, isPending: isSavingTemplate } = useMutation({
@@ -3130,7 +3201,12 @@ function ReportBuilder() {
       });
 
       // Add to page order
-      setPageOrder((prev) => [...prev, nextId]);
+      setPageOrder((prev) => {
+        // If we had no custom order (empty), strictly use current dashboardIds as base
+        // otherwise simply append to the existing custom order
+        const base = prev.length > 0 ? prev : Array.from(dashboards.keys());
+        return [...base, nextId];
+      });
 
       return nextId;
     },
@@ -3193,7 +3269,7 @@ function ReportBuilder() {
     (fromIndex: number, toIndex: number) => {
       setPageOrder((prevOrder) => {
         const baseOrder =
-          prevOrder.length > 0 ? [...prevOrder] : [...dashboardIds];
+          prevOrder.length > 0 ? [...prevOrder] : Array.from(dashboards.keys());
         if (
           fromIndex < 0 ||
           toIndex < 0 ||
@@ -3207,7 +3283,7 @@ function ReportBuilder() {
         return baseOrder;
       });
     },
-    [dashboardIds]
+    [dashboards]
   );
 
   // Update widget data in dashboards state
@@ -3338,8 +3414,13 @@ function ReportBuilder() {
       // Enforce dropping metrics only on their matching integration slide
       if (metricData) {
         const expected = slideIntegrationMap.get(id);
-        const normalize = (val?: string) =>
-          (val ?? "").toLowerCase().replace(/_/g, "-");
+        const normalize = (val?: string) => {
+          const l = (val ?? "").toLowerCase().replace(/_/g, "-");
+          if (l === "woo") return "woocommerce";
+          if (l === "google-console") return "google-search-console";
+          return l;
+        };
+
         console.log("[ReportBuilder][drop]", {
           slideId: id,
           expectedIntegration: expected?.platform,
@@ -3347,6 +3428,7 @@ function ReportBuilder() {
           metricIntegration: metricData.integration,
           metricAccountId: metricData.accountId,
         });
+
         if (
           expected &&
           normalize(metricData.integration) !== normalize(expected.platform)
@@ -3358,11 +3440,14 @@ function ReportBuilder() {
           return;
         }
         // Account mismatch should not hard-block if integration matches; allow but warn
+        // Use loose equality for string/number account IDs
         if (
           expected &&
           metricData.accountId &&
           expected.accountId &&
-          metricData.accountId !== expected.accountId
+          // eslint-disable-next-line eqeqeq
+          metricData.accountId != expected.accountId &&
+          expected.platform !== "meta-business" // Skip for meta-business (Business ID != Page/IG ID is expected)
         ) {
           toast.warning(
             "This metric is from another account. Verify before using."
@@ -3385,7 +3470,13 @@ function ReportBuilder() {
 
       // If this is a custom Content Block with a specific kind, annotate it in data
       if (widgetType === "custom" && widgetData && "content" in widgetData) {
-        (widgetData as CustomWidgetData).type = customKind || "text";
+        const kind = customKind || "text";
+        (widgetData as CustomWidgetData).type = kind;
+        if (kind === "tasks") {
+          (widgetData as CustomWidgetData).content = "Task 1\nTask 2";
+        } else if (kind === "toc") {
+          (widgetData as CustomWidgetData).content = "Section 1";
+        }
       }
 
       const newItem: DashboardLayout = {
@@ -3751,6 +3842,29 @@ function ReportBuilder() {
               ? aliasMetrics
               : {};
 
+      // Special handling for Meta Business: merge Facebook and Instagram metrics if not found under "meta-business"
+      if ((platform === "meta-business" || normalizedPlatform === "meta-business") && Object.keys(metricsByAccount).length === 0) {
+        const fbMetrics = groupedMetrics["meta-facebook"] || groupedMetrics["meta_facebook"] || {};
+        const igMetrics = groupedMetrics["meta-instagram"] || groupedMetrics["meta_instagram"] || {};
+
+        // Merge accounts from both
+        const allAccounts = new Set([...Object.keys(fbMetrics), ...Object.keys(igMetrics)]);
+
+        allAccounts.forEach(accId => {
+          const fb = fbMetrics[accId] || [];
+          const ig = igMetrics[accId] || [];
+
+          const combined = [
+            ...fb.map(m => ({ ...m, displayName: `Facebook - ${m.displayName || m.metricKey}`, integration: "meta-business" })),
+            ...ig.map(m => ({ ...m, displayName: `Instagram - ${m.displayName || m.metricKey}`, integration: "meta-business" }))
+          ];
+
+          if (combined.length > 0) {
+            metricsByAccount[accId] = combined as any;
+          }
+        });
+      }
+
       // If Google Search Console or Google Analytics and we have live unified-metrics rows, map them to metric options
       if ((isGoogleConsole || isGoogleAnalytics) && gscMetricsQuery.data?.rows?.length) {
         const gaLabelMap: Record<string, string> = {
@@ -3845,6 +3959,27 @@ function ReportBuilder() {
             };
           });
         }
+      }
+
+      // Enforce distinct naming for Meta Business metrics (Facebook vs Instagram)
+      if (platform === "meta-business" || normalizedPlatform === "meta-business") {
+        metricsForAccount = metricsForAccount.map(metric => {
+          // If already prefixed, leave it
+          if (metric.displayName?.startsWith("Facebook - ") || metric.displayName?.startsWith("Instagram - ")) {
+            return metric;
+          }
+
+          const isFacebook = metric.metricKey.includes("facebook") || metric.metricKey.startsWith("meta.page.");
+          const isInstagram = metric.metricKey.includes("instagram");
+
+          if (isFacebook) {
+            return { ...metric, displayName: `Facebook - ${metric.displayName || "Metric"}` };
+          }
+          if (isInstagram) {
+            return { ...metric, displayName: `Instagram - ${metric.displayName || "Metric"}` };
+          }
+          return metric;
+        });
       }
 
       // Restrict GA/GSC metrics to curated sets
@@ -4434,9 +4569,7 @@ function ReportBuilder() {
                   (templateQuery.data?.slidesMeta as
                     | ReportSlideMeta[]
                     | undefined) ?? [];
-                if (!customPages.length) {
-                  return base;
-                }
+
                 const existingIds = new Set(base.map((s) => s.id));
                 const extras = customPages
                   .filter((p) => !existingIds.has(p.id))

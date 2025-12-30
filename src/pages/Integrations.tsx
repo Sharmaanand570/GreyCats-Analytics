@@ -1,4 +1,4 @@
-import { FiBell, FiSearch } from "react-icons/fi";
+import { FiBell, FiSearch, FiLoader } from "react-icons/fi";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import DropDownFilter from "../components/DropDownFilter";
@@ -25,6 +25,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { useNavigate } from "react-router-dom";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Building2, ArrowRight } from "lucide-react";
+import { useSyncStatus } from "@/features/reports/hooks/useSyncStatus";
+import { SyncStatusBadge } from "@/components/SyncStatusBadge";
 
 import type { ConnectedIntegration } from "@/types/client.types";
 
@@ -123,6 +125,8 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
     );
   }
 
+  const { isAccountSyncing, getIntegrationCounts, overallProgress } = useSyncStatus(clientId);
+
   const tableData = useMemo(() => {
     if (!client?.integrations) {
       return [];
@@ -155,6 +159,9 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
         link = `${link}/${clientId}`;
       }
 
+      const isSyncing = isAccountSyncing(integration.integrationType, integration.accountId);
+      const syncDetails = getIntegrationCounts(integration.integrationType);
+
       return {
         name: platformConfig?.name || integration.integrationType,
         icon: platformConfig?.icon,
@@ -163,13 +170,13 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
         label: integration.accountName,
         identifier: integration.accountIdentifier,
         clientsConnected: 1,
-        status: capitalizeStatus("connected"),
+        status: <SyncStatusBadge isSyncing={isSyncing} statusText={capitalizeStatus("connected")} syncDetails={syncDetails} />,
         onDisconnect: () => setDisconnectTarget(integration),
       };
     });
-  }, [client, searchQuery]);
+  }, [client, searchQuery, isAccountSyncing, clientId, getIntegrationCounts]);
 
-  console.log("tableData", tableData);
+
 
   const content = (
     <div className="w-full h-full flex flex-col">
@@ -227,6 +234,28 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
         </div>
       </div>
       <div className="w-full px-5">
+        {overallProgress.isSyncing && (
+          <div className="mb-6 bg-blue-50 border border-blue-100 rounded-lg p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-full text-blue-600">
+                <FiLoader className="w-4 h-4 animate-spin" />
+              </div>
+              <div>
+                <h4 className="font-medium text-blue-900 text-sm">Syncing Data Sources</h4>
+                <p className="text-blue-700 text-xs mt-0.5">
+                  Synced {overallProgress.synced} of {overallProgress.total} integrations
+                </p>
+              </div>
+            </div>
+            <div className="w-48 bg-blue-200 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-blue-600 h-full rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${overallProgress.percent}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="border w-full rounded-[0.7rem] overflow-hidden p-6 space-y-4">
             <Skeleton className="h-16 w-full" />

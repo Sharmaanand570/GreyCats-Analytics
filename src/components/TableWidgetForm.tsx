@@ -1,13 +1,7 @@
 import React, { useState } from "react";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
+
 import { Button } from "./ui/button";
 import type { TableWidgetData, ReportTableRow } from "./widgetTypes";
 
@@ -40,13 +34,7 @@ function TableWidgetForm({
   };
 
   const addRow = () => {
-    const newRow: ReportTableRow = {
-      name: "",
-      audience: "",
-      status: "Draft",
-      lastRun: "",
-      nextSend: "",
-    };
+    const newRow: ReportTableRow = {};
     handleChange({ rows: [...rows, newRow] });
   };
 
@@ -90,22 +78,20 @@ function TableWidgetForm({
           <button
             type="button"
             onClick={() => setActiveTab("general")}
-            className={`px-3 py-1 rounded-full font-medium transition-colors ${
-              activeTab === "general"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-800"
-            }`}
+            className={`px-3 py-1 rounded-full font-medium transition-colors ${activeTab === "general"
+              ? "bg-white text-gray-900 shadow-sm"
+              : "text-gray-500 hover:text-gray-800"
+              }`}
           >
             Settings
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("data")}
-            className={`px-3 py-1 rounded-full font-medium transition-colors ${
-              activeTab === "data"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-800"
-            }`}
+            className={`px-3 py-1 rounded-full font-medium transition-colors ${activeTab === "data"
+              ? "bg-white text-gray-900 shadow-sm"
+              : "text-gray-500 hover:text-gray-800"
+              }`}
           >
             Rows
           </button>
@@ -258,76 +244,24 @@ function TableWidgetForm({
                     </button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <div>
-                      <Label className="block text-[11px] text-gray-600 mb-1">
-                        Name
-                      </Label>
-                      <Input
-                        value={row.name}
-                        onChange={(e) =>
-                          updateRow(index, { name: e.target.value })
-                        }
-                        placeholder="Report name"
-                      />
-                    </div>
-                    <div>
-                      <Label className="block text-[11px] text-gray-600 mb-1">
-                        Audience
-                      </Label>
-                      <Input
-                        value={row.audience}
-                        onChange={(e) =>
-                          updateRow(index, { audience: e.target.value })
-                        }
-                        placeholder="Client / Team"
-                      />
-                    </div>
-                    <div>
-                      <Label className="block text-[11px] text-gray-600 mb-1">
-                        Status
-                      </Label>
-                      <Select
-                        value={row.status}
-                        onValueChange={(value) =>
-                          updateRow(index, {
-                            status: value as ReportTableRow["status"],
-                          })
-                        }
-                      >
-                        <SelectTrigger className="w-full h-8 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Draft">Draft</SelectItem>
-                          <SelectItem value="Scheduled">Scheduled</SelectItem>
-                          <SelectItem value="Delivered">Delivered</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="block text-[11px] text-gray-600 mb-1">
-                        Last run
-                      </Label>
-                      <Input
-                        value={row.lastRun}
-                        onChange={(e) =>
-                          updateRow(index, { lastRun: e.target.value })
-                        }
-                        placeholder="e.g. Dec 1, 2025"
-                      />
-                    </div>
-                    <div>
-                      <Label className="block text-[11px] text-gray-600 mb-1">
-                        Next send
-                      </Label>
-                      <Input
-                        value={row.nextSend}
-                        onChange={(e) =>
-                          updateRow(index, { nextSend: e.target.value })
-                        }
-                        placeholder="e.g. Dec 8, 2025"
-                      />
-                    </div>
+                    {columns.map((col, colIndex) => {
+                      // normalize key: lowercase and remove spaces for storage
+                      const key = col.name;
+                      return (
+                        <div key={colIndex}>
+                          <Label className="block text-[11px] text-gray-600 mb-1">
+                            {col.name}
+                          </Label>
+                          <Input
+                            value={(row[key] as string) || ""}
+                            onChange={(e) =>
+                              updateRow(index, { [key]: e.target.value })
+                            }
+                            placeholder={col.name}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ))}

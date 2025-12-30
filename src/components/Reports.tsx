@@ -55,11 +55,12 @@ function mapTemplateToRow(template: ReportTemplateSummary) {
 
 interface ReportsProps {
   viewMode?: "full" | "embedded";
+  clientId?: number;
 }
 
-function Reports({ viewMode = "full" }: ReportsProps) {
+function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
   const { clientId } = useParams<{ clientId: string }>();
-  const parsedClientId = clientId ? parseInt(clientId) : null;
+  const parsedClientId = propClientId ?? (clientId ? parseInt(clientId) : null);
 
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
@@ -73,7 +74,21 @@ function Reports({ viewMode = "full" }: ReportsProps) {
     queryFn: async () => {
       if (!parsedClientId) return [];
       const response = await listReportTemplates(parsedClientId);
-      return response.templates ?? [];
+      const allTemplates = response.templates ?? [];
+
+      console.log('[Reports] Fetched templates for client', parsedClientId);
+
+      // Client-side isolation filter: ensure we only show templates for this client
+      // This defends against the API ignoring the query param
+      return allTemplates.filter(t => {
+        const remoteClientId = t.clientId ?? t.client_id;
+
+        if (remoteClientId && remoteClientId !== parsedClientId) {
+          console.warn('[Reports] Filtered out template', t.id, 'belonging to client', remoteClientId);
+          return false;
+        }
+        return true;
+      });
     },
     enabled: !!parsedClientId,
   });

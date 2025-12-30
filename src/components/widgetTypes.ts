@@ -8,12 +8,8 @@ export interface TitleWidgetData {
   padding?: string; // e.g., "16px", "1rem", "20px 40px"
 }
 
-export type ReportTableRow = {
-  name: string;
-  audience: string;
-  status: "Draft" | "Scheduled" | "Delivered";
-  lastRun: string;
-  nextSend: string;
+export type ReportTableRow = Record<string, string | number | undefined> & {
+  status?: "Draft" | "Scheduled" | "Delivered" | string;
 };
 
 export interface TableWidgetData {
@@ -30,6 +26,7 @@ export interface ChartWidgetData {
   chartType?: string;
   data?: unknown;
   chartImageUrl?: string; // Base64 image URL from html2canvas conversion
+  title?: string;
 }
 
 export interface MapWidgetData {

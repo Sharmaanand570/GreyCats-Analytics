@@ -127,6 +127,8 @@ export interface ReportTemplateSummary {
    * Present in the new backend contract.
    */
   pageOrder?: number[];
+  clientId?: number;
+  client_id?: number;
 }
 
 export type ListTemplatesResponse = ApiSuccessResponse<{

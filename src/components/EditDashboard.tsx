@@ -372,10 +372,12 @@ function EditDashboard() {
       const entries = Object.entries(activeDashboard.widgets);
       if (entries.length > 0) {
         setWidgets(
-          entries.map(([id, widget]) => ({
-            ...(widget as DashboardWidget),
-            id,
-          }))
+          entries
+            .map(([id, widget]) => ({
+              ...(widget as DashboardWidget),
+              id,
+            }))
+            .sort((a, b) => (a.layout?.y ?? 0) - (b.layout?.y ?? 0))
         );
       }
     }
@@ -444,7 +446,7 @@ function EditDashboard() {
       Object.keys(accounts).forEach((accountId) => {
         const key = `${integration}|${accountId || 'default'}`;
         const isInSections = sections.find(s => s.key === key);
-        
+
         console.log('🔍 [EditDashboard] Checking integration:', {
           integration,
           accountId,
@@ -546,10 +548,15 @@ function EditDashboard() {
       //   throw new Error("Add at least one widget before saving");
       // }
 
-      // Convert flat array to map for API
+      // Convert flat array to map for API, injecting 'y' order in layout
       const widgetsMap: Record<string, DashboardWidget> = widgets.reduce(
-        (acc, widget) => {
-          acc[widget.id] = widget;
+        (acc, widget, index) => {
+          // Preserve existing layout but update y to index
+          const layout = widget.layout
+            ? { ...widget.layout, y: index }
+            : { x: 0, y: index, w: 12, h: 1 }; // Default layout
+
+          acc[widget.id] = { ...widget, layout };
           return acc;
         },
         {} as Record<string, DashboardWidget>

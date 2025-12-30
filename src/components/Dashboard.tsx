@@ -100,7 +100,7 @@ function Dashboard({ clientId, onConnectIntegration, withLayout = true, hideHead
   const dashboardWidgets = useMemo<DashboardWidget[]>(() => {
     console.log('🔍 [Dashboard] activeDashboard:', activeDashboard);
     console.log('🔍 [Dashboard] activeDashboard?.widgets:', activeDashboard?.widgets);
-    
+
     // If user has a saved dashboard, use it
     if (activeDashboard?.widgets) {
       const entries = Object.entries(
@@ -108,10 +108,12 @@ function Dashboard({ clientId, onConnectIntegration, withLayout = true, hideHead
       ) as [string, DashboardWidget][];
       console.log('🔍 [Dashboard] Found widgets in activeDashboard:', entries.length);
       if (entries.length > 0) {
-        const widgets = entries.map(([id, widget]) => ({
-          ...widget,
-          id,
-        }));
+        const widgets = entries
+          .map(([id, widget]) => ({
+            ...widget,
+            id,
+          }))
+          .sort((a, b) => (a.layout?.y ?? 0) - (b.layout?.y ?? 0));
         console.log('🔍 [Dashboard] Mapped widgets:', widgets);
         return widgets;
       }
@@ -203,11 +205,23 @@ function Dashboard({ clientId, onConnectIntegration, withLayout = true, hideHead
             return { id: widget.id, widget, data: null };
           }
 
-          // Build params (no accountId or dimensionType - backend handles filtering)
+          // Handle 90-day limit for Meta integrations
+          let effectiveDateFrom = dateFrom;
+          const isMetaLimitIntegration = ['meta_facebook', 'meta_instagram'].includes(normalizedIntegration) || normalizedIntegration.startsWith('meta-');
+
+          if (isMetaLimitIntegration) {
+            const ninetyDaysAgo = subDays(new Date(), 90);
+            const selectedDateFrom = new Date(dateFrom); // Assuming dateFrom is YYYY-MM-DD string
+            if (selectedDateFrom < ninetyDaysAgo) {
+              effectiveDateFrom = formatApiDate(ninetyDaysAgo);
+              console.log(`⚠️ [Dashboard] Clamping start date for ${normalizedIntegration} to 90 days ago: ${effectiveDateFrom}`);
+            }
+          }
+
           const params: Record<string, string> = {
             integration: normalizedIntegration,
             metricKey: widget.metricKey!,
-            startDate: dateFrom,
+            startDate: effectiveDateFrom,
             endDate: dateTo,
           };
 
@@ -292,14 +306,7 @@ function Dashboard({ clientId, onConnectIntegration, withLayout = true, hideHead
         });
 
         // Filter rows by integration and metricKey match
-        const isMetaIntegration =
-          widget.integration === 'meta-ads' ||
-          widget.integration === 'meta-facebook' ||
-          widget.integration === 'meta-instagram';
 
-        const isSingleAccountIntegration =
-          widget.integration === 'woocommerce' ||
-          widget.integration === 'youtube';
 
         const normalizeIntegration = (name: string) => {
           if (name === 'woo') return 'woocommerce';
@@ -328,9 +335,7 @@ function Dashboard({ clientId, onConnectIntegration, withLayout = true, hideHead
             });
           }
 
-          const matchesBasic = isMetaIntegration || isSingleAccountIntegration
-            ? (row.metricKey === widget.metricKey && rowIntegration === widgetIntegration)
-            : (row.metricKey === widget.metricKey && rowIntegration === widgetIntegration);
+          const matchesBasic = row.metricKey === widget.metricKey && rowIntegration === widgetIntegration;
 
           // For tables, we want dimensional data
           if (widget.type === 'table') {
@@ -343,8 +348,9 @@ function Dashboard({ clientId, onConnectIntegration, withLayout = true, hideHead
           const isDimensional = row.dimensionType && row.dimensionType !== "";
           const isWooDateDimension = widget.metricKey?.startsWith('woo.') && row.dimensionType === 'date';
           const isYouTubeDimension = widget.metricKey?.startsWith('youtube.') && row.dimensionType === 'video';
+          const isMetaDateDimension = (widget.metricKey?.startsWith('meta') || widget.metricKey?.startsWith('meta_')) && row.dimensionType === 'date';
 
-          return matchesBasic && (!isDimensional || isWooDateDimension || isYouTubeDimension);
+          return matchesBasic && (!isDimensional || isWooDateDimension || isYouTubeDimension || isMetaDateDimension);
         });
 
         console.log(`📊 [Dashboard] Widget ${id} filtered rows:`, {
@@ -401,6 +407,7 @@ function Dashboard({ clientId, onConnectIntegration, withLayout = true, hideHead
             total: total,
             rawCount: filteredRows.length,
             rows: filteredRows,
+            series: series,
           };
         }
       });

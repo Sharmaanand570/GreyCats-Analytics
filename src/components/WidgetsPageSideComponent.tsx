@@ -60,6 +60,18 @@ function WidgetsPageSideComponent({
   const parsedClientId = params.clientId ? parseInt(params.clientId) : null;
 
   const { data: integrationsData, isLoading } = useIntegrations(parsedClientId);
+
+  // Debug sidebar data
+  // Debug sidebar data
+  React.useEffect(() => {
+    if (integrationsData) {
+      console.log('[Sidebar] Integrations:', integrationsData.integrations?.map(i => i.platform));
+      console.log('[Sidebar] ParsedCID:', parsedClientId);
+      console.log('[Sidebar] SlidesMeta:', slidesMeta);
+      console.log('[Sidebar] PageOrder:', pageOrder);
+      console.log('[Sidebar] CustomPages:', customPages);
+    }
+  }, [integrationsData, parsedClientId, slidesMeta, pageOrder, customPages]);
   const [editingSlideId, setEditingSlideId] = React.useState<number | null>(
     null
   );
@@ -118,6 +130,9 @@ function WidgetsPageSideComponent({
     }
   };
 
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [dropPosition, setDropPosition] = React.useState<"top" | "bottom" | null>(null);
+
   const handleAddPage = () => {
     if (!pageName.trim()) return;
 
@@ -135,16 +150,50 @@ function WidgetsPageSideComponent({
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", String(index));
+    // Transparent drag image or default
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
+
+    if (draggedIndex === null || draggedIndex === index) {
+      setDragOverIndex(null);
+      setDropPosition(null);
+      return;
+    }
+
     setDragOverIndex(index);
+
+    // Calculate drop position (top or bottom half of the target)
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midpoint = rect.top + rect.height / 2;
+    if (e.clientY < midpoint) {
+      setDropPosition("top");
+    } else {
+      setDropPosition("bottom");
+    }
+
+    // Auto-scroll logic
+    if (containerRef.current) {
+      const container = containerRef.current;
+      const { top, bottom } = container.getBoundingClientRect();
+      const scrollZoneHeight = 50; // px
+      const mouseY = e.clientY;
+
+      if (mouseY < top + scrollZoneHeight) {
+        // Scroll up
+        container.scrollTop -= 5;
+      } else if (mouseY > bottom - scrollZoneHeight) {
+        // Scroll down
+        container.scrollTop += 5;
+      }
+    }
   };
 
   const handleDragLeave = () => {
     setDragOverIndex(null);
+    setDropPosition(null);
   };
 
   const handleDrop = (e: React.DragEvent, dropIndex: number) => {
@@ -153,20 +202,124 @@ function WidgetsPageSideComponent({
     if (draggedIndex === null || draggedIndex === dropIndex) {
       setDraggedIndex(null);
       setDragOverIndex(null);
+      setDropPosition(null);
       return;
     }
 
+    // Calculate final index based on drop position
+    // If dropping on TOP of item i, we insert AT i (pushing i down)
+    // If dropping on BOTTOM of item i, we insert AT i+1
+    let finalDropIndex = dropIndex;
+    if (dropPosition === "bottom") {
+      finalDropIndex = dropIndex + 1; // Insert after
+    }
+
+    // Adjust for removal of dragged item
+    // If we drag from 0 to 5 (bottom), remove 0.
+    // If we dropped at "bottom of 5" (idx 5), we target insert at 6.
+    // Logic in ReportBuilder handles splice(from, 1) then splice(to, 0, item).
+    // If from < to, the indices shift down by 1.
+    // Example: [A, B, C]. Drag A(0) to B(1) bottom.
+    // DropIndex=1, Pos=Bottom => Target=2.
+    // Remove A(0). [B, C].
+    // Insert at 2. [B, C, A]. Correct.
+
+    // Example: [A, B, C]. Drag B(1) to A(0) bottom.
+    // DropIndex=0, Pos=Bottom => Target=1.
+    // Remove B(1). [A, C].
+    // Insert at 1. [A, B, C]. Correct (no change).
+
+    // Wait, if we use the simple swap logic from before, it was index specific.
+    // The previous logic was: splice(from, 1), splice(to, 0, item).
+    // This is essentially "insert before target".
+    // "Drop Top" = insert before map-index.
+    // "Drop Bottom" = insert after map-index.
+
+    // However, we need to correct the target index if we are moving downwards, 
+    // because the removal of the item 'from' an earlier index shifts subsequent indices.
+    // Actually, ReportBuilder's logic is simpler: "remove at X, insert at Y".
+    // If I say "insert at 2", and I removed 0.
+    // Old list: 0, 1, 2. Remove 0 -> 1, 2. Insert at 2 -> 1, 2, 0.
+    // So "Insert at 2" means "After the item that was originally at 2"?
+    // Originally at 2 was "2". In new list it is at 1.
+    // 1, 2. Index 2 is end.
+    // So "Insert at 2" puts valid index 2.
+
+    // Let's rely on visual intent:
+    // If "top", we want to be *before* the item currently at dropIndex.
+    // If "bottom", we want to be *after* the item currently at dropIndex.
+
+    // BUT ReportBuilder uses naive splice logic.
+    // Let's compensate in the args passed to onReorderPages?
+    // Or just pass the RAW intent and let ReportBuilder handle it?
+    // ReportBuilder: `baseOrder.splice(toIndex, 0, movedItem)`.
+    // It assumes `toIndex` is relative to the ARRAY AFTER REMOVAL? No, relative to array generally?
+    // `baseOrder.splice(from, 1)` happens FIRST.
+    // So `toIndex` is relative to the array *minus the moved item*.
+
+    // Case 1: Drag Down (from < dropIndex)
+    // [A, B, C]. Drag A(0) to C(2). Drop Top (Before C).
+    // Remove A. [B, C].
+    // We want result [B, A, C].
+    // Insert at index 1.
+    // Target `toIndex` should be 1.
+    // `dropIndex` is 2. `dropPosition` is Top.
+    // If we pass 2: [B, C, A] (After C). Wrong.
+    // So for "Top" when dragging down, we need `dropIndex - 1`?
+    // Wait. In [B, C], C is at index 1.
+    // So we want to insert at 1.
+    // `dropIndex` (original) was 2. So `2 - 1` = 1.
+
+    // Case 2: Drag Up (from > dropIndex)
+    // [A, B, C]. Drag C(2) to A(0). Drop Bottom (After A).
+    // Remove C. [A, B].
+    // We want result [A, C, B].
+    // Insert at index 1.
+    // `dropIndex` is 0. `dropPosition` is Bottom.
+    // If we pass `0 + 1` = 1.
+    // `splice(1, 0, C)` -> [A, C, B]. Correct.
+
+    // Case 3: Drag Up. Drop Top (Before A).
+    // [A, B, C]. C(2) -> A(0) Top.
+    // Remove C. [A, B].
+    // Result [C, A, B]. Insert at 0.
+    // `dropIndex` 0. `dropPosition` Top.
+    // Pass 0. Correct.
+
+    // So the rule seems to be:
+    // Calculate logical target index in the *original* list coordinates first:
+    // "Top" -> dropIndex.
+    // "Bottom" -> dropIndex + 1.
+
+    // Then adjust for the "shifting" caused by removing 'fromIndex'.
+    // If fromIndex < targetIndex: The item we removed was *before* our target slot.
+    // So everything shifted down by 1. We must subtract 1 from target.
+    // If fromIndex >= targetIndex: The removal happened *after* (or at) our target slot.
+    // No shift affects the target slot index.
+
+    let targetIndex = dropIndex;
+    if (dropPosition === "bottom") {
+      targetIndex = dropIndex + 1;
+    }
+
+    // Adjustment logic:
+    if (draggedIndex < targetIndex) {
+      targetIndex = targetIndex - 1;
+    }
+
     if (onReorderPages) {
-      onReorderPages(draggedIndex, dropIndex);
+      onReorderPages(draggedIndex, targetIndex);
     }
 
     setDraggedIndex(null);
     setDragOverIndex(null);
+    setDropPosition(null);
   };
 
   const handleDragEnd = () => {
     setDraggedIndex(null);
     setDragOverIndex(null);
+    setDropPosition(null);
   };
 
   // Transform integrations data into pages format
@@ -311,6 +464,9 @@ function WidgetsPageSideComponent({
 
     const combined = [...integrationPages, ...customPagesFormatted];
 
+    console.log('[Sidebar] IntegrationPages len:', integrationPages.length);
+    console.log('[Sidebar] Combined len:', combined.length);
+
     // Derive all known slide IDs: either from pageOrder (dashboards) or from combined pages
     const allSlideIds =
       pageOrder && pageOrder.length > 0
@@ -354,6 +510,8 @@ function WidgetsPageSideComponent({
 
     return orderedPages;
   }, [integrationsData, customPages, pageOrder, slidesMeta]);
+
+  console.log('[Sidebar] Rendering pages count:', pages.length);
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -427,7 +585,10 @@ function WidgetsPageSideComponent({
         </Dialog>
       </div>
 
-      <div className="flex-1 overflow-y-auto w-full p-2 md:p-3 lg:p-4">
+      <div
+        ref={containerRef}
+        className="flex-1 overflow-y-auto w-full p-2 md:p-3 lg:p-4"
+      >
         {isLoading ? (
           <div className="text-center text-xs md:text-sm text-gray-500 py-4">
             Loading pages...
@@ -435,7 +596,7 @@ function WidgetsPageSideComponent({
         ) : pages.length > 0 || (pageOrder && pageOrder.length > 0) ? (
           pages.map((p, groupIndex) => (
             <div
-              key={p.integrationId}
+              key={`${p.integrationId}-${groupIndex}`}
               className={`flex flex-col gap-1.5 md:gap-2 ${groupIndex === 0 ? "" : "my-3 md:my-4"
                 }`}
             >
@@ -448,6 +609,13 @@ function WidgetsPageSideComponent({
                 const slideIdx = p.slideIndex;
                 const isDragging = draggedIndex === groupIndex;
                 const isDragOver = dragOverIndex === groupIndex;
+
+                // Visual drop indicator classes
+                const dropIndicatorClass = isDragOver
+                  ? dropPosition === "top"
+                    ? "border-t-4 border-t-blue-500"
+                    : "border-b-4 border-b-blue-500"
+                  : "";
 
                 return (
                   <div
@@ -466,11 +634,10 @@ function WidgetsPageSideComponent({
                     }}
                     key={pageIndex}
                     className={`w-full gap-1.5 md:gap-2 border rounded-lg md:rounded-[0.6rem] p-2.5 md:p-3 lg:p-4 flex items-center cursor-move transition-all ${isDragging ? "opacity-50 scale-95" : ""
-                      } ${isDragOver ? "border-blue-500 border-2 bg-blue-50" : ""
                       } ${activeIndex === slideIdx
                         ? "bg-gray-100 border-gray-400"
                         : "hover:bg-gray-50"
-                      }`}
+                      } ${dropIndicatorClass}`}
                     role="button"
                     tabIndex={0}
                   >
@@ -488,6 +655,7 @@ function WidgetsPageSideComponent({
                             onClick={(e) => e.stopPropagation()}
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
+                                // ... existing ...
                                 e.preventDefault();
                                 if (onRenamePage && editingName.trim()) {
                                   onRenamePage(slideIdx, editingName.trim());

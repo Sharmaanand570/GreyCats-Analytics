@@ -1,13 +1,7 @@
 import React from "react";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
+
 import { Switch } from "./ui/switch";
 import type { ChartWidgetData } from "./widgetTypes";
 
@@ -34,15 +28,17 @@ function ChartWidgetForm({ data, onChange }: ChartWidgetFormProps): React.JSX.El
           <button className="border-b-2 border-black pb-1 font-medium">
             General
           </button>
-          <button className="text-gray-500">Data</button>
-          <button className="text-gray-500">Display</button>
-          <button className="text-gray-500">Annotations</button>
+
         </div>
 
         {/* Title */}
         <div className="mb-5">
           <Label className="block text-xs text-gray-600 mb-2">Title</Label>
-          <Input defaultValue="Facebook Post Engagement" />
+          <Input
+            value={data?.title || ""}
+            onChange={(e) => handleChange({ title: e.target.value })}
+            placeholder="Chart title"
+          />
         </div>
 
         {/* Tooltip */}
@@ -61,19 +57,15 @@ function ChartWidgetForm({ data, onChange }: ChartWidgetFormProps): React.JSX.El
             {[
               "Column",
               "Line",
-              "Map",
               "Pie",
-              "Sparkline",
-              "Area",
             ].map((label) => {
               const isSelected = data?.chartType?.toLowerCase() === label.toLowerCase();
               return (
                 <button
                   key={label}
                   onClick={() => handleChange({ chartType: label.toLowerCase() })}
-                  className={`h-12 rounded-md border flex items-center justify-center gap-2 text-sm ${
-                    isSelected ? "border-blue-500 ring-1 ring-blue-500" : ""
-                  }`}
+                  className={`h-12 rounded-md border flex items-center justify-center gap-2 text-sm ${isSelected ? "border-blue-500 ring-1 ring-blue-500" : ""
+                    }`}
                   type="button"
                 >
                   <span>{label}</span>

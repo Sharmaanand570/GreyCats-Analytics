@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClients } from '../hooks/useClients';
-import { Plus, Building2, TrendingUp, Activity, Filter, ArrowUpDown } from 'lucide-react';
+import { Plus, Building2, TrendingUp, Activity, ArrowUpDown } from 'lucide-react';
 import { FiSearch, FiBell } from "react-icons/fi";
 import { Button } from '../components/ui/button';
 import { Input } from "../components/ui/input";
@@ -114,19 +114,7 @@ const ClientsPage: React.FC = () => {
                                     </SelectContent>
                                 </Select>
 
-                                <Select value={filterStatus} onValueChange={setFilterStatus}>
-                                    <SelectTrigger className="w-[130px] h-9 bg-white border-zinc-200">
-                                        <Filter className="w-3.5 h-3.5 mr-2 text-zinc-400" />
-                                        <SelectValue placeholder="Filter" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Clients</SelectItem>
-                                        <SelectItem value="healthy">Healthy Only</SelectItem>
-                                        <SelectItem value="warning">Warnings</SelectItem>
-                                        <SelectItem value="critical">Critical Issues</SelectItem>
-                                        <SelectItem value="inactive">Inactive</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                              
                             </div>
 
                             <div className="relative hidden md:block w-56">
