@@ -11,13 +11,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { IconType } from "react-icons";
-import { FaGoogle, FaYoutube } from "react-icons/fa6";
+import { SiGoogleanalytics, SiGooglesearchconsole, SiYoutube, SiWoocommerce, SiShopify, SiMeta } from "react-icons/si";
 import React from "react";
 import { useYouTubeConnect } from "@/features/YouTube/hooks/useYouTubeConnect";
 import { toast } from "sonner";
 import { useGoogleConnect } from "@/features/YouTube/hooks/google/useGoogleConnect";
 import { useGoogleConsoleConnect } from "@/features/YouTube/hooks/google/useGoogleConsoleConnect";
-import { SiWoocommerce, SiShopify, SiMeta } from "react-icons/si";
+
 import { useWooCommerceConnect } from "@/features/woocommerce/hooks/useWooCommerce";
 import { useShopifyConnect } from "@/features/shopify/hooks/useShopify";
 import { useMetaConnect } from "@/features/meta/hooks/useMetaConnect";
@@ -60,20 +60,20 @@ type WooCommercePayload = {
 const dataSourceOptions: DataSourceOption[] = [
   {
     id: "google-analytics",
-    name: "google Analytics",
-    icon: FaGoogle,
+    name: "Google Analytics",
+    icon: SiGoogleanalytics,
     color: getPlatformConfig("google")?.color,
   },
   {
     id: "youtube",
     name: "YouTube",
-    icon: FaYoutube,
+    icon: SiYoutube,
     color: getPlatformConfig("youtube")?.color,
   },
   {
     id: "google-console",
-    name: "Google Console",
-    icon: FaGoogle,
+    name: "Google Search Console ",
+    icon: SiGooglesearchconsole,
     color: getPlatformConfig("google-console")?.color,
   },
   {
@@ -256,6 +256,8 @@ function ConnectDataSource({
                             style={option.color ? { color: option.color } : undefined}
                           />
                           <span className="text-sm sm:text-base font-medium">{option.name}</span>
+                          {option.name === "Meta Business" && <span className="text-xs text-gray-400 font-light">(facebook & instagram)</span>}
+
                         </div>
                         <svg
                           className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400"
@@ -284,6 +286,7 @@ function ConnectDataSource({
                   </Button>
                 </DialogClose>
                 <Button
+                  isLoading={isConnecting}
                   disabled={!SelectedSource.name || isConnecting}
                   onClick={async (e) => {
                     e.preventDefault();
@@ -418,9 +421,10 @@ function ConnectDataSource({
                             Store URL*
                           </span>
                           <Input
-                            className="w-full rounded-lg sm:rounded-md md:rounded-[0.5rem] p-3 sm:p-3.5 md:p-4 py-2.5 sm:py-3 md:py-4 lg:py-5 mb-2.5 sm:mb-3 md:mb-4 text-sm sm:text-base md:text-base"
+                            className="w-full rounded-lg sm:rounded-md md:rounded-[0.5rem] p-3 sm:p-3.5 md:p-4 py-2.5 sm:py-3 md:py-4 lg:py-5 mb-1 text-sm sm:text-base md:text-base"
                             type="text"
                             placeholder={`https://client.agency.com/ `}
+                            value={woocommerceFormData.storeUrl}
                             onChange={(e) =>
                               setWooCommerceFormData({
                                 ...woocommerceFormData,
@@ -428,6 +432,9 @@ function ConnectDataSource({
                               })
                             }
                           />
+                          {woocommerceFormData.storeUrl && !/^https?:\/\//.test(woocommerceFormData.storeUrl) && (
+                            <p className="text-xs text-red-500 mb-2">Must start with http:// or https://</p>
+                          )}
                         </div>
 
                         <div className="flex flex-col justify-start">
@@ -435,9 +442,10 @@ function ConnectDataSource({
                             Consumer Key*
                           </span>
                           <Input
-                            className="w-full rounded-lg sm:rounded-md md:rounded-[0.5rem] p-3 sm:p-3.5 md:p-4 py-2.5 sm:py-3 md:py-4 lg:py-5 mb-2.5 sm:mb-3 md:mb-4 text-sm sm:text-base md:text-base"
+                            className="w-full rounded-lg sm:rounded-md md:rounded-[0.5rem] p-3 sm:p-3.5 md:p-4 py-2.5 sm:py-3 md:py-4 lg:py-5 mb-1 text-sm sm:text-base md:text-base"
                             type="text"
                             placeholder={`ck_000d52afdc3474****`}
+                            value={woocommerceFormData.consumerKey}
                             onChange={(e) =>
                               setWooCommerceFormData({
                                 ...woocommerceFormData,
@@ -445,6 +453,9 @@ function ConnectDataSource({
                               })
                             }
                           />
+                          {woocommerceFormData.consumerKey && !woocommerceFormData.consumerKey.startsWith('ck_') && (
+                            <p className="text-xs text-red-500 mb-2">Must start with ck_</p>
+                          )}
                         </div>
 
                         <div className="flex flex-col justify-start">
@@ -452,9 +463,10 @@ function ConnectDataSource({
                             Consumer Secret*
                           </span>
                           <Input
-                            className="w-full rounded-lg sm:rounded-md md:rounded-[0.5rem] p-3 sm:p-3.5 md:p-4 py-2.5 sm:py-3 md:py-4 lg:py-5 mb-2.5 sm:mb-3 md:mb-4 text-sm sm:text-base md:text-base"
+                            className="w-full rounded-lg sm:rounded-md md:rounded-[0.5rem] p-3 sm:p-3.5 md:p-4 py-2.5 sm:py-3 md:py-4 lg:py-5 mb-1 text-sm sm:text-base md:text-base"
                             type="text"
                             placeholder={`cs_87af0de2a7ae6*****`}
+                            value={woocommerceFormData.consumerSecret}
                             onChange={(e) =>
                               setWooCommerceFormData({
                                 ...woocommerceFormData,
@@ -462,6 +474,9 @@ function ConnectDataSource({
                               })
                             }
                           />
+                          {woocommerceFormData.consumerSecret && !woocommerceFormData.consumerSecret.startsWith('cs_') && (
+                            <p className="text-xs text-red-500 mb-2">Must start with cs_</p>
+                          )}
                         </div>
                       </div>
                     </form>
@@ -480,10 +495,14 @@ function ConnectDataSource({
                 </Button>
 
                 <Button
+                  isLoading={isConnecting}
                   disabled={
                     woocommerceFormData.storeUrl === "" ||
+                    !/^https?:\/\//.test(woocommerceFormData.storeUrl) ||
                     woocommerceFormData.consumerKey === "" ||
+                    !woocommerceFormData.consumerKey.startsWith('ck_') ||
                     woocommerceFormData.consumerSecret === "" ||
+                    !woocommerceFormData.consumerSecret.startsWith('cs_') ||
                     isConnecting
                   }
                   onClick={() => {
@@ -551,6 +570,7 @@ function ConnectDataSource({
                 </Button>
 
                 <Button
+                  isLoading={isConnecting}
                   disabled={shopifyShopUrl === "" || isConnecting}
                   onClick={async () => {
                     try {

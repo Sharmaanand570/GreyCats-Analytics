@@ -1,10 +1,15 @@
-import { FiSearch, FiBell } from "react-icons/fi";
 import { Button } from "./ui/button";
 import { ChartLineMultiple } from "./ChartLineMultiple";
 import { Link, useNavigate } from "react-router-dom";
 import { DateRangePicker } from "./DateRangePicker";
-import ToolTipComponenet from "./ToolTipComponenet";
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { type DateRange } from "react-day-picker";
+import { useMemo, useState, useEffect } from "react";
+// Icons
+import { FiSearch, FiBell } from "react-icons/fi";
+import { LayoutGrid, BarChart3, LineChart, Building2, TrendingUp, Activity } from "lucide-react";
+// Components
+import { MetricCard } from "./dashboard/MetricCard";
+import { getBrandColor } from "@/lib/brandColors";
 import { useQuery } from "@tanstack/react-query";
 import {
   listDashboards,
@@ -15,18 +20,37 @@ import type {
   Dashboard as DashboardModel,
   DashboardWidget,
   ResolvedWidgetData,
-  WidgetSeriesPoint,
 } from "@/features/reports/api/types";
 import { toast } from "sonner";
 import { subDays, format } from "date-fns";
 import { useAvailableMetrics } from "@/features/reports/hooks/useAvailableMetrics";
+import { useClients } from "@/hooks/useClients";
+import { cn } from "@/lib/utils";
+import { Skeleton } from "./ui/skeleton";
 
 /* DEFAULT_DASHBOARD_WIDGETS and helper functions removed */
 
-const getDefaultDateRange = () => ({
-  from: subDays(new Date(), 6),
-  to: new Date(),
-});
+
+
+const nameCorrection = (name: string): string => {
+
+  if (name === "google-search-console") return "Google Search Console"
+
+  if (name === "meta_ads") return "Meta Ads"
+
+  if (name === "meta_facebook") return "Facebook"
+
+  if (name === "meta_instagram") return "Instagram"
+
+  if (name === "woo") return "Woo Commerce"
+
+  if (name === "shopify") return "Shopify"
+
+  if (name === "google_analytics") return "Google Analytics"
+
+  return name
+}
+
 
 const formatApiDate = (value: Date) => format(value, "yyyy-MM-dd");
 
@@ -38,21 +62,22 @@ const formatNumber = (value?: number) => {
   }).format(value);
 };
 
-const hasWidgetData = (data?: ResolvedWidgetData) => {
-  if (!data || typeof data !== "object") return false;
-  const rawData = data as ResolvedWidgetData & {
-    rawCount?: number;
-    value?: number;
-    total?: number;
-    series?: WidgetSeriesPoint[];
-  };
-  if (typeof rawData.rawCount === "number" && rawData.rawCount > 0) return true;
-  if (typeof rawData.value === "number") return true;
-  if (typeof rawData.total === "number") return true;
-  if (Array.isArray(rawData.series) && rawData.series.length > 0) return true;
-  return false;
-};
+// Helper to determine status based on integrations (Simulated logic for demo)
+const getClientHealth = (client: any) => {
+  const totalIntegrations =
+    (client._count?.metaBusinessAccounts || 0) +
+    (client._count?.metaAdsAccounts || 0) +
+    (client._count?.metaInsightsAccounts || 0) +
+    (client._count?.youtubeAccounts || 0) +
+    (client._count?.shopifyAccounts || 0) +
+    (client._count?.woocommerceAccounts || 0) +
+    (client._count?.googleSearchConsoleAccounts || 0) +
+    (client._count?.googleAnalyticsAccounts || 0);
 
+  if (totalIntegrations > 3) return 'healthy';
+  if (totalIntegrations > 0) return 'warning';
+  return 'critical'; // No integrations
+};
 
 
 interface DashboardProps {
@@ -60,21 +85,34 @@ interface DashboardProps {
   onConnectIntegration?: () => void;
   withLayout?: boolean;
   hideHeader?: boolean;
+  dateRange?: DateRange;
+  onDateRangeChange?: (range: DateRange | undefined) => void;
 }
 
-function Dashboard({ clientId, onConnectIntegration, withLayout = true, hideHeader = false }: DashboardProps) {
+export const getDefaultDateRange = () => ({
+  from: subDays(new Date(), 6),
+  to: new Date(),
+});
+
+function Dashboard({
+  clientId,
+  withLayout = true,
+  hideHeader = false,
+  dateRange: externalDateRange,
+  onDateRangeChange
+}: DashboardProps) {
+  const [internalDateRange, setInternalDateRange] = useState(getDefaultDateRange());
   const navigate = useNavigate();
-  const [dateRange, setDateRange] = useState(getDefaultDateRange());
+
+  const dateRange = externalDateRange || internalDateRange;
+  const setDateRange = onDateRangeChange || setInternalDateRange;
+
+  // Fetch clients only if no clientId is provided
+  const { data: clients, isLoading: isLoadingClients } = useClients();
 
   const { groupedMetrics } = useAvailableMetrics(clientId ?? null);
 
-  const handleConnectIntegration = useCallback(() => {
-    if (onConnectIntegration) {
-      onConnectIntegration();
-    } else {
-      navigate(`/clients/${clientId}?tab=data-sources`);
-    }
-  }, [navigate, clientId, onConnectIntegration]);
+
 
   const dashboardsQuery = useQuery<DashboardModel[], ApiError>({
     queryKey: ["dashboards", clientId],
@@ -399,6 +437,7 @@ function Dashboard({ clientId, onConnectIntegration, withLayout = true, hideHead
             series: series,
             rawCount: filteredRows.length,
             rows: filteredRows,
+            rows: filteredRows,
           };
         } else {
           // For metric cards, just value and total
@@ -431,350 +470,294 @@ function Dashboard({ clientId, onConnectIntegration, withLayout = true, hideHead
   }, [widgetDataQuery.data]);
 
 
-  // Group widgets by integration for rendering
-  const integrationSections = useMemo(() => {
-    const sections: Record<string, { mainChart?: DashboardWidget, cards: DashboardWidget[] }> = {};
 
-    dashboardWidgets.forEach(widget => {
-      // Use integration + accountId as key to distinguish same integration different accounts
-      // But purely for UI grouping 'Integration' name might be enough if we assume one account per integration type for now,
-      // OR explicitly show account name. Agency analytics usually groups by "Facebook", "Google" etc. 
-      // Let's use integration name.
-      const key = widget.integration;
 
-      if (!sections[key]) {
-        sections[key] = { cards: [] };
-      }
-
-      if (['line_chart', 'area_chart', 'bar_chart'].includes(widget.type || '') && !sections[key].mainChart) {
-        sections[key].mainChart = widget;
-      } else {
-        sections[key].cards.push(widget);
-      }
-    });
-    console.log('[Dashboard] Widgets:', dashboardWidgets);
-    console.log('[Dashboard] Sections:', sections);
-    return sections;
-  }, [dashboardWidgets]);
-
-  // renderSparkline removed
-
-  const renderMetricCard = (widget: DashboardWidget, idx: number) => {
-    const data = resolvedWidgets[widget.id];
-    const value =
-      (typeof data?.total === "number" ? data.total : undefined) ??
-      (typeof data?.value === "number" ? data.value : undefined);
-    const hasData = hasWidgetData(data);
-
-    return (
-      <div
-        key={`${widget.id}-${idx}`}
-        className="flex-1 min-w-[12rem] sm:min-w-[14rem] bg-white rounded-xl border border-gray-100 p-4 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow"
-      >
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            {/* Icon could go here */}
-            <span className="text-xs font-medium uppercase text-gray-500 tracking-wide">
-              {widget.metricKey.split('.').pop()?.replace(/_/g, ' ')}
-            </span>
-          </div>
-          <span className="text-2xl font-bold text-gray-900">
-            {formatNumber(value ?? 0)}
-          </span>
-        </div>
-
-        {hasData ? (
-          // Render Sparkline manually (simple rechart without axes)
-          // Since we don't have a 'simple' prop on ChartLineMultiple yet, we can render it here or assume ChartLineMultiple handles it.
-          // For now, let's just reuse ChartLineMultiple but we need to hide AXIS via CSS or add a prop.
-          // I'll assume standard ChartLineMultiple for now, maybe it's too big.
-          // Ideally we need a <SparkLine /> component. 
-          // Let's rely on ChartLineMultiple adjusting to container height.
-          <div className="h-16 -mx-2 -mb-2">
-            <ChartLineMultiple
-              data={(data.series as any) || []}
-              metricLabel={widget.metricKey}
-              simple={true}
-            />
-          </div>
-        ) : (
-          <span className="text-xs text-gray-400 mt-2">No data</span>
-        )}
-      </div>
-    );
+  const getIntegrationIcon = (integration: string, className?: string) => {
+    const norm = integration.toLowerCase();
+    if (norm.includes('google')) return <BarChart3 className={className} />;
+    if (norm.includes('meta')) return <LayoutGrid className={className} />;
+    if (norm.includes('youtube')) return <div className={className}>▶</div>;
+    return <LineChart className={className} />;
   };
+
+  useEffect(() => {
+    // Force unified mode
+  }, []);
 
   const content = (
     <>
       {/* Header */}
       {!hideHeader && (
-        <div className="w-full h-[4.8em] bg-background border-b flex justify-between items-center px-4 sm:px-5">
-          <span className="font-medium text-lg sm:text-xl">Dashboard</span>
+        <div className="w-full h-[4.8em] bg-background border-b flex justify-between items-center px-4 sm:px-5 sticky top-0 z-40 backdrop-blur-md bg-white/80">
+          <span className="font-medium text-lg sm:text-xl text-zinc-800 tracking-tight">
+            {clientId ? 'Executive Dashboard' : 'Select Client'}
+          </span>
           <div className="flex items-center gap-3 sm:gap-4">
-            {/* ... existing header controls ... */}
+            {/* Show view clients button if client is selected */}
             {clientId && (
-              <ToolTipComponenet
-                content="Edit dashboard layout and widgets."
-                side="left"
-                align="center"
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/clients')}
+                className="text-zinc-500 hover:text-zinc-800"
               >
-                <Link to={`/clients/${clientId}/edit-dashboard`}>
-                  <Button className="rounded-md text-xs sm:text-sm md:text-base">
-                    Edit Dashboard
-                  </Button>
-                </Link>
-              </ToolTipComponenet>
-            )}
-            <DateRangePicker
-              value={dateRange}
-              // @ts-ignore
-              onChange={setDateRange}
-            />
-          </div>
-        </div>
-      )}
-      {hideHeader && (
-        <div className="w-full flex justify-end px-3 sm:px-5 py-2">
-          {clientId && (
-            <Link to={`/clients/${clientId}/edit-dashboard`}>
-              <Button variant="outline" size="sm" className="text-xs">
-                Edit Dashboard
+                Switch Client
               </Button>
-            </Link>
-          )}
-          <DateRangePicker
-            value={dateRange}
-            // @ts-ignore
-            onChange={setDateRange}
-          />
-        </div>
-      )}
+            )}
 
-      {/* Main Content Area - Sections */}
-      <div className="w-full flex flex-col gap-8 px-5 py-6">
-        {!clientId ? (
-          <div className="w-full px-5 py-16 text-center text-gray-500 bg-white rounded-2xl border border-dashed flex flex-col items-center justify-center">
-            <div className="p-4 rounded-full bg-gray-50 mb-4">
-              <FiSearch className="text-3xl text-gray-400" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">No Client Selected</h3>
-            <p className="mb-6 max-w-sm">Please select a client to view their dashboard and metrics.</p>
-            <Link to="/clients">
-              <Button>View Clients</Button>
-            </Link>
-          </div>
-        ) : Object.keys(integrationSections).length === 0 ? (
-          <div className="w-full px-5 py-16 text-center text-gray-500 bg-white rounded-2xl border border-dashed flex flex-col items-center justify-center">
-            <div className="p-4 rounded-full bg-gray-50 mb-4">
-              <FiBell className="text-3xl text-gray-400" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">Dashboard is Empty</h3>
-            <p className="mb-6 max-w-sm">Start by adding widgets to your dashboard.</p>
-            <Link to={`/clients/${clientId}/edit-dashboard`}>
-              <Button>Edit Dashboard</Button>
-            </Link>
-          </div>
-        ) : (
-          Object.entries(integrationSections).map(([integration, section]) => (
-            <div key={integration} className="flex flex-col gap-4">
-              {/* Section Header */}
-              <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
-                <h2 className="text-xl font-semibold capitalize text-gray-800">{integration}</h2>
-                <span className="text-xs text-gray-400 px-2 py-0.5 bg-gray-50 rounded-full">
-                  {format(dateRange.from, "MMM d")} - {format(dateRange.to, "MMM d")}
-                </span>
-              </div>
+            {clientId && (
+              <Link to={`/clients/${clientId}/edit-dashboard`}>
+                <Button variant="outline" className="shadow-sm border-zinc-200 text-zinc-700 hover:bg-zinc-50">
+                  Edit Layout
+                </Button>
+              </Link>
+            )}
 
-              <div className="flex flex-col lg:flex-row gap-6">
-                {/* Main Chart - Takes 2/3 width on large screens */}
-                {section.mainChart && (
-                  <div className="w-full lg:w-2/3 bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                    <div className="mb-4">
-                      <h3 className="text-base font-semibold text-gray-700">
-                        {section.mainChart.metricKey.split('.').pop()?.replace(/_/g, ' ')}
-                      </h3>
-                    </div>
-                    <div className="w-full h-[300px]">
-                      <ChartLineMultiple
-                        data={(resolvedWidgets[section.mainChart.id]?.series as any) || []}
-                        metricLabel={section.mainChart.metricKey}
-                        chartType={
-                          section.mainChart.type === 'area_chart' ? 'area' :
-                            section.mainChart.type === 'bar_chart' ? 'bar' :
-                              'line'
-                        }
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Metric Cards Row */}
-                {section.cards.length > 0 && (
-                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
-                    {section.cards.map((widget, idx) => renderMetricCard(widget, idx))}
-                  </div>
-                )}
-              </div>
-
-              {/* Re-rendering Section: Layout Adjustment requested by "Screenshot" logic */}
-              {/* Let's ignore the previous flex-row structure which put chart next to cards.
-                   We want Chart ROW then Cards ROW.
-               */}
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* ... corrected render loop below ... */}
-    </>
-  );
-
-
-  /* RE-WRITING THE RENDER LOOP PROPERLY FOR REPLACEMENT */
-  /* We need to be careful with the replacement. */
-
-  if (!withLayout) {
-    return <div className="w-full flex flex-col">{content}</div>;
-  }
-
-  return (
-    <div className="w-full h-[2000vh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 ">
-      <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-background ">
-        {/* Header */}
-        {!hideHeader && (
-          <div className="w-full h-[4.8em] bg-background border-b flex justify-between items-center px-4 sm:px-5">
-            <span className="font-medium text-lg sm:text-xl">Dashboard</span>
-            <div className="flex items-center gap-3 sm:gap-4">
-              <FiSearch className="text-lg text-gray-500 cursor-pointer" />
-              <FiBell className="text-lg text-gray-500 cursor-pointer" />
-              {clientId && (
-                <ToolTipComponenet
-                  content="Edit dashboard layout and widgets."
-                  side="left"
-                  align="center"
-                >
-                  <Link to={`/clients/${clientId}/edit-dashboard`}>
-                    <Button className="rounded-md text-xs sm:text-sm md:text-base">
-                      Edit Dashboard
-                    </Button>
-                  </Link>
-                </ToolTipComponenet>
-              )}
+            {/* Only show date picker if client is selected */}
+            {clientId && (
               <DateRangePicker
                 value={dateRange}
                 // @ts-ignore
                 onChange={setDateRange}
               />
-            </div>
-          </div>
-        )}
-        {!withLayout && hideHeader && (
-          <div className="w-full flex justify-end px-3 sm:px-5 py-2">
-            {clientId && (
-              <Link to={`/clients/${clientId}/edit-dashboard`}>
-                <Button variant="outline" size="sm" className="text-xs">
-                  Edit Dashboard
-                </Button>
-              </Link>
-            )}
-            <DateRangePicker
-              value={dateRange}
-              // @ts-ignore
-              onChange={setDateRange}
-            />
-          </div>
-        )}
-
-        <div className="w-full flex flex-col gap-4 px-4 py-6 bg-gray-50/50 min-h-screen">
-          <div className="w-full flex flex-col gap-4 px-4 py-6 bg-gray-50/50 min-h-screen">
-            {!clientId ? (
-              <div className="w-full px-5 py-16 text-center text-gray-500 bg-white rounded-2xl border border-dashed flex flex-col items-center justify-center">
-                <div className="p-4 rounded-full bg-gray-50 mb-4">
-                  <FiSearch className="text-3xl text-gray-400" />
-                </div>
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">No Client Selected</h3>
-                <p className="mb-6 max-w-sm">Please select a client to view their dashboard and metrics.</p>
-                <Link to="/clients">
-                  <Button>View Clients</Button>
-                </Link>
-              </div>
-            ) : Object.keys(integrationSections).length === 0 ? (
-              <div className="w-full px-5 py-16 text-center text-gray-500 bg-white rounded-2xl border border-dashed">
-                <p className="mb-4 text-lg">No metrics configured.</p>
-                <Button onClick={handleConnectIntegration}>Connect Integrations</Button>
-              </div>
-            ) : (
-              // Render sections in the order they appear in the dashboard configuration
-              (() => {
-                // Derive order from the first time an integration appears in the resolved widgets list
-                // layout-order comes from dashboardWidgets which is what createDashboardWidgetsFromMetrics or strict widgets array returns
-                const orderedIntegrations = new Set<string>();
-                dashboardWidgets.forEach(w => {
-                  if (w.integration) orderedIntegrations.add(w.integration);
-                });
-
-                // If we have sections that aren't in the ordered list (edge case), append them
-                Object.keys(integrationSections).forEach(k => orderedIntegrations.add(k));
-
-                return Array.from(orderedIntegrations).map((integration) => {
-                  const section = integrationSections[integration];
-                  console.log(`[Dashboard] Rendering section: ${integration}`, section);
-                  if (!section) return null;
-
-                  return (
-                    <div key={integration} className="flex flex-col gap-3">
-                      {/* Section Header Box */}
-                      <div className="w-full bg-white border border-gray-200 rounded-lg px-4 py-2 shadow-sm flex justify-between items-center">
-                        <h2 className="text-xl font-semibold text-gray-800 capitalize">{integration}</h2>
-                        {/* Optional: Add account ID or status here */}
-                      </div>
-
-                      {/* Main Chart Row */}
-                      {section.mainChart && (
-                        <div className="w-full bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className="text-base font-medium text-gray-700 capitalize">
-                              {section.mainChart.metricKey.split('.').pop()?.replace(/_/g, ' ')}
-                            </h3>
-                            <span className="ml-auto text-xl font-bold text-gray-900">
-                              {formatNumber(
-                                (resolvedWidgets[section.mainChart.id]?.total as number) ??
-                                (resolvedWidgets[section.mainChart.id]?.value as number)
-                              )}
-                            </span>
-                          </div>
-                          <div className="w-full h-[250px]">
-                            <ChartLineMultiple
-                              data={(resolvedWidgets[section.mainChart.id]?.series as any) || []}
-                              metricLabel={section.mainChart.metricKey}
-                              chartType={
-                                section.mainChart.type === 'area_chart' ? 'area' :
-                                  section.mainChart.type === 'bar_chart' ? 'bar' :
-                                    'line'
-                              }
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Metric Cards Row */}
-                      {section.cards.length > 0 && (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                          {section.cards.map((widget, idx) => renderMetricCard(widget, idx))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                });
-              })()
             )}
           </div>
         </div>
+      )}
 
+      {/* Main Content Area - Unified Grid */}
+      <div className="w-full flex flex-col gap-6 px-4 py-8 max-w-[1600px] mx-auto">
+        {!clientId ? (
+          // CLIENT SELECTOR GRID (Replaces "No Client Selected" placeholder)
+          <div className="w-full">
+            {isLoadingClients ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <Skeleton key={i} className="h-56 w-full rounded-xl" />
+                ))}
+              </div>
+            ) : clients?.length === 0 ? (
+              // No Clients Found
+              <div className="w-full px-5 py-24 text-center text-zinc-500 bg-white/50 backdrop-blur-sm rounded-3xl border border-dashed border-zinc-200 flex flex-col items-center justify-center transition-all hover:bg-white/80">
+                <div className="p-5 rounded-full bg-zinc-50 mb-6 shadow-sm">
+                  <FiSearch className="text-4xl text-zinc-300" />
+                </div>
+                <h3 className="text-2xl font-bold text-zinc-800 mb-3 tracking-tight">No Clients Found</h3>
+                <p className="mb-8 max-w-sm text-zinc-500 font-medium">Get started by creating your first client workspace.</p>
+                <Link to="/clients">
+                  <Button size="lg" className="rounded-xl px-8 shadow-lg shadow-primary/20">Add Client</Button>
+                </Link>
+              </div>
+            ) : (
+              // Client Grid
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-in fade-in duration-500">
+                {clients?.map((client) => {
+                  const status = getClientHealth(client);
+                  const totalIntegrations =
+                    (client._count?.metaBusinessAccounts || 0) +
+                    (client._count?.metaAdsAccounts || 0) +
+                    (client._count?.metaInsightsAccounts || 0) +
+                    (client._count?.youtubeAccounts || 0) +
+                    (client._count?.shopifyAccounts || 0) +
+                    (client._count?.woocommerceAccounts || 0) +
+                    (client._count?.googleSearchConsoleAccounts || 0) +
+                    (client._count?.googleAnalyticsAccounts || 0);
+
+                  return (
+                    <div
+                      key={client.id}
+                      onClick={() => navigate(`/clients/${client.id}`)}
+                      className={cn(
+                        "group relative flex flex-col justify-between p-5 h-56 border rounded-xl transition-all duration-300 cursor-pointer overflow-hidden shadow-sm hover:shadow-md",
+                        // Status Tints
+                        status === 'healthy' ? "bg-white border-zinc-200 hover:border-primary/50" :
+                          status === 'warning' ? "bg-amber-50/10 border-amber-200/50 hover:border-amber-300/50" :
+                            "bg-white border-zinc-200 hover:border-zinc-300"
+                      )}
+                    >
+                      {/* Micro-Chart Background (Decorative) */}
+                      <div className="absolute right-0 bottom-0 w-32 h-20 opacity-[0.03] pointer-events-none group-hover:opacity-[0.06] transition-opacity">
+                        <svg viewBox="0 0 100 40" className="w-full h-full fill-none stroke-current text-zinc-900">
+                          <path d="M0 30 Q 10 25 20 28 T 40 20 T 60 25 T 80 15 T 100 5" strokeWidth="3" />
+                        </svg>
+                      </div>
+
+                      <div className="flex flex-col items-start w-full relative z-10">
+                        <div className="flex justify-between w-full mb-4">
+                          <div className={cn(
+                            "h-10 w-10 rounded-lg flex items-center justify-center transition-colors shadow-sm",
+                            status === 'healthy' ? "bg-primary/5 text-primary" :
+                              status === 'warning' ? "bg-amber-50 text-amber-600" :
+                                "bg-zinc-100 text-zinc-500"
+                          )}>
+                            <Building2 className="w-5 h-5" />
+                          </div>
+                        </div>
+
+                        <h3 className="font-bold text-lg text-zinc-900 leading-tight line-clamp-1 text-left w-full group-hover:text-primary transition-colors">
+                          {client.name}
+                        </h3>
+
+                        {/* Micro-Trend (Simulated) */}
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className={cn(
+                            "text-xs font-medium px-2 py-0.5 rounded-full",
+                            status === 'healthy' ? "bg-emerald-50 text-emerald-600" : "bg-zinc-50 text-zinc-500"
+                          )}>
+                            {status === 'healthy' ? 'Active' : 'Setup Required'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between w-full mt-auto pt-4 border-t border-black/5 relative z-10">
+                        <div className="flex items-center gap-1.5">
+                          <Activity className="w-3.5 h-3.5 text-zinc-400" />
+                          <span className="text-zinc-600 text-[11px] font-medium">
+                            {totalIntegrations} Connected
+                          </span>
+                        </div>
+
+                        {/* Hover Action "Quick Peek" */}
+                        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity absolute right-0 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-zinc-100">
+                          <span className="text-[10px] font-bold text-primary">View Dashboard →</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        ) : dashboardWidgets.length === 0 ? (
+          <div className="w-full px-5 py-24 text-center text-zinc-500 bg-white/50 backdrop-blur-sm rounded-3xl border border-dashed border-zinc-200 flex flex-col items-center justify-center transition-all hover:bg-white/80">
+            <div className="p-5 rounded-full bg-zinc-50 mb-6 shadow-sm">
+              <FiBell className="text-4xl text-zinc-300" />
+            </div>
+            <h3 className="text-2xl font-bold text-zinc-800 mb-3 tracking-tight">Dashboard is Empty</h3>
+            <p className="mb-8 max-w-sm text-zinc-500 font-medium">Start by customizing your executive dashboard.</p>
+            <Link to={`/clients/${clientId}/edit-dashboard`}>
+              <Button size="lg" className="rounded-xl px-8 shadow-lg shadow-primary/20">Customize Dashboard</Button>
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 animate-in fade-in duration-500">
+            {dashboardWidgets.map((widget) => {
+              const data = resolvedWidgets[widget.id];
+              const brandColor = getBrandColor(widget.integration || '');
+              const isHero = ['line_chart', 'area_chart', 'bar_chart'].includes(widget.type || '');
+
+              // Value resolution
+              const value = (typeof data?.total === "number" ? data.total : undefined) ??
+                (typeof data?.value === "number" ? data.value : undefined);
+
+              if (isHero) {
+                // Render Large Chart
+                return (
+                  <div
+                    key={widget.id}
+                    className="col-span-1 md:col-span-2 lg:col-span-2 row-span-2 bg-white rounded-3xl border border-zinc-100/60 p-6 shadow-sm hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all duration-300 flex flex-col justify-between group h-[380px]"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div
+                            className="p-1.5 rounded-md bg-zinc-50/50"
+                            style={{ color: brandColor, backgroundColor: `${brandColor}10` }}
+                          >
+                            {getIntegrationIcon(widget.integration || '', "w-4 h-4")}
+                          </div>
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                            {nameCorrection(widget.integration || '')} • {widget.metricKey.split('.').pop()?.replace(/_/g, ' ')}
+                          </h3>
+                        </div>
+                        <span className="text-4xl font-bold text-zinc-900 tracking-tighter">
+                          {formatNumber(value)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="w-full flex-1 relative min-h-0">
+                      <div className="absolute inset-0 bg-gradient-to-t from-white/40 to-transparent pointer-events-none z-10" />
+                      <ChartLineMultiple
+                        data={(data?.series as any) || []}
+                        metricLabel={widget.metricKey}
+                        color={brandColor}
+                        chartType={
+                          widget.type === 'area_chart' ? 'area' :
+                            widget.type === 'bar_chart' ? 'bar' : 'line'
+                        }
+                      />
+                    </div>
+                  </div>
+                );
+              }
+
+              // Render Metric Card
+              return (
+                <MetricCard
+                  key={widget.id}
+                  title={widget.metricKey.split('.').pop()?.replace(/_/g, ' ') || ''}
+                  value={formatNumber(value ?? 0)}
+                  series={(data?.series as any) || []}
+                  brandColor={brandColor}
+                  className="col-span-1 h-[180px]"
+                  icon={getIntegrationIcon(widget.integration || '', "w-4 h-4")}
+                  chartType="line"
+                />
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </>
+  );
+
+  if (!withLayout) {
+    return <div className="w-full min-h-screen bg-slate-50/50">{content}</div>;
+  }
+
+  return (
+    <div className="w-full h-screen flex flex-col overflow-x-hidden bg-slate-50">
+      {!hideHeader && (
+        <div className="w-full h-[4.8em] bg-white/80 backdrop-blur-md border-b flex justify-between items-center px-6 sticky top-0 z-20">
+          <span className="font-bold text-lg text-zinc-800 tracking-tight">Overview</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 mr-2">
+              <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-zinc-600">
+                <FiSearch className="text-lg" />
+              </Button>
+              <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-zinc-600">
+                <FiBell className="text-lg" />
+              </Button>
+            </div>
+            {clientId && (
+              <DateRangePicker
+                value={dateRange}
+                // @ts-ignore
+                onChange={setDateRange}
+              />
+            )}
+            {!clientId ? (
+              <Link to="/clients/new">
+                <Button className="shadow-sm">
+                  New Client
+                </Button>
+              </Link>
+            ) : (
+              <Link to={`/clients/${clientId}/edit-dashboard`}>
+                <Button variant="outline" className="shadow-sm border-zinc-200 text-zinc-700 hover:bg-zinc-50">
+                  Edit Layout
+                </Button>
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 overflow-auto">
+        {content}
       </div>
     </div>
   );
 }
-
 
 export default Dashboard;

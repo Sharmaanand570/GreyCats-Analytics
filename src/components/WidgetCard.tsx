@@ -35,7 +35,7 @@ export default function WidgetCard({
         aria-label="Drag widget to reposition"
       >
         <span className="text-xs md:text-sm font-medium text-gray-600">
-          {widget.widgetType.toUpperCase()}
+          {((widget.data as any)?.label || (widget.data as any)?.title || widget.widgetType).toUpperCase()}
         </span>
         <div className="flex items-center gap-1">
           {onDelete && (

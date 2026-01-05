@@ -53,6 +53,7 @@ const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 const ClientsPage = lazy(() => import("./pages/ClientsPage"));
 const ClientDetailPage = lazy(() => import("./pages/ClientDetailPage"));
 const OAuthCallbackPage = lazy(() => import("./pages/OAuthCallbackPage"));
+const SharedReportPage = lazy(() => import("./pages/SharedReportPage"));
 
 const LoadingFallback = () => (
   <div className="flex items-center justify-center min-h-screen">
@@ -171,6 +172,9 @@ function App() {
 
           {/* Multi-Client OAuth Callback */}
           <Route path="oauth/callback" element={<OAuthCallbackPage />} />
+
+          {/* Shared Report View (Authenticated but standalone) */}
+          <Route path="shared/reports/:id" element={<SharedReportPage />} />
         </Route>
 
         {/* Dedicated 404 route (accessible from anywhere) */}

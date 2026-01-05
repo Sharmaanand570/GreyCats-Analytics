@@ -1,5 +1,6 @@
 "use client";
 
+import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { SiMeta } from "react-icons/si";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -115,6 +116,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 // --- Main Page ---
 
 function MetaDetailPage() {
+  const navigate = useNavigate();
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
 
   const { data: clientsData } = useClients();
@@ -156,7 +158,7 @@ function MetaDetailPage() {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="text-slate-300" />
                 <BreadcrumbItem>
-                  <BreadcrumbLink href="/data-sources" className="text-slate-500 hover:text-slate-800 transition-colors">Data Sources</BreadcrumbLink>
+                  <BreadcrumbLink onClick={() => navigate(-1)} className="text-slate-500 hover:text-slate-800 transition-colors cursor-pointer">Data Sources</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="text-slate-300" />
                 <BreadcrumbItem>

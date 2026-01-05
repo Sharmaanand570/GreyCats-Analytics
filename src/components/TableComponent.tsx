@@ -22,8 +22,6 @@ type IntegrationRow = {
   iconColor?: string;
   link: string;
   label: string;
-  identifier: string;
-  clientsConnected: number;
   status: string | React.ReactNode;
   onDisconnect?: () => void;
 };
@@ -31,18 +29,7 @@ type IntegrationRow = {
 type ReportRow = {
   id?: string | number;
   name: string;
-  client: string;
-  type: string;
   created: string;
-  schedule: string;
-  scheduleStatus: string;
-  clientGroup: string;
-  lastSent: string;
-  nextSendDate: string;
-  awaitingApproval: boolean;
-  lastSentStatus: string;
-  // Optional action handler for deleting a report/template (used on Reports page)
-  // Optional action handler for deleting a report/template (used on Reports page)
   onDelete?: () => void;
   // Optional link for the report name
   link?: string;
@@ -74,14 +61,15 @@ type TableType = {
 function TableComponent({ header, bodyData }: TableType) {
   // Type guards
   const isIntegrationRow = (row: any): row is IntegrationRow =>
-    "identifier" in row && "link" in row;
+    "label" in row && "link" in row;
   const isClientRow = (row: any): row is ClientRow => "profile" in row;
   const isReportRow = (row: any): row is ReportRow =>
-    "client" in row && "scheduleStatus" in row;
+    "name" in row && "created" in row && !("label" in row) && !("profile" in row);
   const isAlertRow = (row: any): row is AlertRow =>
     "metric" in row && "currentValue" in row && "triggerValue" in row && "interval" in row && "lastTriggered" in row;
   const isClientDetailRow = (row: any): row is ClientDetailRow =>
     "metric" in row && "currentValue" in row && "triggerValue" in row && "interval" in row && "lastTriggered" in row && "client" in row;
+
 
   const renderIcon = (icon: string | IconType | undefined, name: string, color?: string) => {
     if (!icon) return null;
@@ -170,21 +158,16 @@ function TableComponent({ header, bodyData }: TableType) {
                         className="flex items-center gap-2 text-accent-foreground hover:underline"
                       >
                         {renderIcon(row.icon, row.name, row.iconColor)}
-                        <span>{row.name}</span>
+                        <span>{row.name }</span>
+                        {row.name === "Meta Business" && <span className="text-xs font-light text-gray-500">{"(facebook & instagram)"}</span>}
                       </Link>
                     </td>
                     <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
                       {row.label}
                     </td>
-                    <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
-                      {row.identifier}
-                    </td>
-                    <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
-                      {row.clientsConnected}
-                    </td>
                     <td>{renderStatusChip(row.status)}</td>
                     {row.onDisconnect && (
-                      <td className="pl-2 pr-6 text-sm text-right whitespace-nowrap">
+                      <td className="  text-sm text-left whitespace-nowrap">
                         <button
                           type="button"
                           onClick={(e) => {
@@ -270,31 +253,8 @@ function TableComponent({ header, bodyData }: TableType) {
                       )}
                     </td>
                     <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
-                      {row.client}
-                    </td>
-                    <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
-                      {row.type}
-                    </td>
-                    <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
                       {row.created}
                     </td>
-                    <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
-                      {row.schedule}
-                    </td>
-                    <td>{renderStatusChip(row.scheduleStatus)}</td>
-                    <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
-                      {row.clientGroup}
-                    </td>
-                    <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
-                      {row.lastSent}
-                    </td>
-                    <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
-                      {row.nextSendDate}
-                    </td>
-                    <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
-                      {row.awaitingApproval ? "Yes" : "No"}
-                    </td>
-                    <td>{renderStatusChip(row.lastSentStatus)}</td>
                     {row.onDelete && (
                       <td className="pl-2 pr-6 text-sm text-right whitespace-nowrap">
                         <button

@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
   useFacebookPosts,
@@ -46,6 +47,7 @@ import { Loader2, RefreshCw, Facebook, Instagram } from "lucide-react";
 import { format } from "date-fns";
 
 function MetaBusinessPage() {
+  const navigate = useNavigate();
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
 
   const {
@@ -214,9 +216,10 @@ function MetaBusinessPage() {
                 variant="destructive"
                 size="sm"
                 onClick={handleDisconnect}
-                disabled={isDisconnecting || !selectedAccountId}
+                isLoading={isDisconnecting}
+                disabled={!selectedAccountId}
               >
-                {isDisconnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Disconnect"}
+                Disconnect
               </Button>
             </div>
           </div>
@@ -226,7 +229,7 @@ function MetaBusinessPage() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbLink to="/data-sources">Data Sources</BreadcrumbLink>
+                  <BreadcrumbLink onClick={() => navigate(-1)} className="cursor-pointer">Data Sources</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>

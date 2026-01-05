@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { AxiosError } from "axios";
 import type { LoginRequest } from "../API/LoginApi";
 import type { RegisterRequest } from "../API/RegisterApi";
@@ -92,14 +91,14 @@ export default function AuthPage() {
     resolver: zodResolver(isLogin ? LoginSchema : SignupSchema),
     defaultValues: isLogin
       ? {
-          email: "",
-          password: "",
-        }
+        email: "",
+        password: "",
+      }
       : {
-          email: "",
-          password: "",
-          fullName: "",
-        },
+        email: "",
+        password: "",
+        fullName: "",
+      },
   });
 
   const {
@@ -269,14 +268,11 @@ export default function AuthPage() {
                          !text-white bg-gradient-to-bl from-black via-zinc-900 to-zinc-400
                          transition duration-700 ease-in-out
                          hover:bg-black hover:brightness-110 active:brightness-95"
+              isLoading={isLogin ? isLoginPending : isSignupPending}
               disabled={isLogin ? isLoginPending : isSignupPending}
             >
               {isLogin
-                ? isLoginPending
-                  ? "Signing in..."
-                  : "Sign in with Email"
-                : isSignupPending
-                ? "Creating account..."
+                ? "Sign in with Email"
                 : "Sign up with Email"}
             </Button>
             {authError && (

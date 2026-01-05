@@ -1,6 +1,6 @@
 // @ts-nocheck - Legacy page, replaced by MetaBusinessDetailPage.tsx
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -51,6 +51,7 @@ import {
 import { Instagram, Users, Image as ImageIcon, Video, BarChart2, ExternalLink, RefreshCw, LayoutGrid } from "lucide-react";
 
 function InstagramInsightsPage() {
+  const navigate = useNavigate();
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
 
@@ -138,7 +139,7 @@ function InstagramInsightsPage() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink to="/data-sources" className="text-muted-foreground hover:text-foreground">
+                <BreadcrumbLink onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground cursor-pointer">
                   Data Sources
                 </BreadcrumbLink>
               </BreadcrumbItem>

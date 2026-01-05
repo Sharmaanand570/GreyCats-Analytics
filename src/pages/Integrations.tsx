@@ -46,7 +46,8 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
   const [disconnectTarget, setDisconnectTarget] = useState<ConnectedIntegration | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const handleDisconnect = async () => {
+  const handleDisconnect = async (e: React.MouseEvent) => {
+    e.preventDefault();
     if (!disconnectTarget || !clientId) return;
 
     try {
@@ -168,8 +169,6 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
         iconColor: platformConfig?.color,
         link,
         label: integration.accountName,
-        identifier: integration.accountIdentifier,
-        clientsConnected: 1,
         status: <SyncStatusBadge isSyncing={isSyncing} statusText={capitalizeStatus("connected")} syncDetails={syncDetails} />,
         onDisconnect: () => setDisconnectTarget(integration),
       };
@@ -276,8 +275,6 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
             header={[
               "Integration",
               "Label",
-              "Identifier",
-              "Clients Connected",
               "Status",
               "Action",
             ]}
@@ -299,9 +296,10 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDisconnect}
+              isLoading={removeAccount.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {removeAccount.isPending ? "Disconnecting..." : "Disconnect"}
+              Disconnect
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

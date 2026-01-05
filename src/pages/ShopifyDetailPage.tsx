@@ -1,8 +1,9 @@
+import { useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { SiShopify } from "react-icons/si";
 import { FiSearch, FiBell } from "react-icons/fi";
-import { RefreshCw, Trash2, Power, Loader2, Eye } from "lucide-react";
+import { RefreshCw, Trash2, Loader2, Eye } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,6 +64,7 @@ import { useClients, useClient } from "@/hooks/useClients";
 import { useRemoveAccount } from "@/hooks/useIntegrations";
 
 function ShopifyDetailPage() {
+  const navigate = useNavigate();
   // Get clients and auto-select first client (matching WooCommerce pattern)
   const { data: clientsData } = useClients();
   const clients = clientsData || [];
@@ -216,7 +218,7 @@ function ShopifyDetailPage() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbLink to="/data-sources">
+                  <BreadcrumbLink onClick={() => navigate(-1)} className="cursor-pointer">
                     Data Sources
                   </BreadcrumbLink>
                 </BreadcrumbItem>
@@ -262,20 +264,9 @@ function ShopifyDetailPage() {
                     variant="secondary"
                     size="sm"
                     onClick={handleDisconnect}
-                    disabled={removeAccount.isPending}
-                    className="gap-2"
+                    isLoading={removeAccount.isPending}
                   >
-                    {removeAccount.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Disconnecting...
-                      </>
-                    ) : (
-                      <>
-                        <Power className="w-4 h-4" />
-                        Disconnect
-                      </>
-                    )}
+                    Disconnect
                   </Button>
                   <Button
                     variant="destructive"

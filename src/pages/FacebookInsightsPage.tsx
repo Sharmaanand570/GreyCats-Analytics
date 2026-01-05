@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -49,6 +49,7 @@ import {
 import { Facebook, ThumbsUp, Tag, ExternalLink, Calendar, MessageSquare, BarChart2, RefreshCw } from "lucide-react";
 
 function FacebookInsightsPage() {
+  const navigate = useNavigate();
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
@@ -125,7 +126,7 @@ function FacebookInsightsPage() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink to="/data-sources" className="text-muted-foreground hover:text-foreground">
+                <BreadcrumbLink onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground cursor-pointer">
                   Data Sources
                 </BreadcrumbLink>
               </BreadcrumbItem>

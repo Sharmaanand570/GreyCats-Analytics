@@ -97,6 +97,10 @@ const ClientHeader = memo(
           variant="ghost"
           size="sm"
           className="text-gray-600 hover:text-gray-900 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 h-9 sm:h-10"
+          onClick={() => {
+            /* Add AI logic here later, currently just UI */
+            console.log("Ask AI clicked");
+          }}
         >
           <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
           <span className="hidden sm:inline">Ask AI</span>
@@ -138,9 +142,8 @@ const TabButton = memo(
       aria-selected={isActive}
       aria-current={isActive ? 'page' : undefined}
       tabIndex={isActive ? 0 : -1}
-      className={`px-2 sm:px-3 md:px-4 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm font-medium transition-all duration-200 relative rounded-t-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 shrink-0 ${
-        isActive ? 'text-primary bg-gray-50' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-      }`}
+      className={`px-2 sm:px-3 md:px-4 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm font-medium transition-all duration-200 relative rounded-t-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 shrink-0 ${isActive ? 'text-primary bg-gray-50' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+        }`}
     >
       <span className="truncate max-w-[80px] sm:max-w-[100px] md:max-w-[120px] block">{tab}</span>
       {isActive && <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary"></span>}
@@ -202,9 +205,8 @@ const CategoryItem = memo(
       >
         <span className="truncate">{category}</span>
         <ChevronRight
-          className={`w-4 h-4 text-gray-400 transition-transform duration-200 shrink-0 ml-2 ${
-            isExpanded ? 'rotate-90' : ''
-          }`}
+          className={`w-4 h-4 text-gray-400 transition-transform duration-200 shrink-0 ml-2 ${isExpanded ? 'rotate-90' : ''
+            }`}
           aria-hidden="true"
         />
       </button>

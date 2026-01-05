@@ -174,16 +174,9 @@ function GoogleConsoleDetailPage() {
                 variant="destructive"
                 size="sm"
                 onClick={handleDisconnect}
-                disabled={removeAccount.isPending}
+                isLoading={removeAccount.isPending}
               >
-                {removeAccount.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Disconnecting...
-                  </>
-                ) : (
-                  "Disconnect"
-                )}
+                Disconnect
               </Button>
             </div>
           </div>
@@ -192,7 +185,7 @@ function GoogleConsoleDetailPage() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbLink to="/data-sources">
+                  <BreadcrumbLink onClick={() => navigate(-1)} className="cursor-pointer">
                     Data Sources
                   </BreadcrumbLink>
                 </BreadcrumbItem>

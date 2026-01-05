@@ -22,6 +22,56 @@ function ImageWidgetForm({ data, onChange }: ImageWidgetFormProps): React.JSX.El
     }
   };
 
+  // Helper to compress image before setting state
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const MAX_WIDTH = 1024;
+      const MAX_HEIGHT = 1024;
+      const QUALITY = 0.8;
+
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+
+          // Calculate new dimensions
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            reject(new Error("Could not get canvas context"));
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Compress to JPEG
+          const dataUrl = canvas.toDataURL("image/jpeg", QUALITY);
+          resolve(dataUrl);
+        };
+        img.onerror = (error) => reject(error);
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
   return (
     <div className="w-full h-full overflow-y-auto">
       <div className="w-full p-4 border-b flex items-center justify-between">
@@ -77,16 +127,23 @@ function ImageWidgetForm({ data, onChange }: ImageWidgetFormProps): React.JSX.El
               e.preventDefault();
               e.dataTransfer.dropEffect = "copy";
             }}
-            onDrop={(e) => {
+            onDrop={async (e) => {
               e.preventDefault();
               const file = e.dataTransfer.files?.[0];
               if (file && file.type.startsWith("image/")) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                  const src = event.target?.result as string;
-                  handleChange({ src });
-                };
-                reader.readAsDataURL(file);
+                try {
+                  const compressedSrc = await compressImage(file);
+                  handleChange({ src: compressedSrc });
+                } catch (error) {
+                  console.error("Image compression failed:", error);
+                  // Fallback to original if compression fails
+                  const reader = new FileReader();
+                  reader.onload = (event) => {
+                    const src = event.target?.result as string;
+                    handleChange({ src });
+                  };
+                  reader.readAsDataURL(file);
+                }
               }
             }}
           >
@@ -107,15 +164,22 @@ function ImageWidgetForm({ data, onChange }: ImageWidgetFormProps): React.JSX.El
               accept="image/*"
               className="hidden"
               id="image-upload"
-              onChange={(e) => {
+              onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (file) {
-                  const reader = new FileReader();
-                  reader.onload = (event) => {
-                    const src = event.target?.result as string;
-                    handleChange({ src });
-                  };
-                  reader.readAsDataURL(file);
+                  try {
+                    const compressedSrc = await compressImage(file);
+                    handleChange({ src: compressedSrc });
+                  } catch (error) {
+                    console.error("Image compression failed:", error);
+                    // Fallback
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      const src = event.target?.result as string;
+                      handleChange({ src });
+                    };
+                    reader.readAsDataURL(file);
+                  }
                 }
               }}
             />

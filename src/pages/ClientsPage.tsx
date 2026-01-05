@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClients } from '../hooks/useClients';
-import { Plus, Building2, TrendingUp, Activity, ArrowUpDown } from 'lucide-react';
+import { Plus, Building2, Activity, ArrowUpDown } from 'lucide-react';
 import { FiSearch, FiBell } from "react-icons/fi";
 import { Button } from '../components/ui/button';
 import { Input } from "../components/ui/input";
@@ -114,7 +114,7 @@ const ClientsPage: React.FC = () => {
                                     </SelectContent>
                                 </Select>
 
-                              
+
                             </div>
 
                             <div className="relative hidden md:block w-56">
@@ -164,16 +164,20 @@ const ClientsPage: React.FC = () => {
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                {processedClients.map((client) => {
-                                    const totalIntegrations =
+                                {processedClients.map((clientData) => {
+                                    const client = clientData as any; // Cast for now as processedClients type inference might still be Client[]
+                                    const countFromStructure =
                                         (client._count?.metaBusinessAccounts || 0) +
-                                        (client._count?.metaAdsAccounts || 0) +
-                                        (client._count?.metaInsightsAccounts || 0) +
+                                        (client._count?.metaAdsAccounts || client._count?.metaAdAccounts || 0) +
+                                        (client._count?.metaInsightsAccounts || client._count?.metaInsights || 0) +
                                         (client._count?.youtubeAccounts || 0) +
                                         (client._count?.shopifyAccounts || 0) +
-                                        (client._count?.woocommerceAccounts || 0) +
-                                        (client._count?.googleSearchConsoleAccounts || 0) +
-                                        (client._count?.googleAnalyticsAccounts || 0);
+                                        (client._count?.woocommerceAccounts || client._count?.wooCommerceAccounts || 0) +
+                                        (client._count?.googleAnalyticsAccounts || client._count?.googleAnalyticsProperties || client._count?.platformAccounts || 0);
+
+                                    const totalIntegrations = (client.integrations?.length || 0) > 0
+                                        ? client.integrations.length
+                                        : countFromStructure;
 
                                     const status = getClientHealth(client);
 
@@ -189,12 +193,7 @@ const ClientsPage: React.FC = () => {
                                                         "bg-red-50/20 border-red-100 hover:border-red-200"
                                             )}
                                         >
-                                            {/* Micro-Chart Background (Decorative) */}
-                                            <div className="absolute right-0 bottom-0 w-32 h-20 opacity-[0.03] pointer-events-none group-hover:opacity-[0.06] transition-opacity">
-                                                <svg viewBox="0 0 100 40" className="w-full h-full fill-none stroke-current text-zinc-900">
-                                                    <path d="M0 30 Q 10 25 20 28 T 40 20 T 60 25 T 80 15 T 100 5" strokeWidth="3" />
-                                                </svg>
-                                            </div>
+
 
                                             <div className="flex flex-col items-start w-full relative z-10">
                                                 <div className="flex justify-between w-full mb-4">
@@ -212,13 +211,7 @@ const ClientsPage: React.FC = () => {
                                                     {client.name}
                                                 </h3>
 
-                                                {/* Micro-Trend (Simulated) */}
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className="text-xs text-zinc-400 font-medium">Last 7 Days</span>
-                                                    <span className="flex items-center text-xs font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
-                                                        <TrendingUp className="w-3 h-3 mr-1" /> +12%
-                                                    </span>
-                                                </div>
+
                                             </div>
 
                                             <div className="flex items-center justify-between w-full mt-auto pt-4 border-t border-black/5 relative z-10">

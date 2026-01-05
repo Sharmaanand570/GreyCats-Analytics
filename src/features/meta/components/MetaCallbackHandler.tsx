@@ -35,7 +35,6 @@ function MetaCallbackHandler() {
     const processCallback = async () => {
       // Extract parameters from URL
       const status = searchParams.get("status");
-      const userId = searchParams.get("userId");
       const reason = searchParams.get("reason");
 
       console.log("Full URL:", window.location.href);
@@ -101,6 +100,15 @@ function MetaCallbackHandler() {
     localStorage.removeItem('pending_oauth_integration');
   };
 
+  const handleAccountSelectionCancel = () => {
+    setShowAccountModal(false);
+    toast.info("Account connection cancelled");
+    // Cleanup storage
+    localStorage.removeItem('pending_oauth_client_id');
+    localStorage.removeItem('pending_oauth_integration');
+    handleContinue();
+  };
+
   const handleContinue = () => {
     if (clientId) {
       navigate(`/clients/${clientId}`);
@@ -149,6 +157,7 @@ function MetaCallbackHandler() {
           clientId={clientId}
           integration={integrationType}
           onSuccess={handleAccountSelectionSuccess}
+          onCancel={handleAccountSelectionCancel}
         />
       )}
 

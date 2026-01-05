@@ -11,13 +11,15 @@ interface ChartLineProps {
   metricLabel?: string;
   simple?: boolean;
   chartType?: "line" | "area" | "bar";
+  color?: string;
 }
 
 export function ChartLineMultiple({
   data,
   metricLabel = "Value",
   simple = false,
-  chartType = "line"
+  chartType = "line",
+  color
 }: ChartLineProps) {
 
   const formattedData = data.map(point => ({
@@ -32,6 +34,9 @@ export function ChartLineMultiple({
       </div>
     );
   }
+
+  // Use passed color or fallback to primary variable
+  const activeColor = color || "var(--color-primary, #2563eb)";
 
   const commonProps = {
     data: formattedData,
@@ -94,18 +99,18 @@ export function ChartLineMultiple({
           {chartType === 'area' ? (
             <AreaChart {...commonProps}>
               <defs>
-                <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-primary, #2563eb)" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="var(--color-primary, #2563eb)" stopOpacity={0} />
+                <linearGradient id={`colorValue-${metricLabel}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={activeColor} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={activeColor} stopOpacity={0} />
                 </linearGradient>
               </defs>
               {renderCommonElements()}
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke="var(--color-primary, #2563eb)"
+                stroke={activeColor}
                 fillOpacity={1}
-                fill="url(#colorValue)"
+                fill={`url(#colorValue-${metricLabel})`}
                 strokeWidth={simple ? 2 : 3}
               />
             </AreaChart>
@@ -114,7 +119,7 @@ export function ChartLineMultiple({
               {renderCommonElements()}
               <Bar
                 dataKey="value"
-                fill="var(--color-primary, #2563eb)"
+                fill={activeColor}
                 radius={[4, 4, 0, 0]}
               />
             </BarChart>
@@ -124,10 +129,10 @@ export function ChartLineMultiple({
               <Line
                 dataKey="value"
                 type="monotone"
-                stroke="var(--color-primary, #2563eb)"
+                stroke={activeColor}
                 strokeWidth={simple ? 2 : 3}
                 dot={false}
-                activeDot={simple ? false : { r: 6, strokeWidth: 0, fill: "var(--color-primary, #2563eb)" }}
+                activeDot={simple ? false : { r: 6, strokeWidth: 0, fill: activeColor }}
               />
             </LineChart>
           )}

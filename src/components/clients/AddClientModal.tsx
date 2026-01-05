@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateClient } from '../../hooks/useClients';
-import { Loader2 } from 'lucide-react';
 import {
     Dialog,
     DialogContent,
@@ -109,15 +108,8 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ open, onClose }) => {
                         >
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={createClient.isPending || !name.trim()}>
-                            {createClient.isPending ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Creating...
-                                </>
-                            ) : (
-                                'Create Client'
-                            )}
+                        <Button type="submit" isLoading={createClient.isPending} disabled={createClient.isPending || !name.trim()}>
+                            Create Client
                         </Button>
                     </DialogFooter>
                 </form>

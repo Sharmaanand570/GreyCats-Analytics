@@ -1,6 +1,6 @@
 import type { IconType } from "react-icons";
-import { FaYoutube, FaGoogle, FaCartShopping } from "react-icons/fa6";
-import { SiGoogleanalytics, SiShopify, SiMeta, SiQuora } from "react-icons/si";
+import { FaCartShopping } from "react-icons/fa6";
+import { SiGoogleanalytics, SiShopify, SiMeta, SiQuora, SiYoutube, SiGooglesearchconsole } from "react-icons/si";
 
 export type PlatformConfig = {
   name: string;
@@ -25,7 +25,7 @@ const platformMap: Record<string, PlatformConfig> = {
 
   youtube: {
     name: "YouTube",
-    icon: FaYoutube,
+    icon: SiYoutube,
     link: "/data-sources/youtube",
     color: "#FF0000", // YouTube red
   },
@@ -44,14 +44,14 @@ const platformMap: Record<string, PlatformConfig> = {
   },
   "google-console": {
     name: "Google Search Console",
-    icon: FaGoogle,
+    icon: SiGooglesearchconsole,
     link: "/data-sources/google-console",
     color: "#4285F4", // Google blue
   },
   // Alias for backend platform name "google-search-console"
   "google-search-console": {
     name: "Google Search Console",
-    icon: FaGoogle,
+    icon: SiGooglesearchconsole,
     link: "/data-sources/google-console",
     color: "#4285F4",
   },

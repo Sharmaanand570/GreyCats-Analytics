@@ -254,8 +254,8 @@ export default function CompanyDetailsForm() {
 
           {/* Button */}
           <div className="flex items-center justify-end gap-2 pt-2">
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving..." : "Save"}
+            <Button type="submit" isLoading={isSubmitting} disabled={isSubmitting}>
+              Save
             </Button>
           </div>
         </form>

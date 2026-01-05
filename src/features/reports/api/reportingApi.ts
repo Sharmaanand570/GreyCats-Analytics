@@ -14,6 +14,8 @@ import type {
   GeneratePdfResponse,
   GetDashboardsResponse,
   GetTemplateResponse,
+  ListReportSchedulesResponse,
+  GetReportScheduleResponse,
   ListTemplatesResponse,
   ReportTemplate,
   ReportWidgetDefinition,
@@ -52,6 +54,8 @@ export const getSyncStatus = (clientId: number) =>
     const response = await api.get<SyncStatusResponse>(
       `/clients/${clientId}/sync-status`
     );
+
+    console.log(response.data, "hjvbjhvhjvjhvjhvjhvj");
     return response.data;
   });
 
@@ -219,6 +223,7 @@ const mapApiTemplateToReportTemplate = (
     defaultDateTo: apiTemplate.defaultDateTo,
     pageOrder,
     slidesMeta,
+    clientId: apiTemplate.clientId ?? apiTemplate.client_id,
   };
 };
 
@@ -426,6 +431,22 @@ export const updateReportSchedule = (
 export const deleteReportSchedule = (clientId: number, scheduleId: number) =>
   handleRequest(async () => {
     const response = await api.delete<ReportScheduleMessageResponse>(
+      `/clients/${clientId}/report-schedules/${scheduleId}`
+    );
+    return response.data;
+  });
+
+export const listReportSchedules = (clientId: number) =>
+  handleRequest(async () => {
+    const response = await api.get<ListReportSchedulesResponse>(
+      `/clients/${clientId}/report-schedules?activeOnly=false`
+    );
+    return response.data;
+  });
+
+export const getReportSchedule = (clientId: number, scheduleId: number) =>
+  handleRequest(async () => {
+    const response = await api.get<GetReportScheduleResponse>(
       `/clients/${clientId}/report-schedules/${scheduleId}`
     );
     return response.data;

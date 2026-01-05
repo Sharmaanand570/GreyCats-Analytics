@@ -1,5 +1,5 @@
 import { FiLoader, FiCheckCircle } from "react-icons/fi";
-import { cn } from "@/lib/utils";
+
 
 interface SyncStatusBadgeProps {
     isSyncing: boolean;

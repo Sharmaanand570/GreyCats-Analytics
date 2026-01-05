@@ -30,8 +30,6 @@ import { ChartLineMultiple } from "../components/ChartLineMultiple";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "../components/ui/card";
 import {
   Table,
@@ -83,10 +81,9 @@ import {
   getReportTemplate,
   fetchUnifiedMetric,
   updateReportTemplate,
-  createReportSchedule,
-  updateReportSchedule,
-  deleteReportSchedule,
+  listReportSchedules,
 } from "@/features/reports/api/reportingApi";
+import { CreateScheduleModal } from "../components/CreateScheduleModal";
 import { getGoogleConsoleUnifiedMetrics } from "@/features/YouTube/API/googleConsoleapi";
 import type {
   ApiError,
@@ -95,10 +92,7 @@ import type {
   ResolvedWidgetData,
   WidgetSeriesPoint,
   ReportSlideMeta,
-  ReportSchedule,
-  ReportScheduleFrequency,
-  CreateReportSchedulePayload,
-  UpdateReportSchedulePayload,
+
 } from "@/features/reports/api/types";
 import { useIntegrations } from "@/features/DataSources/hooks/useIntegrations";
 import { getPlatformConfig } from "@/utils/platformMapping";
@@ -399,9 +393,7 @@ function pickDefaultMetricsForIntegration(
       const facebookRemaining = remainingCandidates.filter(m =>
         m.integration === 'meta-facebook' || m.integration === 'meta_facebook'
       );
-      const instagramRemaining = remainingCandidates.filter(m =>
-        m.integration === 'meta-instagram' || m.integration === 'meta_instagram'
-      );
+
 
       // Ensure we have at least some Facebook metrics if available
       const facebookCount = curatedFound.filter(m =>
@@ -714,76 +706,7 @@ function buildDefaultWidgetsForIntegration(
     currentY += 8;
   }
 
-  // 3. For Google Search Console, add dimensional breakdowns (by device, country)
-  if (metrics[0] && metrics[0].integration === "google-search-console" && widgets.length < MAX_DEFAULT_WIDGETS) {
-    const firstMetric = metrics[0];
 
-    // Add "By Device" table widget
-    if (widgets.length < MAX_DEFAULT_WIDGETS) {
-      const id = generateWidgetId("auto");
-
-      widgets.push({
-        i: id,
-        x: 0,
-        y: currentY,
-        w: 6,
-        h: 6,
-        widgetType: "table",
-        data: undefined,
-        metricConfig: {
-          id,
-          metricKey: firstMetric.metricKey,
-          integration: firstMetric.integration,
-          accountId: firstMetric.accountId,
-          groupBy: "device",
-          aggregation: "sum",
-          type: "table",
-          layout: {
-            slideId,
-            x: 0,
-            y: currentY,
-            w: 6,
-            h: 6,
-          },
-          ...(firstMetric.filters ? { filters: firstMetric.filters } : {}),
-        },
-      });
-    }
-
-    // Add "By Country" table widget
-    if (widgets.length < MAX_DEFAULT_WIDGETS) {
-      const id = generateWidgetId("auto");
-
-      widgets.push({
-        i: id,
-        x: 6,
-        y: currentY,
-        w: 6,
-        h: 6,
-        widgetType: "table",
-        data: undefined,
-        metricConfig: {
-          id,
-          metricKey: firstMetric.metricKey,
-          integration: firstMetric.integration,
-          accountId: firstMetric.accountId,
-          groupBy: "country",
-          aggregation: "sum",
-          type: "table",
-          layout: {
-            slideId,
-            x: 6,
-            y: currentY,
-            w: 6,
-            h: 6,
-          },
-          ...(firstMetric.filters ? { filters: firstMetric.filters } : {}),
-        },
-      });
-    }
-
-    currentY += 6;
-  }
 
   return widgets.slice(0, MAX_DEFAULT_WIDGETS);
 }
@@ -1003,10 +926,7 @@ const renderWidgetContent = (
         series.length > 0 ||
         typeof (resolvedData as ResolvedWidgetData)?.total === "number";
 
-      const chartTitle =
-        (widget.data as ChartWidgetData)?.title ||
-        widget.metricConfig?.metricKey?.split(".").pop()?.replace(/_/g, " ") ||
-        "Metric";
+
 
       const chartData = series.map((point) => ({
         label: point.x,
@@ -1015,9 +935,7 @@ const renderWidgetContent = (
 
       return (
         <div className="h-full flex flex-col">
-          <div className="text-xs md:text-sm font-medium text-gray-700 mb-2 px-1 capitalize">
-            {chartTitle}
-          </div>
+
           <div className="flex-1">
             {hasData ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -1136,10 +1054,7 @@ const renderWidgetContent = (
         series.length > 0 ||
         typeof (resolvedData as ResolvedWidgetData)?.total === "number";
 
-      const chartTitle =
-        (widget.data as ChartWidgetData)?.title ||
-        widget.metricConfig?.metricKey?.split(".").pop()?.replace(/_/g, " ") ||
-        "Metric";
+
 
       const chartData = series.map((point) => ({
         label: point.x,
@@ -1148,9 +1063,7 @@ const renderWidgetContent = (
 
       return (
         <div className="h-full flex flex-col p-1">
-          <div className="text-xs md:text-sm font-medium text-gray-700 mb-2 capitalize">
-            {chartTitle}
-          </div>
+
           <div className="flex-1 min-h-[200px]">
             {hasData ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -1239,7 +1152,7 @@ const renderWidgetContent = (
         resolvedRows[0] &&
         typeof resolvedRows[0] === 'object' &&
         resolvedRows[0] !== null &&
-        'dimensionValue' in (resolvedRows[0] as Record<string, unknown>) &&
+        (resolvedRows[0] as any).dimensionValue && // Check values are truthy (not null)
         'value' in (resolvedRows[0] as Record<string, unknown>);
 
       // If dimensional data, convert to simple 2-column format
@@ -1264,6 +1177,7 @@ const renderWidgetContent = (
         !isGaTopPagesTable &&
           !gaRows &&
           !dimensionalRows &&  // Don't use series if we have dimensional data
+          (!metricConfig?.groupBy || metricConfig.groupBy === 'none' || metricConfig.groupBy === 'date') && // Only show series (time-series) if grouping is date-based or none. Don't show dates for 'device' tables.
           Array.isArray((resolvedData as ResolvedWidgetData)?.series)
           ? (((resolvedData as ResolvedWidgetData)
             .series as WidgetSeriesPoint[]) as unknown[])
@@ -1313,12 +1227,18 @@ const renderWidgetContent = (
       const usingDimensionalRows = !usingGaRows && !!dimensionalRows && dimensionalRows.length > 0;
       const usingSeriesRows = !usingGaRows && !usingDimensionalRows && !!seriesRows && seriesRows.length > 0;
       const usingResolvedRows =
-        !usingGaRows && !usingDimensionalRows && !usingSeriesRows && !!resolvedRows && resolvedRows.length > 0;
+        !usingGaRows &&
+        !usingDimensionalRows &&
+        !usingSeriesRows &&
+        !!resolvedRows &&
+        resolvedRows.length > 0 &&
+        (!metricConfig?.groupBy || metricConfig.groupBy === 'none' || metricConfig.groupBy === 'date');
       const usingTableData =
         !usingGaRows &&
         !usingDimensionalRows &&
         !usingSeriesRows &&
         !usingResolvedRows &&
+        (!metricConfig?.metricKey) && // Never use static table data if a metric is configured
         !!tableData?.rows &&
         tableData.rows.length > 0;
 
@@ -1328,7 +1248,7 @@ const renderWidgetContent = (
         (usingResolvedRows ? (resolvedRows as any[]) : null) ??
         (usingSeriesRows ? (seriesRows as any[]) : null) ??
         (usingTableData ? tableData?.rows : null) ??
-        reportTableRows;
+        (metricConfig?.metricKey ? [] : reportTableRows);
 
       const autoColumns =
         resolvedRows &&
@@ -1344,13 +1264,7 @@ const renderWidgetContent = (
       const dimensionType = metricConfig?.groupBy || '';
       const metricName = metricConfig?.metricKey?.split('.').pop()?.replace(/_/g, ' ') || 'Metric';
 
-      const title =
-        tableData?.title ??
-        (isGaTopPagesTable
-          ? "Top Pages by Views"
-          : usingDimensionalRows && dimensionType
-            ? `${metricName} by ${dimensionType.charAt(0).toUpperCase() + dimensionType.slice(1)}`
-            : "Scheduled Reports");
+
 
       const caption =
         tableData?.caption ??
@@ -1372,7 +1286,7 @@ const renderWidgetContent = (
             ]
             : usingSeriesRows
               ? [
-                { name: "Label", width: "60%" },
+                { name: "Metric", width: "60%" },
                 { name: "Value" },
               ]
               : usingResolvedRows && autoColumns
@@ -1394,9 +1308,7 @@ const renderWidgetContent = (
 
       return (
         <Card className="h-full flex flex-col rounded-lg border-0 shadow-none">
-          <CardHeader className="pb-2 px-2 pt-2">
-            <CardTitle className="text-sm md:text-base">{title}</CardTitle>
-          </CardHeader>
+
           <CardContent className="flex-1 p-0 overflow-visible">
             <div className="w-full h-full overflow-x-auto">
               <Table className="w-full table-fixed text-xs md:text-sm">
@@ -1442,7 +1354,7 @@ const renderWidgetContent = (
                         } else if (usingSeriesRows) {
                           const sRow = row as any as WidgetSeriesPoint;
                           cellValue =
-                            col.name === "Label"
+                            col.name === "Metric"
                               ? sRow.x
                               : col.name === "Value"
                                 ? sRow.y
@@ -1614,11 +1526,7 @@ const renderWidgetContent = (
               </span>
             )}
           </span>
-          {metricData?.label && (
-            <span className="text-gray-600 mt-1 md:mt-2 text-xs md:text-sm">
-              {metricData.label}
-            </span>
-          )}
+
 
           {/* Trend & Comparison (Manual / Custom Metrics) */}
           {(metricData?.trendValue || metricData?.comparisonValue) && (
@@ -1900,23 +1808,53 @@ export interface WidgetFormState {
   h?: number;
 }
 
-function ReportBuilder() {
+interface ReportBuilderProps {
+  readOnly?: boolean;
+  providedReportId?: number;
+}
+
+function ReportBuilder({ readOnly = false, providedReportId }: ReportBuilderProps = {}) {
   const params = useParams<{ clientId: string; id?: string }>();
   const parsedClientId = params.clientId ? parseInt(params.clientId) : null;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  // Template State
+  const [templateId, setTemplateId] = useState<number | null>(
+    providedReportId ?? (params.id && params.id !== "new" ? parseInt(params.id) : null)
+  );
   // Initialize dashboards based on integrations
   const [dashboards, setDashboards] = useState<DashboardMap>(() => {
     // Start with empty map, will be populated based on integrations
     return new Map([[0, []]]);
   });
-  const [templateId, setTemplateId] = useState<number | null>(null);
   const [isDashboardsInitialized, setIsDashboardsInitialized] = useState(false);
 
   // Custom pages state (pages added by user, not from integrations)
   const [customPages, setCustomPages] = useState<
     Array<{ id: number; name: string; subtitle?: string }>
   >([]);
+
+  // Template Query - Must be before integrations to derive clientId
+  // Template Query - Must be before integrations to derive clientId
+  const templateQuery = useQuery({
+    queryKey: ["report-template", templateId],
+    queryFn: async () => {
+      if (templateId == null) {
+        throw new Error("Missing template id");
+      }
+      const response = await getReportTemplate(templateId);
+      console.log("getReportTemplate response", response);
+      return response.template;
+    },
+    enabled: templateId != null,
+    retry: 0,
+  });
+
+  const { isLoading: isTemplateLoading, isError: isTemplateError } = templateQuery;
+
+  // Derive clientId from template if not in params
+  const effectiveClientId = parsedClientId ?? templateQuery.data?.clientId ?? null;
 
   // Page order state - tracks the order of all pages (integration indices + custom page IDs)
   const [pageOrder, setPageOrder] = useState<number[]>([]);
@@ -1977,39 +1915,45 @@ function ReportBuilder() {
   );
 
   // Report schedule state
-  const [schedule, setSchedule] = useState<ReportSchedule | null>(null);
-  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
-  const [scheduleName, setScheduleName] = useState("Daily Performance Report");
-  const [scheduleDescription, setScheduleDescription] = useState(
-    "Auto daily metrics at 9 AM"
-  );
-  const [scheduleFrequency, setScheduleFrequency] =
-    useState<ReportScheduleFrequency>("daily");
-  const [scheduleTimezone, setScheduleTimezone] =
-    useState<string>("Asia/Kolkata");
-  const [scheduleTimeOfDay, setScheduleTimeOfDay] = useState<string>("09:00");
-  const [scheduleSendEmail, setScheduleSendEmail] = useState(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const { data: schedulesData } = useQuery({
+    queryKey: ["report-schedules", parsedClientId],
+    queryFn: () => {
+      if (!parsedClientId) throw new Error("Client ID is required");
+      return listReportSchedules(parsedClientId);
+    },
+    enabled: !!parsedClientId,
+  });
+
+  const currentSchedule = useMemo(() => {
+    if (!schedulesData?.data || !templateId) return null;
+    return schedulesData.data.find(s => s.templateId === templateId) || null;
+  }, [schedulesData, templateId]);
 
   // Auto-save state
   const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  const { data: integrationsData } = useIntegrations(parsedClientId);
+  const {
+    data: integrationsData,
+    isLoading: isLoadingIntegrations,
+  } = useIntegrations(effectiveClientId);
 
   // Debug log with safe handling of undefined
   if (integrationsData) {
     console.log(integrationsData, "integrationsData", parsedClientId);
   }
 
+  // NOTE: We only enable 'available metrics' fetch if we have a clientId
+  // If we are in 'shared' mode, we might not have clientId initially,
+  // but once template loads, effectiveClientId will be set.
   const {
     groupedMetrics,
     isLoading: isLoadingAvailableMetrics,
     error: availableMetricsError,
-  } = useAvailableMetrics(parsedClientId);
+  } = useAvailableMetrics(effectiveClientId);
 
   // UI state for the AgencyAnalytics-style "Choose your Metrics" panel
-  const [selectedPlatformForMetrics, setSelectedPlatformForMetrics] =
-    useState<string | null>(null);
   const [selectedIntegrationForMetrics, setSelectedIntegrationForMetrics] =
     useState<{
       platform: string;
@@ -2120,8 +2064,7 @@ function ReportBuilder() {
     }
 
     // Prevent creating a report if there are no connected integrations
-    const integrationCount = integrationsData?.integrations?.length ?? 0;
-    if (integrationCount === 0) {
+    if ((integrationsData?.integrations?.length ?? 0) === 0) {
 
       toast.error(
         "You need to connect at least one data source before creating a report."
@@ -2138,19 +2081,6 @@ function ReportBuilder() {
     setIsNameDialogOpen(false);
   }, [createTemplate, defaultTemplatePayload, newReportName, integrationsData]);
 
-  const templateQuery = useQuery({
-    queryKey: ["report-template", templateId],
-    queryFn: async () => {
-      if (templateId == null || !parsedClientId) {
-        throw new Error("Missing template id or client id");
-      }
-      const response = await getReportTemplate(templateId);
-      console.log("getReportTemplate response", response);
-      return response.template;
-    },
-    enabled: templateId != null,
-    retry: 0,
-  });
 
   // Apply saved default date range from template (if present)
   useEffect(() => {
@@ -2176,7 +2106,9 @@ function ReportBuilder() {
         // Just inform the user and go back to the reports list.
         templateBootstrapRef.current = false;
         toast.error("Report not found");
-        navigate(`/clients/${parsedClientId}/reports`);
+        if (!readOnly) {
+          navigate(`/clients/${parsedClientId}/reports`);
+        }
         return;
       }
       toast.error(error.message || "Failed to load report template");
@@ -2378,9 +2310,9 @@ function ReportBuilder() {
     setIsDashboardsInitialized(true);
   }, [templateQuery.data, integrationsData]);
 
-  const templateName =
-    (templateQuery.data?.name ?? newReportName) || "Untitled Report";
-  const isTemplateLoading = templateQuery.isPending || templateQuery.isFetching;
+  const templateName = isTemplateError
+    ? "Report Not Found"
+    : (templateQuery.data?.name ?? newReportName) || "Untitled Report";
 
   // Signature of all metric widgets in the current dashboards/layout state.
   // This ensures we refetch report data whenever the user adds/removes widgets
@@ -2651,19 +2583,14 @@ function ReportBuilder() {
             return { hash, widgets: localWidgets, data: null };
           }
 
-          const params: Record<string, string> = {
+          const params = {
             integration: normalizedIntegration,
             metricKey: widget.metricKey,
             startDate: dateFrom,
             endDate: dateTo,
           };
 
-          const data = await fetchUnifiedMetric(parsedClientId!, params as {
-            integration: string;
-            metricKey: string;
-            startDate: string;
-            endDate: string;
-          });
+          const data = await fetchUnifiedMetric(parsedClientId!, params);
 
           return { hash, widgets: localWidgets, data };
         } catch (error) {
@@ -2730,7 +2657,8 @@ function ReportBuilder() {
           const isSingleAccountIntegration =
             widget.integration === 'woocommerce' ||
             widget.integration === 'youtube' ||
-            widget.integration === 'meta-business';
+            widget.integration === 'meta-business' ||
+            widget.integration === 'google-search-console';
 
 
 
@@ -2992,50 +2920,7 @@ function ReportBuilder() {
 
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
-  // Report schedule mutations
-  const { mutate: createSchedule } = useMutation({
-    mutationFn: async (payload: CreateReportSchedulePayload) => {
-      if (!parsedClientId) throw new Error("Client ID is required");
-      return createReportSchedule(parsedClientId, payload);
-    },
-    onSuccess: (response) => {
-      setSchedule(response.data);
-      toast.success("Schedule created");
-    },
-    onError: (error: ApiError) => {
-      toast.error(error.message || "Failed to create schedule");
-    },
-  });
 
-  const { mutate: updateSchedule } = useMutation({
-    mutationFn: async (args: {
-      id: number;
-      payload: UpdateReportSchedulePayload;
-    }) => {
-      if (!parsedClientId) throw new Error("Client ID is required");
-      return updateReportSchedule(parsedClientId, args.id, args.payload);
-    },
-    onSuccess: () => {
-      toast.success("Schedule updated");
-    },
-    onError: (error: ApiError) => {
-      toast.error(error.message || "Failed to update schedule");
-    },
-  });
-
-  const { mutate: removeSchedule } = useMutation({
-    mutationFn: async (id: number) => {
-      if (!parsedClientId) throw new Error("Client ID is required");
-      return deleteReportSchedule(parsedClientId, id);
-    },
-    onSuccess: () => {
-      setSchedule(null);
-      toast.success("Schedule deleted");
-    },
-    onError: (error: ApiError) => {
-      toast.error(error.message || "Failed to delete schedule");
-    },
-  });
 
   const handleSaveTemplate = useCallback(() => {
     if (!templateId) {
@@ -3085,65 +2970,12 @@ function ReportBuilder() {
     navigate(`/clients/${parsedClientId}?tab=data-sources`);
   }, [navigate, parsedClientId]);
 
-  const handleOpenScheduleDialog = useCallback(() => {
-    // Prefill dialog with existing schedule or sensible defaults
-    if (schedule) {
-      setScheduleName(schedule.name);
-      setScheduleDescription(schedule.description ?? "");
-      setScheduleFrequency(schedule.frequency as ReportScheduleFrequency);
-      setScheduleTimezone(schedule.timezone);
-      setScheduleTimeOfDay(schedule.timeOfDay);
-      setScheduleSendEmail(Boolean(schedule.sendEmail));
-    }
-    setIsScheduleDialogOpen(true);
-  }, [schedule]);
 
-  const handleSaveSchedule = useCallback(() => {
-    if (!templateId) {
-      toast.error("Save the template before scheduling");
-      return;
-    }
-
-    if (!schedule) {
-      const payload: CreateReportSchedulePayload = {
-        templateId,
-        name: scheduleName,
-        description: scheduleDescription || undefined,
-        frequency: scheduleFrequency,
-        timezone: scheduleTimezone,
-        timeOfDay: scheduleTimeOfDay,
-        sendEmail: scheduleSendEmail,
-      };
-      createSchedule(payload);
-    } else {
-      const payload: UpdateReportSchedulePayload = {
-        name: scheduleName || undefined,
-        description: scheduleDescription || undefined,
-        timeOfDay: scheduleTimeOfDay || undefined,
-        isActive: true,
-        sendEmail: scheduleSendEmail,
-      };
-      updateSchedule({ id: schedule.id, payload });
-    }
-
-    setIsScheduleDialogOpen(false);
-  }, [
-    templateId,
-    schedule,
-    scheduleName,
-    scheduleDescription,
-    scheduleFrequency,
-    scheduleTimezone,
-    scheduleTimeOfDay,
-    scheduleSendEmail,
-    createSchedule,
-    updateSchedule,
-  ]);
 
   useEffect(() => {
-    const routeId = params.id;
+    const routeId = providedReportId ? String(providedReportId) : params.id;
     if (!routeId || routeId === "new") {
-      if (!isCreatingTemplate && !templateBootstrapRef.current) {
+      if (!readOnly && !isCreatingTemplate && !templateBootstrapRef.current) {
         templateBootstrapRef.current = true;
         setIsNameDialogOpen(true);
       }
@@ -3157,7 +2989,7 @@ function ReportBuilder() {
     }
 
     setTemplateId(numericId);
-  }, [params.id, isCreatingTemplate, defaultTemplatePayload, createTemplate]);
+  }, [params.id, providedReportId, isCreatingTemplate, defaultTemplatePayload, createTemplate, readOnly]);
 
   const [widgetFormState, setWidgetFormState] = useState<WidgetFormState>({
     slideId: 0,
@@ -3286,6 +3118,51 @@ function ReportBuilder() {
     [dashboards]
   );
 
+  const handleAddIntegrationPage = useCallback((integrationIndex: number) => {
+    // 1. Check if we already have this slide (shouldn't happen if UI filters correctly, but safety first)
+    if (dashboards.has(integrationIndex)) {
+      toast.error("This integration page already exists");
+      return;
+    }
+
+    // 2. Create the slide with default widgets if enabled
+    let defaultWidgets: DashboardLayout[] = [];
+    if (ENABLE_AUTO_DEFAULT_WIDGETS && groupedMetrics && !isLoadingAvailableMetrics) {
+      const integration = integrationsData?.integrations?.[integrationIndex];
+      if (integration) {
+        const picked = pickDefaultMetricsForIntegration(
+          integration.platform,
+          integration.accountId,
+          groupedMetrics as any,
+          (msg) => toast.warning(msg)
+        );
+        defaultWidgets = buildDefaultWidgetsForIntegration(integrationIndex, picked);
+      }
+    }
+
+    // 3. Add to dashboards
+    setDashboards((prev) => {
+      const updated = new Map(prev);
+      updated.set(integrationIndex, defaultWidgets);
+      return updated;
+    });
+
+    // 4. Add to page order (append to end)
+    setPageOrder((prev) => {
+      return [...prev, integrationIndex];
+    });
+
+    toast.success("Integration page added");
+
+    // 5. Scroll to new page
+    setTimeout(() => {
+      if (slidesRef.current[integrationIndex]) {
+        slidesRef.current[integrationIndex]?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
+
+  }, [dashboards, groupedMetrics, isLoadingAvailableMetrics, integrationsData]);
+
   // Update widget data in dashboards state
   const updateWidgetData = useCallback(
     (slideId: number, widgetId: string, newData: WidgetData) => {
@@ -3399,6 +3276,7 @@ function ReportBuilder() {
           metricKey: string;
           integration: string;
           accountId: string;
+          label?: string;
           filters?: Record<string, unknown>;
         }
         | undefined;
@@ -3465,8 +3343,18 @@ function ReportBuilder() {
 
       // 🧠 Use 0, not -1 — react-grid-layout handles y positioning automatically
       const widgetIdentifier = generateWidgetId("item");
-      // Default widget data; for custom content blocks we may specialise later
+      // Default widget data
       let widgetData = getDefaultWidgetData(widgetType);
+
+      // Apply the metric label if available
+      if (metricData?.label && widgetData) {
+        if ("label" in widgetData) {
+          (widgetData as any).label = metricData.label;
+        }
+        if ("title" in widgetData) {
+          (widgetData as any).title = metricData.label;
+        }
+      }
 
       // If this is a custom Content Block with a specific kind, annotate it in data
       if (widgetType === "custom" && widgetData && "content" in widgetData) {
@@ -3551,6 +3439,7 @@ function ReportBuilder() {
           metricKey: string;
           integration: string;
           accountId: string;
+          label?: string;
           filters?: Record<string, unknown>;
         }
         | string
@@ -4199,6 +4088,7 @@ function ReportBuilder() {
                         metricKey: metric.metricKey,
                         integration: metric.integration,
                         accountId: metric.accountId,
+                        label: metric.displayName,
                         ...(metric.filters
                           ? { filters: metric.filters }
                           : isGoogleConsole
@@ -4355,180 +4245,90 @@ function ReportBuilder() {
             <Button variant="outline" onClick={handleCancelNewReport}>
               Cancel
             </Button>
-            <Button onClick={handleConfirmNewReport}>Create Report</Button>
+            <Button onClick={handleConfirmNewReport} isLoading={isCreatingTemplate}>Create Report</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
       {/* Schedule Dialog */}
-      <Dialog
-        open={isScheduleDialogOpen}
-        onOpenChange={setIsScheduleDialogOpen}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {schedule ? "Edit Report Schedule" : "Create Report Schedule"}
-            </DialogTitle>
-            <DialogDescription>
-              Automatically run this report at a specific time.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">
-                Name
-              </label>
-              <Input
-                value={scheduleName}
-                onChange={(e) => setScheduleName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">
-                Description
-              </label>
-              <Input
-                value={scheduleDescription}
-                onChange={(e) => setScheduleDescription(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">
-                Frequency
-              </label>
-              <select
-                className="border rounded px-2 py-1 text-sm w-full"
-                value={scheduleFrequency}
-                onChange={(e) =>
-                  setScheduleFrequency(
-                    e.target.value as ReportScheduleFrequency
-                  )
-                }
-              >
-                <option value="daily">Daily</option>
-                <option value="weekly" disabled>
-                  Weekly (coming soon)
-                </option>
-                <option value="monthly" disabled>
-                  Monthly (coming soon)
-                </option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">
-                Time of day
-              </label>
-              <Input
-                type="time"
-                value={scheduleTimeOfDay}
-                onChange={(e) => setScheduleTimeOfDay(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">
-                Timezone
-              </label>
-              <Input
-                value={scheduleTimezone}
-                onChange={(e) => setScheduleTimezone(e.target.value)}
-              />
-            </div>
-            <div className="flex items-center gap-2 pt-2">
-              <input
-                id="schedule-send-email"
-                type="checkbox"
-                checked={scheduleSendEmail}
-                onChange={(e) => setScheduleSendEmail(e.target.checked)}
-              />
-              <label
-                htmlFor="schedule-send-email"
-                className="text-xs md:text-sm text-gray-700"
-              >
-                Send report via email when it runs
-              </label>
-            </div>
-          </div>
-          <DialogFooter className="flex justify-between items-center">
-            {schedule && (
-              <Button
-                type="button"
-                variant="outline"
-                className="text-red-600 border-red-300"
-                onClick={() => removeSchedule(schedule.id)}
-              >
-                Delete Schedule
-              </Button>
-            )}
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                type="button"
-                onClick={() => setIsScheduleDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="button" onClick={handleSaveSchedule}>
-                {schedule ? "Save Changes" : "Create Schedule"}
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {effectiveClientId && (
+        <CreateScheduleModal
+          open={isScheduleModalOpen}
+          onOpenChange={setIsScheduleModalOpen}
+          clientId={effectiveClientId}
+          templates={templateId ? [{ id: templateId, name: templateName }] : []}
+          scheduleToEdit={currentSchedule}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["report-schedules", effectiveClientId] });
+          }}
+        />
+      )}
       {/* Top Bar */}
-      <div className="sticky z-50 top-0 py-3 md:py-[1.3em]  border-b flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-3 md:px-5">
-        <div className="flex flex-col">
-          <span className="font-medium text-lg md:text-xl">Report Builder</span>
-          <div className="flex items-center gap-2">
-            <span className="text-xs md:text-sm text-gray-500">
-              {showFullPageSkeleton ? "Loading template..." : templateName}
-            </span>
-            {templateId && (
-              <span className="text-xs text-gray-400">
-                {isSavingTemplate ? (
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                    Saving...
-                  </span>
-                ) : hasUnsavedChanges ? (
-                  <span>Unsaved changes</span>
-                ) : lastSavedTime ? (
-                  <span>All changes saved</span>
-                ) : null}
+      {!readOnly && (
+        <div className="sticky z-50 top-0 py-3 md:py-[1.3em]  border-b flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-3 md:px-5">
+          <div className="flex flex-col">
+            <span className="font-medium text-lg md:text-xl">Report Builder</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs md:text-sm text-gray-500">
+                {showFullPageSkeleton ? "Loading template..." : templateName}
               </span>
-            )}
+              {templateId && (
+                <span className="text-xs text-gray-400">
+                  {isSavingTemplate ? (
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                      Saving...
+                    </span>
+                  ) : hasUnsavedChanges ? (
+                    <span>Unsaved changes</span>
+                  ) : lastSavedTime ? (
+                    <span>All changes saved</span>
+                  ) : null}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <span className="mx-1 md:mx-2 text-base md:text-lg text-gray-500 cursor-pointer">
+              <FiSearch />
+            </span>
+            <span className="mx-1 md:mx-2 text-base md:text-lg text-gray-500 cursor-pointer">
+              <FiBell />
+            </span>
+            <Button
+              variant="outline"
+              className="rounded-[0.4rem] text-xs md:text-sm px-2 md:px-4 py-1.5 md:py-2"
+              onClick={() => setIsScheduleModalOpen(true)}
+              disabled={isSavingTemplate || showFullPageSkeleton}
+            >
+              {currentSchedule ? "Edit Schedule" : "Add Schedule"}
+            </Button>
+            <Button
+              variant="outline"
+              className="rounded-[0.4rem] text-xs md:text-sm px-2 md:px-4 py-1.5 md:py-2"
+              onClick={handleSaveTemplate}
+              disabled={showFullPageSkeleton}
+              isLoading={isSavingTemplate}
+            >
+              Save Template
+            </Button>
+
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          <span className="mx-1 md:mx-2 text-base md:text-lg text-gray-500 cursor-pointer">
-            <FiSearch />
-          </span>
-          <span className="mx-1 md:mx-2 text-base md:text-lg text-gray-500 cursor-pointer">
-            <FiBell />
-          </span>
-          <Button
-            variant="outline"
-            className="rounded-[0.4rem] text-xs md:text-sm px-2 md:px-4 py-1.5 md:py-2"
-            onClick={handleOpenScheduleDialog}
-            disabled={isSavingTemplate || showFullPageSkeleton}
-          >
-            {schedule ? "Edit Schedule" : "Add Schedule"}
-          </Button>
-          <Button
-            variant="outline"
-            className="rounded-[0.4rem] text-xs md:text-sm px-2 md:px-4 py-1.5 md:py-2"
-            onClick={handleSaveTemplate}
-            disabled={isSavingTemplate || showFullPageSkeleton}
-          >
-            {isSavingTemplate ? "Saving..." : "Save Template"}
-          </Button>
+      )}
 
+      {/* Shared View Top Bar (Minimal) */}
+      {readOnly && (
+        <div className="sticky z-50 top-0 py-3 md:py-[1.3em] border-b flex items-center justify-between px-3 md:px-5 bg-white">
+          <div className="flex flex-col">
+            <span className="font-medium text-lg md:text-xl">{templateName}</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Sub Header */}
       <div className="sticky z-40 top-[var(--rb-header)] py-2 md:py-[1.2em]  border-b flex flex-col md:flex-row justify-between items-stretch md:items-center gap-2 md:gap-0 px-3 md:px-5">
         <div className="flex items-center gap-2 md:gap-4 min-w-0">
-          <RadioButtonGroup />
+          {!readOnly && <RadioButtonGroup />}
         </div>
         <div className="flex gap-2 items-center">
           <div className="flex-1 md:flex-none">
@@ -4539,305 +4339,371 @@ function ReportBuilder() {
               }}
             />
           </div>
-          <button
+          <Button
             onClick={handleGeneratePdf}
-            disabled={isGeneratingPdf}
             className="bg-accent-foreground text-white py-1.5 md:py-2 px-3 md:px-4 rounded-[0.6rem] text-xs md:text-sm hover:cursor-pointer whitespace-nowrap disabled:opacity-60"
+            isLoading={isGeneratingPdf}
           >
             <span className="hidden md:inline">
-              {isGeneratingPdf ? "Generating..." : "Download PDF"}
+              Download PDF
             </span>
-            <span className="md:hidden">{isGeneratingPdf ? "..." : "PDF"}</span>
-          </button>
+            <span className="md:hidden">PDF</span>
+          </Button>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="flex flex-1 min-h-0 relative">
-        {/* Left Sidebar */}
-        <div className="sticky top-[calc(var(--rb-header)+var(--rb-subheader))] left-0 w-48 md:w-52 lg:w-[15.5rem]  border-r h-[calc(100vh-(var(--rb-header)+var(--rb-subheader)))] overflow-y-auto transition-all duration-300 z-30">
-          <div className="w-full h-full">
-            <WidgetsPageSideComponent
-              reftype={slidesRef}
-              customPages={customPages}
-              pageOrder={effectivePageOrder}
-              // Pass through slide metadata from the template, augmented with any
-              // in-memory custom pages so newly added pages appear immediately in
-              // the sidebar even before a full save/refresh round-trip.
-              slidesMeta={(() => {
-                const base =
-                  (templateQuery.data?.slidesMeta as
-                    | ReportSlideMeta[]
-                    | undefined) ?? [];
-
-                const existingIds = new Set(base.map((s) => s.id));
-                const extras = customPages
-                  .filter((p) => !existingIds.has(p.id))
-                  .map((p) => ({
-                    id: p.id,
-                    title: p.name,
-                    subtitle: p.subtitle,
-                    source: "custom" as const,
-                  }));
-                return [...base, ...extras];
-              })()}
-              onDeletePage={handleDeletePage}
-              onAddPage={addCustomPage}
-              onReorderPages={handleReorderPages}
-              onRenamePage={handleRenamePage}
-            />
+        {readOnly && isTemplateError ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50 h-[calc(100vh-(var(--rb-header)+var(--rb-subheader)))]">
+            <div className="bg-white p-8 md:p-12 rounded-2xl shadow-sm max-w-md w-full flex flex-col items-center border">
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-6">
+                <svg
+                  className="w-8 h-8 text-red-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+              </div>
+              <h2 className="text-xl md:text-2xl font-semibold text-gray-900 mb-2">
+                Report Not Found
+              </h2>
+              <p className="text-gray-500 mb-8">
+                The report you are looking for does not exist or you do not have permission to view it.
+              </p>
+              <Button onClick={() => window.location.reload()}>
+                Try Again
+              </Button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <>
+            {/* Left Sidebar */}
+            {!readOnly && (
+              <div className="sticky top-[calc(var(--rb-header)+var(--rb-subheader))] left-0 w-48 md:w-52 lg:w-[15.5rem]  border-r h-[calc(100vh-(var(--rb-header)+var(--rb-subheader)))] overflow-y-auto transition-all duration-300 z-30">
+                <div className="w-full h-full">
+                  <WidgetsPageSideComponent
+                    reftype={slidesRef}
+                    customPages={customPages}
+                    pageOrder={effectivePageOrder}
+                    onAddPage={addCustomPage}
+                    onDeletePage={handleDeletePage}
+                    onRenamePage={handleRenamePage}
+                    onReorderPages={handleReorderPages}
+                    onAddIntegrationPage={handleAddIntegrationPage}
+                    availableIntegrations={integrationsData?.integrations?.map((integ, idx) => ({
+                      index: idx,
+                      platform: integ.platform,
+                      accountName: integ.accountName
+                    })).filter(integ => !dashboards.has(integ.index)) ?? []}
+                    // Pass through slide metadata from the template, augmented with any
+                    // in-memory custom pages so newly added pages appear immediately in
+                    // the sidebar even before a full save/refresh round-trip.
+                    slidesMeta={(() => {
+                      const base =
+                        (templateQuery.data?.slidesMeta as
+                          | ReportSlideMeta[]
+                          | undefined) ?? [];
 
-        {/* Grid Area */}
-        <div className="flex-1 overflow-y-auto bg-gray-100 flex flex-col items-center h-[calc(100vh-(var(--rb-header)+var(--rb-subheader)))] px-2 md:px-0">
-          {showFullPageSkeleton ? (
-            <div className="w-full max-w-5xl my-4 space-y-8">
-              {/* Skeleton Slide 1 */}
-              <div className="rounded-xl border bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-8 border-b pb-4">
-                  <div className="space-y-2">
-                    <Skeleton className="h-8 w-64" />
-                    <Skeleton className="h-4 w-48" />
-                  </div>
-                  <Skeleton className="h-6 w-32" />
-                </div>
-                <div className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <Skeleton className="h-32 w-full rounded-lg" />
-                    <Skeleton className="h-32 w-full rounded-lg" />
-                  </div>
-                  <Skeleton className="h-64 w-full rounded-lg" />
+                      const existingIds = new Set(base.map((s) => s.id));
+
+                      // Add custom pages not in base
+                      const extras = customPages
+                        .filter((p) => !existingIds.has(p.id))
+                        .map((p) => ({
+                          id: p.id,
+                          title: p.name,
+                          subtitle: p.subtitle,
+                          source: "custom" as const,
+                        }));
+
+                      // Add missing integration slides
+                      // Integrations are 0-indexed corresponding to integrationsData array
+                      const integrationExtras: ReportSlideMeta[] = [];
+                      if (integrationsData?.integrations) {
+                        Array.from(dashboards.keys()).forEach(slideId => {
+                          if (!existingIds.has(slideId) && !customPages.find(p => p.id === slideId)) {
+                            // Check if it's a valid integration index
+                            const integration = integrationsData.integrations[slideId];
+                            if (integration) {
+                              integrationExtras.push({
+                                id: slideId,
+                                title: "", // Sidebar logic will fallback to integration name if empty
+                                subtitle: "",
+                                source: "integration"
+                              });
+                            }
+                          }
+                        });
+                      }
+
+                      return [...base, ...extras, ...integrationExtras];
+                    })()}
+                  />
                 </div>
               </div>
-            </div>
-          ) : (
-            effectivePageOrder.map((id) => {
-              const layout = dashboards.get(id);
-              if (!layout) return null;
+            )}
 
-              // Format date range for display
-              const formatDateRange = () => {
-                if (!dateRange?.from && !dateRange?.to) {
-                  return undefined;
-                }
-                if (dateRange.from && dateRange.to) {
-                  return `${format(dateRange.from, "MMM d, yyyy")} - ${format(
-                    dateRange.to,
-                    "MMM d, yyyy"
-                  )}`;
-                }
-                if (dateRange.from) {
-                  return `From ${format(dateRange.from, "MMM d, yyyy")}`;
-                }
-                if (dateRange.to) {
-                  return `Until ${format(dateRange.to, "MMM d, yyyy")}`;
-                }
-                return undefined;
-              };
-
-              // Get slide title - prefer the current customPages (Pages sidebar)
-              // so that renaming a page immediately updates the main slide
-              // header. Fall back to slide metadata from the template, then
-              // integration names, and finally a neutral "Untitled page" label.
-              const slideMeta = templateQuery.data?.slidesMeta?.find(
-                (s) => s.id === id
-              );
-              const customPage = customPages.find((p) => p.id === id);
-
-              let slideTitle: string;
-              let slideSubtitle: string | undefined;
-
-              if (customPage) {
-                slideTitle = customPage.name;
-                slideSubtitle = customPage.subtitle;
-              } else if (slideMeta) {
-                slideTitle = slideMeta.title;
-                slideSubtitle = slideMeta.subtitle;
-              } else {
-                // Use slideIntegrationMap which correctly maps slideId to integration
-                const integration = slideIntegrationMap.get(id);
-
-                if (integration) {
-                  const platformConfig = getPlatformConfig(integration.platform);
-                  slideTitle = platformConfig?.name || integration.platform;
-                  slideSubtitle = integration.accountName;
-                } else {
-                  slideTitle = "Untitled page";
-                }
-              }
-
-              // Combine title and subtitle for display
-              const displayTitle = slideSubtitle
-                ? `${slideTitle} - ${slideSubtitle}`
-                : slideTitle;
-
-              return (
-                <SlideContainer
-                  key={id}
-                  id={`slide-${id}`}
-                  title={displayTitle}
-                  dateRange={formatDateRange()}
-                  containerRef={(el) => {
-                    slidesRef.current[id] = el; // Use slide ID instead of loop index
-                  }}
-                >
-                  {layout.length === 0 ? (
-                    isTemplateLoading ? (
-                      <div className="relative w-full min-h-[500px] flex items-center justify-center">
-                        <div className="flex flex-col items-center gap-4">
-                          <Skeleton className="h-16 w-16 rounded-full" />
-                          <Skeleton className="h-6 w-48" />
-                          <Skeleton className="h-4 w-64" />
-                        </div>
+            {/* Grid Area */}
+            <div className="flex-1 overflow-y-auto bg-gray-100 flex flex-col items-center h-[calc(100vh-(var(--rb-header)+var(--rb-subheader)))] px-2 md:px-0">
+              {showFullPageSkeleton ? (
+                <div className="w-full max-w-5xl my-4 space-y-8">
+                  {/* Skeleton Slide 1 */}
+                  <div className="rounded-xl border bg-white p-6 shadow-sm">
+                    <div className="flex items-center justify-between mb-8 border-b pb-4">
+                      <div className="space-y-2">
+                        <Skeleton className="h-8 w-64" />
+                        <Skeleton className="h-4 w-48" />
                       </div>
-                    ) : (
-                      /* Empty State - Still accepts drops */
-                      <div className="relative w-full min-h-[500px]">
+                      <Skeleton className="h-6 w-32" />
+                    </div>
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-2 gap-4">
+                        <Skeleton className="h-32 w-full rounded-lg" />
+                        <Skeleton className="h-32 w-full rounded-lg" />
+                      </div>
+                      <Skeleton className="h-64 w-full rounded-lg" />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                effectivePageOrder.map((id) => {
+                  const layout = dashboards.get(id);
+                  if (!layout) return null;
+
+                  // Format date range for display
+                  const formatDateRange = () => {
+                    if (!dateRange?.from && !dateRange?.to) {
+                      return undefined;
+                    }
+                    if (dateRange.from && dateRange.to) {
+                      return `${format(dateRange.from, "MMM d, yyyy")} - ${format(
+                        dateRange.to,
+                        "MMM d, yyyy"
+                      )}`;
+                    }
+                    if (dateRange.from) {
+                      return `From ${format(dateRange.from, "MMM d, yyyy")}`;
+                    }
+                    if (dateRange.to) {
+                      return `Until ${format(dateRange.to, "MMM d, yyyy")}`;
+                    }
+                    return undefined;
+                  };
+
+                  // Get slide title - prefer the current customPages (Pages sidebar)
+                  // so that renaming a page immediately updates the main slide
+                  // header. Fall back to slide metadata from the template, then
+                  // integration names, and finally a neutral "Untitled page" label.
+                  const slideMeta = templateQuery.data?.slidesMeta?.find(
+                    (s) => s.id === id
+                  );
+                  const customPage = customPages.find((p) => p.id === id);
+
+                  let slideTitle: string;
+                  let slideSubtitle: string | undefined;
+
+                  if (customPage) {
+                    slideTitle = customPage.name;
+                    slideSubtitle = customPage.subtitle;
+                  } else if (slideMeta) {
+                    slideTitle = slideMeta.title;
+                    slideSubtitle = slideMeta.subtitle;
+                  } else {
+                    // Use slideIntegrationMap which correctly maps slideId to integration
+                    const integration = slideIntegrationMap.get(id);
+
+                    if (integration) {
+                      const platformConfig = getPlatformConfig(integration.platform);
+                      slideTitle = platformConfig?.name || integration.platform;
+                      slideSubtitle = integration.accountName;
+                    } else {
+                      slideTitle = "Untitled page";
+                    }
+                  }
+
+                  // Combine title and subtitle for display
+                  const displayTitle = slideSubtitle
+                    ? `${slideTitle} - ${slideSubtitle}`
+                    : slideTitle;
+
+                  return (
+                    <SlideContainer
+                      key={id}
+                      id={`slide-${id}`}
+                      title={displayTitle}
+                      dateRange={formatDateRange()}
+                      containerRef={(el) => {
+                        slidesRef.current[id] = el; // Use slide ID instead of loop index
+                      }}
+                    >
+                      {layout.length === 0 ? (
+                        isTemplateLoading ? (
+                          <div className="relative w-full min-h-[500px] flex items-center justify-center">
+                            <div className="flex flex-col items-center gap-4">
+                              <Skeleton className="h-16 w-16 rounded-full" />
+                              <Skeleton className="h-6 w-48" />
+                              <Skeleton className="h-4 w-64" />
+                            </div>
+                          </div>
+                        ) : (
+                          /* Empty State - Still accepts drops */
+                          <div className="relative w-full min-h-[500px]">
+                            <AutoWidthGrid
+                              className="layout w-full h-full"
+                              layout={[]}
+                              cols={currentGridConfig.cols}
+                              rowHeight={currentGridConfig.rowHeight}
+                              autoSize={false}
+                              margin={currentGridConfig.margin}
+                              containerPadding={isTablet ? [8, 8] : [14, 14]}
+                              isDroppable={!readOnly}
+                              isDraggable={false}
+                              compactType={null}
+                              onDrop={(layoutArr, layoutItem, e) =>
+                                handleDrop(layoutArr, layoutItem, e as DragEvent, id)
+                              }
+                              onLayoutChange={createLayoutChangeHandler(id, layout)}
+                              style={{ minHeight: "500px" }}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4">
+                              <div className="text-center">
+                                <svg
+                                  className="mx-auto h-12 w-12 sm:h-16 sm:w-16 text-gray-400 mb-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={1.5}
+                                    d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                  />
+                                </svg>
+                                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
+                                  Start Building Your Report
+                                </h3>
+                                <p className="text-xs sm:text-sm text-gray-600 mb-4 max-w-xs sm:max-w-sm mx-auto">
+                                  Drag and drop widgets from the right sidebar to create
+                                  your custom report
+                                </p>
+                                <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M13 7l5 5m0 0l-5 5m5-5H6"
+                                    />
+                                  </svg>
+                                  <span className="hidden sm:inline">
+                                    Try dragging a metric from Integrations
+                                  </span>
+                                  <span className="sm:hidden">
+                                    Drag from Integrations
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      ) : (
                         <AutoWidthGrid
-                          className="layout w-full h-full"
-                          layout={[]}
+                          className="layout"
+                          layout={layout}
                           cols={currentGridConfig.cols}
                           rowHeight={currentGridConfig.rowHeight}
-                          autoSize={false}
+                          autoSize={true}
                           margin={currentGridConfig.margin}
                           containerPadding={isTablet ? [8, 8] : [14, 14]}
-                          isDroppable={true}
-                          isDraggable={false}
+                          isDroppable={!readOnly}
+                          isDraggable={!readOnly}
                           compactType={null}
+                          draggableHandle=".drag-handle"
+                          draggableCancel=".non-draggable"
                           onDrop={(layoutArr, layoutItem, e) =>
                             handleDrop(layoutArr, layoutItem, e as DragEvent, id)
                           }
                           onLayoutChange={createLayoutChangeHandler(id, layout)}
-                          style={{ minHeight: "500px" }}
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4">
-                          <div className="text-center">
-                            <svg
-                              className="mx-auto h-12 w-12 sm:h-16 sm:w-16 text-gray-400 mb-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={1.5}
-                                d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                              />
-                            </svg>
-                            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
-                              Start Building Your Report
-                            </h3>
-                            <p className="text-xs sm:text-sm text-gray-600 mb-4 max-w-xs sm:max-w-sm mx-auto">
-                              Drag and drop widgets from the right sidebar to create
-                              your custom report
-                            </p>
-                            <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
+                        >
+                          {layout.map((widget) => {
+                            const dataKey = widget.metricConfig?.id ?? widget.i;
+                            const widgetResolvedData: ResolvedWidgetData | undefined =
+                              resolvedWidgets[dataKey];
+                            return (
+                              <div
+                                key={widget.i}
+                                ref={createWidgetRefCallback(id, widget.i)}
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M13 7l5 5m0 0l-5 5m5-5H6"
-                                />
-                              </svg>
-                              <span className="hidden sm:inline">
-                                Try dragging a metric from Integrations
-                              </span>
-                              <span className="sm:hidden">
-                                Drag from Integrations
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  ) : (
-                    <AutoWidthGrid
-                      className="layout"
-                      layout={layout}
-                      cols={currentGridConfig.cols}
-                      rowHeight={currentGridConfig.rowHeight}
-                      autoSize={true}
-                      margin={currentGridConfig.margin}
-                      containerPadding={isTablet ? [8, 8] : [14, 14]}
-                      isDroppable={true}
-                      isDraggable={true}
-                      compactType={null}
-                      draggableHandle=".drag-handle"
-                      draggableCancel=".non-draggable"
-                      onDrop={(layoutArr, layoutItem, e) =>
-                        handleDrop(layoutArr, layoutItem, e as DragEvent, id)
-                      }
-                      onLayoutChange={createLayoutChangeHandler(id, layout)}
-                    >
-                      {layout.map((widget) => {
-                        const dataKey = widget.metricConfig?.id ?? widget.i;
-                        const widgetResolvedData: ResolvedWidgetData | undefined =
-                          resolvedWidgets[dataKey];
-                        return (
-                          <div
-                            key={widget.i}
-                            ref={createWidgetRefCallback(id, widget.i)}
-                          >
-                            <WidgetCard
-                              widget={widget}
-                              onContentClick={createWidgetClickHandler(id)}
-                              onDelete={() => handleDeleteWidget(id, widget.i)}
-                            >
-                              {renderWidgetContent(widget, widgetResolvedData, {
-                                isLoading:
-                                  (shouldResolveWidgets && reportDataQuery.status === "pending") ||
-                                  (reportDataQuery.isFetching && !widgetResolvedData),
-                                onConnectIntegration: handleConnectIntegration,
-                              })}
-                            </WidgetCard>
-                          </div>
-                        );
-                      })}
-                    </AutoWidthGrid>
-                  )}
-                </SlideContainer>
-              );
-            })
-          )}
-        </div>
-
-        {/* Right Sidebar */}
-        <div className="sticky top-[calc(var(--rb-header)+var(--rb-subheader))] right-0 flex  border-l h-[calc(100vh-(var(--rb-header)+var(--rb-subheader)))] overflow-y-visible z-20">
-          <div
-            className={`${rightPanelTitle !== ""
-              ? "w-48 md:w-56 lg:w-[16.25rem]"
-              : "w-0 overflow-hidden"
-              } h-full transition-all duration-300`}
-          >
-            <div className="w-full p-3 md:p-4 border-b font-semibold text-sm md:text-base text-accent-foreground">
-              {rightPanelTitle}
+                                <WidgetCard
+                                  widget={widget}
+                                  onContentClick={createWidgetClickHandler(id)}
+                                  onDelete={() => handleDeleteWidget(id, widget.i)}
+                                >
+                                  {renderWidgetContent(widget, widgetResolvedData, {
+                                    isLoading:
+                                      (shouldResolveWidgets && reportDataQuery.status === "pending") ||
+                                      (reportDataQuery.isFetching && !widgetResolvedData),
+                                    onConnectIntegration: handleConnectIntegration,
+                                  })}
+                                </WidgetCard>
+                              </div>
+                            );
+                          })}
+                        </AutoWidthGrid>
+                      )}
+                    </SlideContainer>
+                  );
+                })
+              )}
             </div>
 
-            {rightPanelContent}
-          </div>
+            {/* Right Sidebar */}
+            {!readOnly && (
+              <div className="sticky top-[calc(var(--rb-header)+var(--rb-subheader))] right-0 flex  border-l h-[calc(100vh-(var(--rb-header)+var(--rb-subheader)))] overflow-y-visible z-20">
+                <div
+                  className={`${rightPanelTitle !== ""
+                    ? "w-48 md:w-56 lg:w-[16.25rem]"
+                    : "w-0 overflow-hidden"
+                    } h-full transition-all duration-300`}
+                >
+                  <div className="w-full p-3 md:p-4 border-b font-semibold text-sm md:text-base text-accent-foreground">
+                    {rightPanelTitle}
+                  </div>
 
-          <div
-            className={`${widgetFormState.widgetType !== ""
-              ? "w-48 md:w-56 lg:w-[16.25rem]"
-              : "w-0 overflow-hidden"
-              } h-full transition-all duration-300`}
-          >
-            {widgetFormSections}
-          </div>
+                  {rightPanelContent}
+                </div>
 
-          <ReportElements
-            setRightPanelTitle={setRightPanelTitle}
-            setWidgetFormState={setWidgetFormState}
-          />
-        </div>
+                <div
+                  className={`${widgetFormState.widgetType !== ""
+                    ? "w-48 md:w-56 lg:w-[16.25rem]"
+                    : "w-0 overflow-hidden"
+                    } h-full transition-all duration-300`}
+                >
+                  {widgetFormSections}
+                </div>
+
+                <ReportElements
+                  setRightPanelTitle={setRightPanelTitle}
+                  setWidgetFormState={setWidgetFormState}
+                />
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

@@ -102,6 +102,15 @@ function MetaBusinessCallbackHandler() {
     localStorage.removeItem('pending_oauth_integration');
   };
 
+  const handleAccountSelectionCancel = () => {
+    setShowAccountModal(false);
+    toast.info("Account connection cancelled");
+    // Cleanup storage
+    localStorage.removeItem('pending_oauth_client_id');
+    localStorage.removeItem('pending_oauth_integration');
+    handleContinue();
+  };
+
   const handleContinue = () => {
     if (clientId) {
       navigate(`/clients/${clientId}`);
@@ -161,6 +170,7 @@ function MetaBusinessCallbackHandler() {
           clientId={clientId}
           integration={integrationType}
           onSuccess={handleAccountSelectionSuccess}
+          onCancel={handleAccountSelectionCancel}
         />
       )}
 

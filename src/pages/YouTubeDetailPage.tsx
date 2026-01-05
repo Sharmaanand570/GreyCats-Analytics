@@ -50,7 +50,7 @@ import {
 import { Loader2, RefreshCw, Youtube, Eye, ThumbsUp, Clock, Users, TrendingUp } from "lucide-react";
 import { FaYoutube } from "react-icons/fa6";
 import { format, subDays } from "date-fns";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import type { YouTubeVideoItem } from "@/features/YouTube/API/youtubeApi";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import type { DateRange } from "react-day-picker";
@@ -72,6 +72,7 @@ const buildChartData = (series?: Array<Record<string, unknown>>) => {
 };
 
 function YouTubeDetailPage() {
+  const navigate = useNavigate();
   const { clientId } = useParams();
   const numericClientId = Number(clientId);
 
@@ -220,8 +221,8 @@ function YouTubeDetailPage() {
                 {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                 Sync
               </Button>
-              <Button variant="destructive" size="sm" onClick={handleDisconnect} disabled={isDisconnecting || removeAccount.isPending}>
-                {isDisconnecting || removeAccount.isPending ? "Disconnecting..." : "Disconnect"}
+              <Button variant="destructive" size="sm" onClick={handleDisconnect} isLoading={isDisconnecting || removeAccount.isPending}>
+                Disconnect
               </Button>
             </div>
           </div>
@@ -230,7 +231,7 @@ function YouTubeDetailPage() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbLink to="/data-sources">Data Sources</BreadcrumbLink>
+                  <BreadcrumbLink onClick={() => navigate(-1)} className="cursor-pointer">Data Sources</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>

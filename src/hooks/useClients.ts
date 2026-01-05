@@ -26,12 +26,27 @@ export const useClients = () => {
 
   return useQuery({
     queryKey: clientKeys.lists(),
-    queryFn: async (): Promise<Client[]> => {
+    queryFn: async (): Promise<ClientWithIntegrations[]> => {
       try {
         const response = await api.get<ClientsResponse>('/clients');
-        const clients = response.data.clients || [];
-        setClients(clients);
-        return clients;
+        const rawClients = response.data.clients || [];
+
+        // Fetch detailed data for each client to ensure all integrations (like GA) are counted correctly
+        // The list endpoint misses some counts (e.g. googleAnalyticsProperties), so we need the detail view.
+        const detailedClients = await Promise.all(
+          rawClients.map(async (client) => {
+            try {
+              const detailResponse = await api.get<ClientDetailResponse>(`/clients/${client.id}`);
+              return normalizeClientData(detailResponse.data.client);
+            } catch (error) {
+              console.warn(`Failed to fetch details for client ${client.id}, using list data`, error);
+              return normalizeClientData(client);
+            }
+          })
+        );
+
+        setClients(detailedClients);
+        return detailedClients;
       } catch (error: any) {
 
         console.error('Error fetching clients:', error);

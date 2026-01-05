@@ -17,14 +17,6 @@ import { useIntegrations } from "@/features/DataSources/hooks/useIntegrations";
 const TABLE_HEADERS = [
   "Name",
   "Created",
-  "Default From",
-  "Default To",
-  "Schedule",
-  "Schedule Status",
-  "Last Sent",
-  "Next Send Date",
-  "Awaiting Approval",
-  "Last Sent Status",
   "Actions",
 ];
 
@@ -32,24 +24,9 @@ function mapTemplateToRow(template: ReportTemplateSummary) {
   return {
     id: template.id,
     name: template.name,
-    client: "—",
-    type: "Template",
     created: template.createdAt
       ? new Date(template.createdAt).toLocaleDateString()
       : "—",
-    clientGroup: "—",
-    defaultFrom: template.defaultDateFrom
-      ? new Date(template.defaultDateFrom).toLocaleDateString()
-      : "—",
-    defaultTo: template.defaultDateTo
-      ? new Date(template.defaultDateTo).toLocaleDateString()
-      : "—",
-    schedule: "Manual",
-    scheduleStatus: "Draft",
-    lastSent: "—",
-    nextSendDate: "—",
-    awaitingApproval: false,
-    lastSentStatus: "Draft",
   };
 }
 

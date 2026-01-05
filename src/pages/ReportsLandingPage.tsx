@@ -24,22 +24,8 @@ import {
 } from "../components/ui/select";
 import { cn } from "@/lib/utils";
 
-// Helper to determine status based on integrations
-const getClientHealth = (client: any) => {
-    const totalIntegrations =
-        (client._count?.metaBusinessAccounts || 0) +
-        (client._count?.metaAdsAccounts || 0) +
-        (client._count?.metaInsightsAccounts || 0) +
-        (client._count?.youtubeAccounts || 0) +
-        (client._count?.shopifyAccounts || 0) +
-        (client._count?.woocommerceAccounts || 0) +
-        (client._count?.googleSearchConsoleAccounts || 0) +
-        (client._count?.googleAnalyticsAccounts || 0);
+// Helper to determine status based on integrations removed - calculation is now dynamic
 
-    if (totalIntegrations > 3) return 'healthy';
-    if (totalIntegrations > 0) return 'warning';
-    return 'critical'; // No integrations
-};
 
 const ReportsLandingPage: React.FC = () => {
     const navigate = useNavigate();
@@ -156,15 +142,13 @@ const ReportsLandingPage: React.FC = () => {
                                     </TableHeader>
                                     <TableBody>
                                         {processedClients.map((client) => {
-                                            const totalIntegrations =
-                                                (client._count?.metaBusinessAccounts || 0) +
-                                                (client._count?.metaAdsAccounts || 0) +
-                                                (client._count?.metaInsightsAccounts || 0) +
-                                                (client._count?.youtubeAccounts || 0) +
-                                                (client._count?.shopifyAccounts || 0) +
-                                                (client._count?.woocommerceAccounts || 0) +
-                                                (client._count?.googleSearchConsoleAccounts || 0) +
-                                                (client._count?.googleAnalyticsAccounts || 0);
+                                            // Dynamic counting of all integrations directly from the API count object
+                                            // Dynamic counting: prioritize integrations array length
+                                            const totalIntegrations = (client.integrations?.length || 0) > 0
+                                                ? client.integrations.length
+                                                : (client._count
+                                                    ? Object.values(client._count).reduce((acc: number, curr: any) => acc + (typeof curr === 'number' ? curr : 0), 0)
+                                                    : 0);
 
                                             return (
                                                 <TableRow
@@ -190,7 +174,7 @@ const ReportsLandingPage: React.FC = () => {
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="text-right">
-                                                        <span className="text-sm font-medium text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <span className="text-sm font-medium text-blue-600">
                                                             View Reports &rarr;
                                                         </span>
                                                     </TableCell>

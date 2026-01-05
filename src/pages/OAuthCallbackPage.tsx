@@ -40,15 +40,16 @@ const OAuthCallbackPage: React.FC = () => {
 
     const handleModalClose = (open: boolean) => {
         setShowAccountModal(open);
-        if (!open) {
-            // Navigate back to client detail page
-            if (clientId) {
-                navigate(`/clients/${clientId}/integrations`);
-            } else {
-                navigate('/clients');
-            }
-        }
     };
+
+    const handleCancel = () => {
+        setShowAccountModal(false);
+        if (clientId) {
+            navigate(`/clients/${clientId}/integrations`);
+        } else {
+            navigate('/clients');
+        }
+    }
 
     const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
@@ -88,6 +89,7 @@ const OAuthCallbackPage: React.FC = () => {
                 clientId={clientId}
                 integration={integrationType}
                 onSuccess={handleSuccess}
+                onCancel={handleCancel}
             />
 
             <AlertDialog open={showSuccessDialog} onOpenChange={handleContinue}>

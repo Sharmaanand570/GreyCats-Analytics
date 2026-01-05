@@ -36,6 +36,8 @@ type WidgetsPageSideComponentType = {
   onReorderPages?: (fromIndex: number, toIndex: number) => void;
   onDeletePage?: (slideId: number) => void;
   onRenamePage?: (slideId: number, newName: string) => void;
+  onAddIntegrationPage?: (integrationIndex: number) => void;
+  availableIntegrations?: { index: number; platform: string; accountName?: string }[];
 };
 
 function WidgetsPageSideComponent({
@@ -47,9 +49,13 @@ function WidgetsPageSideComponent({
   onReorderPages,
   onDeletePage,
   onRenamePage,
+  onAddIntegrationPage,
+  availableIntegrations = [],
 }: WidgetsPageSideComponentType) {
   const [activeIndex, setActiveIndex] = React.useState<number>(0);
   const [isAddPageOpen, setIsAddPageOpen] = React.useState(false);
+  const [addPageType, setAddPageType] = React.useState<"custom" | "integration">("custom");
+  const [selectedIntegrationIndex, setSelectedIntegrationIndex] = React.useState<string>("");
   const [pageName, setPageName] = React.useState("");
   const [pageSubtitle, setPageSubtitle] = React.useState("");
   const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
@@ -134,15 +140,24 @@ function WidgetsPageSideComponent({
   const [dropPosition, setDropPosition] = React.useState<"top" | "bottom" | null>(null);
 
   const handleAddPage = () => {
-    if (!pageName.trim()) return;
+    if (addPageType === "custom") {
+      if (!pageName.trim()) return;
 
-    if (onAddPage) {
-      onAddPage(pageName.trim(), pageSubtitle.trim() || undefined);
+      if (onAddPage) {
+        onAddPage(pageName.trim(), pageSubtitle.trim() || undefined);
+      }
+    } else {
+      if (!selectedIntegrationIndex) return;
+      if (onAddIntegrationPage) {
+        onAddIntegrationPage(parseInt(selectedIntegrationIndex, 10));
+      }
     }
 
     // Reset form
     setPageName("");
     setPageSubtitle("");
+    setAddPageType("custom");
+    setSelectedIntegrationIndex("");
     setIsAddPageOpen(false);
   };
 
@@ -532,40 +547,103 @@ function WidgetsPageSideComponent({
             <DialogHeader>
               <DialogTitle>Add New Page</DialogTitle>
               <DialogDescription>
-                Create a custom page for your report. You can add widgets to it
-                later.
+                Add a new page to your report. You can create a blank custom page or restore a missing integration page.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="page-name">Page Name *</Label>
-                <Input
-                  id="page-name"
-                  placeholder="e.g., Executive Summary"
-                  value={pageName}
-                  onChange={(e) => setPageName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && pageName.trim()) {
-                      handleAddPage();
-                    }
-                  }}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="page-subtitle">Subtitle (Optional)</Label>
-                <Input
-                  id="page-subtitle"
-                  placeholder="e.g., Monthly Overview"
-                  value={pageSubtitle}
-                  onChange={(e) => setPageSubtitle(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && pageName.trim()) {
-                      handleAddPage();
-                    }
-                  }}
-                />
-              </div>
+
+            <div className="flex gap-2 mb-4 border-b pb-2">
+              <button
+                className={`text-sm pb-1 px-2 ${addPageType === "custom"
+                  ? "font-medium border-b-2 border-blue-500 text-blue-600"
+                  : "text-gray-500 hover:text-gray-700"
+                  }`}
+                onClick={() => setAddPageType("custom")}
+              >
+                Custom Page
+              </button>
+              <button
+                className={`text-sm pb-1 px-2 ${addPageType === "integration"
+                  ? "font-medium border-b-2 border-blue-500 text-blue-600"
+                  : "text-gray-500 hover:text-gray-700"
+                  }`}
+                onClick={() => setAddPageType("integration")}
+              >
+                Integration Page
+              </button>
             </div>
+
+            {addPageType === "custom" ? (
+              <div className="grid gap-4 py-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="page-name">Page Name *</Label>
+                  <Input
+                    id="page-name"
+                    placeholder="e.g., Executive Summary"
+                    value={pageName}
+                    onChange={(e) => setPageName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && pageName.trim()) {
+                        handleAddPage();
+                      }
+                    }}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="page-subtitle">Subtitle (Optional)</Label>
+                  <Input
+                    id="page-subtitle"
+                    placeholder="e.g., Monthly Overview"
+                    value={pageSubtitle}
+                    onChange={(e) => setPageSubtitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && pageName.trim()) {
+                        handleAddPage();
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-4 py-2">
+                <div className="grid gap-2">
+                  <Label>Select Integration</Label>
+                  {availableIntegrations.length === 0 ? (
+                    <div className="text-sm text-gray-500 italic p-2 border rounded bg-gray-50">
+                      All connected integrations are already in the report.
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2 max-h-[200px] overflow-y-auto border rounded p-2">
+                      {availableIntegrations.map((integ) => (
+                        <label
+                          key={integ.index}
+                          className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer border border-transparent hover:border-gray-200"
+                        >
+                          <input
+                            type="radio"
+                            name="integration-select"
+                            value={integ.index}
+                            checked={selectedIntegrationIndex === String(integ.index)}
+                            onChange={(e) => setSelectedIntegrationIndex(e.target.value)}
+                            className="text-blue-600"
+                          />
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-gray-900">
+                              {getPlatformConfig(integ.platform)?.name || integ.platform}
+                            </div>
+                            {integ.accountName && (
+                              <div className="text-xs text-gray-500">
+                                {integ.accountName}
+                              </div>
+                            )}
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <DialogFooter>
               <Button
                 variant="outline"
@@ -573,12 +651,21 @@ function WidgetsPageSideComponent({
                   setIsAddPageOpen(false);
                   setPageName("");
                   setPageSubtitle("");
+                  setAddPageType("custom");
+                  setSelectedIntegrationIndex("");
                 }}
               >
                 Cancel
               </Button>
-              <Button onClick={handleAddPage} disabled={!pageName.trim()}>
-                Add Page
+              <Button
+                onClick={handleAddPage}
+                disabled={
+                  addPageType === "custom"
+                    ? !pageName.trim()
+                    : !selectedIntegrationIndex
+                }
+              >
+                {addPageType === "custom" ? "Add Page" : "Add Integration"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -712,7 +799,7 @@ function WidgetsPageSideComponent({
                           Edit
                         </button>
                       )}
-                      {p.isCustom && onDeletePage && (
+                      {onDeletePage && (
                         <button
                           type="button"
                           className="ml-1 text-[10px] text-red-500 hover:text-red-700"

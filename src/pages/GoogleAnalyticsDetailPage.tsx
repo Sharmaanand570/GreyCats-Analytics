@@ -44,7 +44,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
 import { DataSyncBanner } from "@/components/DataSyncBanner";
 import {
   Area,
@@ -181,16 +180,9 @@ function GoogleAnalyticsDetailPage() {
                 variant="destructive"
                 size="sm"
                 onClick={handleDisconnect}
-                disabled={removeAccount.isPending}
+                isLoading={removeAccount.isPending}
               >
-                {removeAccount.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Disconnecting...
-                  </>
-                ) : (
-                  "Disconnect"
-                )}
+                Disconnect
               </Button>
             </div>
           </div>
@@ -199,7 +191,7 @@ function GoogleAnalyticsDetailPage() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbLink to="/data-sources">Data Sources</BreadcrumbLink>
+                  <BreadcrumbLink onClick={() => navigate(-1)} className="cursor-pointer">Data Sources</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>

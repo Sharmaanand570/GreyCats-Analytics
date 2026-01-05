@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { FiBell, FiSearch } from "react-icons/fi";
 import { FaCartShopping } from "react-icons/fa6";
 import { Input } from "@/components/ui/input";
@@ -41,7 +42,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getStatusBadgeClass } from "@/utils/statusColors";
-import { MoreVertical, ExternalLink, RefreshCw, Loader2, PowerOff, Eye } from "lucide-react";
+import { MoreVertical, ExternalLink, RefreshCw, Loader2, Eye } from "lucide-react";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import {
@@ -62,6 +63,7 @@ import { Label } from "@/components/ui/label";
 import { DataSyncBanner } from "@/components/DataSyncBanner";
 
 const WooCommerceDetailPage = () => {
+  const navigate = useNavigate();
   // Get clients list and auto-select first client (matching pattern from MetaDetailPage, GoogleAnalyticsDetailPage)
   const { data: clientsData } = useClients();
   const clients = clientsData || [];
@@ -369,7 +371,7 @@ const WooCommerceDetailPage = () => {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbLink to="/data-sources">Data Sources</BreadcrumbLink>
+                  <BreadcrumbLink onClick={() => navigate(-1)} className="cursor-pointer">Data Sources</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
@@ -400,19 +402,9 @@ const WooCommerceDetailPage = () => {
                           variant="destructive"
                           size="sm"
                           onClick={handleDisconnect}
-                          disabled={removeAccount.isPending}
+                          isLoading={removeAccount.isPending}
                         >
-                          {removeAccount.isPending ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Disconnecting...
-                            </>
-                          ) : (
-                            <>
-                              <PowerOff className="w-4 h-4" />
-                              Disconnect
-                            </>
-                          )}
+                          Disconnect
                         </Button>
                       )}
                     </div>

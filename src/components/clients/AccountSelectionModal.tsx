@@ -21,6 +21,7 @@ interface AccountSelectionModalProps {
     clientId: number;
     integration: IntegrationType | null; // Can be null if not yet determined
     onSuccess: () => void;
+    onCancel?: () => void;
 }
 
 export function AccountSelectionModal({
@@ -28,7 +29,8 @@ export function AccountSelectionModal({
     onOpenChange,
     clientId,
     integration,
-    onSuccess
+    onSuccess,
+    onCancel
 }: AccountSelectionModalProps) {
     const [accounts, setAccounts] = useState<AvailableAccount[]>([]);
     console.log("integration", integration);
@@ -81,6 +83,13 @@ export function AccountSelectionModal({
         }
     };
 
+    const handleClose = (isOpen: boolean) => {
+        if (!isOpen && onCancel) {
+            onCancel();
+        }
+        onOpenChange(isOpen);
+    };
+
     const filteredAccounts = useMemo(() => {
         if (!searchQuery.trim()) return accounts;
         const lowerQuery = searchQuery.toLowerCase();
@@ -94,7 +103,7 @@ export function AccountSelectionModal({
     const integrationName = platformConfig?.name || integration;
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={open} onOpenChange={handleClose}>
             <DialogContent className="sm:max-w-[500px] h-[80vh] flex flex-col p-0 gap-0 overflow-hidden">
                 <DialogHeader className="p-6 border-b">
                     <DialogTitle className="flex items-center gap-2">
@@ -177,21 +186,15 @@ export function AccountSelectionModal({
                 </div>
 
                 <DialogFooter className="p-4 border-t bg-gray-50/50 gap-2 sm:gap-0">
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>
+                    <Button variant="outline" onClick={() => handleClose(false)}>
                         Cancel
                     </Button>
                     <Button
                         onClick={handleConnect}
+                        isLoading={assigning}
                         disabled={!selectedAccount || assigning || loading}
                     >
-                        {assigning ? (
-                            <>
-                                <FiLoader className="mr-2 h-4 w-4 animate-spin" />
-                                Connecting...
-                            </>
-                        ) : (
-                            "Connect Selected Account"
-                        )}
+                        Connect Selected Account
                     </Button>
                 </DialogFooter>
             </DialogContent>

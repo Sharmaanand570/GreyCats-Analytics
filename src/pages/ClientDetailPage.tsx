@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { DateRangePicker } from '../components/DateRangePicker';
+import { getDefaultDateRange } from '../components/Dashboard';
+import { type DateRange } from "react-day-picker";
 import Dashboard from '../components/Dashboard';
 import { Button } from '../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
@@ -9,8 +12,9 @@ import Reports from '../components/Reports';
 import { AccountSelectionModal } from '../components/clients/AccountSelectionModal';
 import type { IntegrationType } from '../types/integration.types';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Loader2, LayoutDashboard, FileBarChart, Database } from 'lucide-react';
+import { ChevronLeft, Loader2, LayoutDashboard, FileBarChart, Database, CalendarDays } from 'lucide-react';
 import { FiBell } from "react-icons/fi";
+import { ReportSchedules } from '../components/ReportSchedules';
 
 import { clientKeys } from '../hooks/useClients';
 
@@ -23,6 +27,7 @@ const ClientDetailPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
     const [accountModalOpen, setAccountModalOpen] = useState(false);
     const [pendingIntegration, setPendingIntegration] = useState<IntegrationType | null>(null);
+    const [dateRange, setDateRange] = useState<DateRange | undefined>(getDefaultDateRange());
     const queryClient = useQueryClient();
 
     React.useEffect(() => {
@@ -95,7 +100,20 @@ const ClientDetailPage: React.FC = () => {
                         </div>
 
                         <div className="flex items-center gap-4">
-
+                            {activeTab === 'overview' && parsedClientId && (
+                                <>
+                                    <Link to={`/clients/${parsedClientId}/edit-dashboard`}>
+                                        <Button variant="outline" size="sm" className="shadow-sm border-zinc-200 text-zinc-700 hover:bg-zinc-50">
+                                            Edit Layout
+                                        </Button>
+                                    </Link>
+                                    <DateRangePicker
+                                        value={dateRange}
+                                        // @ts-ignore
+                                        onChange={setDateRange}
+                                    />
+                                </>
+                            )}
                             <div className="flex items-center border-l pl-4 gap-3">
                                 <button className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
                                     <FiBell className="text-lg" />
@@ -116,6 +134,10 @@ const ClientDetailPage: React.FC = () => {
                                     <FileBarChart className="w-4 h-4 mr-2" />
                                     Reports
                                 </TabsTrigger>
+                                <TabsTrigger value="schedules" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                                    <CalendarDays className="w-4 h-4 mr-2" />
+                                    Schedules
+                                </TabsTrigger>
                                 <TabsTrigger value="data-sources" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
                                     <Database className="w-4 h-4 mr-2" />
                                     Data Sources
@@ -130,6 +152,8 @@ const ClientDetailPage: React.FC = () => {
                                             onConnectIntegration={() => setActiveTab("data-sources")}
                                             withLayout={false}
                                             hideHeader={true}
+                                            dateRange={dateRange}
+                                            onDateRangeChange={setDateRange}
                                         />
                                     )}
                                 </div>
@@ -138,6 +162,12 @@ const ClientDetailPage: React.FC = () => {
                             <TabsContent value="reports" className="space-y-4 focus-visible:outline-none">
                                 {parsedClientId && (
                                     <Reports viewMode="embedded" clientId={parsedClientId} />
+                                )}
+                            </TabsContent>
+
+                            <TabsContent value="schedules" className="space-y-4 focus-visible:outline-none">
+                                {parsedClientId && (
+                                    <ReportSchedules clientId={parsedClientId} />
                                 )}
                             </TabsContent>
 

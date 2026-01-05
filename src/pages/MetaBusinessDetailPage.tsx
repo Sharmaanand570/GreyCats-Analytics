@@ -1,4 +1,5 @@
 "use client";
+import { useNavigate, useParams } from "react-router-dom";
 
 import { useState, useEffect } from "react";
 import {
@@ -67,8 +68,17 @@ import { useClients, useClient } from "@/hooks/useClients";
  * - Unified Facebook & Instagram management
  */
 function MetaBusinessDetailPage() {
+    const navigate = useNavigate();
+    const { clientId } = useParams();
     const [activeTab, setActiveTab] = useState("facebook");
-    const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+    const [selectedClientId, setSelectedClientId] = useState<number | null>(clientId ? Number(clientId) : null);
+
+    // Auto-select client if passed in URL
+    useEffect(() => {
+        if (clientId) {
+            setSelectedClientId(Number(clientId));
+        }
+    }, [clientId]);
 
     // Facebook State
     const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
@@ -179,7 +189,7 @@ function MetaBusinessDetailPage() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-4 border-b border-border">
                     <div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                            <span className="hover:text-primary cursor-pointer transition-colors">Data Sources</span>
+                            <span onClick={() => navigate(-1)} className="hover:text-primary cursor-pointer transition-colors">Data Sources</span>
                             <span className="text-muted-foreground/30">/</span>
                             <span className="font-medium text-foreground">Meta Business</span>
                         </div>

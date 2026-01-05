@@ -113,6 +113,7 @@ export interface ReportTemplate {
   pageOrder?: number[];
   // Optional slide metadata (titles/subtitles) for each logical page.
   slidesMeta?: ReportSlideMeta[];
+  clientId?: number;
 }
 
 // Lightweight summary used by the list endpoint
@@ -184,6 +185,8 @@ export interface ApiReportTemplate {
   slides: ApiReportTemplateSlide[];
   createdAt?: string;
   updatedAt?: string;
+  clientId?: number;
+  client_id?: number;
 }
 
 export interface CreateTemplatePayload {
@@ -257,7 +260,12 @@ export interface ReportSchedule {
   lastRunAt?: string | null;
   nextRunAt?: string | null;
   sendEmail: boolean;
+  emailTo?: string;
+  emailSubject?: string;
+  emailBody?: string;
   createdAt: string;
+  clientId?: number;
+  client_id?: number;
 }
 
 export interface CreateReportSchedulePayload {
@@ -267,7 +275,12 @@ export interface CreateReportSchedulePayload {
   frequency: ReportScheduleFrequency;
   timezone: string;
   timeOfDay: string;
+  dayOfWeek?: number | null;
+  dayOfMonth?: number | null;
   sendEmail: boolean;
+  emailTo?: string;
+  emailSubject?: string;
+  emailBody?: string;
 }
 
 export interface UpdateReportSchedulePayload {
@@ -280,10 +293,30 @@ export interface UpdateReportSchedulePayload {
   dayOfMonth?: number | null;
   isActive?: boolean;
   sendEmail?: boolean;
+  emailTo?: string;
+  emailSubject?: string;
+  emailBody?: string;
 }
 
 export type ReportScheduleResponse = ApiSuccessResponse<{
   data: ReportSchedule;
+}>;
+
+export type ListReportSchedulesResponse = ApiSuccessResponse<{
+  data: ReportSchedule[];
+}>;
+
+export type GetReportScheduleResponse = ApiSuccessResponse<{
+  data: ReportSchedule & {
+    template: { id: number; name: string };
+    runLogs: {
+      id: number;
+      status: string;
+      startedAt: string;
+      finishedAt?: string;
+      generatedReport?: { id: number; fileName: string };
+    }[];
+  };
 }>;
 
 export type ReportScheduleMessageResponse = ApiSuccessResponse<{
