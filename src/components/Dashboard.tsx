@@ -6,7 +6,7 @@ import { type DateRange } from "react-day-picker";
 import { useMemo, useState, useEffect } from "react";
 // Icons
 import { FiSearch, FiBell } from "react-icons/fi";
-import { LayoutGrid, BarChart3, LineChart, Building2, TrendingUp, Activity } from "lucide-react";
+import { LayoutGrid, BarChart3, LineChart, Building2, Activity } from "lucide-react";
 // Components
 import { MetricCard } from "./dashboard/MetricCard";
 import { getBrandColor } from "@/lib/brandColors";
@@ -436,7 +436,6 @@ function Dashboard({
             total: total,
             series: series,
             rawCount: filteredRows.length,
-            rows: filteredRows,
             rows: filteredRows,
           };
         } else {

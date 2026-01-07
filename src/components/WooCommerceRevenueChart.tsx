@@ -92,7 +92,7 @@ export function WooCommerceRevenueChart({
                 tickLine={false}
                 tick={{ fill: "#6b7280", fontSize: 12 }}
                 tickMargin={8}
-                tickFormatter={(value) => `$${value}`}
+                tickFormatter={(value: number) => `$${value}`}
                 domain={[0, 20]}
                 ticks={[0, 5, 10, 15, 20]}
               />

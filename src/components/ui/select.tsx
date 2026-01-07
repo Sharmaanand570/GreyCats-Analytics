@@ -12,7 +12,7 @@ interface SelectProps {
 
 const Select = ({ children, value, defaultValue, onValueChange, className, disabled }: SelectProps) => {
   const [internalValue, setInternalValue] = React.useState(defaultValue || value || "")
-  
+
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newValue = e.target.value
     setInternalValue(newValue)
@@ -38,7 +38,7 @@ const Select = ({ children, value, defaultValue, onValueChange, className, disab
   // Get options from SelectContent
   const options: React.ReactElement[] = []
   if (content && React.isValidElement(content)) {
-    React.Children.forEach(content.props.children, (child) => {
+    React.Children.forEach((content as any).props.children, (child) => {
       if (React.isValidElement(child) && child.type === SelectItem) {
         options.push(child)
       }
@@ -48,9 +48,9 @@ const Select = ({ children, value, defaultValue, onValueChange, className, disab
   // Get placeholder from SelectValue if present
   let placeholder = ""
   if (trigger && React.isValidElement(trigger)) {
-    React.Children.forEach(trigger.props.children, (child) => {
+    React.Children.forEach((trigger as any).props.children, (child) => {
       if (React.isValidElement(child) && child.type === SelectValue) {
-        placeholder = child.props.placeholder || ""
+        placeholder = (child as any).props.placeholder || ""
       }
     })
   }
@@ -61,7 +61,7 @@ const Select = ({ children, value, defaultValue, onValueChange, className, disab
       onChange={handleChange}
       className={cn(
         "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50",
-        trigger?.props?.className,
+        (trigger as any)?.props?.className,
         className
       )}
       disabled={disabled}
@@ -72,8 +72,8 @@ const Select = ({ children, value, defaultValue, onValueChange, className, disab
         </option>
       )}
       {options.map((option, idx) => (
-        <option key={idx} value={option.props.value}>
-          {option.props.children}
+        <option key={idx} value={(option as any).props.value}>
+          {(option as any).props.children}
         </option>
       ))}
     </select>

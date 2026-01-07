@@ -12,7 +12,7 @@ export const useSyncStatus = (clientId: number | null) => {
             return getSyncStatus(clientId);
         },
         enabled: !!clientId,
-        refetchInterval: (query) => {
+        refetchInterval: (_query) => {
             if (!shouldPoll) return false;
             return 5000; // Poll every 5 seconds
         },

@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 
 // -----------------------
 // Zod Schema
@@ -64,7 +63,7 @@ export default function CompanyDetailsForm() {
     },
   });
 
-  const onSubmit: SubmitHandler<CompanyFormValues> = (data) => {
+  const onSubmit: SubmitHandler<CompanyFormValues> = () => {
     alert("Saved — check console for submitted payload");
   };
 

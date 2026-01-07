@@ -1,25 +1,27 @@
 
 
-export enum StorageKey {
-  ANALYTICS_TOKEN = "ANALYTICS_TOKEN_KEY_",
-}
+export const StorageKey = {
+  ANALYTICS_TOKEN: "ANALYTICS_TOKEN_KEY_",
+} as const;
+
+export type StorageKeyType = typeof StorageKey[keyof typeof StorageKey];
 
 
-export const setAuthToken = (key:StorageKey.ANALYTICS_TOKEN, value: string): void => {
+export const setAuthToken = (key: StorageKeyType, value: string): void => {
   localStorage.setItem(key, value);
-}; 
+};
 
 
-export const isAuthenticated = (key: StorageKey.ANALYTICS_TOKEN): boolean => {
+export const isAuthenticated = (key: StorageKeyType): boolean => {
   const token = localStorage.getItem(key);
   return token !== null;
 }
 
 
-export const getAuthToken = (key: StorageKey.ANALYTICS_TOKEN): string | null => {
+export const getAuthToken = (key: StorageKeyType): string | null => {
   return localStorage.getItem(key);
 }
 
-export const removeAuthToken = (key: StorageKey.ANALYTICS_TOKEN): void => {
+export const removeAuthToken = (key: StorageKeyType): void => {
   localStorage.removeItem(key);
 }

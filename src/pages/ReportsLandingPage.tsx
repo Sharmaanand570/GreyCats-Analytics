@@ -2,11 +2,10 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClients } from '../hooks/useClients';
-import { Building2, FileText, ArrowUpDown, Filter, Search } from 'lucide-react';
+import { Building2, FileText, ArrowUpDown, Search } from 'lucide-react';
 import { FiBell } from "react-icons/fi";
 import { Input } from "../components/ui/input";
 import { Skeleton } from "../components/ui/skeleton";
-import { Badge } from "../components/ui/badge";
 import {
     Table,
     TableBody,
@@ -22,7 +21,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from "../components/ui/select";
-import { cn } from "@/lib/utils";
 
 // Helper to determine status based on integrations removed - calculation is now dynamic
 

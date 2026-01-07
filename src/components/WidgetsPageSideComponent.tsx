@@ -16,9 +16,11 @@ import {
 } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import type { ReportSlideMeta } from "@/features/reports/api/types";
 
 type WidgetsPageSideComponentType = {
-  reftype: React.RefObject<(HTMLDivElement | null)[]>;
+  activeSlideId?: number | null;
+  onSlideClick?: (slideId: number) => void;
   customPages?: Array<{ id: number; name: string; subtitle?: string }>;
   pageOrder?: number[];
   /**
@@ -26,12 +28,7 @@ type WidgetsPageSideComponentType = {
    * coming from the report template. When provided, this is the primary source
    * of truth for page labels in the sidebar.
    */
-  slidesMeta?: Array<{
-    id: number;
-    title: string;
-    subtitle?: string;
-    source?: "integration" | "custom";
-  }>;
+  slidesMeta?: ReportSlideMeta[];
   onAddPage?: (name: string, subtitle?: string) => void;
   onReorderPages?: (fromIndex: number, toIndex: number) => void;
   onDeletePage?: (slideId: number) => void;
@@ -41,7 +38,8 @@ type WidgetsPageSideComponentType = {
 };
 
 function WidgetsPageSideComponent({
-  reftype,
+  activeSlideId,
+  onSlideClick,
   customPages = [],
   pageOrder,
   slidesMeta,
@@ -52,7 +50,6 @@ function WidgetsPageSideComponent({
   onAddIntegrationPage,
   availableIntegrations = [],
 }: WidgetsPageSideComponentType) {
-  const [activeIndex, setActiveIndex] = React.useState<number>(0);
   const [isAddPageOpen, setIsAddPageOpen] = React.useState(false);
   const [addPageType, setAddPageType] = React.useState<"custom" | "integration">("custom");
   const [selectedIntegrationIndex, setSelectedIntegrationIndex] = React.useState<string>("");
@@ -83,56 +80,9 @@ function WidgetsPageSideComponent({
   );
   const [editingName, setEditingName] = React.useState<string>("");
 
-  React.useEffect(() => {
-    const slideEls = reftype.current?.filter(Boolean) as
-      | HTMLDivElement[]
-      | undefined;
-    if (!slideEls || slideEls.length === 0) {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        // pick the entry with greatest intersection ratio
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort(
-            (a, b) => (b.intersectionRatio ?? 0) - (a.intersectionRatio ?? 0)
-          )[0];
-        if (visible?.target) {
-          const element = visible.target as HTMLDivElement;
-          // Extract slide ID from the element's id attribute (e.g., "slide-0" -> 0)
-          const slideId = element.id?.match(/slide-(\d+)/)?.[1];
-          if (slideId !== undefined) {
-            const parsedId = parseInt(slideId, 10);
-            setActiveIndex(parsedId);
-          }
-        }
-      },
-      {
-        root: null, // viewport
-        threshold: [0.25, 0.5, 0.75, 1],
-      }
-    );
-
-    slideEls.forEach((el) => {
-      if (el) {
-        observer.observe(el);
-      }
-    });
-    return () => {
-      observer.disconnect();
-    };
-  }, [reftype, customPages, integrationsData]);
-
   const scrollToSlide = (index: number) => {
-    const slide = reftype.current[index];
-    if (slide) {
-      slide.scrollIntoView({
-        behavior: "smooth",
-        block: "center", // aligns the top of the slide with the top of the container
-        inline: "nearest", // optional, for horizontal layout
-      });
+    if (onSlideClick) {
+      onSlideClick(index);
     }
   };
 
@@ -224,10 +174,6 @@ function WidgetsPageSideComponent({
     // Calculate final index based on drop position
     // If dropping on TOP of item i, we insert AT i (pushing i down)
     // If dropping on BOTTOM of item i, we insert AT i+1
-    let finalDropIndex = dropIndex;
-    if (dropPosition === "bottom") {
-      finalDropIndex = dropIndex + 1; // Insert after
-    }
 
     // Adjust for removal of dragged item
     // If we drag from 0 to 5 (bottom), remove 0.
@@ -357,8 +303,10 @@ function WidgetsPageSideComponent({
       const integrationSlides = slidesMeta.filter(
         (s) => s.source === "integration"
       );
-      integrationSlides.forEach((slide, idx) => {
-        const integration = integrations[idx];
+      integrationSlides.forEach((slide) => {
+        // Use integrationIndex if available, otherwise fallback to slide id
+        const idxToUse = slide.integrationIndex !== undefined ? slide.integrationIndex : Number(slide.id);
+        const integration = integrations[idxToUse];
         const platformConfig = integration
           ? getPlatformConfig(integration.platform)
           : undefined;
@@ -368,7 +316,7 @@ function WidgetsPageSideComponent({
           integrationId: integration
             ? integration.id
             : `integration-${slide.id}`,
-          slideIndex: slide.id,
+          slideIndex: Number(slide.id),
           isCustom: false,
           pages: [
             {
@@ -393,11 +341,11 @@ function WidgetsPageSideComponent({
         combined.push({
           label: "Custom",
           integrationId: `custom-${slide.id}`,
-          slideIndex: slide.id,
+          slideIndex: Number(slide.id),
           isCustom: true,
           pages: [
             {
-              innerlabel: slide.title,
+              innerlabel: slide.title || "Untitled page",
               sublabel: slide.subtitle || "Custom page",
             },
           ],
@@ -411,7 +359,7 @@ function WidgetsPageSideComponent({
 
       const orderSource =
         pageOrder && pageOrder.length > 0
-          ? pageOrder
+          ? pageOrder.map(Number)
           : combined.map((entry) => entry.slideIndex);
 
       // Always produce a page entry for every slide id in orderSource, even if
@@ -721,7 +669,7 @@ function WidgetsPageSideComponent({
                     }}
                     key={pageIndex}
                     className={`w-full gap-1.5 md:gap-2 border rounded-lg md:rounded-[0.6rem] p-2.5 md:p-3 lg:p-4 flex items-center cursor-move transition-all ${isDragging ? "opacity-50 scale-95" : ""
-                      } ${activeIndex === slideIdx
+                      } ${activeSlideId === slideIdx
                         ? "bg-gray-100 border-gray-400"
                         : "hover:bg-gray-50"
                       } ${dropIndicatorClass}`}
@@ -768,7 +716,7 @@ function WidgetsPageSideComponent({
                       ) : (
                         <>
                           <span
-                            className={`font-medium text-xs md:text-sm truncate ${activeIndex === slideIdx ? "text-gray-900" : ""
+                            className={`font-medium text-xs md:text-sm truncate ${activeSlideId === slideIdx ? "text-gray-900" : ""
                               }`}
                           >
                             {ps.innerlabel}

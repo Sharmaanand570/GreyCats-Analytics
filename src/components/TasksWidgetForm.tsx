@@ -72,7 +72,6 @@ function TasksWidgetForm({
                 type: "tasks",
                 // store optional title in a lightweight way
                 content: serializeTasks(tasks),
-                // @ts-expect-error: title is not in CustomWidgetData but safe to keep
                 title: e.target.value,
               } as CustomWidgetData)
             }

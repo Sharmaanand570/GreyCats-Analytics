@@ -173,9 +173,10 @@ function App() {
           {/* Multi-Client OAuth Callback */}
           <Route path="oauth/callback" element={<OAuthCallbackPage />} />
 
-          {/* Shared Report View (Authenticated but standalone) */}
-          <Route path="shared/reports/:id" element={<SharedReportPage />} />
         </Route>
+
+        {/* Shared Report View (Public) */}
+        <Route path="shared/reports/:id" element={<SharedReportPage />} />
 
         {/* Dedicated 404 route (accessible from anywhere) */}
         <Route path="/404" element={<NotFoundPage />} />

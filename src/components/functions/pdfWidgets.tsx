@@ -121,13 +121,14 @@ const styles = StyleSheet.create({
 });
 
 // Helper to get status badge color for PDF
-function getStatusBadgeColor(status: "Draft" | "Scheduled" | "Delivered"): {
+function getStatusBadgeColor(status: string | undefined): {
   backgroundColor: string;
   color: string;
   borderColor: string;
 } {
-  const badgeClass = getReportStatusBadgeClass(status);
-  
+  if (!status) return { backgroundColor: "#f3f4f6", color: "#374151", borderColor: "#6b7280" };
+  const badgeClass = getReportStatusBadgeClass(status as any);
+
   // Map Tailwind classes to PDF colors
   if (badgeClass.includes("bg-green")) {
     return { backgroundColor: "#d1fae5", color: "#065f46", borderColor: "#10b981" };
@@ -144,7 +145,7 @@ export function PDFTitleWidget({ data }: { data?: TitleWidgetData }) {
   const text = data?.text ?? "Demo title";
   const fontSize = data?.fontSize ?? "2xl";
   const align = data?.align ?? "center";
-  
+
   // Map fontSize to PDF font sizes
   const fontSizeMap: Record<string, number> = {
     xs: 10,
@@ -156,9 +157,9 @@ export function PDFTitleWidget({ data }: { data?: TitleWidgetData }) {
     "3xl": 30,
     "4xl": 36,
   };
-  
+
   const pdfFontSize = fontSizeMap[fontSize] ?? 24;
-  
+
   const justifyContent =
     align === "left" ? "flex-start" : align === "right" ? "flex-end" : "center";
 
@@ -236,14 +237,14 @@ export function PDFTableWidget({ data }: { data?: TableWidgetData }) {
               col.name === "Report"
                 ? row.name
                 : col.name === "Audience"
-                ? row.audience
-                : col.name === "Status"
-                ? row.status
-                : col.name === "Last Run"
-                ? row.lastRun
-                : col.name === "Next Send"
-                ? row.nextSend
-                : "";
+                  ? row.audience
+                  : col.name === "Status"
+                    ? row.status
+                    : col.name === "Last Run"
+                      ? row.lastRun
+                      : col.name === "Next Send"
+                        ? row.nextSend
+                        : "";
 
             if (col.name === "Status") {
               const badgeColors = getStatusBadgeColor(row.status);

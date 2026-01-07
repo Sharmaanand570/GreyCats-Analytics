@@ -91,7 +91,7 @@ export function ShopifyRevenueChart({
                   axisLine={false}
                   tickLine={false}
                   tick={{ fill: "#6b7280", fontSize: 12 }}
-                  tickFormatter={(value) => `$${value}`}
+                  tickFormatter={(value: number) => `$${value}`}
                 />
                 <Tooltip
                   contentStyle={{

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -49,6 +49,8 @@ import {
 import { Facebook, ThumbsUp, Tag, ExternalLink, Calendar, MessageSquare, BarChart2, RefreshCw } from "lucide-react";
 
 function FacebookInsightsPage() {
+  const params = useParams<{ clientId?: string }>();
+  const clientId = params.clientId ? parseInt(params.clientId, 10) : null;
   const navigate = useNavigate();
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
@@ -86,9 +88,9 @@ function FacebookInsightsPage() {
   const posts = postsData?.posts ?? [];
 
   const handleSyncFacebook = async () => {
-    if (!selectedPageId) return;
+    if (!selectedPageId || !clientId) return;
     try {
-      await syncFacebook({ pageId: selectedPageId });
+      await syncFacebook({ clientId, body: { pageId: selectedPageId } });
     } catch {
       // handled in hook
     }

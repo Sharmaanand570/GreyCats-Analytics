@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FiSearch, FiBell, FiPlus, FiArrowDownRight, FiArrowUpRight, FiActivity, FiServer, FiDollarSign, FiPercent } from "react-icons/fi";
+import { FiSearch, FiBell, FiPlus, FiArrowDownRight, FiArrowUpRight, FiActivity, FiServer, FiDollarSign } from "react-icons/fi";
 import { format } from "date-fns";
 
 // --- Types ---
@@ -214,8 +214,8 @@ const PulseCard = ({ alert }: { alert: Alert }) => {
       <div className="relative flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${alert.type === 'financial' ? 'bg-orange-50 text-orange-600' :
-              alert.type === 'system' ? 'bg-blue-50 text-blue-600' :
-                'bg-purple-50 text-purple-600'
+            alert.type === 'system' ? 'bg-blue-50 text-blue-600' :
+              'bg-purple-50 text-purple-600'
             }`}>
             {alert.type === 'financial' && <FiDollarSign className="text-xl" />}
             {alert.type === 'system' && <FiServer className="text-xl" />}
@@ -270,8 +270,8 @@ const MonitorCard = ({ alert }: { alert: Alert }) => {
       <div className="flex justify-between items-start mb-3">
         <div className="flex items-center gap-2.5">
           <div className={`w-8 h-8 rounded-md flex items-center justify-center text-sm ${alert.type === 'financial' ? 'bg-zinc-50 text-zinc-600' :
-              alert.type === 'system' ? 'bg-zinc-50 text-zinc-600' :
-                'bg-zinc-50 text-zinc-600'
+            alert.type === 'system' ? 'bg-zinc-50 text-zinc-600' :
+              'bg-zinc-50 text-zinc-600'
             }`}>
             {alert.type === 'financial' && <FiDollarSign />}
             {alert.type === 'system' && <FiServer />}

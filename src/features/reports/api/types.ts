@@ -51,6 +51,7 @@ export type ResolvedWidgetData =
     total?: number;
     value?: number;
     rawCount?: number;
+    rows?: unknown[];
   }
   | Record<string, unknown>;
 
@@ -62,6 +63,7 @@ export interface ReportWidgetDefinition {
   groupBy: "none" | "day" | "week" | "month" | string;
   aggregation: "sum" | "avg" | "min" | "max" | string;
   type?: string;
+  displayName?: string;
   accountId?: string;
   /**
    * Arbitrary filters that affect how the metric is resolved.
@@ -93,6 +95,10 @@ export interface ReportSlideMeta {
    * between integration-derived pages and user-created custom pages.
    */
   source?: "integration" | "custom";
+  /**
+   * For integration slides, the index in the integrations array.
+   */
+  integrationIndex?: number;
 }
 
 // Full template shape used by the Report Builder UI

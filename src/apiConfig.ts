@@ -39,9 +39,15 @@ api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
-      console.warn("Unauthorized — redirecting to login…");
-      removeAuthToken(StorageKey.ANALYTICS_TOKEN);
-      window.location.href = "/auth/login";
+      // Skip redirect for shared endpoints or if explicitly disabled
+      const isSharedEndpoint = error.config?.url?.includes("/shared/");
+      const skipRedirect = (error.config as any)?.skipAuthRedirect;
+
+      if (!isSharedEndpoint && !skipRedirect) {
+        console.warn("Unauthorized — redirecting to login…");
+        removeAuthToken(StorageKey.ANALYTICS_TOKEN);
+        window.location.href = "/auth/login";
+      }
     }
 
     return Promise.reject(error);

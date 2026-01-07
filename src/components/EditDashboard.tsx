@@ -94,7 +94,7 @@ const WidgetEditCard = memo(({
 }) => {
 
   // Find display name for current metric
-  const currentMetricName = availableMetrics.find(m => m.metricKey === widget.metricKey)?.displayName || widget.metricKey;
+
   // const isChart = ... // Unused
 
   return (
@@ -122,9 +122,7 @@ const WidgetEditCard = memo(({
             onValueChange={(val) => onUpdate({ ...widget, metricKey: val })}
           >
             <SelectTrigger className="h-8 w-full sm:w-[240px] text-sm font-medium border-zinc-200">
-              <SelectValue placeholder="Select Metric">
-                {currentMetricName}
-              </SelectValue>
+              <SelectValue placeholder="Select Metric" />
             </SelectTrigger>
             <SelectContent>
               {availableMetrics.map(m => (
