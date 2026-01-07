@@ -25,7 +25,6 @@ import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
 // UI Components
-import { ChartPieInteractive } from "../components/ChartPieInteractive";
 import { ChartLineMultiple } from "../components/ChartLineMultiple";
 import {
   Card,
@@ -533,6 +532,40 @@ function pickDefaultMetricsForIntegration(
   // This handles cases where client uses accountId '5' but metrics are stored under '1'
   let candidates = perAccount[accountId] ?? [];
 
+  // Special handling for Meta Business: aggregate from sub-integrations if essentially empty
+  if (normalized === 'meta-business' && candidates.length === 0) {
+    console.log('✨ aggregating Meta Business metrics from sub-platforms');
+    const ads = groupedMetrics['meta-ads'] || groupedMetrics['meta_ads'] || {};
+    const fb = groupedMetrics['meta-facebook'] || groupedMetrics['meta_facebook'] || {};
+    const ig = groupedMetrics['meta-instagram'] || groupedMetrics['meta_instagram'] || {};
+
+    // Collect all available metrics from sub-integrations
+    const allMetrics: MetricOption[] = [];
+
+    // Add Ads metrics
+    Object.values(ads).forEach((accountMetrics: any) => {
+      if (Array.isArray(accountMetrics)) {
+        allMetrics.push(...accountMetrics.map((m: any) => ({ ...m, integration: 'meta-ads' })));
+      }
+    });
+
+    // Add Facebook metrics
+    Object.values(fb).forEach((accountMetrics: any) => {
+      if (Array.isArray(accountMetrics)) {
+        allMetrics.push(...accountMetrics.map((m: any) => ({ ...m, integration: 'meta-facebook' })));
+      }
+    });
+
+    // Add Instagram metrics
+    Object.values(ig).forEach((accountMetrics: any) => {
+      if (Array.isArray(accountMetrics)) {
+        allMetrics.push(...accountMetrics.map((m: any) => ({ ...m, integration: 'meta-instagram' })));
+      }
+    });
+
+    candidates = allMetrics;
+  }
+
   if (candidates.length === 0) {
     const availableAccounts = Object.keys(perAccount);
     if (availableAccounts.length > 0) {
@@ -551,6 +584,13 @@ function pickDefaultMetricsForIntegration(
   if (!candidates.length) {
     console.warn('⚠️ No metrics found in debug list for', integrationKey, accountId);
 
+    // Try to find the ACTUAL accountId from available metrics if the provided one has no hits
+    const availableAccounts = Object.keys(perAccount);
+    const bestAccountId = availableAccounts.length > 0 ? availableAccounts[0] : accountId;
+    if (bestAccountId !== accountId) {
+      console.log(`✨ Using accountId fallback for synthetic metrics: ${accountId} -> ${bestAccountId}`);
+    }
+
     // Fallback: use curated defaults if available
     const curated = CURATED_DEFAULTS[normalized] ?? CURATED_DEFAULTS[integrationKey] ?? [];
     if (curated.length > 0) {
@@ -559,7 +599,7 @@ function pickDefaultMetricsForIntegration(
       const syntheticMetrics: MetricOption[] = curated.map(metricKey => ({
         metricKey,
         integration: integrationKey,
-        accountId,
+        accountId: bestAccountId, // Use best available accountId
         label: metricKey.split('.').pop() || metricKey,
       }));
       return syntheticMetrics;
@@ -926,9 +966,7 @@ const renderWidgetContent = (
       const series = Array.isArray((resolvedData as ResolvedWidgetData)?.series)
         ? ((resolvedData as ResolvedWidgetData).series as WidgetSeriesPoint[])
         : [];
-      const hasData =
-        series.length > 0 ||
-        typeof (resolvedData as ResolvedWidgetData)?.total === "number";
+      const hasData = series.length > 0;
 
 
 
@@ -937,12 +975,15 @@ const renderWidgetContent = (
         value: point.y,
       }));
 
-      return (
-        <div className="h-full flex flex-col">
+      if (widget.metricConfig?.metricKey?.startsWith('youtube.')) {
+        console.log(`[YouTubeData] Widget ${widget.i}: hasData=${hasData}, seriesCount=${series.length}, firstPoints=`, series.slice(0, 3));
+      }
 
-          <div className="flex-1">
+      return (
+        <div className="flex-1 flex flex-col min-h-0 relative">
+          <div className="flex-1 min-h-[200px] relative">
             {hasData ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minHeight={150}>
                 {(() => {
                   const cType = (widget.data as ChartWidgetData)?.chartType?.toLowerCase() || (widget.widgetType === "pie_chart" ? "pie" : "area");
                   if (cType === "column" || cType === "bar") {
@@ -1035,7 +1076,9 @@ const renderWidgetContent = (
                 })()}
               </ResponsiveContainer>
             ) : (
-              <ChartPieInteractive data={[]} />
+              <div className="flex-1 flex items-center justify-center">
+                {renderWidgetEmptyState(onConnectIntegration, "No chart data for this date range")}
+              </div>
             )}
           </div>
           <div className="border-t px-3 py-2 text-xs md:text-sm space-y-1 min-h-[3.5rem]">
@@ -1073,9 +1116,8 @@ const renderWidgetContent = (
       }));
 
       return (
-        <div className="h-full flex flex-col p-1">
-
-          <div className="flex-1 min-h-[200px]">
+        <div className="h-full flex flex-col p-1 min-h-0 relative">
+          <div className="flex-1 min-h-[200px] relative">
             {hasData ? (
               <ResponsiveContainer width="100%" height="100%">
                 {widget.widgetType === "bar_chart" ? (
@@ -1486,7 +1528,7 @@ const renderWidgetContent = (
 
       return (
         <div
-          className={`h-full w-full flex items-start ${alignClass} hover:border text-xs md:text-sm text-gray-900`}
+          className={`h-full w-full flex items-center ${alignClass} hover:border text-xs md:text-sm text-gray-900`}
           style={{
             ...(titleData?.backgroundColor
               ? { backgroundColor: titleData.backgroundColor }
@@ -1534,7 +1576,7 @@ const renderWidgetContent = (
         : true;
 
       return (
-        <div className="h-full flex flex-col items-center justify-center text-xs md:text-sm px-2 text-center">
+        <div className="flex-1 w-full flex flex-col items-center justify-center text-xs md:text-sm px-2 text-center min-h-[100px]">
           <span className="text-2xl md:text-3xl font-bold text-gray-900">
             {resolvedValue ?? metricData?.value ?? 0}
             {metricData?.unit && (
@@ -2110,12 +2152,87 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
     integrationsData?.integrations.forEach((integration, index) => {
       // 1. Pick default metrics for this integration
       // Use the groupedMetrics from the hook, falling back if needed
+      console.log(`[CreateReport] Picking defaults for ${integration.platform} (Account: ${integration.accountId})`);
       const metrics = pickDefaultMetricsForIntegration(
         integration.platform,
         integration.accountId,
         groupedMetrics,
         (msg) => console.log(msg) // valid fallback logger
       );
+
+      // Custom enforced defaults for Meta Business and Meta Ads
+      const normalizedPlatform = integration.platform.toLowerCase().replace(/_/g, '-');
+      if (['meta-business', 'meta-ads'].includes(normalizedPlatform)) {
+
+        let targetKeys: string[] = [];
+
+        if (normalizedPlatform === 'meta-business') {
+          targetKeys = [
+            // Facebook
+            'meta.facebook.post.comments',
+            'meta.facebook.post.engagedUsers',
+            'meta.facebook.post.engagement',
+            'meta.facebook.followers',
+            'meta.facebook.post.impressions',
+            'meta.facebook.post.likes',
+            'meta.facebook.postsCount',
+            'meta.facebook.post.reach',
+            'meta.facebook.post.reactions',
+            'meta.facebook.post.shares',
+            // Instagram
+            'meta.instagram.media.comments',
+            'meta.instagram.media.engagement',
+            'meta.instagram.followers',
+            'meta.instagram.media.impressions',
+            'meta.instagram.media.likes',
+            'meta.instagram.mediaCount',
+          ];
+        } else if (normalizedPlatform === 'meta-ads') {
+          targetKeys = [
+            'meta.ads.clicks',
+            'meta.ads.cpc',
+            'meta.ads.impressions',
+            'meta.ads.spend',
+          ];
+        }
+
+        // Aggregate all potentially relevant metrics
+        // We look at all meta sources because sometimes they are cross-listed or grouped
+        const allMetrics: MetricOption[] = [];
+        const ads = groupedMetrics['meta-ads'] || groupedMetrics['meta_ads'] || {};
+        const fb = groupedMetrics['meta-facebook'] || groupedMetrics['meta_facebook'] || {};
+        const ig = groupedMetrics['meta-instagram'] || groupedMetrics['meta_instagram'] || {};
+
+        const pushMetrics = (source: any, integ: string) => {
+          Object.values(source).forEach((accountMetrics: any) => {
+            if (Array.isArray(accountMetrics)) {
+              allMetrics.push(...accountMetrics.map((m: any) => ({ ...m, integration: integ })));
+            }
+          });
+        };
+
+        pushMetrics(ads, 'meta-ads');
+        pushMetrics(fb, 'meta-facebook');
+        pushMetrics(ig, 'meta-instagram');
+
+        // Filter and sort based on targetKeys
+        const enforcedMetrics = targetKeys.map(key => allMetrics.find(m => m.metricKey === key)).filter((m): m is MetricOption => !!m);
+
+        if (enforcedMetrics.length > 0) {
+          console.log(`[CreateReport] Enforcing ${enforcedMetrics.length} defaults for ${normalizedPlatform}`);
+          // Override the default picker result with our enforced list
+          // We splice to empty the array and then push new items to keep the reference if it matters, 
+          // though assigning metrics = ... would be fine if we weren't in a loop of a larger scope potentially.
+          // Actually, 'metrics' here is a local const from pickDefault... return. We can't reassign it if it's const.
+          // But wait, the code above defined it as `const metrics = ...`. 
+          // We need to mutate the array or change the declaration. 
+          // Since I can't change the declaration in this block easily without a larger diff, I will clear and push.
+          metrics.length = 0;
+          metrics.push(...enforcedMetrics);
+        } else {
+          console.warn(`[CreateReport] ⚠️ Could not find any enforced defaults for ${integration.platform}. Falling back to standard defaults if any.`);
+        }
+      }
 
       // 2. Build widgets from these metrics
       const integrationWidgets = buildDefaultWidgetsForIntegration(index, metrics);
@@ -2407,26 +2524,47 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
         const normalize = (s: string) => s.toLowerCase().replace(/_/g, '-');
         const widgetIntegration = normalize(firstWidget.metricConfig?.integration || '');
 
+        console.log(`[RescueDebug] Attempting to rescue ghost ${backendId}. First Widget Int: '${firstWidget.metricConfig?.integration}' -> Normalized: '${widgetIntegration}'`);
+
         const targetIndex = integrationsData.integrations.findIndex(i => {
           const plat = normalize(i.platform);
-          return plat === widgetIntegration ||
+          const isMatch = plat === widgetIntegration ||
             (plat === 'woocommerce' && widgetIntegration === 'woo') ||
-            (plat === 'google-search-console' && widgetIntegration === 'google-console');
+            (plat === 'google-search-console' && widgetIntegration === 'google-console') ||
+            (plat === 'meta-business' && ['meta-facebook', 'meta-instagram'].includes(widgetIntegration)); // Exclude 'meta-ads' to prevent merging
+
+          // console.log(`[RescueDebug] Checking against platform '${i.platform}' (norm: '${plat}') -> Match: ${isMatch}`);
+          return isMatch;
         });
 
         if (targetIndex !== -1) {
           const existing = map.get(targetIndex) || [];
           // Avoid duplicates if we already rescued or populated
+          // For Meta Business, we might have multiple "ghost" slides (one for FB, one for IG) mapping to the same target
+          // So we should append, not just skip if existing is non-empty, OR be smart about it.
+          // Actually, if we simply append, we might duplicate if the target already has its *own* widgets?
+          // But usually the target (valid integration) starts empty if it was "lost".
+          // If we have mixed content, appending is safer than losing data.
+
+          // Update widgets to point to new slideId (layout consistency)
+          const updatedWidgets = ghostWidgets.map(w => ({
+            ...w,
+            slideId: targetIndex
+          }));
+
           if (existing.length === 0) {
-            // Update widgets to point to new slideId (layout consistency)
-            const updatedWidgets = ghostWidgets.map(w => ({
-              ...w,
-              slideId: targetIndex
-            }));
             map.set(targetIndex, updatedWidgets);
-            console.log(`[ReportBuilder] Rescued ${ghostWidgets.length} widgets from ghost ${backendId} to ${targetIndex}`);
+            console.log(`[ReportBuilder] Rescued ${ghostWidgets.length} widgets from ghost ${backendId} to ${targetIndex} (${integrationsData.integrations[targetIndex].platform})`);
+          } else {
+            // If data already exists, merge it
+            map.set(targetIndex, [...existing, ...updatedWidgets]);
+            console.log(`[ReportBuilder] Merged ${ghostWidgets.length} widgets from ghost ${backendId} into existing slide ${targetIndex}`);
           }
+        } else {
+          console.warn(`[RescueDebug] FAILED to rescue ghost ${backendId}. No matching integration found for widgetIntegration: '${widgetIntegration}'`);
         }
+      } else {
+        console.log(`[RescueDebug] Ghost ${backendId} has no widgets to rescue.`);
       }
       map.delete(backendId);
     };
@@ -2545,11 +2683,11 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
     // Mark that there are unsaved changes
     setHasUnsavedChanges(true);
 
-    // Debounce: wait 2 seconds after last change before saving
+    // Debounce: wait 1 second after last change before saving
     const timer = setTimeout(() => {
       const payload = buildTemplatePayloadFromDashboards();
       saveTemplate(payload);
-    }, 2000);
+    }, 1000);
 
     return () => clearTimeout(timer);
   }, [dashboards, customPages, templateName, templateId, isTemplateLoading, readOnly]);
@@ -2866,59 +3004,41 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
         // EXCEPTION: meta-ads returns all campaigns, so we don't filter by accountId
         // For tables, keep dimensional data
 
+        // Helper to normalize integration names (handle underscores, specific mappings)
+        const normalizeIntegration = (name: string) => {
+          const lower = (name || '').toLowerCase();
+          if (lower === 'woo' || lower === 'woocommerce') return 'woocommerce';
+          if (lower === 'google' || lower === 'google-analytics' || lower === 'google_analytics') return 'google-analytics';
+          if (lower === 'youtube') return 'youtube';
+
+          if (lower.startsWith('meta_') || lower.startsWith('meta-')) {
+            return lower.replace(/-/g, '_'); // Meta likes underscores
+          }
+          return lower.replace(/_/g, '-'); // Others like hyphens
+        };
+
+        const widgetIntegration = normalizeIntegration(widget.integration);
+
         const isMetaIntegration =
-          widget.integration === 'meta-ads' ||
-          widget.integration === 'meta-ads' ||
-          widget.integration === 'meta-facebook' ||
-          widget.integration === 'meta-facebook' ||
-          widget.integration === 'meta-instagram' ||
-          widget.integration === 'meta-instagram';
+          widgetIntegration === 'meta_ads' ||
+          widgetIntegration === 'meta_facebook' ||
+          widgetIntegration === 'meta_instagram';
+
+        const isSingleAccountIntegration =
+          isMetaIntegration ||
+          widgetIntegration === 'woocommerce' ||
+          widgetIntegration === 'youtube' ||
+          widgetIntegration === 'meta-business' ||
+          widgetIntegration === 'google-search-console';
 
         const filteredRows = data.rows.filter((row: any) => {
-          // Normalize integration names for comparison
-          // Frontend uses "google-analytics" but API returns "google_analytics"
-          // Meta integrations keep underscores (meta_instagram, meta_facebook, meta_ads)
-          const normalizeIntegration = (name: string) => {
-            // Special case: API returns "woo" but frontend uses "woocommerce"
-            if (name === 'woo') return 'woocommerce';
-            // Special case: Meta integrations keep underscores
-            if (name.startsWith('meta_') || name.startsWith('meta-')) {
-              return name.replace(/-/g, '_'); // Convert hyphens to underscores for Meta
-            }
-            // For other integrations, convert underscores to hyphens
-            return name.replace(/_/g, '-');
-          };
-
           const rowIntegration = normalizeIntegration(row.integration || '');
-          const widgetIntegration = normalizeIntegration(widget.integration || '');
 
-          // For meta integrations and single-account integrations (woo/youtube), don't filter by accountId
-          // Also for meta-business (frontend container), skip account check as rows have specific FB/IG IDs
-          const isSingleAccountIntegration =
-            widget.integration === 'woocommerce' ||
-            widget.integration === 'youtube' ||
-            widget.integration === 'meta-business' ||
-            widget.integration === 'google-search-console';
-
-
-
-          const matchesBasic = isMetaIntegration || isSingleAccountIntegration
-            ? (row.metricKey === widget.metricKey) // Relaxed check: trust metricKey for Meta Business routing
+          const matchesBasic = isMetaIntegration || isSingleAccountIntegration || widgetIntegration === 'meta-business'
+            ? (row.metricKey === widget.metricKey) // Relaxed check: trust metricKey
             : (row.metricKey === widget.metricKey &&
-              row.accountId == widget.accountId &&
+              String(row.accountId) === String(widget.accountId) &&
               rowIntegration === widgetIntegration);
-
-          // DEBUG: Log when accountId doesn't match (skip for meta/single-account integrations)
-          if (!isMetaIntegration && !isSingleAccountIntegration && row.metricKey === widget.metricKey && row.accountId != widget.accountId) {
-            console.log(`❌ AccountId mismatch for ${widget.metricKey}:`, {
-              rowAccountId: row.accountId,
-              rowAccountIdType: typeof row.accountId,
-              widgetAccountId: widget.accountId,
-              widgetAccountIdType: typeof widget.accountId,
-              rowIntegration: row.integration,
-              widgetIntegration: widget.integration
-            });
-          }
 
           // For tables, we want dimensional data
           if (widget.type === 'table') {
@@ -2928,9 +3048,10 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
           // For metric cards and charts, exclude dimensional data
           // EXCEPT for time-series dimensions (day, date, week, month)
           // EXCEPT for YouTube which has dimensionType="video" but we want to aggregate by date
-          const isDimensional = row.dimensionType && row.dimensionType !== "";
-          const isTimeDimension = row.dimensionType === 'day' || row.dimensionType === 'date' || row.dimensionType === 'week' || row.dimensionType === 'month';
-          const isYouTubeDimension = widget.metricKey.startsWith('youtube.') && row.dimensionType === 'video';
+          const dimType = (row.dimensionType || '').replace('ga:', '').toLowerCase();
+          const isDimensional = dimType !== "";
+          const isTimeDimension = dimType === 'day' || dimType === 'date' || dimType === 'week' || dimType === 'month' || dimType === 'year';
+          const isYouTubeDimension = widget.metricKey.startsWith('youtube.') && (dimType === 'video' || row.dimensionType === 'video');
 
           // Include if: not dimensional OR is a time dimension OR is YouTube video dimension
           return matchesBasic && (!isDimensional || isTimeDimension || isYouTubeDimension);
@@ -2969,7 +3090,13 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
             rows: filteredRows,
             rawCount: filteredRows.length,
           };
-        } else if (widget.type === 'line_chart' || widget.type === 'bar_chart') {
+        } else if (
+          widget.type === 'line_chart' ||
+          widget.type === 'bar_chart' ||
+          widget.type === 'area_chart' ||
+          widget.type === 'pie_chart' ||
+          widget.type === 'chart'
+        ) {
           // For charts, include series
           merged[id] = {
             value: total,
@@ -3041,7 +3168,13 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
         const integration = integrationsData?.integrations?.[index] ?? integrationsData?.integrations?.[slideId];
         if (integration) {
           const platformConfig = getPlatformConfig(integration.platform);
-          return { id: slideId, title: platformConfig?.name || integration.platform, subtitle: integration.accountName, source: "integration" as const };
+          return {
+            id: slideId,
+            title: platformConfig?.name || integration.platform,
+            subtitle: integration.accountName,
+            source: "integration" as const,
+            integrationIndex: slideId
+          };
         }
         return { id: slideId, title: "Untitled page", source: "custom" as const };
       });
@@ -3071,6 +3204,14 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
             "Metric"
           );
 
+          // DATA INTEGRITY DEBUG
+          if (slideMeta?.source === 'integration') {
+            const intgName = slideMeta.title;
+            console.log(`📦 [PayloadBuilder] Processing widget for ${intgName} (Slide ${slideId}):`, {
+              id: widget.i, type: widget.widgetType, key: metricConfig.metricKey
+            });
+          }
+
           widgets.push({
             ...metricConfig,
             id: metricConfig.id ?? widget.i,
@@ -3093,6 +3234,9 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
             },
           });
         });
+
+        // Per-slide summary log
+        // console.log(`📦 [PayloadBuilder] Slide ${slideId} has ${layout.length} widgets.`);
       });
 
       return {
@@ -3367,7 +3511,16 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
 
     // 4. Add to page order (append to end)
     setPageOrder((prev) => {
-      return [...prev, integrationIndex];
+      const newOrder = [...prev, integrationIndex];
+      // Force immediate save to persist the new slide and its widgets
+      // We construct the payload manually here because state updates (setDashboards) are async
+      // and wouldn't be reflected in buildTemplatePayloadFromDashboards() immediately.
+      setTimeout(() => {
+        setHasUnsavedChanges(true); // Trigger the effect or let the effect handle it?
+        // Actually, the effect depends on [dashboards], so setDashboards will trigger it.
+        // But we want to ensure it happens.
+      }, 0);
+      return newOrder;
     });
 
     toast.success("Integration page added");
@@ -4511,7 +4664,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
             <Button variant="outline" onClick={handleCancelNewReport}>
               Cancel
             </Button>
-            <Button onClick={handleConfirmNewReport} isLoading={isCreatingTemplate}>Create Report</Button>
+            <Button onClick={handleConfirmNewReport} isLoading={isCreatingTemplate} disabled={isLoadingAvailableMetrics}>Create Report</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

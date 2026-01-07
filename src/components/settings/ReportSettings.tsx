@@ -1,6 +1,9 @@
+import { useEffect } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { userApi } from "@/api/userApi";
 import {
     Select,
     SelectContent,
@@ -11,6 +14,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 
 const reportSettingsSchema = z.object({
     defaultDateRange: z.string(),
@@ -21,23 +26,76 @@ const reportSettingsSchema = z.object({
 type ReportSettingsFormValues = z.infer<typeof reportSettingsSchema>;
 
 export default function ReportSettings() {
+    const queryClient = useQueryClient();
+
+    // 1. Fetch Defaults
+    const { data: defaultsResponse, isLoading, error } = useQuery({
+        queryKey: ["reportDefaults"],
+        queryFn: userApi.getReportDefaults,
+    });
+
+    const defaults = defaultsResponse?.data;
+
+    // 2. Form Setup
     const {
         handleSubmit,
         control,
-        formState: { isSubmitting },
+        reset,
     } = useForm<ReportSettingsFormValues>({
         resolver: zodResolver(reportSettingsSchema),
-        defaultValues: {
-            defaultDateRange: "30d",
-            defaultFrequency: "weekly",
-            preferredFormat: "pdf",
-        },
     });
 
-    const onSubmit: SubmitHandler<ReportSettingsFormValues> = async (data) => {
-        console.log("Report Settings Submitted:", data);
-        await new Promise((resolve) => setTimeout(resolve, 800));
+    useEffect(() => {
+        if (defaults) {
+            reset({
+                defaultDateRange: defaults.defaultDateRange,
+                defaultFrequency: defaults.defaultReportFreq,
+                preferredFormat: defaults.preferredFormat,
+            });
+        }
+    }, [defaults, reset]);
+
+    // 3. Update Mutation
+    const updateMutation = useMutation({
+        mutationFn: userApi.updateReportDefaults,
+        onSuccess: (res) => {
+            if (res.success) {
+                toast.success("Report defaults updated");
+                queryClient.invalidateQueries({ queryKey: ["reportDefaults"] });
+            } else {
+                toast.error(res.message || "Failed to update defaults");
+            }
+        },
+        onError: (err: any) => {
+            toast.error(err.response?.data?.message || "An error occurred");
+        }
+    });
+
+    const onSubmit: SubmitHandler<ReportSettingsFormValues> = (data) => {
+        updateMutation.mutate({
+            defaultDateRange: data.defaultDateRange,
+            defaultReportFreq: data.defaultFrequency,
+            preferredFormat: data.preferredFormat,
+        });
     };
+
+    if (isLoading) {
+        return (
+            <div className="space-y-6">
+                <Skeleton className="h-8 w-48" />
+                <Skeleton className="h-4 w-96" />
+                <div className="space-y-6 mt-8">
+                    <Skeleton className="h-10 w-full max-w-xl" />
+                    <Skeleton className="h-10 w-full max-w-xl" />
+                    <Skeleton className="h-10 w-full max-w-xl" />
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return <div className="text-red-500">Error loading report defaults. Please try again later.</div>;
+    }
 
     return (
         <div className="space-y-6">
@@ -57,7 +115,7 @@ export default function ReportSettings() {
                                 control={control}
                                 name="defaultDateRange"
                                 render={({ field }) => (
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select date range" />
                                         </SelectTrigger>
@@ -78,7 +136,7 @@ export default function ReportSettings() {
                                 control={control}
                                 name="defaultFrequency"
                                 render={({ field }) => (
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select frequency" />
                                         </SelectTrigger>
@@ -98,7 +156,7 @@ export default function ReportSettings() {
                                 control={control}
                                 name="preferredFormat"
                                 render={({ field }) => (
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select format" />
                                         </SelectTrigger>
@@ -112,7 +170,7 @@ export default function ReportSettings() {
                         </div>
 
                         <div className="flex justify-end pt-4">
-                            <Button type="submit" isLoading={isSubmitting}>Save Defaults</Button>
+                            <Button type="submit" isLoading={updateMutation.isPending}>Save Defaults</Button>
                         </div>
 
                     </form>

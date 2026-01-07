@@ -31,17 +31,17 @@ export default function WidgetCard({
       className={`group rounded-lg md:rounded-xl shadow-sm overflow-hidden h-full transition-all duration-200 ${shouldHideBorder
         ? 'border border-transparent hover:border-gray-200'
         : 'border border-gray-200'
-        } ${readOnly ? 'cursor-default' : ''}`}
+        } flex flex-col ${readOnly ? 'cursor-default' : ''}`}
       style={{ position: "relative", zIndex: 1 }}
     >
       <div
-        className={`drag-handle flex items-center justify-between px-2 md:px-3 py-1.5 md:py-2 transition-all duration-200 ${shouldHideBorder
+        className={`drag-handle flex items-center justify-center relative px-10 py-1.5 md:py-2 transition-all duration-200 ${shouldHideBorder
           ? 'bg-transparent border-b border-transparent opacity-0 ' + (readOnly ? '' : 'group-hover:opacity-100 group-hover:bg-gray-50 group-hover:border-gray-200')
           : 'bg-gray-50 border-b border-gray-200'
           } ${readOnly ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
         aria-label="Widget header"
       >
-        <span className="text-xs md:text-sm font-medium text-gray-600">
+        <span className="text-xs md:text-sm font-medium text-gray-600 truncate">
           {prettifyMetricLabel(
             widget.metricConfig?.displayName ||
             (widget as any).displayName ||
@@ -59,7 +59,7 @@ export default function WidgetCard({
         </span>
 
         {!readOnly && (
-          <div className="flex items-center gap-1">
+          <div className="absolute right-2 md:right-3 flex items-center gap-1">
             {onDelete && (
               <button
                 type="button"
@@ -79,7 +79,7 @@ export default function WidgetCard({
       </div>
 
       <div
-        className={`non-draggable p-1 h-full overflow-hidden flex flex-col ${readOnly ? 'pointer-events-none' : ''}`}
+        className={`non-draggable p-1 flex-1 min-h-0 overflow-hidden flex flex-col ${readOnly ? 'pointer-events-none' : ''}`}
         onClick={(e) => {
           if (readOnly) return;
           e.stopPropagation();

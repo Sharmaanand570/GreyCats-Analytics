@@ -600,10 +600,10 @@ export const getReportTemplate = (templateId: number, token?: string) =>
             aggregation: (wData as any).aggregation || "sum",
             layout: {
               slideId: Number(slideId),
-              x: currentX,
-              y: currentY,
-              w: width,
-              h: height
+              x: (wData as any).layout?.x ?? (wData as any).x ?? currentX,
+              y: (wData as any).layout?.y ?? (wData as any).y ?? currentY,
+              w: (wData as any).layout?.w ?? (wData as any).w ?? width,
+              h: (wData as any).layout?.h ?? (wData as any).h ?? height
             },
             snapshotData: wData
           } as any);
@@ -655,6 +655,32 @@ export const getReportTemplate = (templateId: number, token?: string) =>
     if (!apiTemplate.slides) {
       apiTemplate.slides = [];
     }
+
+    // REFINE TITLES: Ensure every slide has a descriptive title.
+    // In Shared View, we lack 'integrationsData' (sidebar), so 'ReportBuilder' cannot
+    // lookup integration names if the title is empty. We must populate them here.
+    apiTemplate.slides.forEach(slide => {
+      const isGeneric = !slide.title ||
+        slide.title === "Page" ||
+        slide.title === "Report Page" ||
+        /^Slide \d+$/.test(slide.title);
+
+      if (isGeneric && slide.widgets && slide.widgets.length > 0) {
+        // Infer from first widget's integration
+        const first = slide.widgets[0];
+        const integration = (first.integration || (first as any).metricIntegration || "").toLowerCase();
+
+        if (integration) {
+          if (integration.includes('meta') || integration.includes('facebook') || integration.includes('instagram')) slide.title = "Meta Business";
+          else if (integration.includes('google') && (integration.includes('analytics') || integration.includes('ga4'))) slide.title = "Google Analytics";
+          else if (integration.includes('search-console') || integration === 'google-console') slide.title = "Google Search Console";
+          else if (integration.includes('woo')) slide.title = "WooCommerce";
+          else if (integration.includes('shopify')) slide.title = "Shopify";
+          else if (integration.includes('linkedin')) slide.title = "LinkedIn";
+          else slide.title = prettifyMetricLabel(integration);
+        }
+      }
+    });
 
     const mapped: GetTemplateResponse = {
       success: true,

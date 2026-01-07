@@ -13,20 +13,6 @@ export default function SettingSideBar({ activeTab, setActive }: SettingSideBarP
       items: [
         { id: "personal-info", label: "Personal Information" },
         { id: "company-details", label: "Company Details" },
-        { id: "account-preferences", label: "Account Preferences" },
-      ]
-    },
-    {
-      category: "Notifications",
-      items: [
-        { id: "notification-settings", label: "Notification Settings" },
-      ]
-    },
-    {
-      category: "Data & Reports",
-      items: [
-        { id: "report-settings", label: "Default Report Settings" },
-        { id: "integration-preferences", label: "Integration Preferences" },
       ]
     },
     {

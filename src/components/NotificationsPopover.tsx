@@ -4,10 +4,10 @@ import { getNotifications, markNotificationRead } from '../api/alertsApi';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
-import { FiBell, FiCheck, FiInfo } from 'react-icons/fi';
+import { FiBell, FiCheck } from 'react-icons/fi';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from './ui/badge';
-import type { AlertNotification } from '../types/alert.types';
+
 
 export const NotificationsPopover: React.FC = () => {
     const queryClient = useQueryClient();

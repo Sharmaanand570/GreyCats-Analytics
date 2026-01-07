@@ -4,10 +4,7 @@ import SettingSideBar from "@/components/SettingSideBar";
 // Components
 import CompanyDetailsForm from "@/components/CompanyDetailsForm";
 import PersonalInformation from "@/components/settings/PersonalInformation";
-import AccountPreferences from "@/components/settings/AccountPreferences";
-import NotificationSettings from "@/components/settings/NotificationSettings";
 import ReportSettings from "@/components/settings/ReportSettings";
-import IntegrationPreferences from "@/components/settings/IntegrationPreferences";
 import SecuritySettings from "@/components/settings/SecuritySettings";
 import BillingInformation from "@/components/settings/BillingInformation";
 
@@ -21,14 +18,8 @@ export default function SettingsPage() {
         return <PersonalInformation />;
       case "company-details":
         return <CompanyDetailsForm />;
-      case "account-preferences":
-        return <AccountPreferences />;
-      case "notification-settings":
-        return <NotificationSettings />;
       case "report-settings":
         return <ReportSettings />;
-      case "integration-preferences":
-        return <IntegrationPreferences />;
       case "security-settings":
         return <SecuritySettings />;
       case "billing-info":
@@ -47,7 +38,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Main Layout */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
           {/* Sidebar */}
           <div>
             <SettingSideBar activeTab={activeTab} setActive={setActiveTab} />

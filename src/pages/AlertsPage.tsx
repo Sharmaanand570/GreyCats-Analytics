@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -313,8 +313,8 @@ const PulseCard = ({ alert, onDelete, onEdit }: CardProps) => {
       <div className="relative flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${type === 'financial' ? 'bg-orange-50 text-orange-600' :
-              type === 'system' ? 'bg-blue-50 text-blue-600' :
-                'bg-purple-50 text-purple-600'
+            type === 'system' ? 'bg-blue-50 text-blue-600' :
+              'bg-purple-50 text-purple-600'
             }`}>
             {type === 'financial' && <FiDollarSign className="text-xl" />}
             {type === 'system' && <FiServer className="text-xl" />}
@@ -370,8 +370,8 @@ const MonitorCard = ({ alert, onDelete, onEdit }: CardProps) => {
       <div className="flex justify-between items-start mb-3">
         <div className="flex items-center gap-2.5">
           <div className={`w-8 h-8 rounded-md flex items-center justify-center text-sm ${type === 'financial' ? 'bg-zinc-50 text-zinc-600' :
-              type === 'system' ? 'bg-zinc-50 text-zinc-600' :
-                'bg-zinc-50 text-zinc-600'
+            type === 'system' ? 'bg-zinc-50 text-zinc-600' :
+              'bg-zinc-50 text-zinc-600'
             }`}>
             {type === 'financial' && <FiDollarSign />}
             {type === 'system' && <FiServer />}
