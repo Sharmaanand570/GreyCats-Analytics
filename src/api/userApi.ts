@@ -12,6 +12,7 @@ export const userApi = {
     // 1. Personal Information
     getProfile: async (): Promise<ApiResponse<UserProfile>> => {
         const response = await api.get("/user/profile");
+        console.log("getProfile response:", response.data);
         return response.data;
     },
 
@@ -21,6 +22,13 @@ export const userApi = {
             phoneNumber: profileData.phoneNumber,
             jobTitle: profileData.jobTitle,
             companyName: profileData.companyName,
+            companyWebsite: profileData.companyWebsite,
+            companyStreetAddress: profileData.companyStreetAddress,
+            companyCity: profileData.companyCity,
+            companyState: profileData.companyState,
+            companyCountry: profileData.companyCountry,
+            companyPIN: profileData.companyPIN,
+            companyPhone: profileData.companyPhone,
         });
         return response.data;
     },
@@ -35,6 +43,19 @@ export const userApi = {
         });
         return response.data;
     },
+
+    uploadCompanyLogo: async (file: File): Promise<ApiResponse<{ companyLogo: string }>> => {
+        const formData = new FormData();
+        formData.append("logo", file);
+        const response = await api.post("/user/profile/company-logo", formData, {
+            headers: {
+                "Content-Type": "multipart/form-data",
+            },
+        });
+        return response.data;
+    },
+
+
 
     // 2. Account Preferences
     getPreferences: async (): Promise<ApiResponse<UserPreferences>> => {
@@ -71,7 +92,11 @@ export const userApi = {
 
     // 5. Security Settings
     changePassword: async (passwords: any): Promise<ApiResponse<void>> => {
-        const response = await api.post("/user/change-password", passwords);
+        // Pass a custom config to skip the global 401 redirect
+        // because "Wrong Current Password" might return 401.
+        const response = await api.post("/user/change-password", passwords, {
+            skipAuthRedirect: true,
+        } as any);
         return response.data;
     },
 
@@ -87,6 +112,17 @@ export const userApi = {
 
     revokeAllSessions: async (): Promise<ApiResponse<void>> => {
         const response = await api.post("/user/sessions/revoke-all");
+        return response.data;
+    },
+
+    // 6. Email Change
+    sendEmailChangeOTP: async (data: { newEmail: string }): Promise<ApiResponse<void>> => {
+        const response = await api.post("/user/change-email/send-otp", data);
+        return response.data;
+    },
+
+    verifyAndChangeEmail: async (data: { otp: string }): Promise<ApiResponse<{ email: string }>> => {
+        const response = await api.post("/user/change-email/verify", data);
         return response.data;
     },
 };

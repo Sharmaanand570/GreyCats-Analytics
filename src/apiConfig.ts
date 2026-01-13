@@ -43,7 +43,9 @@ api.interceptors.response.use(
       const isSharedEndpoint = error.config?.url?.includes("/shared/");
       const skipRedirect = (error.config as any)?.skipAuthRedirect;
 
-      if (!isSharedEndpoint && !skipRedirect) {
+      const isLoginEndpoint = error.config?.url?.includes("/auth/login");
+
+      if (!isSharedEndpoint && !isLoginEndpoint && !skipRedirect) {
         console.warn("Unauthorized — redirecting to login…");
         removeAuthToken(StorageKey.ANALYTICS_TOKEN);
         window.location.href = "/auth/login";

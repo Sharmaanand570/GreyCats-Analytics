@@ -6,6 +6,15 @@ export interface UserProfile {
     profilePicture?: string;
     jobTitle?: string;
     companyName?: string;
+    companyLogo?: string;
+    companyWebsite?: string;
+    companyStreetAddress?: string;
+    companyCity?: string;
+    companyState?: string;
+    companyCountry?: string;
+    companyPIN?: string;
+    companyPhone?: string;
+
     createdAt: string;
 }
 
@@ -51,3 +60,12 @@ export interface ApiResponse<T> {
     data: T;
     message?: string;
 }
+
+export interface EmailChangeOTPRequest {
+    newEmail: string;
+}
+
+export interface VerifyEmailOTPRequest {
+    otp: string;
+}
+

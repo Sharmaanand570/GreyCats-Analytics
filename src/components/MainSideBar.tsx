@@ -1,4 +1,3 @@
-"use client";
 
 import {
   Sidebar,
@@ -12,6 +11,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from "./ui/sidebar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type React from "react";
 import {
   Bell,
@@ -28,6 +28,8 @@ import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { Button } from "./ui/button";
 import { ClientSelector } from "./ClientSelector";
 import { removeAuthToken, StorageKey } from "@/utils/storage";
+import { useUserStore } from "@/utils/useUserStore";
+import { getProfileImageUrl } from "@/utils/imageUtils";
 
 
 
@@ -35,6 +37,22 @@ function MainSideBar(): React.JSX.Element {
   const location = useLocation();
   const [activeTab, setActive] = useState(location.pathname);
   const is404Page = location.pathname.startsWith("/404");
+  const { user, fetchProfile } = useUserStore();
+
+  useEffect(() => {
+    if (!user) {
+      fetchProfile();
+    }
+  }, [user, fetchProfile]);
+
+  const userInitials = user?.fullName
+    ? user.fullName
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
+    : "G";
 
   useEffect(() => {
     setActive(location.pathname);
@@ -224,10 +242,16 @@ function MainSideBar(): React.JSX.Element {
 
               {/* Footer */}
               <SidebarFooter className="mt-auto border-t border-zinc-700 pt-4">
-                <div className="flex items-center gap-3 rounded-md px-2 py-3 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800/50">
-                  <div className="flex size-9 items-center justify-center rounded-full bg-zinc-700 text-xs font-medium text-zinc-100 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:scale-110">
-                    AV
-                  </div>
+                <div
+                  onClick={() => handleChangeURL("/account-setup")}
+                  className="flex items-center gap-3 rounded-md px-2 py-3 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800/50 cursor-pointer"
+                >
+                  <Avatar className="h-9 w-9 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:scale-110">
+                    <AvatarImage src={getProfileImageUrl(user?.profilePicture)} alt={user?.fullName} />
+                    <AvatarFallback className="bg-zinc-700 text-xs font-medium text-zinc-100">
+                      {userInitials}
+                    </AvatarFallback>
+                  </Avatar>
                   {!collabsState && (
                     <div
                       className={`min-w-0 md:hidden lg:block transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${collabsState
@@ -236,10 +260,10 @@ function MainSideBar(): React.JSX.Element {
                         }`}
                     >
                       <div className="text-sm font-medium leading-tight text-white transition-colors duration-300">
-                        Alex Cohen
+                        {user?.fullName || "User"}
                       </div>
                       <div className="text-xs text-zinc-400 leading-tight transition-colors duration-300">
-                        Analyst
+                        {user?.jobTitle || "Viewer"}
                       </div>
                     </div>
                   )}
@@ -271,7 +295,7 @@ function MainSideBar(): React.JSX.Element {
               className="w-72 p-5 bg-gradient-to-bl from-black via-zinc-900 to-zinc-700 text-white flex flex-col"
             >
               <h2 className="text-xl font-semibold mb-6 tracking-wide">
-                Analyst
+                {user?.jobTitle || "Viewer"}
               </h2>
 
               {/* Menu Groups */}
@@ -318,16 +342,22 @@ function MainSideBar(): React.JSX.Element {
 
               {/* Footer */}
               <div className="mt-auto pt-6 border-t border-zinc-700">
-                <div className="flex items-center gap-3 mt-4 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:opacity-80">
-                  <div className="flex size-9 items-center justify-center rounded-full bg-zinc-600 text-xs font-medium text-white transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-110">
-                    AV
-                  </div>
+                <div
+                  onClick={() => handleChangeURL("/account-setup")}
+                  className="flex items-center gap-3 mt-4 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:opacity-80 cursor-pointer"
+                >
+                  <Avatar className="h-9 w-9 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-110">
+                    <AvatarImage src={getProfileImageUrl(user?.profilePicture)} alt={user?.fullName} />
+                    <AvatarFallback className="bg-zinc-600 text-xs font-medium text-white">
+                      {userInitials}
+                    </AvatarFallback>
+                  </Avatar>
                   <div>
                     <div className="text-sm font-medium leading-tight transition-colors duration-300">
-                      Alex Cohen
+                      {user?.fullName || "User"}
                     </div>
                     <div className="text-xs text-zinc-400 leading-tight transition-colors duration-300">
-                      Analyst
+                      {user?.jobTitle || "Viewer"}
                     </div>
                   </div>
                 </div>

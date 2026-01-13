@@ -7,6 +7,8 @@ export const validRoutes = [
   "/auth",
   "/auth/login",
   "/auth/signup",
+  "/auth/signup-details",
+  "/auth/forgot-password",
 
   // Protected routes
   "/edit-dashboard",

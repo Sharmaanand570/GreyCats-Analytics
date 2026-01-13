@@ -373,7 +373,15 @@ function Dashboard({
             });
           }
 
-          const matchesBasic = row.metricKey === widget.metricKey && rowIntegration === widgetIntegration;
+          // Define isMetaIntegration helper
+          const isMetaIntegration = widgetIntegration.startsWith('meta_');
+
+          // Reverted strict filtering: trust metricKey for Meta and Meta Business
+          const matchesBasic = isMetaIntegration || widgetIntegration === 'meta-business'
+            ? (row.metricKey === widget.metricKey)
+            : (row.metricKey === widget.metricKey &&
+              String(row.accountId) === String(widget.accountId) &&
+              rowIntegration === widgetIntegration);
 
           // For tables, we want dimensional data
           if (widget.type === 'table') {
@@ -487,7 +495,7 @@ function Dashboard({
     <>
       {/* Header */}
       {!hideHeader && (
-        <div className="w-full h-[4.8em] bg-background border-b flex justify-between items-center px-4 sm:px-5 sticky top-0 z-40 backdrop-blur-md bg-white/80">
+        <div className="w-full h-[4.8em] border-b flex justify-between items-center px-4 sm:px-5 sticky top-0 z-40 backdrop-blur-md bg-white/80">
           <span className="font-medium text-lg sm:text-xl text-zinc-800 tracking-tight">
             {clientId ? 'Executive Dashboard' : 'Select Client'}
           </span>

@@ -12,6 +12,13 @@ const EditDashboard = lazy(() => import("./components/EditDashboard"));
 const AuthPage = lazy(
   () => import("./features/Authantication/componenets/AuthPage")
 );
+const SignupDetailsPage = lazy(
+  () => import("./features/Authantication/componenets/SignupDetailsPage")
+);
+
+const ForgotPassword = lazy(
+  () => import("./features/Authantication/componenets/ForgotPassword")
+);
 const Integrations = lazy(() => import("./pages/Integrations"));
 const YouTubeDetailPage = lazy(() => import("./pages/YouTubeDetailPage"));
 const WooCommerceDetailPage = lazy(
@@ -94,6 +101,8 @@ function App() {
             <Route index element={<AuthPage />} />
             <Route path="login" element={<AuthPage />} />
             <Route path="signup" element={<AuthPage />} />
+            <Route path="signup-details" element={<SignupDetailsPage />} />
+            <Route path="forgot-password" element={<ForgotPassword />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
 

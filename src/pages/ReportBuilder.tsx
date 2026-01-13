@@ -3019,23 +3019,16 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
 
         const widgetIntegration = normalizeIntegration(widget.integration);
 
-        const isMetaIntegration =
-          widgetIntegration === 'meta_ads' ||
-          widgetIntegration === 'meta_facebook' ||
-          widgetIntegration === 'meta_instagram';
-
-        const isSingleAccountIntegration =
-          isMetaIntegration ||
-          widgetIntegration === 'woocommerce' ||
-          widgetIntegration === 'youtube' ||
-          widgetIntegration === 'meta-business' ||
-          widgetIntegration === 'google-search-console';
+        // Check if the widget's integration is a Meta integration (e.g., meta_facebook, meta_instagram, meta_ads)
+        // This is used to relax accountId filtering for Meta integrations, as they often return data
+        // across multiple accounts or for a "business" container rather than a specific ad account.
+        const isMetaIntegration = widgetIntegration.startsWith('meta_');
 
         const filteredRows = data.rows.filter((row: any) => {
           const rowIntegration = normalizeIntegration(row.integration || '');
 
-          const matchesBasic = isMetaIntegration || isSingleAccountIntegration || widgetIntegration === 'meta-business'
-            ? (row.metricKey === widget.metricKey) // Relaxed check: trust metricKey
+          const matchesBasic = isMetaIntegration || widgetIntegration === 'meta-business'
+            ? (row.metricKey === widget.metricKey)
             : (row.metricKey === widget.metricKey &&
               String(row.accountId) === String(widget.accountId) &&
               rowIntegration === widgetIntegration);

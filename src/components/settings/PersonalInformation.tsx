@@ -1,15 +1,26 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { userApi } from "@/api/userApi";
+import { useUserStore } from "@/utils/useUserStore";
+import { getProfileImageUrl } from "@/utils/imageUtils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+    DialogFooter,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 const personalInfoSchema = z.object({
@@ -24,6 +35,7 @@ type PersonalInfoFormValues = z.infer<typeof personalInfoSchema>;
 
 export default function PersonalInformation() {
     const queryClient = useQueryClient();
+    const { fetchProfile } = useUserStore();
 
     // 1. Fetch Profile
     const { data: profileResponse, isLoading, error } = useQuery({
@@ -63,6 +75,7 @@ export default function PersonalInformation() {
             if (res.success) {
                 toast.success("Profile updated successfully");
                 queryClient.invalidateQueries({ queryKey: ["userProfile"] });
+                fetchProfile();
             } else {
                 toast.error(res.message || "Failed to update profile");
             }
@@ -79,12 +92,67 @@ export default function PersonalInformation() {
             if (res.success) {
                 toast.success("Profile picture updated");
                 queryClient.invalidateQueries({ queryKey: ["userProfile"] });
+                fetchProfile();
             }
         },
         onError: (err: any) => {
             toast.error(err.response?.data?.message || "Failed to upload picture");
         },
     });
+
+    // 5. Email Change Logic
+    const [isChangeEmailOpen, setIsChangeEmailOpen] = useState(false);
+    const [emailChangeStep, setEmailChangeStep] = useState<"email" | "otp">("email");
+    const [newEmail, setNewEmail] = useState("");
+    const [otp, setOtp] = useState("");
+
+    const sendEmailOtpMutation = useMutation({
+        mutationFn: userApi.sendEmailChangeOTP,
+        onSuccess: (res) => {
+            if (res.success) {
+                toast.success(res.message || "OTP sent to new email");
+                setEmailChangeStep("otp");
+            } else {
+                toast.error(res.message || "Failed to send OTP");
+            }
+        },
+        onError: (err: any) => {
+            toast.error(err.response?.data?.message || "Failed to send OTP");
+        },
+    });
+
+    const verifyEmailMutation = useMutation({
+        mutationFn: userApi.verifyAndChangeEmail,
+        onSuccess: (res) => {
+            if (res.success) {
+                toast.success("Email updated successfully");
+                setIsChangeEmailOpen(false);
+                setNewEmail("");
+                setOtp("");
+                setEmailChangeStep("email");
+                queryClient.invalidateQueries({ queryKey: ["userProfile"] });
+                fetchProfile();
+            } else {
+                toast.error(res.message || "Failed to verified OTP");
+            }
+        },
+        onError: (err: any) => {
+            toast.error(err.response?.data?.message || "Invalid OTP");
+        },
+    });
+
+    const handleSendOtp = () => {
+        if (!newEmail) return toast.error("Please enter a new email");
+        if (newEmail === profile?.email) return toast.error("New email cannot be same as current email");
+        // Simple regex or let backend handle strict validation, but zod scheme for form exists.
+        // We can manually validate if needed.
+        sendEmailOtpMutation.mutate({ newEmail });
+    };
+
+    const handleVerifyOtp = () => {
+        if (!otp || otp.length < 6) return toast.error("Please enter a valid 6-digit OTP");
+        verifyEmailMutation.mutate({ otp });
+    };
 
     const onSubmit: SubmitHandler<PersonalInfoFormValues> = (data) => {
         updateProfileMutation.mutate({
@@ -142,7 +210,7 @@ export default function PersonalInformation() {
                 <CardContent className="px-0">
                     <div className="flex items-center gap-6 mb-8">
                         <Avatar className="h-24 w-24">
-                            <AvatarImage src={profile?.profilePicture} alt={profile?.fullName} />
+                            <AvatarImage src={getProfileImageUrl(profile?.profilePicture)} alt={profile?.fullName} />
                             <AvatarFallback className="text-xl">
                                 {profile?.fullName?.split(" ").map(n => n[0]).join("")}
                             </AvatarFallback>
@@ -181,8 +249,103 @@ export default function PersonalInformation() {
 
                         <div className="grid gap-2">
                             <Label htmlFor="email">Email</Label>
-                            <Input id="email" {...register("email")} disabled className="bg-muted" />
-                            <p className="text-xs text-muted-foreground">Email address cannot be changed for this account type.</p>
+                            <div className="flex gap-2">
+                                <Input id="email" {...register("email")} disabled className="bg-muted flex-1" />
+                                <Dialog open={isChangeEmailOpen} onOpenChange={(open) => {
+                                    if (!open) {
+                                        setNewEmail("");
+                                        setOtp("");
+                                        setEmailChangeStep("email");
+                                    }
+                                    setIsChangeEmailOpen(open);
+                                }}>
+                                    <DialogTrigger asChild>
+                                        <Button variant="outline" type="button">Change</Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-md">
+                                        <DialogHeader>
+                                            <DialogTitle>Change Email Address</DialogTitle>
+                                            <DialogDescription>
+                                                {emailChangeStep === "email"
+                                                    ? "Enter your new email address. We'll send you a verification code."
+                                                    : `Enter the code sent to ${newEmail}`
+                                                }
+                                            </DialogDescription>
+                                        </DialogHeader>
+
+                                        <div className="space-y-4 py-4">
+                                            {emailChangeStep === "email" ? (
+                                                <div className="grid gap-2">
+                                                    <Label htmlFor="newEmail">New Email Address</Label>
+                                                    <Input
+                                                        id="newEmail"
+                                                        placeholder="name@example.com"
+                                                        value={newEmail}
+                                                        onChange={(e) => setNewEmail(e.target.value)}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="grid gap-2">
+                                                    <Label htmlFor="otp">Verification Code</Label>
+                                                    <Input
+                                                        id="otp"
+                                                        placeholder="123456"
+                                                        maxLength={6}
+                                                        className="text-center text-lg tracking-widest"
+                                                        value={otp}
+                                                        onChange={(e) => setOtp(e.target.value)}
+                                                    />
+                                                    <p className="text-xs text-muted-foreground text-center">
+                                                        Code expires in 10 minutes
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <DialogFooter className="flex-col sm:justify-between sm:flex-row gap-2">
+                                            {emailChangeStep === "otp" && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    onClick={() => setEmailChangeStep("email")}
+                                                    disabled={verifyEmailMutation.isPending}
+                                                >
+                                                    Back
+                                                </Button>
+                                            )}
+
+                                            {emailChangeStep === "email" ? (
+                                                <Button
+                                                    type="button"
+                                                    onClick={handleSendOtp}
+                                                    isLoading={sendEmailOtpMutation.isPending}
+                                                    className="w-full sm:w-auto ml-auto"
+                                                >
+                                                    Send Verification Code
+                                                </Button>
+                                            ) : (
+                                                <div className="flex gap-2 w-full justify-end">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        onClick={handleSendOtp}
+                                                        disabled={verifyEmailMutation.isPending || sendEmailOtpMutation.isPending}
+                                                    >
+                                                        Resend Code
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        onClick={handleVerifyOtp}
+                                                        isLoading={verifyEmailMutation.isPending}
+                                                    >
+                                                        Verify & Change
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
                             {errors.email && <p className="text-sm text-red-500">{errors.email.message}</p>}
                         </div>
 
