@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -27,17 +27,65 @@ export default function ShopifyCallbackHandler() {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const hasRun = useRef(false);
+
   useEffect(() => {
     const status = searchParams.get("status");
     const shop = searchParams.get("shop");
     const reason = searchParams.get("reason");
 
+    if (hasRun.current) return;
+    hasRun.current = true;
+
     console.log("📥 Shopify Callback Params:", { status, shop, reason });
 
+    const handleSuccess = async () => {
+      if (!shop) return;
+
+      try {
+        const storedClientId = localStorage.getItem('pending_oauth_client_id');
+
+        if (storedClientId) {
+          setIsProcessing(true);
+          // 1. Fetch available accounts to find the new connection's ID
+          const { getAvailableAccounts, assignAccountToClient } = await import("@/api/integrationApi");
+          const accounts = await getAvailableAccounts("shopify");
+
+          // 2. Find the account matching the shop domain
+          const targetAccount = accounts.find(acc =>
+            acc.identifier === shop || acc.name === shop
+          );
+
+          if (targetAccount) {
+            // 3. Assign to client
+            try {
+              await assignAccountToClient(parseInt(storedClientId), "shopify", targetAccount.id);
+              toast.success(`Shopify store ${shop} connected and assigned to client successfully`);
+            } catch (assignError) {
+              console.warn("Assignment warning (might be already assigned):", assignError);
+              // Do not fail the whole flow if assignment fails - backend might have done it
+              toast.success(`Shopify store ${shop} connected successfully`);
+            }
+          } else {
+            console.warn("Could not find new Shopify account to assign");
+            toast.success(`Shopify store ${shop} connected (assignment pending - account not found)`);
+          }
+        } else {
+          toast.success(`Shopify store ${shop} connected successfully`);
+        }
+      } catch (error) {
+        console.error("Callback processing error:", error);
+        // Even if frontend logic fails, the OAuth was likely successful on backend
+        // So we show success but maybe with a warning, or just generic success.
+        toast.info(`Connection process completed for ${shop}`);
+      } finally {
+        setIsProcessing(false);
+        setShowSuccessDialog(true);
+      }
+    };
+
     if (status === "success" && shop) {
-      toast.success(`Shopify store ${shop} connected successfully`);
-      setIsProcessing(false);
-      setShowSuccessDialog(true);
+      handleSuccess();
       return;
     }
 

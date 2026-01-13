@@ -149,7 +149,12 @@ export const useAvailableMetrics = (clientId: number | null, options?: { enabled
       totalRows: data?.rows?.length,
       integrations: Object.keys(grouped),
       youtubeAccounts: grouped['youtube'] ? Object.keys(grouped['youtube']) : 'none',
+      shopifyAccounts: grouped['shopify'] ? Object.keys(grouped['shopify']) : 'none',
     });
+
+    if (grouped['shopify']) {
+      console.log('🛒 [AvailableMetrics] Shopify Data:', grouped['shopify']);
+    }
 
     return grouped;
   }, [data]);

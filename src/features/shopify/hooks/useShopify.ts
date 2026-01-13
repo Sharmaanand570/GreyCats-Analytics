@@ -37,8 +37,8 @@ const commonQueryOptions = {
 };
 
 export const useShopifyConnect = () => {
-  return useMutation<ShopifyConnectResponse, Error, ShopifyConnectParams>({
-    mutationFn: (params) => connectShopify(params),
+  return useMutation<ShopifyConnectResponse & { installLink: string }, Error, { storeUrl: string; clientId?: number | null }>({
+    mutationFn: ({ storeUrl, clientId }) => connectShopify(storeUrl, clientId),
     onError: (error) => {
       toast.error(error.message || "Failed to initiate Shopify connection");
     },
@@ -222,12 +222,15 @@ export const useShopifySimpleOrders = (clientId: number, limit?: number) => {
 /**
  * Hook to fetch Shopify trends for a client
  */
-export const useShopifyTrends = (clientId: number) => {
+export const useShopifyTrends = (
+  clientId: number,
+  params?: { startDate?: string; endDate?: string }
+) => {
   return useQuery({
-    queryKey: ["shopify", "trends", clientId],
+    queryKey: ["shopify", "trends", clientId, params],
     queryFn: async () => {
       const { getShopifyTrends } = await import("../API/shopifyApi");
-      return getShopifyTrends(clientId);
+      return getShopifyTrends(clientId, params);
     },
     enabled: !!clientId,
     ...commonQueryOptions,

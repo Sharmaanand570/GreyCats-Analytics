@@ -82,6 +82,7 @@ import {
   updateReportTemplate,
   listReportSchedules,
 } from "@/features/reports/api/reportingApi";
+import { getShopifyTrends, getShopifySummary } from "@/features/shopify/API/shopifyApi";
 import { prettifyMetricLabel } from "@/utils/labelUtils";
 import { CreateScheduleModal } from "../components/CreateScheduleModal";
 import { getGoogleConsoleUnifiedMetrics } from "@/features/YouTube/API/googleConsoleapi";
@@ -527,6 +528,19 @@ function pickDefaultMetricsForIntegration(
     groupedMetrics[normalized] ??
     groupedMetrics[normalized === "google-console" ? "google-search-console" : ""] ??
     {};
+
+  // For Shopify, if no metrics are found (cold start), force the curated list immediately
+  // This bypasses the search for "candidates" which might fail if the integration key doesn't perfectly match
+  if (normalized === 'shopify' && (!perAccount || Object.keys(perAccount).length === 0)) {
+    console.log('🛒 Shopify cold start detected - using forced defaults');
+    const shopifyDefaults = CURATED_DEFAULTS['shopify'] ?? [];
+    return shopifyDefaults.map(key => ({
+      metricKey: key,
+      integration: integrationKey,
+      accountId: accountId,
+      displayName: key.split('.').pop()?.replace(/([A-Z])/g, ' $1').trim(), // avgOrderValue -> avg Order Value
+    }));
+  }
 
   // If we can't find metrics for the specific accountId, try to find ANY metrics for this integration
   // This handles cases where client uses accountId '5' but metrics are stored under '1'
@@ -2875,7 +2889,8 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
 
         const isDefaultRange = !defaultFrom || !defaultTo || (currentFrom === defaultFrom && currentTo === defaultTo);
 
-        if ((widget as any).snapshotData && isDefaultRange) {
+        // Snapshots only apply for Shared views where we want consistent static data
+        if ((widget as any).snapshotData && isDefaultRange && !!shareToken) {
           console.log(`⚡ Using snapshot data for widget group [${widget.metricKey}]`);
           return { hash, widgets: localWidgets, data: (widget as any).snapshotData };
         }
@@ -2946,6 +2961,51 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
             token: shareToken,
           };
 
+          // Override for Shopify: Fetch directly from Shopify-specific API
+          if (normalizedIntegration === 'shopify') {
+            try {
+              let rows: UnifiedMetricRow[] = [];
+              const startD = dateFrom;
+              const endD = dateTo;
+
+              const trendsData = await getShopifyTrends(effectiveClientId!, { startDate: startD, endDate: endD });
+
+              if (trendsData.success && trendsData.trends) {
+                // Strictly filter by date range
+                rows = trendsData.trends
+                  .filter(t => t.date >= startD && t.date <= endD)
+                  .map((t) => {
+                    let val = 0;
+                    if (widget.metricKey === 'shopify.revenue') val = t.revenue;
+                    else if (widget.metricKey === 'shopify.orders') val = t.orders;
+                    else if (widget.metricKey === 'shopify.avgOrderValue') val = t.orders > 0 ? (t.revenue / t.orders) : 0;
+
+                    return {
+                      id: Math.floor(Math.random() * 1000000), // dummy ID
+                      metricKey: widget.metricKey,
+                      value: val,
+                      date: t.date,
+                      integration: 'shopify',
+                      accountId: widget.accountId || '',
+                      userId: 0,
+                      clientId: effectiveClientId!,
+                      recordedAt: new Date().toISOString(),
+                      dimensionType: '',
+                      dimensionValue: '',
+                      extra: null
+                    } as UnifiedMetricRow;
+                  });
+              }
+
+              // Also check summary if trends are empty?
+              // Trends usually cover the date range. If empty data, rows is empty.
+              return { hash, widgets: localWidgets, data: { success: true, rows, pagination: { page: 1, limit: rows.length, total: rows.length, totalPages: 1 } } };
+            } catch (err) {
+              console.error("Shopify Direct Fetch Error", err);
+              // Fallback to unified metric if this fails? or just return null
+            }
+          }
+
           const data = await fetchUnifiedMetric(effectiveClientId!, params);
 
           return { hash, widgets: localWidgets, data };
@@ -2998,6 +3058,10 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
           return;
         }
 
+        if (widget.integration === 'shopify') {
+          console.log('[ShopifyDebug] Raw Data for Widget:', { id, rows: data.rows });
+        }
+
         // Filter rows by accountId and metricKey
         // For metric cards and charts, also filter out dimensional data (dimensionType should be empty)
         // EXCEPTION: WooCommerce uses dimensionType="date" for time-series, which we want to include
@@ -3027,11 +3091,23 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
         const filteredRows = data.rows.filter((row: any) => {
           const rowIntegration = normalizeIntegration(row.integration || '');
 
-          const matchesBasic = isMetaIntegration || widgetIntegration === 'meta-business'
+          const matchesBasic = isMetaIntegration || widgetIntegration === 'meta-business' || widgetIntegration === 'woocommerce'
             ? (row.metricKey === widget.metricKey)
             : (row.metricKey === widget.metricKey &&
               String(row.accountId) === String(widget.accountId) &&
               rowIntegration === widgetIntegration);
+
+          if (widget.integration === 'shopify') {
+            console.log('[ShopifyDebug] Filtering Row:', {
+              rowMetric: row.metricKey,
+              widgetMetric: widget.metricKey,
+              rowAccount: row.accountId,
+              widgetAccount: widget.accountId,
+              rowInteg: rowIntegration,
+              widgetInteg: widgetIntegration,
+              matches: matchesBasic
+            });
+          }
 
           // For tables, we want dimensional data
           if (widget.type === 'table') {
@@ -3482,13 +3558,13 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
 
     // 2. Create the slide with default widgets if enabled
     let defaultWidgets: DashboardLayout[] = [];
-    if (ENABLE_AUTO_DEFAULT_WIDGETS && groupedMetrics && !isLoadingAvailableMetrics) {
+    if (ENABLE_AUTO_DEFAULT_WIDGETS) {
       const integration = integrationsData?.integrations?.[integrationIndex];
       if (integration) {
         const picked = pickDefaultMetricsForIntegration(
           integration.platform,
           integration.accountId,
-          groupedMetrics as any,
+          (groupedMetrics ?? {}) as any,
           (msg) => toast.warning(msg)
         );
         defaultWidgets = buildDefaultWidgetsForIntegration(integrationIndex, picked);
@@ -3675,11 +3751,10 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
           expected &&
           normalize(metricData.integration) !== normalize(expected.platform)
         ) {
-          toast.error(
-            `Drop this metric on the ${getPlatformConfig(expected.platform)?.name || expected.platform
-            } page`
+          // Soften strict block to a warning to prevent invisible failures for slightly mismatched keys
+          toast.warning(
+            `Metric integration (${metricData.integration}) differs from page (${expected.platform}).`
           );
-          return;
         }
         // Account mismatch should not hard-block if integration matches; allow but warn
         // Use loose equality for string/number account IDs

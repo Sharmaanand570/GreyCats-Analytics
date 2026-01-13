@@ -574,16 +574,20 @@ function ConnectDataSource({
                   disabled={shopifyShopUrl === "" || isConnecting}
                   onClick={async () => {
                     try {
+                      // Pass object with url and clientId
                       const response = await connectShopify({
-                        shop: shopifyShopUrl,
+                        storeUrl: shopifyShopUrl,
+                        clientId
                       });
 
-                      if (response.success && response.url) {
+                      const targetUrl = response.oauthUrl || response.url;
+
+                      if (response.success && targetUrl) {
                         if (clientId) {
                           localStorage.setItem("pending_oauth_client_id", clientId.toString());
                           localStorage.setItem("pending_oauth_integration", "shopify");
                         }
-                        window.location.href = response.url;
+                        window.location.href = targetUrl;
                       }
 
                       queryClient.invalidateQueries({ queryKey: ["integrations"] });

@@ -29,6 +29,7 @@ import { useSyncStatus } from "@/features/reports/hooks/useSyncStatus";
 import { SyncStatusBadge } from "@/components/SyncStatusBadge";
 
 import type { ConnectedIntegration } from "@/types/client.types";
+import { useShopifyPolling } from "@/features/shopify/hooks/useShopifyPolling";
 
 interface IntegrationsProps {
   clientId?: number;
@@ -39,6 +40,8 @@ interface IntegrationsProps {
 function Integrations({ clientId: propClientId, withLayout = true, hideHeader = false }: IntegrationsProps) {
   const params = useParams<{ clientId?: string }>();
   const clientId = propClientId ?? (params.clientId ? parseInt(params.clientId) : null);
+
+  useShopifyPolling(clientId); // Add polling hook
 
   const { data: client, isLoading, error } = useClient(clientId);
   console.log("client", client);

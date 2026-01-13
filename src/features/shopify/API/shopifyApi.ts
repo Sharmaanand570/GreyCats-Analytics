@@ -6,6 +6,9 @@ import type { AxiosError } from "axios";
 export type ShopifyConnectResponse = {
   success: boolean;
   url: string;
+  installLink: string;
+  oauthUrl?: string; // Sometimes returned
+  shopDomain?: string;
 };
 
 export type ShopifyCallbackResponse = {
@@ -179,13 +182,20 @@ const handleApiError = (error: unknown, fallbackMessage: string): never => {
  * Initiate Shopify OAuth connection
  * GET /shopify/connect?shop=shop-link
  */
+/**
+ * Initiate Shopify OAuth connection
+ * GET /shopify/connect?shop=shop-link
+ */
 export const connectShopify = async (
-  params: ShopifyConnectParams
-): Promise<ShopifyConnectResponse> => {
+  storeUrl: string,
+  clientId?: number | null // Added clientId
+): Promise<ShopifyConnectResponse & { installLink: string }> => {
   try {
-    const response = await api.get<ShopifyConnectResponse>("/shopify/connect", {
+    // Updated to match the working APIDog request: GET /shopify/reconnect
+    const response = await api.get("/shopify/reconnect", {
       params: {
-        shop: params.shop,
+        shop: storeUrl,
+        client_id: clientId, // Pass client_id to backend
       },
     });
 
@@ -367,7 +377,7 @@ export type ShopifySummaryResponse = {
 
 // Product Types (simplified for client-specific endpoint)
 export type ShopifySimpleProduct = {
-  id: number;
+  id: string;
   title: string;
   price: string;
   compareAtPrice: string | null;
@@ -380,12 +390,18 @@ export type ShopifySimpleProduct = {
 export type ShopifyProductsResponse = {
   success: boolean;
   products: ShopifySimpleProduct[];
+  pagination?: {
+    page: number;
+    limit: number;
+    totalCount: number;
+    totalPages: number;
+  };
 };
 
 // Order Types (simplified for client-specific endpoint)
 export type ShopifySimpleOrder = {
-  id: number;
-  orderNumber: number;
+  id: string;
+  orderNumber: string;
   financialStatus: string;
   fulfillmentStatus: string | null;
   totalPrice: string;
@@ -472,9 +488,15 @@ export const getShopifyOrders = async (
  * Get Shopify trends for a client
  * GET /api/clients/:clientId/shopify/trends
  */
-export const getShopifyTrends = async (clientId: number): Promise<ShopifyTrendsResponse> => {
+export const getShopifyTrends = async (
+  clientId: number,
+  params?: { startDate?: string; endDate?: string }
+): Promise<ShopifyTrendsResponse> => {
   try {
-    const response = await api.get<ShopifyTrendsResponse>(`/clients/${clientId}/shopify/trends`);
+    const response = await api.get<ShopifyTrendsResponse>(
+      `/clients/${clientId}/shopify/trends`,
+      { params }
+    );
     return response.data;
   } catch (error) {
     return handleApiError(error, "Failed to fetch Shopify trends");

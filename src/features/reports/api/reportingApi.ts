@@ -324,17 +324,18 @@ export const fetchUnifiedMetric = (
       startDate: params.startDate,
       endDate: params.endDate,
       ...(params.token ? { token: params.token } : {}),
+      // Temporarily adding accountId if passed (need to update type signature or just cast params if I want to test this hypothesis, but let's just log for now)
     };
 
     // Removed dimensionType and accountId as requested by user
     // Only keeping: clientId (passed separately), integration, metricKey, startDate, endDate
 
-    console.log("requestParams", requestParams);
+    console.log("[UnifiedMetric API] Request Params:", requestParams);
     const response = await api.get(`/unified-metrics`, {
       params: { ...requestParams, clientId, client_id: clientId },
       skipAuthRedirect: !!params.token,
     } as any);
-    console.log("response requestParams", response.data);
+    console.log("[UnifiedMetric API] Response Data:", response.data);
     return response.data;
   });
 
