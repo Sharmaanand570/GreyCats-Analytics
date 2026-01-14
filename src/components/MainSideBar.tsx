@@ -20,6 +20,7 @@ import {
   Settings,
   CircleChevronRight,
   LogOut,
+  ShieldAlert,
 } from "lucide-react";
 import { FiMenu } from "react-icons/fi";
 import { useEffect, useState } from "react";
@@ -38,6 +39,7 @@ function MainSideBar(): React.JSX.Element {
   const [activeTab, setActive] = useState(location.pathname);
   const is404Page = location.pathname.startsWith("/404");
   const { user, fetchProfile } = useUserStore();
+  console.log("MainSideBar render user:", user, "role:", user?.role);
 
   useEffect(() => {
     if (!user) {
@@ -134,6 +136,9 @@ function MainSideBar(): React.JSX.Element {
     {
       label: "Settings",
       items: [
+        ...(user?.role === "ADMIN" || user?.role === "SUPER_ADMIN"
+          ? [{ label: "Admin Panel", path: "/admin/dashboard", icon: <ShieldAlert /> }]
+          : []),
         { label: "Account Setup", path: "/account-setup", icon: <Settings /> },
         { label: "Logout", path: "logout", icon: <LogOut /> },
       ],

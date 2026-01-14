@@ -15,6 +15,8 @@ export interface UserProfile {
     companyPIN?: string;
     companyPhone?: string;
 
+    role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
+
     createdAt: string;
 }
 

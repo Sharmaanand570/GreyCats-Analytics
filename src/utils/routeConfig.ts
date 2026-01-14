@@ -56,7 +56,10 @@ const dynamicRoutePatterns = [
   /^\/data-sources\/meta-business\/\d+$/, // /data-sources/meta-business/:clientId
   /^\/data-sources\/meta-facebook\/\d+$/, // /data-sources/meta-facebook/:clientId
   /^\/data-sources\/meta-instagram\/\d+$/, // /data-sources/meta-instagram/:clientId
+  /^\/data-sources\/meta-facebook\/\d+$/, // /data-sources/meta-facebook/:clientId
+  /^\/data-sources\/meta-instagram\/\d+$/, // /data-sources/meta-instagram/:clientId
   /^\/shared\/reports\/\d+$/, // /shared/reports/:id
+  /^\/admin(\/.*)?$/, // Allow all admin routes
 ];
 
 /**

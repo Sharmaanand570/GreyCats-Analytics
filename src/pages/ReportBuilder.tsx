@@ -83,7 +83,7 @@ import {
   listReportSchedules,
   type UnifiedMetricRow,
 } from "@/features/reports/api/reportingApi";
-import { getShopifyTrends, getShopifySummary } from "@/features/shopify/API/shopifyApi";
+import { getShopifyTrends } from "@/features/shopify/API/shopifyApi";
 import { prettifyMetricLabel } from "@/utils/labelUtils";
 import { CreateScheduleModal } from "../components/CreateScheduleModal";
 import { getGoogleConsoleUnifiedMetrics } from "@/features/YouTube/API/googleConsoleapi";
@@ -2996,7 +2996,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
                         date: t.date,
                         integration: 'shopify',
                         // Force undefined to trigger "Global Metric" self-healing
-                        accountId: undefined,
+                        accountId: "",
                         userId: 0,
                         clientId: effectiveClientId,
                         recordedAt: new Date().toISOString(),
@@ -3309,7 +3309,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
           console.log(`🩹 [Self healing check] Widget: ${widgetId} / ${metricConfig.metricKey}`, {
             currentAccountId: fixedAccountId,
             hasResolvedData: !!resolvedData,
-            rowsLength: resolvedData?.rows?.length
+            rowsLength: (resolvedData?.rows as any)?.length
           });
 
           if (resolvedData && Array.isArray(resolvedData.rows) && resolvedData.rows.length > 0) {
@@ -4648,7 +4648,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
                         integration: metric.integration,
                         // Do NOT hardcode widget.accountId here.
                         // Leave it undefined so Self-Healing logic can detect it's a "Global" metric and clear the accountId in the saved template.
-                        accountId: undefined,
+                        accountId: "",
                         label: metric.displayName,
                         ...(metric.filters
                           ? { filters: metric.filters }

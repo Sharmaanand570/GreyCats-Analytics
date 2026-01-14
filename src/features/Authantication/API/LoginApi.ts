@@ -4,9 +4,10 @@ export type LoginResponse = {
   token: string;
   message: string;
   user: {
-    id: string;
+    id: number;
     email: string;
-    name: string;
+    fullName: string;
+    role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
   };
 };
 
@@ -17,7 +18,7 @@ export type LoginRequest = {
 }
 
 
-export const loginUser = async ( {email, password }:LoginRequest): Promise<LoginResponse> => {
+export const loginUser = async ({ email, password }: LoginRequest): Promise<LoginResponse> => {
   const response = await api.post<LoginResponse>("/auth/login", {
     email,
     password,

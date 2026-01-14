@@ -14,6 +14,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useLoginQuery } from "../hooks/useLoginQuery";
+import { useUserStore } from "@/utils/useUserStore";
 import {
   useSendOtpMutation,
   useVerifyOtpMutation,
@@ -164,8 +165,21 @@ export default function AuthPage() {
           email: data.email,
           password: data.password,
         };
-        await mutateLogin(loginPayload);
-        navigate("/");
+        const response = await mutateLogin(loginPayload);
+
+        // Update user store immediately with partial data from login response
+        // This prevents race conditions in protected routes/RoleGuard
+        const { setUser } = useUserStore.getState();
+        setUser({
+          ...response.user,
+          createdAt: new Date().toISOString(), // Fallback for temporary state
+        } as any);
+
+        if (response.user.role === "ADMIN" || response.user.role === "SUPER_ADMIN") {
+          navigate("/admin/dashboard");
+        } else {
+          navigate("/");
+        }
       } else {
         // --- SIGNUP FLOW ---
         if (signupStep === "DETAILS") {

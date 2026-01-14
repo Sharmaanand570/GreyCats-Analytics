@@ -5,7 +5,6 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Textarea } from './ui/textarea';
 import type { Alert, CreateAlertData, UpdateAlertData, AlertCondition, AlertInterval } from '../types/alert.types';
 import type { ClientWithIntegrations } from '../types/client.types';
 
@@ -30,7 +29,7 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, clientName, clie
     const [condition, setCondition] = useState<AlertCondition>(initialData?.condition || 'less_than');
     const [triggerValue, setTriggerValue] = useState<string>(initialData?.triggerValue?.toString() || '');
     const [interval, setInterval] = useState<AlertInterval>(initialData?.interval || 'day');
-    const [name, setName] = useState<string>(initialData?.name || ''); // Usually auto-generated if empty, but good to have
+    const [name, setName] = useState<string>(''); // Name not available in Alert type yet
     const [notifyEmail, setNotifyEmail] = useState<boolean>(initialData?.notifyEmail ?? true);
     const [emailTo, setEmailTo] = useState<string>(initialData?.emailTo || '');
 
@@ -172,7 +171,7 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, clientName, clie
                         <SelectTrigger>
                             <SelectValue placeholder="Select Metric to Monitor" />
                         </SelectTrigger>
-                        <SelectContent className="max-h-[200px]">
+                        <SelectContent>
                             {metrics.length === 0 ? (
                                 <div className="p-4 text-center text-sm text-muted-foreground">
                                     No metrics available for this account
@@ -254,7 +253,7 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, clientName, clie
                         <span>Email Notifications</span>
                         <span className="font-normal text-xs text-muted-foreground">Receive an email when triggered</span>
                     </Label>
-                    <Switch checked={notifyEmail} onCheckedChange={setNotifyEmail} />
+                    <Switch checked={notifyEmail} onChange={(e) => setNotifyEmail(e.target.checked)} />
                 </div>
 
                 {notifyEmail && (

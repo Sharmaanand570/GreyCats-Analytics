@@ -1,7 +1,8 @@
 import { lazy, Suspense, useEffect } from "react";
-import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
+import { Routes, Route, useLocation, useNavigate, Navigate } from "react-router-dom";
 import MainSideBar from "./components/MainSideBar";
 import AuthParentComp from "./features/Authantication/componenets/AuthParentComp";
+import { ImpersonationBanner } from "./components/ImpersonationBanner";
 import ShopifyCallbackHandler from "./features/shopify/componenets/ShopifyCallbackHandler";
 import MetaCallbackHandler from "./features/meta/components/MetaCallbackHandler";
 import { isValidPath } from "./utils/routeConfig";
@@ -61,6 +62,20 @@ const ClientsPage = lazy(() => import("./pages/ClientsPage"));
 const ClientDetailPage = lazy(() => import("./pages/ClientDetailPage"));
 const OAuthCallbackPage = lazy(() => import("./pages/OAuthCallbackPage"));
 const SharedReportPage = lazy(() => import("./pages/SharedReportPage"));
+
+// Admin Pages
+const AdminLayout = lazy(() => import("./components/AdminLayout"));
+const AdminDashboard = lazy(() => import("./features/admin/pages/AdminDashboard"));
+const UsersListPage = lazy(() => import("./features/admin/pages/UsersListPage"));
+const UserDetailsPage = lazy(() => import("./features/admin/pages/UserDetailsPage"));
+const ClientsListPage = lazy(() => import("./features/admin/pages/ClientsListPage"));
+const ClientDetailsPage = lazy(() => import("./features/admin/pages/ClientDetailsPage"));
+const PlansPage = lazy(() => import("./features/admin/pages/PlansPage"));
+const UserSubscriptionsPage = lazy(() => import("./features/admin/pages/UserSubscriptionsPage"));
+const SystemStatsPage = lazy(() => import("./features/admin/pages/SystemStatsPage"));
+const ActivityTimelinePage = lazy(() => import("./features/admin/pages/ActivityTimelinePage"));
+const IntegrationHealthPage = lazy(() => import("./features/admin/pages/IntegrationHealthPage"));
+const RoleGuard = lazy(() => import("./components/RoleGuard"));
 
 const LoadingFallback = () => (
   <div className="flex items-center justify-center min-h-screen">
@@ -162,6 +177,26 @@ function App() {
 
             {/* Catch-all for invalid routes within protected area */}
             <Route path="*" element={<NotFoundPage />} />
+          </Route>
+
+          {/* Admin Routes */}
+          <Route element={<RoleGuard allowedRoles={["ADMIN", "SUPER_ADMIN"]} />}>
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<AdminDashboard />} />
+              <Route path="user" element={<Navigate to="users" replace />} />
+              <Route path="users" element={<UsersListPage />} />
+              <Route path="users/:userId" element={<UserDetailsPage />} />
+              <Route path="client" element={<Navigate to="clients" replace />} />
+              <Route path="clients" element={<ClientsListPage />} />
+              <Route path="clients/:clientId" element={<ClientDetailsPage />} />
+              <Route path="subscriptions/plans" element={<PlansPage />} />
+              <Route path="subscriptions/users" element={<UserSubscriptionsPage />} />
+              <Route path="monitoring/stats" element={<SystemStatsPage />} />
+              <Route path="monitoring/activity" element={<ActivityTimelinePage />} />
+              <Route path="monitoring/integrations" element={<IntegrationHealthPage />} />
+              <Route path="*" element={<Navigate to="dashboard" replace />} />
+            </Route>
           </Route>
 
           {/* OAuth callback routes */}

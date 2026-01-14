@@ -1,6 +1,7 @@
 import { isAuthenticated, StorageKey } from "@/utils/storage";
 import { useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 
 function AuthParentComp(): React.JSX.Element | null {
   const location = useLocation();
@@ -30,7 +31,12 @@ function AuthParentComp(): React.JSX.Element | null {
 
   if (checkingAuth) return null; // prevents flicker
 
-  return <Outlet />;
+  return (
+    <>
+      <ImpersonationBanner />
+      <Outlet />
+    </>
+  );
 }
 
 export default AuthParentComp;
