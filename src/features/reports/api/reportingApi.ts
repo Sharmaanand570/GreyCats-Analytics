@@ -223,7 +223,7 @@ const mapApiTemplateToReportTemplate = (
         displayName: prettifyMetricLabel(w.displayName || (w as any).title || (w as any).label || w.metricKey || ""),
         layout, // Use the mapped layout
         filters, // Use the mapped filters
-        ...(widgetData ? { widgetData } : {}), // Add widgetData if present
+        ...(widgetData ? { widgetData, snapshotData: widgetData } : {}), // Add widgetData and alias as snapshotData
       });
     });
   });
@@ -255,6 +255,20 @@ const mapApiTemplateToReportTemplate = (
  * Fetch unified metrics (production data) without resolving specific widgets.
  * This can be used to build the available-metrics list from live data.
  */
+export interface UnifiedMetricRow {
+  id: number;
+  metricKey: string;
+  value: number;
+  date: string;
+  integration: string;
+  accountId: string;
+  userId: number;
+  clientId: number;
+  recordedAt: string;
+  dimensionType?: string;
+  dimensionValue?: string;
+  extra?: any;
+}
 export const fetchUnifiedMetricsList = (
   clientId: number,
   params?: {
@@ -291,7 +305,7 @@ export const fetchUnifiedMetricsList = (
 // Fetch individual metric data with optional dimensional breakdown
 // Removed accountId and dimensionType from params - backend handles filtering
 export const fetchUnifiedMetric = (
-  clientId: number,
+  clientId: number | null | undefined,
   params: {
     integration: string;
     metricKey: string;
@@ -324,15 +338,16 @@ export const fetchUnifiedMetric = (
       startDate: params.startDate,
       endDate: params.endDate,
       ...(params.token ? { token: params.token } : {}),
-      // Temporarily adding accountId if passed (need to update type signature or just cast params if I want to test this hypothesis, but let's just log for now)
     };
 
-    // Removed dimensionType and accountId as requested by user
-    // Only keeping: clientId (passed separately), integration, metricKey, startDate, endDate
+    if (clientId) {
+      requestParams.clientId = String(clientId);
+      requestParams.client_id = String(clientId);
+    }
 
     console.log("[UnifiedMetric API] Request Params:", requestParams);
     const response = await api.get(`/unified-metrics`, {
-      params: { ...requestParams, clientId, client_id: clientId },
+      params: requestParams,
       skipAuthRedirect: !!params.token,
     } as any);
     console.log("[UnifiedMetric API] Response Data:", response.data);

@@ -81,6 +81,7 @@ import {
   fetchUnifiedMetric,
   updateReportTemplate,
   listReportSchedules,
+  type UnifiedMetricRow,
 } from "@/features/reports/api/reportingApi";
 import { getShopifyTrends, getShopifySummary } from "@/features/shopify/API/shopifyApi";
 import { prettifyMetricLabel } from "@/utils/labelUtils";
@@ -1934,7 +1935,12 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
   const { isLoading: isTemplateLoading, isError: isTemplateError } = templateQuery;
 
   // Derive clientId from template if not in params
-  const effectiveClientId = parsedClientId ?? templateQuery.data?.clientId ?? null;
+  // Robustness Fix: Check initialData directly as well to ensure we capture it for shared reports
+  const effectiveClientId = parsedClientId ??
+    templateQuery.data?.clientId ??
+    (initialData as any)?.clientId ??
+    (initialData as any)?.client_id ??
+    null;
 
   // Page order state - tracks the order of all pages (integration indices + custom page IDs)
   const [pageOrder, setPageOrder] = useState<number[]>([]);
@@ -2968,45 +2974,46 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
               const startD = dateFrom;
               const endD = dateTo;
 
-              const trendsData = await getShopifyTrends(effectiveClientId!, { startDate: startD, endDate: endD });
+              // Only attempt direct fetch if we have a clientId (authenticated session)
+              // Shared reports (without clientId) will fall back to unified-metric API below
+              if (effectiveClientId) {
+                const trendsData = await getShopifyTrends(effectiveClientId, { startDate: startD, endDate: endD });
 
-              if (trendsData.success && trendsData.trends) {
-                // Strictly filter by date range
-                rows = trendsData.trends
-                  .filter(t => t.date >= startD && t.date <= endD)
-                  .map((t) => {
-                    let val = 0;
-                    if (widget.metricKey === 'shopify.revenue') val = t.revenue;
-                    else if (widget.metricKey === 'shopify.orders') val = t.orders;
-                    else if (widget.metricKey === 'shopify.avgOrderValue') val = t.orders > 0 ? (t.revenue / t.orders) : 0;
+                if (trendsData.success && trendsData.trends) {
+                  // Strictly filter by date range
+                  rows = trendsData.trends
+                    .filter(t => t.date >= startD && t.date <= endD)
+                    .map((t) => {
+                      let val = 0;
+                      if (widget.metricKey === 'shopify.revenue') val = t.revenue;
+                      else if (widget.metricKey === 'shopify.orders') val = t.orders;
+                      else if (widget.metricKey === 'shopify.avgOrderValue') val = t.orders > 0 ? (t.revenue / t.orders) : 0;
 
-                    return {
-                      id: Math.floor(Math.random() * 1000000), // dummy ID
-                      metricKey: widget.metricKey,
-                      value: val,
-                      date: t.date,
-                      integration: 'shopify',
-                      accountId: widget.accountId || '',
-                      userId: 0,
-                      clientId: effectiveClientId!,
-                      recordedAt: new Date().toISOString(),
-                      dimensionType: '',
-                      dimensionValue: '',
-                      extra: null
-                    } as UnifiedMetricRow;
-                  });
+                      return {
+                        id: Math.floor(Math.random() * 1000000), // dummy ID
+                        metricKey: widget.metricKey,
+                        value: val,
+                        date: t.date,
+                        integration: 'shopify',
+                        // Force undefined to trigger "Global Metric" self-healing
+                        accountId: undefined,
+                        userId: 0,
+                        clientId: effectiveClientId,
+                        recordedAt: new Date().toISOString(),
+                        dimensionType: '',
+                        dimensionValue: '',
+                        extra: null
+                      } as UnifiedMetricRow;
+                    });
+                  return { hash, widgets: localWidgets, data: { success: true, rows, pagination: { page: 1, limit: rows.length, total: rows.length, totalPages: 1 } } };
+                }
               }
-
-              // Also check summary if trends are empty?
-              // Trends usually cover the date range. If empty data, rows is empty.
-              return { hash, widgets: localWidgets, data: { success: true, rows, pagination: { page: 1, limit: rows.length, total: rows.length, totalPages: 1 } } };
             } catch (err) {
               console.error("Shopify Direct Fetch Error", err);
-              // Fallback to unified metric if this fails? or just return null
             }
           }
 
-          const data = await fetchUnifiedMetric(effectiveClientId!, params);
+          const data = await fetchUnifiedMetric(effectiveClientId, params);
 
           return { hash, widgets: localWidgets, data };
         } catch (error) {
@@ -3086,32 +3093,42 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
         // Check if the widget's integration is a Meta integration (e.g., meta_facebook, meta_instagram, meta_ads)
         // This is used to relax accountId filtering for Meta integrations, as they often return data
         // across multiple accounts or for a "business" container rather than a specific ad account.
-        const isMetaIntegration = widgetIntegration.startsWith('meta_');
+        // const isMetaIntegration = widgetIntegration.startsWith('meta_');
 
-        const filteredRows = data.rows.filter((row: any) => {
+        // Loose Matching Logic for accountId mismatch fallback
+        // First try strict match
+        let matchingRows = data.rows.filter((row: any) => {
           const rowIntegration = normalizeIntegration(row.integration || '');
-
-          const matchesBasic = isMetaIntegration || widgetIntegration === 'meta-business' || widgetIntegration === 'woocommerce'
+          const strictMatch = (widgetIntegration.startsWith('meta_') || widgetIntegration === 'meta-business' || widgetIntegration === 'woocommerce')
             ? (row.metricKey === widget.metricKey)
             : (row.metricKey === widget.metricKey &&
-              String(row.accountId) === String(widget.accountId) &&
+              // Handle null vs undefined mismatch (e.g. widget.accountId=null, row.accountId=undefined)
+              (row.accountId == widget.accountId || String(row.accountId) === String(widget.accountId)) &&
               rowIntegration === widgetIntegration);
+          return strictMatch;
+        });
 
-          if (widget.integration === 'shopify') {
-            console.log('[ShopifyDebug] Filtering Row:', {
-              rowMetric: row.metricKey,
-              widgetMetric: widget.metricKey,
-              rowAccount: row.accountId,
-              widgetAccount: widget.accountId,
-              rowInteg: rowIntegration,
-              widgetInteg: widgetIntegration,
-              matches: matchesBasic
-            });
+        // If strict match fails, try loose match (ignore account ID) for ANY integration
+        // This fixes the issue where cloned templates have stale account IDs but the API returns valid data for the client
+        if (matchingRows.length === 0) {
+          matchingRows = data.rows.filter((row: any) => {
+            const rowIntegration = normalizeIntegration(row.integration || '');
+            const looseMatch = (
+              row.metricKey === widget.metricKey &&
+              rowIntegration === widgetIntegration
+            );
+            return looseMatch;
+          });
+          if (matchingRows.length > 0) {
+            console.log(`⚠️ Widget ${id} caused accountId mismatch. Falling back to simple metric key match. (Expected: ${widget.accountId})`);
           }
+        }
 
+        const filteredRows = matchingRows.filter((row: any) => {
+          // Additional Dimension Filters (re-apply on the matched set)
           // For tables, we want dimensional data
           if (widget.type === 'table') {
-            return matchesBasic;
+            return true;
           }
 
           // For metric cards and charts, exclude dimensional data
@@ -3123,7 +3140,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
           const isYouTubeDimension = widget.metricKey.startsWith('youtube.') && (dimType === 'video' || row.dimensionType === 'video');
 
           // Include if: not dimensional OR is a time dimension OR is YouTube video dimension
-          return matchesBasic && (!isDimensional || isTimeDimension || isYouTubeDimension);
+          return (!isDimensional || isTimeDimension || isYouTubeDimension);
         });
 
         // Calculate total value
@@ -3281,10 +3298,60 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
             });
           }
 
+          // Self-Healing: If we have resolved live data, ensure the saved widget
+          // uses the correctly matched accountId. This fixes "ghost" attributes
+          // where the widget thinks it belongs to Account ID 21 but data only exists for Account ID 1.
+          // Self-Healing debug logs
+          const widgetId = metricConfig.id ?? widget.i;
+          const resolvedData = resolvedWidgets[widgetId] as ResolvedWidgetData | undefined;
+          let fixedAccountId = metricConfig.accountId;
+
+          console.log(`🩹 [Self healing check] Widget: ${widgetId} / ${metricConfig.metricKey}`, {
+            currentAccountId: fixedAccountId,
+            hasResolvedData: !!resolvedData,
+            rowsLength: resolvedData?.rows?.length
+          });
+
+          if (resolvedData && Array.isArray(resolvedData.rows) && resolvedData.rows.length > 0) {
+            const firstRow = resolvedData.rows[0] as UnifiedMetricRow;
+
+            // Case 1: Row has a specific accountId -> enforce it
+            if (firstRow.accountId) {
+              // Debug GA specifically
+              if (metricConfig.integration.includes('google')) {
+                console.log(`🔍 [Self-Healing GA Debug] Widget Int: '${metricConfig.integration}', Row Int: '${firstRow.integration}', Widget Acc: '${fixedAccountId}', Row Acc: '${firstRow.accountId}'`);
+              }
+
+              // Fix Account ID Mismatch
+              // eslint-disable-next-line eqeqeq
+              if (firstRow.accountId != fixedAccountId) {
+                console.log(`🩹 [Self-Healing] Correction for ${metricConfig.metricKey}: accountId ${fixedAccountId} -> ${firstRow.accountId}`);
+                toast.success(`Auto-corrected ${displayName} to Account ID ${firstRow.accountId}`);
+                fixedAccountId = firstRow.accountId;
+              }
+
+              // Fix Integration Name Mismatch (e.g. google-analytics vs google_analytics)
+              if (firstRow.integration && firstRow.integration !== metricConfig.integration) {
+                console.log(`🩹 [Self-Healing] Correction for ${metricConfig.metricKey}: integration ${metricConfig.integration} -> ${firstRow.integration}`);
+                toast.success(`Auto-corrected ${displayName} integration to ${firstRow.integration}`);
+                // modify the config we push
+                metricConfig.integration = firstRow.integration;
+              }
+            }
+            // Case 2: Row has NO accountId (e.g. global/client metric) but widget insists on one -> clear it
+            else if (fixedAccountId) {
+              console.log(`🩹 [Self-Healing] Clearing accountId for ${metricConfig.metricKey} (Global Metric)`);
+              toast.success(`Auto-corrected ${displayName} to Global Metric`);
+              fixedAccountId = undefined;
+            }
+          }
+
           widgets.push({
             ...metricConfig,
             id: metricConfig.id ?? widget.i,
             type: metricConfig.type ?? widget.widgetType,
+            // Apply the corrected accountId
+            accountId: fixedAccountId,
             displayName, // Explicit root level name for snapshotting
             layout: {
               slideId,
@@ -3321,6 +3388,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
       customPages,
       integrationsData,
       effectivePageOrder,
+      resolvedWidgets,
     ]);
 
   const { mutate: saveTemplate, isPending: isSavingTemplate } = useMutation({
@@ -3347,10 +3415,16 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
 
-
+  // We do NOT auto-save on mount/refresh. User must click Save to persist self-healing fixes.
   const handleSaveTemplate = useCallback(() => {
     if (!templateId) {
       toast.error("Template not ready yet");
+      return;
+    }
+
+    // Prevent saving if data is still loading, as Self-Healing needs resolved widgets
+    if (reportDataQuery.isFetching) {
+      toast.warning("Please wait for all data to load before saving to ensure report link integrity.");
       return;
     }
 
@@ -3359,6 +3433,46 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
     console.log(`💾 [handleSaveTemplate] Dashboards Keys:`, Array.from(dashboards.keys()));
 
     const basePayload = buildTemplatePayloadFromDashboards();
+
+    // DATA SYNC FIX: Inject live data from reportDataQuery into the payload
+    // This forces the backend snapshot to match the "WYSIWYG" Builder view (e.g. 1888 value)
+    // instead of regenerating it with potentially different backend logic (e.g. 799 value).
+    if (basePayload.widgets && reportDataQuery.data) {
+      basePayload.widgets = basePayload.widgets.map(w => {
+        // Find matching data in the query result
+        // The query result uses widget IDs as keys
+        const liveData = reportDataQuery.data?.[w.id];
+
+        if (liveData) {
+          console.log(`💉 [DataSync] Injecting live data for widget ${w.id} (${w.metricKey})`);
+
+          // Optimization: Strip heavy rows from Metric widgets as they only need summaries
+          // This prevents "Request Entity Too Large" errors (413)
+          const isMetric = w.type === 'metric' || (w as any).widgetType === 'metric';
+
+          // Create a shallow copy to modify
+          const optimizedData = { ...liveData };
+
+          if (isMetric) {
+            // Metrics rely on 'value'/'total'/'series'. They rarely need the full 'rows' dump.
+            // We replace it with an empty array to save space.
+            optimizedData.rows = [];
+          }
+
+          return {
+            ...w,
+            // Inject into widgetData (primary snapshot storage)
+            widgetData: optimizedData,
+            // Also update filters.widgetData if it exists there (legacy/redundant ref)
+            filters: {
+              ...w.filters,
+              widgetData: optimizedData
+            }
+          };
+        }
+        return w;
+      });
+    }
 
     const payload = {
       ...basePayload,
@@ -3374,6 +3488,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
     saveTemplate(payload);
   }, [
     templateId,
+    reportDataQuery.data, // Add dependency to ensure we have latest data
     buildTemplatePayloadFromDashboards,
     saveTemplate,
     dateRange,
@@ -4531,7 +4646,9 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
                       handleDragStart(e, selectedMetricWidgetType, {
                         metricKey: metric.metricKey,
                         integration: metric.integration,
-                        accountId: metric.accountId,
+                        // Do NOT hardcode widget.accountId here.
+                        // Leave it undefined so Self-Healing logic can detect it's a "Global" metric and clear the accountId in the saved template.
+                        accountId: undefined,
                         label: metric.displayName,
                         ...(metric.filters
                           ? { filters: metric.filters }

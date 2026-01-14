@@ -489,10 +489,13 @@ export const getShopifyOrders = async (
  * GET /api/clients/:clientId/shopify/trends
  */
 export const getShopifyTrends = async (
-  clientId: number,
+  clientId: number | null | undefined,
   params?: { startDate?: string; endDate?: string }
 ): Promise<ShopifyTrendsResponse> => {
   try {
+    if (!clientId) {
+      throw new Error("Client ID is required for direct Shopify API calls");
+    }
     const response = await api.get<ShopifyTrendsResponse>(
       `/clients/${clientId}/shopify/trends`,
       { params }
