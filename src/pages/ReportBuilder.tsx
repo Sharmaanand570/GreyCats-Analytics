@@ -1626,7 +1626,7 @@ const renderWidgetContent = (
             </div>
           )}
 
-          {!options?.readOnly && (
+          {!options?.readOnly && !metricData?.hideDataPoints && (
             <span className="text-[10px] md:text-xs text-gray-500 mt-1">
               {isIntegrationMetric && typeof resolvedData?.rawCount === "number"
                 ? resolvedData.rawCount

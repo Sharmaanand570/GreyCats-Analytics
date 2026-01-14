@@ -14,7 +14,7 @@ export interface Alert {
     userId: number;
     clientId: number;
     integration: string;
-    accountId: string;
+    accountId: number;  // Changed from string to number
     metricKey: string;
     metricLabel: string;
     condition: AlertCondition;
@@ -33,7 +33,7 @@ export interface Alert {
 
 export interface CreateAlertData {
     integration: string;
-    accountId: string;
+    accountId: number | string;
     metricKey: string;
     metricLabel: string;
     condition: AlertCondition;

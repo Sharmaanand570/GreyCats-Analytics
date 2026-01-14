@@ -1,6 +1,7 @@
 import React from "react";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
+import { Switch } from "./ui/switch";
 import type { MetricWidgetData } from "./widgetTypes";
 
 interface MetricWidgetFormProps {
@@ -99,6 +100,16 @@ function MetricWidgetForm({
               <option value="down">Down (Red)</option>
             </select>
           </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <Label className="block text-xs text-gray-600">
+            Hide "Data Points" count
+          </Label>
+          <Switch
+            checked={data?.hideDataPoints ?? false}
+            onChange={(e) => handleChange({ hideDataPoints: e.target.checked })}
+          />
         </div>
       </div>
     </div>

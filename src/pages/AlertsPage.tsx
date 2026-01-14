@@ -2,17 +2,18 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-
+import { toast } from 'sonner';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FiSearch, FiPlus, FiActivity, FiServer, FiDollarSign, FiTrash2, FiEdit2 } from "react-icons/fi";
+import { FiSearch, FiPlus, FiActivity, FiServer, FiDollarSign, FiTrash2, FiEdit2, FiClock } from "react-icons/fi";
 import { format } from "date-fns";
 import { useClientContext } from '@/context/ClientContext';
 import { getAlerts, createAlert, updateAlert, deleteAlert } from '@/api/alertsApi';
 import { AlertForm } from '@/components/AlertForm';
 import { NotificationsPopover } from '@/components/NotificationsPopover';
 import type { Alert, CreateAlertData, UpdateAlertData } from '@/types/alert.types';
+import type { ClientWithIntegrations } from '@/types/client.types';
 
 // --- Logic Helpers ---
 
@@ -56,7 +57,7 @@ const AlertsPage: React.FC = () => {
 
   // -- Queries & Mutations --
 
-  const { data: response, isLoading } = useQuery({
+  const { data: response, isLoading, error: queryError } = useQuery({
     queryKey: ['alerts', clientId],
     queryFn: () => getAlerts(clientId!),
     enabled: !!clientId,
@@ -67,6 +68,11 @@ const AlertsPage: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alerts', clientId] });
       setIsCreateModalOpen(false);
+      toast.success('Alert created successfully');
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.message || 'Failed to create alert';
+      toast.error(errorMessage);
     },
   });
 
@@ -75,6 +81,11 @@ const AlertsPage: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alerts', clientId] });
       setEditingAlert(null);
+      toast.success('Alert updated successfully');
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.message || 'Failed to update alert';
+      toast.error(errorMessage);
     },
   });
 
@@ -82,6 +93,11 @@ const AlertsPage: React.FC = () => {
     mutationFn: (id: number) => deleteAlert(clientId!, id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alerts', clientId] });
+      toast.success('Alert deleted successfully');
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.message || 'Failed to delete alert';
+      toast.error(errorMessage);
     },
   });
 
@@ -184,6 +200,13 @@ const AlertsPage: React.FC = () => {
             <div className="flex flex-col items-center justify-center h-64 text-zinc-500">
               <p>Please select a client to view alerts.</p>
             </div>
+          ) : queryError ? (
+            <div className="flex flex-col items-center justify-center h-64 text-red-500">
+              <p className="font-medium">Failed to load alerts</p>
+              <p className="text-sm text-zinc-500 mt-2">
+                {(queryError as any)?.response?.data?.message || 'Please try again later'}
+              </p>
+            </div>
           ) : isLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-zinc-900"></div>
@@ -263,6 +286,8 @@ const AlertsPage: React.FC = () => {
           {clientId && (
             <AlertForm
               clientId={clientId}
+              clientName={currentClient?.name}
+              client={currentClient as ClientWithIntegrations}
               onSubmit={handleCreate}
               onCancel={() => setIsCreateModalOpen(false)}
               isLoading={createMutation.isPending}
@@ -280,6 +305,8 @@ const AlertsPage: React.FC = () => {
           {clientId && editingAlert && (
             <AlertForm
               clientId={clientId}
+              clientName={currentClient?.name}
+              client={currentClient as ClientWithIntegrations}
               initialData={editingAlert}
               onSubmit={handleUpdate}
               onCancel={() => setEditingAlert(null)}
@@ -336,9 +363,16 @@ const PulseCard = ({ alert, onDelete, onEdit }: CardProps) => {
 
       <div className="relative mb-4">
         <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-bold text-zinc-900">
-            {typeof alert.currentValue === 'number' && type === 'financial' ? `$${alert.currentValue.toLocaleString()}` : (alert.currentValue ?? 'N/A')}
-          </span>
+          {typeof alert.currentValue === 'number' ? (
+            <span className="text-3xl font-bold text-zinc-900">
+              {type === 'financial' ? `$${alert.currentValue.toLocaleString()}` : alert.currentValue}
+            </span>
+          ) : (
+            <span className="flex items-center gap-2 text-zinc-400 text-lg font-medium bg-zinc-50 px-3 py-1 rounded-full">
+              <FiClock className="w-4 h-4 animate-pulse" />
+              Waiting for data...
+            </span>
+          )}
         </div>
         <p className="text-sm text-red-600 font-medium mt-1">
           Threshold: <span className="opacity-80">{alert.condition.replace(/_/g, ' ')} {alert.triggerValue}</span>
@@ -387,9 +421,16 @@ const MonitorCard = ({ alert, onDelete, onEdit }: CardProps) => {
 
       <div className="flex justify-between items-end">
         <div>
-          <span className="text-lg font-semibold text-zinc-700">
-            {typeof alert.currentValue === 'number' && type === 'financial' ? `$${alert.currentValue.toLocaleString()}` : (alert.currentValue ?? 'N/A')}
-          </span>
+          {typeof alert.currentValue === 'number' ? (
+            <span className="text-lg font-semibold text-zinc-700">
+              {type === 'financial' ? `$${alert.currentValue.toLocaleString()}` : alert.currentValue}
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-zinc-400 text-sm font-medium">
+              <FiClock className="w-3.5 h-3.5" />
+              Waiting...
+            </span>
+          )}
           <p className="text-xs text-zinc-400 mt-0.5 max-w-[100px] truncate" title={`${alert.condition} ${alert.triggerValue}`}>
             Target: {alert.condition.replace(/_/g, ' ')} {alert.triggerValue}
           </p>

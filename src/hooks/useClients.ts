@@ -122,8 +122,9 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
         identifier = account.searchConsoleAccount?.siteUrl || account.siteUrl || identifier;
         break;
       case 'google-analytics':
-        name = account.analyticsAccount?.platform || account.platform || account.propertyName || name;
-        identifier = account.analyticsAccount?.id || account.id || account.propertyId || identifier;
+        // Try to get propertyId as identifier first, as that's what metrics use
+        identifier = account.analyticsAccount?.propertyId || account.propertyId || account.analyticsAccount?.id || account.id || identifier;
+        name = account.analyticsAccount?.propertyName || account.propertyName || account.platform || name;
         break;
     }
 
@@ -245,20 +246,37 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
 
   if (client.googleAnalyticsProperties) {
     client.googleAnalyticsProperties.forEach((acc: any) => {
-      const uniqueKey = `google-analytics-${acc.platformAccountId}`;
-      const propertyNameKey = `google-analytics-name-${acc.platformAccount?.propertyName}`;
-      const propertyIdKey = `google-analytics-identifier-${acc.platformAccount?.propertyId}`;
+      const flatAcc = {
+        id: acc.id,
+        propertyName: acc.propertyName || acc.platformAccount?.propertyName,
+        propertyId: acc.propertyId || acc.platformAccount?.propertyId,
+        platform: 'Google Analytics'
+      };
+
+      const uniqueKey = `google-analytics-${acc.id}`;
+      const propertyNameKey = `google-analytics-name-${flatAcc.propertyName}`;
+      const propertyIdKey = `google-analytics-identifier-${flatAcc.propertyId}`;
+
+      // Check if this integration was already added (e.g. from client.integrations) but is missing the identifier
+      const existingIndex = integrations.findIndex(i =>
+        i.integrationType === 'google-analytics' &&
+        i.accountId === acc.id &&
+        i.accountIdentifier === 'unknown'
+      );
+
+      if (existingIndex !== -1 && flatAcc.propertyId) {
+        // Enriched the existing entry with the found propertyId
+        integrations[existingIndex].accountIdentifier = flatAcc.propertyId;
+        // Also add the identifier to processedIds to prevent future duplicates if any
+        processedIds.add(propertyIdKey);
+        return;
+      }
 
       // Check ALL possible existing keys to avoid duplication
-      if (!processedIds.has(uniqueKey) && !processedIds.has(propertyNameKey) && !processedIds.has(propertyIdKey)) {
-        const flatAcc = {
-          id: acc.id,
-          propertyName: acc.platformAccount?.propertyName,
-          propertyId: acc.platformAccount?.propertyId,
-          platform: 'Google Analytics'
-        };
-        // Manually use mapAccount logic here or reuse mapAccount if adapted
-        // For now, manual check since mapAccount expects different structure
+      if (!processedIds.has(uniqueKey) &&
+        (!flatAcc.propertyName || !processedIds.has(propertyNameKey)) &&
+        (!flatAcc.propertyId || !processedIds.has(propertyIdKey))) {
+
         integrations.push({
           integrationType: 'google-analytics',
           accountId: acc.id,
@@ -267,8 +285,8 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
           connectedAt: acc.createdAt || new Date().toISOString()
         });
         processedIds.add(uniqueKey);
-        processedIds.add(propertyNameKey);
-        processedIds.add(propertyIdKey);
+        if (flatAcc.propertyName) processedIds.add(propertyNameKey);
+        if (flatAcc.propertyId) processedIds.add(propertyIdKey);
       }
     });
   }

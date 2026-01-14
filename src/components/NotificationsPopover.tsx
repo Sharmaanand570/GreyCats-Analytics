@@ -7,12 +7,13 @@ import { ScrollArea } from './ui/scroll-area';
 import { FiBell, FiCheck } from 'react-icons/fi';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from './ui/badge';
+import { toast } from 'sonner';
 
 
 export const NotificationsPopover: React.FC = () => {
     const queryClient = useQueryClient();
 
-    const { data, isLoading } = useQuery({
+    const { data, isLoading, error } = useQuery({
         queryKey: ['notifications'],
         queryFn: async () => getNotifications({ limit: 20 }),
         refetchInterval: 60000, // Check every minute
@@ -22,6 +23,11 @@ export const NotificationsPopover: React.FC = () => {
         mutationFn: markNotificationRead,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['notifications'] });
+            toast.success('Notification marked as read');
+        },
+        onError: (error: any) => {
+            const errorMessage = error.response?.data?.message || 'Failed to mark notification as read';
+            toast.error(errorMessage);
         },
     });
 
@@ -55,6 +61,14 @@ export const NotificationsPopover: React.FC = () => {
                     {isLoading ? (
                         <div className="p-4 text-center text-sm text-muted-foreground">
                             Loading...
+                        </div>
+                    ) : error ? (
+                        <div className="p-8 text-center text-sm text-red-500 flex flex-col items-center gap-2">
+                            <FiBell className="text-2xl opacity-20" />
+                            <p className="font-medium">Failed to load notifications</p>
+                            <p className="text-xs text-zinc-500">
+                                {(error as any)?.response?.data?.message || 'Please try again later'}
+                            </p>
                         </div>
                     ) : notifications.length === 0 ? (
                         <div className="p-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">

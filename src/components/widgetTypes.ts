@@ -43,6 +43,7 @@ export interface MetricWidgetData {
   trendValue?: string; // e.g. "12%"
   trendDirection?: "up" | "down" | "neutral";
   widgetImageUrl?: string; // Base64 image URL from html2canvas conversion
+  hideDataPoints?: boolean;
 }
 
 export interface ImageWidgetData {

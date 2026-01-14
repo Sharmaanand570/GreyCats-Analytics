@@ -7,22 +7,25 @@ import { Switch } from './ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
 import type { Alert, CreateAlertData, UpdateAlertData, AlertCondition, AlertInterval } from '../types/alert.types';
+import type { ClientWithIntegrations } from '../types/client.types';
 
 interface AlertFormProps {
     clientId: number;
+    clientName?: string;
+    client?: ClientWithIntegrations;
     initialData?: Alert;
     onSubmit: (data: CreateAlertData | UpdateAlertData) => void;
     onCancel: () => void;
     isLoading?: boolean;
 }
 
-export const AlertForm: React.FC<AlertFormProps> = ({ clientId, initialData, onSubmit, onCancel, isLoading }) => {
+export const AlertForm: React.FC<AlertFormProps> = ({ clientId, clientName, client, initialData, onSubmit, onCancel, isLoading }) => {
     // Hooks
     const { groupedMetrics, isLoading: statsLoading } = useAvailableMetrics(clientId);
 
     // State
     const [integration, setIntegration] = useState<string>(initialData?.integration || '');
-    const [accountId, setAccountId] = useState<string>(initialData?.accountId || '');
+    const [accountId, setAccountId] = useState<string>(initialData?.accountId?.toString() || '');
     const [metricKey, setMetricKey] = useState<string>(initialData?.metricKey || '');
     const [condition, setCondition] = useState<AlertCondition>(initialData?.condition || 'less_than');
     const [triggerValue, setTriggerValue] = useState<string>(initialData?.triggerValue?.toString() || '');
@@ -43,6 +46,22 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, initialData, onS
         setMetricKey('');
     };
 
+    // Helper to find friendly account name
+    const getAccountName = (accId: string): string => {
+        if (!client?.integrations) return accId;
+
+        // Normalize integration type to match client.integrations format (hyphenated)
+        // e.g. "google_analytics" -> "google-analytics"
+        const normalizedType = integration.toLowerCase().replace(/_/g, '-');
+
+        const match = client.integrations.find(i =>
+            (i.integrationType === normalizedType || i.integrationType === integration) &&
+            (i.accountId.toString() === accId.toString() || i.accountIdentifier === accId.toString())
+        );
+
+        return match ? match.accountName : accId;
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -55,8 +74,8 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, initialData, onS
         }
 
         const payload: CreateAlertData = {
-            integration,
-            accountId,
+            integration, // Send exactly as selected (e.g. google_analytics)
+            accountId: Number(accountId),  // Convert string to number for API
             metricKey,
             metricLabel,
             condition,
@@ -83,9 +102,38 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, initialData, onS
         }
     }, [metricKey]);
 
+    // Debug logging
+    useEffect(() => {
+        if (integration && accountId && groupedMetrics) {
+            console.log('🔍 AlertForm Debug:', {
+                integration,
+                accountId,
+                availableIntegrations: Object.keys(groupedMetrics),
+                availableAccounts: integration ? Object.keys(groupedMetrics[integration] || {}) : [],
+                metricsCount: metrics.length,
+                metrics: metrics.slice(0, 5) // Show first 5 metrics
+            });
+        }
+    }, [integration, accountId, groupedMetrics, metrics]);
+
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
+
+            {/* Client Context Banner */}
+            {clientName && (
+                <div className="bg-zinc-50 border border-zinc-200 rounded-md p-3 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded bg-zinc-200 flex items-center justify-center text-zinc-500 font-bold shrink-0">
+                        {clientName.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                        <p className="text-[10px] text-zinc-500 uppercase tracking-wide font-medium">Creating alert for client</p>
+                        <p className="font-semibold text-sm text-zinc-900">{clientName}</p>
+                    </div>
+                </div>
+            )}
+
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Integration Selection */}
                 <div className="space-y-2">
@@ -111,7 +159,7 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, initialData, onS
                         </SelectTrigger>
                         <SelectContent>
                             {accounts.map(acc => (
-                                <SelectItem key={acc} value={acc}>{acc}</SelectItem>
+                                <SelectItem key={acc} value={acc}>{getAccountName(acc)}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
@@ -125,11 +173,22 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, initialData, onS
                             <SelectValue placeholder="Select Metric to Monitor" />
                         </SelectTrigger>
                         <SelectContent className="max-h-[200px]">
-                            {metrics.map(m => (
-                                <SelectItem key={m.metricKey} value={m.metricKey}>{m.displayName}</SelectItem>
-                            ))}
+                            {metrics.length === 0 ? (
+                                <div className="p-4 text-center text-sm text-muted-foreground">
+                                    No metrics available for this account
+                                </div>
+                            ) : (
+                                metrics.map(m => (
+                                    <SelectItem key={m.metricKey} value={m.metricKey}>{m.displayName}</SelectItem>
+                                ))
+                            )}
                         </SelectContent>
                     </Select>
+                    {metrics.length === 0 && integration && accountId && (
+                        <p className="text-xs text-amber-600">
+                            ⚠️ No metrics found. Please ensure this integration has data synced.
+                        </p>
+                    )}
                 </div>
 
                 {/* Condition */}
