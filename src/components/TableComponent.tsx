@@ -24,6 +24,7 @@ type IntegrationRow = {
   label: string;
   status: string | React.ReactNode;
   onDisconnect?: () => void;
+  renderActions?: () => React.ReactNode;
 };
 
 type ReportRow = {
@@ -56,9 +57,11 @@ type ClientDetailRow = {
 type TableType = {
   header: string[];
   bodyData: (ClientRow | IntegrationRow | ReportRow | AlertRow | ClientDetailRow)[];
+  backgroundColor?: string;
+  textColor?: string;
 };
 
-function TableComponent({ header, bodyData }: TableType) {
+function TableComponent({ header, bodyData, backgroundColor, textColor }: TableType) {
   // Type guards
   const isIntegrationRow = (row: any): row is IntegrationRow =>
     "label" in row && "link" in row;
@@ -109,16 +112,16 @@ function TableComponent({ header, bodyData }: TableType) {
 
   if (!bodyData || bodyData.length === 0) {
     return (
-      <div className="border w-full rounded-[0.7rem] overflow-hidden">
-        <div className="h-[78vh] flex items-center justify-center ">
+      <div className="border w-full rounded-[0.7rem] overflow-hidden" style={{ backgroundColor: backgroundColor || "transparent" }}>
+        <div className="h-[78vh] flex items-center justify-center " style={{ color: textColor || "inherit" }}>
           <div className="text-center py-12">
             <div className="flex justify-center mb-4">
               <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
                 <FiInbox className="w-8 h-8 text-gray-400" />
               </div>
             </div>
-            <p className="text-gray-700 text-lg font-semibold mb-1">No data available</p>
-            <p className="text-gray-500 text-sm">There are no items to display at this time</p>
+            <p className="text-gray-700 text-lg font-semibold mb-1" style={{ color: textColor || "inherit" }}>No data available</p>
+            <p className="text-gray-500 text-sm" style={{ color: textColor ? textColor + "cc" : undefined }}>There are no items to display at this time</p>
           </div>
         </div>
       </div>
@@ -126,7 +129,7 @@ function TableComponent({ header, bodyData }: TableType) {
   }
 
   return (
-    <div className="border w-full rounded-[0.7rem] overflow-hidden">
+    <div className="border w-full rounded-[0.7rem] overflow-hidden" style={{ backgroundColor: backgroundColor || "transparent" }}>
       <div className="h-[78vh] overflow-auto">
         <table className="w-full table-auto min-w-max">
           <thead className="bg-gradient-to-tr from-[#F3F3F3] to-white border-b sticky top-0 z-10">
@@ -158,7 +161,7 @@ function TableComponent({ header, bodyData }: TableType) {
                         className="flex items-center gap-2 text-accent-foreground hover:underline"
                       >
                         {renderIcon(row.icon, row.name, row.iconColor)}
-                        <span>{row.name }</span>
+                        <span>{row.name}</span>
                         {row.name === "Meta Business" && <span className="text-xs font-light text-gray-500">{"(facebook & instagram)"}</span>}
                       </Link>
                     </td>
@@ -166,18 +169,23 @@ function TableComponent({ header, bodyData }: TableType) {
                       {row.label}
                     </td>
                     <td>{renderStatusChip(row.status)}</td>
-                    {row.onDisconnect && (
-                      <td className="  text-sm text-left whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            row.onDisconnect?.();
-                          }}
-                          className="text-red-500 hover:text-red-700 text-sm font-medium"
-                        >
-                          Disconnect
-                        </button>
+                    {/* Generic Actions or Fallback Disconnect */}
+                    {(row.renderActions || row.onDisconnect) && (
+                      <td className="text-sm text-left whitespace-nowrap">
+                        {row.renderActions ? (
+                          row.renderActions()
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              row.onDisconnect?.();
+                            }}
+                            className="text-red-500 hover:text-red-700 text-sm font-medium"
+                          >
+                            Disconnect
+                          </button>
+                        )}
                       </td>
                     )}
                   </>

@@ -173,7 +173,21 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
         link,
         label: integration.accountName,
         status: <SyncStatusBadge isSyncing={isSyncing} statusText={capitalizeStatus("connected")} syncDetails={syncDetails} />,
-        onDisconnect: () => setDisconnectTarget(integration),
+        renderActions: () => (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDisconnectTarget(integration);
+              }}
+            >
+              Disconnect
+            </Button>
+          </div>
+        ),
       };
     });
   }, [client, searchQuery, isAccountSyncing, clientId, getIntegrationCounts]);

@@ -215,7 +215,7 @@ const WooCommerceDetailPage = () => {
   const handleSyncProducts = async () => {
     if (!accountId) return;
     try {
-      await syncProducts();
+      await syncProducts({ accountId });
     } catch (error) {
       // Error is handled in the hook with toast
     }
@@ -224,7 +224,7 @@ const WooCommerceDetailPage = () => {
   const handleSyncOrders = async () => {
     if (!accountId) return;
     try {
-      await syncOrders();
+      await syncOrders({ accountId });
     } catch (error) {
       // Error is handled in the hook with toast
     }
@@ -609,7 +609,7 @@ const WooCommerceDetailPage = () => {
                         products={
                           productsAnalyticsData?.products && productsAnalyticsData.products.length > 0
                             ? productsAnalyticsData.products.slice(0, 3).map((p) => ({
-                              productId: p.id.toString(),
+                              productId: p.productId,
                               name: p.name,
                               revenue: p.revenue,
                               qty: p.qty,

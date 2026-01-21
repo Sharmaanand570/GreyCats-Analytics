@@ -1,11 +1,11 @@
-import { useNavigate } from "react-router-dom";
+// import { useNavigate } from "react-router-dom";
 import { isImpersonating, stopImpersonating } from "@/api/adminApi";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { UserX } from "lucide-react";
 
 export const ImpersonationBanner = () => {
-    const navigate = useNavigate();
+    // const navigate = useNavigate();
 
     if (!isImpersonating()) return null;
 
@@ -24,7 +24,7 @@ export const ImpersonationBanner = () => {
     };
 
     return (
-        <div className="bg-red-600 text-white px-4 py-2 flex justify-between items-center shadow-lg fixed top-0 left-0 right-0 z-50">
+        <div className="bg-red-600 text-white px-4 py-2 flex justify-between items-center shadow-lg w-full z-50">
             <div className="flex items-center gap-2">
                 <span className="text-xl">🔴</span>
                 <span className="font-medium">You are currently impersonating a user</span>

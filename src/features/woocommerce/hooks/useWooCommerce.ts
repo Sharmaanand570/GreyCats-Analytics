@@ -4,6 +4,14 @@ import {
   getWooCommerceProducts,
   getWooCommerceOrders,
   getWooCommerceTrends,
+  getWooCommercePerProductPaginated,
+  getWooCommerceAgencyRollup,
+  getWooCommerceSyncStatus,
+  getWooCommerceAccountInfo,
+  getWooCommerceProduct,
+  getWooCommerceOrder,
+  syncWooProducts,
+  syncWooOrders,
 } from "../api/woocommerceApi";
 import type {
   WooCommerceAnalyticsResponse,
@@ -160,8 +168,8 @@ export const useWooCommercePerProductPaginated = (
 ) => {
   return useQuery<WooCommercePerProductPaginatedResponse>({
     queryKey: ["woocommerce-per-product-paginated", clientId, params],
-    queryFn: () => Promise.resolve({ success: true, products: [], page: 1, limit: 10, total: 0, totalPages: 0 }),
-    enabled: false, // Disabled until backend endpoint is available
+    queryFn: () => getWooCommercePerProductPaginated(clientId, params),
+    enabled: !!clientId && !!params?.accountId,
   });
 };
 
@@ -169,8 +177,8 @@ export const useWooCommercePerProductPaginated = (
 export const useWooCommerceAgencyRollup = (clientId: number) => {
   return useQuery<WooCommerceAgencyRollupResponse>({
     queryKey: ["woocommerce-agency-rollup", clientId],
-    queryFn: () => Promise.resolve({ success: true, totals: { totalRevenue: 0, totalOrders: 0, totalAvgOrder: 0 }, accounts: [] }),
-    enabled: false, // Disabled until backend endpoint is available
+    queryFn: () => getWooCommerceAgencyRollup(clientId),
+    enabled: !!clientId,
   });
 };
 
@@ -178,8 +186,8 @@ export const useWooCommerceAgencyRollup = (clientId: number) => {
 export const useWooCommerceSyncStatus = (clientId: number, accountId: number | null) => {
   return useQuery<WooCommerceSyncStatusResponse>({
     queryKey: ["woocommerce-sync-status", clientId, accountId],
-    queryFn: () => Promise.resolve({ success: true, sync: { id: 0, isActive: false, lastProductsSync: null, lastOrdersSync: null } }),
-    enabled: false, // Disabled until backend endpoint is available
+    queryFn: () => getWooCommerceSyncStatus(clientId, accountId),
+    enabled: !!clientId && !!accountId,
   });
 };
 
@@ -187,8 +195,8 @@ export const useWooCommerceSyncStatus = (clientId: number, accountId: number | n
 export const useWooCommerceAccountInfo = (clientId: number, accountId: number | null) => {
   return useQuery<WooCommerceAccountInfoResponse>({
     queryKey: ["woocommerce-account-info", clientId, accountId],
-    queryFn: () => Promise.resolve({ success: true, account: { id: 0, storeUrl: '', isActive: false, lastProductsSync: null, lastOrdersSync: null } }),
-    enabled: false, // Disabled until backend endpoint is available
+    queryFn: () => getWooCommerceAccountInfo(clientId, accountId),
+    enabled: !!clientId && !!accountId,
   });
 };
 
@@ -196,8 +204,8 @@ export const useWooCommerceAccountInfo = (clientId: number, accountId: number | 
 export const useWooCommerceProduct = (clientId: number, productId: string, accountId: number) => {
   return useQuery<WooCommerceProductDetailResponse>({
     queryKey: ["woocommerce-product", clientId, productId, accountId],
-    queryFn: () => Promise.resolve({ success: true, product: null }),
-    enabled: false, // Disabled until backend endpoint is available
+    queryFn: () => getWooCommerceProduct(clientId, productId, accountId),
+    enabled: !!clientId && !!productId && !!accountId,
   });
 };
 
@@ -205,24 +213,75 @@ export const useWooCommerceProduct = (clientId: number, productId: string, accou
 export const useWooCommerceOrder = (clientId: number, orderId: string | null, accountId: number | null) => {
   return useQuery<WooCommerceOrderDetailResponse>({
     queryKey: ["woocommerce-order", clientId, orderId, accountId],
-    queryFn: () => Promise.resolve({ success: true, order: null }),
-    enabled: false, // Disabled until backend endpoint is available
+    queryFn: () => getWooCommerceOrder(clientId, orderId, accountId),
+    enabled: !!clientId && !!orderId && !!accountId,
   });
 };
 
 // Sync mutations (used in WooCommerceDetailPage)
 export const useWooCommerceSyncProducts = () => {
-  return { mutate: () => { }, mutateAsync: async () => { }, isPending: false };
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ accountId }: { accountId: number }) => { // Expect accountId to be passed
+      return syncWooProducts(accountId);
+    },
+    onSuccess: () => {
+      toast.success('Products sync started successfully');
+      queryClient.invalidateQueries({ queryKey: ['woocommerce-sync-status'] });
+      queryClient.invalidateQueries({ queryKey: ['woocommerce-products'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to sync products');
+    }
+  });
 };
 
 export const useWooCommerceSyncOrders = () => {
-  return { mutate: () => { }, mutateAsync: async () => { }, isPending: false };
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ accountId }: { accountId: number }) => {
+      return syncWooOrders(accountId);
+    },
+    onSuccess: () => {
+      toast.success('Orders sync started successfully');
+      queryClient.invalidateQueries({ queryKey: ['woocommerce-sync-status'] });
+      queryClient.invalidateQueries({ queryKey: ['woocommerce-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['woocommerce-analytics'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to sync orders');
+    }
+  });
 };
 
 export const useWooCommerceDisconnect = () => {
-  return { mutate: () => { }, mutateAsync: async () => { }, isPending: false };
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ accountId }: { accountId: number }) => {
+      const response = await api.post('/woocommerce/disconnect', { accountId });
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Disconnected successfully');
+      queryClient.invalidateQueries({ queryKey: ['woocommerce-accounts'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to disconnect');
+    }
+  });
 };
 
 export const useWooCommerceReconnect = () => {
-  return { mutate: () => { }, mutateAsync: async () => { }, isPending: false };
+  return useMutation({
+    mutationFn: async ({ accountId }: { accountId: number }) => {
+      const response = await api.post('/woocommerce/reconnect', { accountId });
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Reconnected successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to reconnect');
+    }
+  });
 };

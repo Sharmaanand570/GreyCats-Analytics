@@ -48,7 +48,7 @@ export function PlanModal({ isOpen, onClose, onSave, plan, isLoading }: PlanModa
         displayName: "",
         description: "",
         price: 0,
-        currency: "USD",
+        currency: "INR",
         interval: "monthly",
         limits: {
             maxClients: 5,
@@ -77,7 +77,7 @@ export function PlanModal({ isOpen, onClose, onSave, plan, isLoading }: PlanModa
                 displayName: "",
                 description: "",
                 price: 0,
-                currency: "USD",
+                currency: "INR",
                 interval: "monthly",
                 limits: {
                     maxClients: 5,
@@ -185,10 +185,10 @@ export function PlanModal({ isOpen, onClose, onSave, plan, isLoading }: PlanModa
                                         <SelectValue placeholder="Select currency" />
                                     </SelectTrigger>
                                     <SelectContent>
+                                        <SelectItem value="INR">INR (₹)</SelectItem>
                                         <SelectItem value="USD">USD ($)</SelectItem>
                                         <SelectItem value="EUR">EUR (€)</SelectItem>
                                         <SelectItem value="GBP">GBP (£)</SelectItem>
-                                        <SelectItem value="INR">INR (₹)</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

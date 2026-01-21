@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { AdminPageHeader } from "../components/AdminPageHeader";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+// import { AdminPageHeader } from "../components/AdminPageHeader"; // Removed unused import
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { adminApi, type AdminStats } from "@/api/adminApi";
-import { Users, Building2, CreditCard, DollarSign, Activity } from "lucide-react";
+import { Users, Building2, CreditCard, IndianRupee, Activity } from "lucide-react"; // Removed ArrowUpRight
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -15,8 +15,11 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { StatsCard } from "../components/StatsCard";
+import { useUserStore } from "@/utils/useUserStore";
 
 export default function AdminDashboard() {
+    const { user } = useUserStore();
     const [stats, setStats] = useState<AdminStats | null>(null);
     const [activity, setActivity] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -34,17 +37,14 @@ export default function AdminDashboard() {
             // Map backend stats structure to frontend AdminStats interface
             const finalStats: AdminStats = {
                 totalUsers: rawStats.totalUsers || 0,
-                userGrowth: 0, // Not provided by backend
+                userGrowth: rawStats.userGrowth || 0,
                 totalClients: rawStats.totalClients || 0,
-                clientGrowth: 0, // Not provided by backend
-                activeSubscriptions: 0, // Not provided by backend
-                mrr: 0 // Not provided by backend
+                clientGrowth: rawStats.clientGrowth || 0,
+                activeSubscriptions: rawStats.activeSubscriptions || 0,
+                mrr: rawStats.mrr || 0
             };
 
             setStats(finalStats);
-
-            console.log("Stats Data:", statsData);
-            console.log("Activity Data:", activityData);
 
             // Handle activity structure: { success: true, activities: [...] }
             const finalActivities = activityData.activities || activityData.logs || activityData.data || [];
@@ -61,98 +61,116 @@ export default function AdminDashboard() {
         fetchData();
     }, []);
 
-    const StatCard = ({ title, value, subtext, icon: Icon }: { title: string, value: string | number, subtext: string, icon: any }) => (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{title}</CardTitle>
-                <Icon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-                {loading ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-bold">{value}</div>}
-                {loading ? <Skeleton className="h-3 w-24 mt-1" /> : <p className="text-xs text-muted-foreground">{subtext}</p>}
-            </CardContent>
-        </Card>
-    );
+    // Helper to determine trend direction (mock logic for now as API might just give numbers)
+    const getTrend = (value: number) => ({
+        value: value,
+        label: "from last month",
+        direction: value >= 0 ? "up" as const : "down" as const
+    });
 
     return (
-        <div className="space-y-6">
-            <AdminPageHeader
-                title="Dashboard"
-                description="Overview of system performance and recent activity."
-            />
+        <div className="space-y-8 animate-in fade-in duration-500">
+            {/* Header Section */}
+            <div className="flex flex-col gap-2">
+                <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                    Welcome back, {user?.fullName?.split(' ')[0] || 'Admin'}
+                </h1>
+                <p className="text-gray-500 dark:text-gray-400">
+                    Here's what's happening with your platform today.
+                </p>
+            </div>
 
             {/* Stats Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <StatsCard
                     title="Total Users"
-                    value={stats?.totalUsers || "0"}
-                    subtext={`${stats?.userGrowth || 0}% from last month`}
+                    value={loading ? "..." : stats?.totalUsers || "0"}
+                    trend={loading ? undefined : getTrend(stats?.userGrowth || 0)}
                     icon={Users}
                 />
-                <StatCard
+                <StatsCard
                     title="Total Clients"
-                    value={stats?.totalClients || "0"}
-                    subtext={`${stats?.clientGrowth || 0}% from last month`}
+                    value={loading ? "..." : stats?.totalClients || "0"}
+                    trend={loading ? undefined : getTrend(stats?.clientGrowth || 0)}
                     icon={Building2}
                 />
-                <StatCard
+                <StatsCard
                     title="Active Subscriptions"
-                    value={stats?.activeSubscriptions || "0"}
-                    subtext="Active paid plans"
+                    value={loading ? "..." : stats?.activeSubscriptions || "0"}
+                    description="Active paid plans"
                     icon={CreditCard}
                 />
-                <StatCard
+                <StatsCard
                     title="Monthly Revenue"
-                    value={`$${stats?.mrr || "0"}`}
-                    subtext="Current MRR"
-                    icon={DollarSign}
+                    value={loading ? "..." : `₹${stats?.mrr || "0"}`}
+                    description="Current MRR"
+                    icon={IndianRupee}
                 />
             </div>
 
             {/* Activity Feed */}
-            <Card className="col-span-4">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Activity className="h-5 w-5" />
-                        Recent Activity
-                    </CardTitle>
+            <Card className="border-gray-200 dark:border-white/10 shadow-sm bg-white dark:bg-[#111]">
+                <CardHeader className="border-b border-gray-100 dark:border-white/5 pb-4">
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                            <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                <Activity className="h-4 w-4 text-gray-500" />
+                                Recent Activity
+                            </CardTitle>
+                            <CardDescription>
+                                Latest actions performed across the system.
+                            </CardDescription>
+                        </div>
+                        {/* Could add a 'View All' button here later */}
+                    </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
                     <div className="overflow-x-auto">
                         <Table>
                             <TableHeader>
-                                <TableRow>
-                                    <TableHead>User</TableHead>
+                                <TableRow className="hover:bg-transparent border-gray-100 dark:border-white/5">
+                                    <TableHead className="pl-6 w-[200px]">User</TableHead>
                                     <TableHead>Action</TableHead>
                                     <TableHead>Target</TableHead>
-                                    <TableHead>Date</TableHead>
+                                    <TableHead className="text-right pr-6">Date</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
                                     Array.from({ length: 5 }).map((_, i) => (
-                                        <TableRow key={i}>
-                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                        <TableRow key={i} className="border-gray-100 dark:border-white/5">
+                                            <TableCell className="pl-6"><Skeleton className="h-4 w-24" /></TableCell>
                                             <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                                             <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                            <TableCell className="pr-6"><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
                                         </TableRow>
                                     ))
                                 ) : activity.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">No recent activity.</TableCell>
+                                        <TableCell colSpan={4} className="h-32 text-center text-gray-500">
+                                            No recent activity found.
+                                        </TableCell>
                                     </TableRow>
                                 ) : (
                                     activity.map((log: any) => (
-                                        <TableRow key={log.id}>
-                                            <TableCell className="font-medium">{log.adminName || "System"}</TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline">{log.action}</Badge>
+                                        <TableRow key={log.id} className="hover:bg-gray-50/50 dark:hover:bg-white/5 border-gray-100 dark:border-white/5 transition-colors">
+                                            <TableCell className="pl-6 font-medium text-gray-900 dark:text-gray-200">
+                                                {log.adminName || "System"}
                                             </TableCell>
-                                            <TableCell>{log.target}</TableCell>
-                                            <TableCell className="text-muted-foreground text-sm">
+                                            <TableCell>
+                                                <Badge
+                                                    variant="outline"
+                                                    className="font-normal bg-white dark:bg-black/20 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/10"
+                                                >
+                                                    {log.action}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-gray-600 dark:text-gray-400">
+                                                {log.target}
+                                            </TableCell>
+                                            <TableCell className="text-right pr-6 text-sm text-gray-500 dark:text-gray-500">
                                                 {log.timestamp || log.createdAt
-                                                    ? format(new Date(log.timestamp || log.createdAt), "PP p")
+                                                    ? format(new Date(log.timestamp || log.createdAt), "MMM d, h:mm a")
                                                     : "N/A"}
                                             </TableCell>
                                         </TableRow>

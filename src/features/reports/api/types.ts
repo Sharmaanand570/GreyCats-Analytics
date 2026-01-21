@@ -82,6 +82,12 @@ export interface ReportWidgetDefinition {
     h: number;
   };
   [key: string]: unknown;
+
+  /**
+   * Data snapshot for shared reports, hydrated from the API response.
+   * This allows the builder to render data without refetching when in read-only/shared mode.
+   */
+  snapshotData?: any;
 }
 
 // Lightweight metadata about each slide/page in a template, derived from the
@@ -189,6 +195,7 @@ export interface ApiReportTemplate {
    */
   pageOrder?: number[];
   slides: ApiReportTemplateSlide[];
+  widgets?: ApiReportTemplateWidget[]; // Flat array sometimes returned by backend
   createdAt?: string;
   updatedAt?: string;
   clientId?: number;

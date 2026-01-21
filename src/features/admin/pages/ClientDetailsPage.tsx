@@ -29,9 +29,15 @@ export default function ClientDetailsPage() {
                 const rawClient = (data as any).client || data;
 
                 // Map backend fields to frontend
+                // Map backend fields to frontend
                 const totalIntegrations = (rawClient.metaBusinessAccounts?.length || 0) +
                     (rawClient.shopifyAccounts?.length || 0) +
-                    (rawClient.youtubeAccounts?.length || 0);
+                    (rawClient.youtubeAccounts?.length || 0) +
+                    (rawClient.wooCommerceAccounts?.length || 0) +
+                    (rawClient.metaAdAccounts?.length || 0) +
+                    (rawClient.googleSearchConsoleProperties?.length || 0) +
+                    (rawClient.googleAnalyticsProperties?.length || 0) +
+                    (rawClient.metaInsights?.length || 0);
 
                 const mappedClient = {
                     ...rawClient,
@@ -148,9 +154,29 @@ export default function ClientDetailsPage() {
                                     {(client as any).youtubeAccounts && (client as any).youtubeAccounts.length > 0 && (
                                         <div className="text-sm">• YouTube</div>
                                     )}
-                                    {(!(client as any).metaBusinessAccounts || (client as any).metaBusinessAccounts.length === 0) &&
-                                        (!(client as any).shopifyAccounts || (client as any).shopifyAccounts.length === 0) &&
-                                        (!(client as any).youtubeAccounts || (client as any).youtubeAccounts.length === 0) && (
+                                    {(client as any).wooCommerceAccounts && (client as any).wooCommerceAccounts.length > 0 && (
+                                        <div className="text-sm">• WooCommerce</div>
+                                    )}
+                                    {(client as any).metaAdAccounts && (client as any).metaAdAccounts.length > 0 && (
+                                        <div className="text-sm">• Meta Ads</div>
+                                    )}
+                                    {(client as any).googleSearchConsoleProperties && (client as any).googleSearchConsoleProperties.length > 0 && (
+                                        <div className="text-sm">• Google Search Console</div>
+                                    )}
+                                    {(client as any).googleAnalyticsProperties && (client as any).googleAnalyticsProperties.length > 0 && (
+                                        <div className="text-sm">• Google Analytics</div>
+                                    )}
+                                    {(client as any).metaInsights && (client as any).metaInsights.length > 0 && (
+                                        <div className="text-sm">• Meta Insights</div>
+                                    )}
+                                    {(!(client as any).metaBusinessAccounts?.length &&
+                                        !(client as any).shopifyAccounts?.length &&
+                                        !(client as any).youtubeAccounts?.length &&
+                                        !(client as any).wooCommerceAccounts?.length &&
+                                        !(client as any).metaAdAccounts?.length &&
+                                        !(client as any).googleSearchConsoleProperties?.length &&
+                                        !(client as any).googleAnalyticsProperties?.length &&
+                                        !(client as any).metaInsights?.length) && (
                                             <p className="text-sm text-muted-foreground">No integrations connected</p>
                                         )}
                                 </div>

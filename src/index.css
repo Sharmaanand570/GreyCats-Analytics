@@ -2,7 +2,7 @@
 /* 1️⃣ Base Imports */
 /* -------------------------------------- */
 
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=satoshi@900,700,500,400&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -101,7 +101,8 @@
 /* -------------------------------------- */
 
 :root {
-  --font-poppins: "Poppins", sans-serif;
+  --font-satoshi: 'Satoshi', sans-serif;
+  --font-poppins: var(--font-satoshi); /* Alias for backward compatibility */
 
   /* Border Radius */
   --radius-sm: calc(var(--radius) - 4px);
@@ -284,7 +285,6 @@
 * {
   border-color: var(--border);
   outline-color: var(--ring);
-  outline-opacity: 0.5;
 }
 
 html,
@@ -298,7 +298,7 @@ body,
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: var(--font-poppins);
+  font-family: var(--font-satoshi);
 }
 
 /* Scrollbar utilities */
@@ -327,24 +327,23 @@ body {
   }
 }
 
-@theme inline {
-  @keyframes shimmer-slide {
+@keyframes shimmer-slide {
   to {
     transform: translate(calc(100cqw - 100%), 0);
-    }
   }
-  @keyframes spin-around {
+}
+
+@keyframes spin-around {
   0% {
     transform: translateZ(0) rotate(0);
-    }
+  }
   15%, 35% {
     transform: translateZ(0) rotate(90deg);
-    }
+  }
   65%, 85% {
     transform: translateZ(0) rotate(270deg);
-    }
+  }
   100% {
     transform: translateZ(0) rotate(360deg);
-    }
   }
 }

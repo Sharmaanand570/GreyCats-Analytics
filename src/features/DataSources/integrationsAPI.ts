@@ -195,3 +195,14 @@ export const getIntegrations = async (
   }
 };
 
+
+// Management
+export const deleteIntegrationAccount = async (clientId: number, integrationType: string, accountId: string) => {
+  const response = await api.delete(`/clients/${clientId}/accounts/${integrationType}/${accountId}`);
+  return response.data;
+};
+
+export const markReconnectNeeded = async (platform: string) => {
+  const response = await api.put(`/integrations/${platform}/reconnect`);
+  return response.data;
+};

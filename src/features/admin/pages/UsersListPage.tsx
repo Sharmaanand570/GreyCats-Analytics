@@ -18,12 +18,28 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Search, UserCog, UserPlus } from "lucide-react";
+import { MoreHorizontal, Search, UserCog } from "lucide-react";
 import { adminApi, type AdminUser } from "@/api/adminApi";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 export default function UsersListPage() {
     const navigate = useNavigate();
@@ -32,6 +48,12 @@ export default function UsersListPage() {
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+
+    const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+    const [roleDialogOpen, setRoleDialogOpen] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [newRole, setNewRole] = useState<'USER' | 'ADMIN' | 'SUPER_ADMIN'>('USER');
+    const [actionLoading, setActionLoading] = useState(false);
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -58,12 +80,55 @@ export default function UsersListPage() {
         navigate(`/admin/users/${userId}`);
     };
 
+    const handleDeleteUser = async () => {
+        if (!selectedUser) return;
+        setActionLoading(true);
+        try {
+            await adminApi.deleteUser(selectedUser.id);
+            toast.success("User deleted successfully");
+            setDeleteDialogOpen(false);
+            fetchUsers();
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to delete user");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleUpdateRole = async () => {
+        if (!selectedUser) return;
+        setActionLoading(true);
+        try {
+            await adminApi.updateUserRole(selectedUser.id, newRole);
+            toast.success("User role updated");
+            setRoleDialogOpen(false);
+            fetchUsers();
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to update role");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleSuspendUser = async (user: AdminUser) => {
+        const newStatus = user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+        try {
+            await adminApi.updateUserStatus(user.id, newStatus);
+            toast.success(`User ${newStatus.toLowerCase()} successfully`);
+            fetchUsers();
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to update status");
+        }
+    };
+
     return (
         <div className="space-y-6">
             <AdminPageHeader
                 title="Users"
                 description="Manage all users and their access."
-                action={{ label: "Add User", onClick: () => console.log("Add User"), icon: UserPlus }}
             >
                 <div className="relative w-64">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -177,6 +242,22 @@ export default function UsersListPage() {
                                                 }}>
                                                     <UserCog className="mr-2 h-4 w-4" /> Impersonate
                                                 </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => {
+                                                    setSelectedUser(user);
+                                                    setNewRole(user.role);
+                                                    setRoleDialogOpen(true);
+                                                }}>
+                                                    Change Role
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleSuspendUser(user)}>
+                                                    {user.status === 'ACTIVE' ? 'Suspend User' : 'Activate User'}
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem className="text-red-600" onClick={() => {
+                                                    setSelectedUser(user);
+                                                    setDeleteDialogOpen(true);
+                                                }}>
+                                                    Delete User
+                                                </DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </TableCell>
@@ -206,6 +287,53 @@ export default function UsersListPage() {
                     Next
                 </Button>
             </div>
-        </div>
+
+            <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Change User Role</DialogTitle>
+                        <DialogDescription>
+                            Select a new role for {selectedUser?.fullName}.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="role" className="text-right">
+                                Role
+                            </Label>
+                            <Select value={newRole} onValueChange={(val: any) => setNewRole(val)}>
+                                <SelectTrigger className="col-span-3">
+                                    <SelectValue placeholder="Select a role" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="USER">User</SelectItem>
+                                    <SelectItem value="ADMIN">Admin</SelectItem>
+                                    <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setRoleDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleUpdateRole} disabled={actionLoading}>Save changes</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete User</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete {selectedUser?.fullName}? This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+                        <Button variant="destructive" onClick={handleDeleteUser} disabled={actionLoading}>Delete</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div >
     );
 }

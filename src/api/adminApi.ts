@@ -83,7 +83,38 @@ export interface AdminSubscription {
     autoRenew: boolean;
 }
 
+export interface FeatureFlag {
+    id: string;
+    name: string;
+    description?: string;
+    enabled: boolean;
+    rolloutPercentage: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
 export const adminApi = {
+    // Feature Flags
+    getFeatureFlags: async (): Promise<FeatureFlag[]> => {
+        const response = await api.get('/superadmin/features');
+        return response.data.flags;
+    },
+
+    createFeatureFlag: async (data: Partial<FeatureFlag>) => {
+        const response = await api.post('/superadmin/features', data);
+        return response.data;
+    },
+
+    updateFeatureFlag: async (name: string, data: Partial<FeatureFlag>) => {
+        const response = await api.patch(`/superadmin/features/${name}`, data);
+        return response.data;
+    },
+
+    setUserFeatureOverride: async (userId: number, features: Record<string, boolean>) => {
+        const response = await api.post(`/superadmin/users/${userId}/features`, { features });
+        return response.data;
+    },
+
     // Users
     getUsers: async (page = 1, limit = 20, search = "", role?: string): Promise<AdminUsersResponse> => {
         const params = new URLSearchParams();
@@ -111,6 +142,21 @@ export const adminApi = {
         return response.data;
     },
 
+    updateUserRole: async (userId: number, role: 'USER' | 'ADMIN' | 'SUPER_ADMIN') => {
+        const response = await api.patch(`/admin/users/${userId}/role`, { role });
+        return response.data;
+    },
+
+    deleteUser: async (userId: number) => {
+        const response = await api.delete(`/admin/users/${userId}`);
+        return response.data;
+    },
+
+    getUserSessions: async (userId: number) => {
+        const response = await api.get(`/admin/users/${userId}/sessions`);
+        return response.data;
+    },
+
     // Clients
     getClients: async (page = 1, limit = 20, search = "", userId?: number | string): Promise<AdminClientsResponse> => {
         const params = new URLSearchParams();
@@ -125,6 +171,21 @@ export const adminApi = {
 
     getClientDetails: async (clientId: string | number) => {
         const response = await api.get(`/admin/clients/${clientId}`);
+        return response.data;
+    },
+
+    deleteClient: async (clientId: number) => {
+        const response = await api.delete(`/admin/clients/${clientId}`);
+        return response.data;
+    },
+
+    updateClient: async (clientId: number, data: Partial<AdminClient>) => {
+        const response = await api.patch(`/admin/clients/${clientId}`, data);
+        return response.data;
+    },
+
+    transferClient: async (clientId: number, newOwnerId: number) => {
+        const response = await api.post(`/admin/clients/${clientId}/transfer`, { newOwnerId });
         return response.data;
     },
 
@@ -184,14 +245,15 @@ export const adminApi = {
         return response.data;
     },
 
-    extendSubscription: async (userId: number, date: string) => {
-        const response = await api.post(`/admin/users/${userId}/subscription/extend`, { date });
+    extendSubscription: async (userId: number, days: number) => {
+        const response = await api.post(`/admin/users/${userId}/subscription/extend`, { days });
         return response.data;
     },
 
     // Super Admin Monitoring
     getSystemHealth: async (): Promise<any> => {
-        const response = await api.get('/superadmin/system/health');
+        // Backend returns business stats (users, clients, integrations) not hardware stats
+        const response = await api.get('/superadmin/stats');
         return response.data;
     },
 
@@ -203,6 +265,48 @@ export const adminApi = {
 
     getIntegrationHealth: async (): Promise<any> => {
         const response = await api.get('/superadmin/integrations/health');
+        return response.data;
+    },
+
+    getFailedSyncs: async (): Promise<any> => {
+        const response = await api.get('/superadmin/sync-failures');
+        return response.data;
+    },
+
+    getDatabaseStats: async (): Promise<any> => {
+        const response = await api.get('/superadmin/database/stats');
+        return response.data;
+    },
+
+    getSubscriptionAnalytics: async (): Promise<any> => {
+        const response = await api.get('/superadmin/subscriptions/analytics');
+        return response.data;
+    },
+
+    // System Config
+    getSystemConfigs: async () => {
+        const response = await api.get('/superadmin/config');
+        return response.data;
+    },
+
+    updateSystemConfig: async (config: any) => {
+        const response = await api.patch('/superadmin/config', config);
+        return response.data;
+    },
+
+    // Security (MFA)
+    setupSuperAdminMFA: async () => {
+        const response = await api.get('/superadmin/mfa/setup');
+        return response.data;
+    },
+
+    verifySuperAdminMFA: async (token: string) => {
+        const response = await api.post('/superadmin/mfa/verify', { token });
+        return response.data;
+    },
+
+    disableSuperAdminMFA: async () => {
+        const response = await api.post('/superadmin/mfa/disable');
         return response.data;
     },
 };

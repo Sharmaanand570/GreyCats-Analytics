@@ -15,7 +15,6 @@ import type {
   GetDashboardsResponse,
   GetTemplateResponse,
   ListReportSchedulesResponse,
-  GetReportScheduleResponse,
   ListTemplatesResponse,
   ReportTemplate,
   ReportWidgetDefinition,
@@ -176,13 +175,15 @@ const mapApiTemplateToReportTemplate = (
 
 
 
+    // Determine if this is a custom page or integration page
+    // Custom pages typically have IDs >= 1000 (backend-generated) or have no widgets
+    const isCustomPage = slideId >= 1000 || slide.widgets.length === 0;
+
     slidesMeta.push({
       id: slideId,
       title: slide.title,
       subtitle: slide.subtitle,
-      // By default, treat API-provided slides as integration-based; the
-      // builder can later override to "custom" when users add their own pages.
-      source: "integration",
+      source: isCustomPage ? "custom" : "integration",
     });
 
     slide.widgets.forEach((w, widgetIndex) => {
@@ -255,6 +256,7 @@ const mapApiTemplateToReportTemplate = (
  * Fetch unified metrics (production data) without resolving specific widgets.
  * This can be used to build the available-metrics list from live data.
  */
+
 export interface UnifiedMetricRow {
   id: number;
   metricKey: string;
@@ -312,6 +314,7 @@ export const fetchUnifiedMetric = (
     startDate: string;
     endDate: string;
     token?: string;
+    groupBy?: string;
   }
 ) =>
   handleRequest(async () => {
@@ -338,6 +341,7 @@ export const fetchUnifiedMetric = (
       startDate: params.startDate,
       endDate: params.endDate,
       ...(params.token ? { token: params.token } : {}),
+      ...(params.groupBy ? { groupBy: params.groupBy } : {}),
     };
 
     if (clientId) {
@@ -509,7 +513,6 @@ export const getReportTemplate = (templateId: number, token?: string) =>
 
     // HYDRATION: If we have a snapshot (data) and slides (definitions), combine them.
     if (snapshot && apiTemplate.slides && apiTemplate.slides.length > 0) {
-      console.log("💧 [SharedReport] Hydrating widgets with snapshot data...");
       apiTemplate.slides.forEach(slide => {
         const slideData = (snapshot as Record<string, any>)[String(slide.id || "")];
         if (!slideData) return;
@@ -526,7 +529,40 @@ export const getReportTemplate = (templateId: number, token?: string) =>
           }
         });
       });
-      console.log("💧 [SharedReport] Hydration complete.");
+
+      if (apiTemplate.widgets && Array.isArray(apiTemplate.widgets)) {
+        console.log(`💧 [Hydrator] Hydrating flat widgets (${apiTemplate.widgets.length})...`);
+        apiTemplate.widgets.forEach(widget => {
+          let foundData = null;
+          const snapshotData = snapshot as Record<string, any>;
+          // console.log(`   🔍 Looking for widget ${widget.id} / ${widget.widgetKey}`);
+
+          for (const slideId of Object.keys(snapshotData)) {
+            const slideContent = snapshotData[slideId];
+            const widgetMap = slideContent.widgets || slideContent;
+
+            // Try all possible keys
+            const key1 = widget.id || "";
+            const key2 = widget.widgetKey || "";
+            const key3 = String(widget.id || "");
+
+            const data = widgetMap[key1] || widgetMap[key2] || widgetMap[key3];
+
+            if (data) {
+              // console.log(`      ✅ Found match in slide ${slideId} for key ${key1}/${key2}`);
+              foundData = data;
+              break;
+            }
+          }
+
+          if (foundData) {
+            (widget as any).snapshotData = foundData;
+          } else {
+            console.warn(`      ❌ No data found for widget ${widget.id} / ${widget.widgetKey}`);
+          }
+        });
+      }
+
     }
 
     // FALLBACK RECONSTRUCTOR: If we still have no slides (meaning 'widgets' array was missing),
@@ -805,6 +841,42 @@ export const getReportSchedule = (clientId: number, scheduleId: number) =>
     return response.data;
   });
 
+// Generated Reports
+export interface GeneratedReport {
+  id: string;
+  reportScheduleId: number;
+  status: 'PENDING' | 'COMPLETED' | 'FAILED';
+  pdfUrl?: string;
+  createdAt: string;
+  dateFrom: string;
+  dateTo: string;
+}
+
+export interface ListGeneratedReportsResponse {
+  success: boolean;
+  reports: GeneratedReport[];
+}
+
+export const listGeneratedReports = (clientId: number) =>
+  handleRequest(async () => {
+    // Assumes router mounted at /report-schedules based on finding
+    const response = await api.get<ListGeneratedReportsResponse>(
+      `/report-schedules/${clientId}/generated`
+    );
+    return response.data;
+  });
+
+export const downloadGeneratedReport = (clientId: number, reportId: string) =>
+  handleRequest(async () => {
+    const response = await api.get(
+      `/report-schedules/${clientId}/generated/${reportId}/download`,
+      { responseType: 'blob' }
+    );
+    return response.data;
+  });
+
+
+
 
 
 export const generatePdf = (clientId: number, payload: GeneratePdfPayload) =>
@@ -919,4 +991,19 @@ export const deleteDashboardWidget = (
     );
     return response.data;
   });
+
+export const resolveWidgets = (
+  clientId: number,
+  widgets: any[], // Type: UnifiedWidgetConfig[]
+  dateRange: { startDate: string; endDate: string }
+) =>
+  handleRequest(async () => {
+    const response = await api.post<any>(
+      `/unified-metrics/resolve`,
+      { widgets, dateRange },
+      { params: { clientId } }
+    );
+    return response.data;
+  });
+
 

@@ -1,6 +1,7 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -72,6 +73,19 @@ type SignupStep = "DETAILS" | "OTP";
 export default function AuthPage() {
   const imgRef = useRef<HTMLImageElement | null>(null);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const reason = searchParams.get("reason");
+    if (reason === "session_expired") {
+      // Use setTimeout to ensure toast library is ready/mounted if needed, 
+      // or just call it. sonner is usually global.
+      toast.error("Your session has expired. Please log in again.");
+
+      // Clear the query param to avoid showing it again if user refreshes
+      navigate("/auth/login", { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   const [isLogin, setIsLogin] = useState(true);
   const [signupStep, setSignupStep] = useState<SignupStep>("DETAILS");

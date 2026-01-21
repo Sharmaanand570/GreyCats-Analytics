@@ -519,5 +519,23 @@ export const getShopifyMeta = async (clientId: number): Promise<ShopifySummaryRe
   }
 };
 
+export const syncShopifyOrders = async (clientId: number): Promise<ShopifySyncResponse> => {
+  try {
+    const response = await api.get<ShopifySyncResponse>(`/clients/${clientId}/shopify/orders`);
+    return response.data;
+  } catch (error) {
+    return handleApiError(error, "Failed to sync Shopify orders");
+  }
+};
+
+export const forceSyncProducts = async (clientId: number): Promise<ShopifySyncResponse> => {
+  try {
+    const response = await api.get<ShopifySyncResponse>(`/clients/${clientId}/shopify/sync`);
+    return response.data;
+  } catch (error) {
+    return handleApiError(error, "Failed to force sync Shopify products");
+  }
+};
+
 
 

@@ -45,6 +45,7 @@ export const useUserStore = create<UserState>()(
 
       logout: () => {
         localStorage.removeItem("user-storage");
+        localStorage.removeItem("ANALYTICS_TOKEN_KEY_"); // Ensure token is cleared too
         set({ user: null });
       },
       pageNotFound: false,

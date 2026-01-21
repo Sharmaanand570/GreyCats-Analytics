@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { FaGoogle } from "react-icons/fa6";
 import { Button } from "@/components/ui/button";
@@ -34,16 +35,14 @@ import {
 } from "@/components/ui/select";
 import { useClients } from "@/hooks/useClients";
 import {
-  useGoogleConsoleSelectProperty,
   useGoogleConsoleSummary,
   useGoogleConsoleTopPages,
   useGoogleConsoleTopQueries,
-  useGoogleConsoleProperties,
 } from "@/features/YouTube/hooks/google/useGoogleConsoleData";
 import { useRemoveAccount } from "@/hooks/useIntegrations";
+import { useClientContext } from "../context/ClientContext";
 import { useClient } from "@/hooks/useClients";
 import {
-  Loader2,
   MousePointer2,
   Eye,
   Percent,
@@ -56,13 +55,21 @@ import { DataSyncBanner } from "@/components/DataSyncBanner";
 function GoogleConsoleDetailPage() {
   const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
   const navigate = useNavigate();
+  const { currentClient, setCurrentClient } = useClientContext();
 
-  // Parse clientId from URL or default to null
-  const selectedClientId = clientIdParam ? Number(clientIdParam) : null;
+  // Parse clientId from URL or default to current client from context
+  const selectedClientId = clientIdParam ? Number(clientIdParam) : currentClient?.id;
 
   // Fetch all clients for selector
   const { data: clients } = useClients();
-  const { data: client } = useClient(selectedClientId);
+  const { data: client } = useClient(selectedClientId || null);
+
+  // Auto-select first client if none is selected
+  useEffect(() => {
+    if (!selectedClientId && clients && clients.length > 0) {
+      setCurrentClient(clients[0]);
+    }
+  }, [selectedClientId, clients, setCurrentClient]);
 
   // Handle client selection - update URL
   const handleClientChange = (newClientId: string) => {
@@ -70,15 +77,6 @@ function GoogleConsoleDetailPage() {
   };
 
   const clientId = selectedClientId || 0;
-
-  const {
-    data: propertiesData,
-    isLoading: isLoadingProperties,
-  } = useGoogleConsoleProperties(clientId);
-
-  const properties = propertiesData?.properties || [];
-
-  console.log("propertiesData", propertiesData);
 
   // Use new overview endpoints
   const {
@@ -104,19 +102,11 @@ function GoogleConsoleDetailPage() {
     isLoading: isLoadingTopQueries,
   } = useGoogleConsoleTopQueries(clientId);
 
-  const {
-    mutateAsync: selectProperty,
-    isPending: isSelectingProperty,
-  } = useGoogleConsoleSelectProperty();
-
   const removeAccount = useRemoveAccount();
   const handleDisconnect = async () => {
     if (!client?.integrations || !selectedClientId) return;
 
     // Find the Google Console integration/account
-    // Note: IntegrationType 'google-search-console' needs to vary based on how it's stored.
-    // Assuming 'google-search-console' or similar. I'll check integration types first if unsafe.
-    // Based on previous files, let's assume 'google-search-console'.
     const integration = client.integrations.find(i => i.integrationType === 'google-search-console');
     if (!integration) return;
 
@@ -128,15 +118,6 @@ function GoogleConsoleDetailPage() {
       });
     } catch {
       // handled in hook
-    }
-  };
-
-  const handleSelectProperty = async (siteUrl: string) => {
-    if (!siteUrl) return;
-    try {
-      await selectProperty({ clientId, body: { siteUrl } });
-    } catch {
-      // toast handled in hook
     }
   };
 
@@ -212,169 +193,102 @@ function GoogleConsoleDetailPage() {
               </Card>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Summary Metrics Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm font-medium">
-                    Selected Property
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Total Clicks
                   </CardTitle>
-                  <CardDescription>
-                    Choose which property daily SEO sync should use.
-                  </CardDescription>
+                  <MousePointer2 className="h-4 w-4 text-blue-500" />
                 </CardHeader>
                 <CardContent>
-                  {isLoadingProperties ? (
-                    <div className="space-y-3">
-                      <Skeleton className="h-6 w-24" />
-                      <Skeleton className="h-10 w-full" />
-                    </div>
-                  ) : properties.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No Search Console properties found for this account.
-                    </p>
+                  {isLoadingSummary ? (
+                    <Skeleton className="h-8 w-20" />
                   ) : (
-                    <div className="space-y-3">
-                      {properties.map((p) => (
-                        <div
-                          key={p.id}
-                          className={`flex items-center justify-between p-3 rounded-lg border ${p.isSelected
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border bg-background'
-                            }`}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">
-                              {p.siteUrl}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {p.permissionLevel}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2 ml-3">
-                            {p.isSelected ? (
-                              <span className="text-xs font-medium text-primary px-3 py-1 bg-primary/10 rounded-full">
-                                ✓ Selected
-                              </span>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleSelectProperty(p.siteUrl)}
-                                disabled={isSelectingProperty}
-                              >
-                                {isSelectingProperty ? (
-                                  <>
-                                    <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                                    Selecting...
-                                  </>
-                                ) : (
-                                  'Select'
-                                )}
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                    <div className="flex flex-col gap-1">
+                      <div className="text-2xl font-bold">
+                        {summaryMetrics.totalClicks.toLocaleString()}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Last 30 days
+                      </p>
                     </div>
                   )}
                 </CardContent>
               </Card>
 
-              {/* Summary Metrics Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Total Clicks
-                    </CardTitle>
-                    <MousePointer2 className="h-4 w-4 text-blue-500" />
-                  </CardHeader>
-                  <CardContent>
-                    {isLoadingSummary ? (
-                      <Skeleton className="h-8 w-20" />
-                    ) : (
-                      <div className="flex flex-col gap-1">
-                        <div className="text-2xl font-bold">
-                          {summaryMetrics.totalClicks.toLocaleString()}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Last 30 days
-                        </p>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Total Impressions
+                  </CardTitle>
+                  <Eye className="h-4 w-4 text-violet-500" />
+                </CardHeader>
+                <CardContent>
+                  {isLoadingSummary ? (
+                    <Skeleton className="h-8 w-20" />
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      <div className="text-2xl font-bold">
+                        {summaryMetrics.totalImpressions.toLocaleString()}
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
+                      <p className="text-xs text-muted-foreground">
+                        Last 30 days
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Total Impressions
-                    </CardTitle>
-                    <Eye className="h-4 w-4 text-violet-500" />
-                  </CardHeader>
-                  <CardContent>
-                    {isLoadingSummary ? (
-                      <Skeleton className="h-8 w-20" />
-                    ) : (
-                      <div className="flex flex-col gap-1">
-                        <div className="text-2xl font-bold">
-                          {summaryMetrics.totalImpressions.toLocaleString()}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Last 30 days
-                        </p>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Average CTR
+                  </CardTitle>
+                  <Percent className="h-4 w-4 text-emerald-500" />
+                </CardHeader>
+                <CardContent>
+                  {isLoadingSummary ? (
+                    <Skeleton className="h-8 w-20" />
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      <div className="text-2xl font-bold">
+                        {(summaryMetrics.avgCTR * 100).toFixed(2)}%
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
+                      <p className="text-xs text-muted-foreground">
+                        Last 30 days
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Average CTR
-                    </CardTitle>
-                    <Percent className="h-4 w-4 text-emerald-500" />
-                  </CardHeader>
-                  <CardContent>
-                    {isLoadingSummary ? (
-                      <Skeleton className="h-8 w-20" />
-                    ) : (
-                      <div className="flex flex-col gap-1">
-                        <div className="text-2xl font-bold">
-                          {(summaryMetrics.avgCTR * 100).toFixed(2)}%
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Last 30 days
-                        </p>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Avg Position
+                  </CardTitle>
+                  <Trophy className="h-4 w-4 text-amber-500" />
+                </CardHeader>
+                <CardContent>
+                  {isLoadingSummary ? (
+                    <Skeleton className="h-8 w-20" />
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      <div className="text-2xl font-bold">
+                        {summaryMetrics.avgPosition.toFixed(1)}
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
+                      <p className="text-xs text-muted-foreground">
+                        Last 30 days
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
 
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Avg Position
-                    </CardTitle>
-                    <Trophy className="h-4 w-4 text-amber-500" />
-                  </CardHeader>
-                  <CardContent>
-                    {isLoadingSummary ? (
-                      <Skeleton className="h-8 w-20" />
-                    ) : (
-                      <div className="flex flex-col gap-1">
-                        <div className="text-2xl font-bold">
-                          {summaryMetrics.avgPosition.toFixed(1)}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Last 30 days
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Top Pages */}
               <Card className="col-span-1">
                 <CardHeader className="flex flex-row items-center justify-between">

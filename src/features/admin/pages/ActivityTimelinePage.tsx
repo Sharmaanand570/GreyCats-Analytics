@@ -25,7 +25,8 @@ export default function ActivityTimelinePage() {
             setLoading(true);
             try {
                 const data = await adminApi.getActivityLogs();
-                setLogs(data.logs || []); // Assuming response structure { logs: [], total: ... }
+                // Backend returns { activities: [...] }
+                setLogs(data.activities || []);
             } catch (error) {
                 console.error("Failed to fetch activity logs", error);
             } finally {

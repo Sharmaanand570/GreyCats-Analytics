@@ -32,6 +32,7 @@ import { removeAuthToken, StorageKey } from "@/utils/storage";
 import { useUserStore } from "@/utils/useUserStore";
 import { getProfileImageUrl } from "@/utils/imageUtils";
 
+import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 
 
 function MainSideBar(): React.JSX.Element {
@@ -146,7 +147,7 @@ function MainSideBar(): React.JSX.Element {
   ];
 
   return (
-    <div className="flex  bg-gradient-to-b from-black via-zinc-950 to-zinc-800 ">
+    <div className="flex relative bg-gradient-to-b from-black via-zinc-950 to-zinc-800 ">
       {/* ---------- 🖥️ DESKTOP SIDEBAR ---------- */}
       {is404Page ? null : (
         <SidebarProvider
@@ -374,6 +375,7 @@ function MainSideBar(): React.JSX.Element {
 
       {/* ---------- PAGE CONTENT ---------- */}
       <main className="flex-1 bg-[#F9FAFB] overflow-y-auto transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]">
+        <ImpersonationBanner />
         <Outlet />
       </main>
     </div>

@@ -28,33 +28,39 @@ export default function WidgetCard({
 
   return (
     <div
-      className={`group rounded-lg md:rounded-xl shadow-sm overflow-hidden h-full transition-all duration-200 ${shouldHideBorder
-        ? 'border border-transparent hover:border-gray-200'
-        : 'border border-gray-200'
+      className={`group rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08)] overflow-hidden h-full transition-all duration-300 hover:-translate-y-0.5 ${shouldHideBorder
+        ? 'border border-transparent'
+        : 'border border-gray-100'
         } flex flex-col ${readOnly ? 'cursor-default' : ''}`}
-      style={{ position: "relative", zIndex: 1 }}
+      style={{
+        position: "relative",
+        zIndex: 1,
+        backgroundColor: (widget.data as any)?.backgroundColor || (shouldHideBorder ? "transparent" : "#ffffff"),
+        color: (widget.data as any)?.textColor || "inherit"
+      }}
     >
       <div
-        className={`drag-handle flex items-center justify-center relative px-10 py-1.5 md:py-2 transition-all duration-200 ${shouldHideBorder
-          ? 'bg-transparent border-b border-transparent opacity-0 ' + (readOnly ? '' : 'group-hover:opacity-100 group-hover:bg-gray-50 group-hover:border-gray-200')
-          : 'bg-gray-50 border-b border-gray-200'
+        className={`drag-handle flex items-center justify-between relative px-4 py-3 md:py-4 transition-all duration-200 ${shouldHideBorder
+          ? 'bg-transparent border-b border-transparent opacity-0 ' + (readOnly ? '' : 'group-hover:opacity-100 group-hover:bg-white group-hover:border-gray-50')
+          : 'bg-white border-b border-transparent'
           } ${readOnly ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
         aria-label="Widget header"
       >
-        <span className="text-xs md:text-sm font-medium text-gray-600 truncate">
+        <span className="text-sm font-semibold text-gray-700 leading-normal truncate flex-1 py-0.5">
           {prettifyMetricLabel(
-            widget.metricConfig?.displayName ||
-            (widget as any).displayName ||
-            (widget as any).title ||
-            widget.metricConfig?.metricKey ||
-            resolvedData?.metricLabel ||
-            resolvedData?.label ||
-            resolvedData?.displayName ||
-            resolvedData?.title ||
-            (widget.data as any)?.label ||
-            (widget.data as any)?.displayName ||
-            (widget.data as any)?.title ||
-            widget.widgetType
+            (widget.data as any)?.label && (widget.data as any).label !== "Metric" ? (widget.data as any).label :
+              widget.metricConfig?.displayName ||
+              (widget as any).displayName ||
+              (widget as any).title ||
+              widget.metricConfig?.metricKey ||
+              resolvedData?.metricLabel ||
+              resolvedData?.label ||
+              resolvedData?.displayName ||
+              resolvedData?.title ||
+              (widget.data as any)?.label ||
+              (widget.data as any)?.displayName ||
+              (widget.data as any)?.title ||
+              widget.widgetType
           )}
         </span>
 
@@ -88,6 +94,6 @@ export default function WidgetCard({
       >
         {children}
       </div>
-    </div>
+    </div >
   );
 }

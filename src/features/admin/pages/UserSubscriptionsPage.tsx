@@ -105,11 +105,9 @@ export default function UserSubscriptionsPage() {
     };
 
     const handleExtendSubscription = async (userId: number) => {
-        // For simplicity, just extending by 30 days. In real app, modal for specific date.
+        // For simplicity, just extending by 30 days. In real app, modal for specific date/days.
         try {
-            const nextDate = new Date();
-            nextDate.setDate(nextDate.getDate() + 30);
-            await adminApi.extendSubscription(userId, nextDate.toISOString());
+            await adminApi.extendSubscription(userId, 30);
             toast.success("Subscription extended by 30 days");
             fetchSubs();
         } catch (error) {

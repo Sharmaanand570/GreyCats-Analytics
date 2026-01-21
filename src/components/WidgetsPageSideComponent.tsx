@@ -64,17 +64,7 @@ function WidgetsPageSideComponent({
 
   const { data: integrationsData, isLoading } = useIntegrations(parsedClientId);
 
-  // Debug sidebar data
-  // Debug sidebar data
-  React.useEffect(() => {
-    if (integrationsData) {
-      console.log('[Sidebar] Integrations:', integrationsData.integrations?.map(i => i.platform));
-      console.log('[Sidebar] ParsedCID:', parsedClientId);
-      console.log('[Sidebar] SlidesMeta:', slidesMeta);
-      console.log('[Sidebar] PageOrder:', pageOrder);
-      console.log('[Sidebar] CustomPages:', customPages);
-    }
-  }, [integrationsData, parsedClientId, slidesMeta, pageOrder, customPages]);
+
   const [editingSlideId, setEditingSlideId] = React.useState<number | null>(
     null
   );
@@ -171,99 +161,16 @@ function WidgetsPageSideComponent({
       return;
     }
 
-    // Calculate final index based on drop position
-    // If dropping on TOP of item i, we insert AT i (pushing i down)
-    // If dropping on BOTTOM of item i, we insert AT i+1
-
-    // Adjust for removal of dragged item
-    // If we drag from 0 to 5 (bottom), remove 0.
-    // If we dropped at "bottom of 5" (idx 5), we target insert at 6.
-    // Logic in ReportBuilder handles splice(from, 1) then splice(to, 0, item).
-    // If from < to, the indices shift down by 1.
-    // Example: [A, B, C]. Drag A(0) to B(1) bottom.
-    // DropIndex=1, Pos=Bottom => Target=2.
-    // Remove A(0). [B, C].
-    // Insert at 2. [B, C, A]. Correct.
-
-    // Example: [A, B, C]. Drag B(1) to A(0) bottom.
-    // DropIndex=0, Pos=Bottom => Target=1.
-    // Remove B(1). [A, C].
-    // Insert at 1. [A, B, C]. Correct (no change).
-
-    // Wait, if we use the simple swap logic from before, it was index specific.
-    // The previous logic was: splice(from, 1), splice(to, 0, item).
-    // This is essentially "insert before target".
-    // "Drop Top" = insert before map-index.
-    // "Drop Bottom" = insert after map-index.
-
-    // However, we need to correct the target index if we are moving downwards, 
-    // because the removal of the item 'from' an earlier index shifts subsequent indices.
-    // Actually, ReportBuilder's logic is simpler: "remove at X, insert at Y".
-    // If I say "insert at 2", and I removed 0.
-    // Old list: 0, 1, 2. Remove 0 -> 1, 2. Insert at 2 -> 1, 2, 0.
-    // So "Insert at 2" means "After the item that was originally at 2"?
-    // Originally at 2 was "2". In new list it is at 1.
-    // 1, 2. Index 2 is end.
-    // So "Insert at 2" puts valid index 2.
-
-    // Let's rely on visual intent:
-    // If "top", we want to be *before* the item currently at dropIndex.
-    // If "bottom", we want to be *after* the item currently at dropIndex.
-
-    // BUT ReportBuilder uses naive splice logic.
-    // Let's compensate in the args passed to onReorderPages?
-    // Or just pass the RAW intent and let ReportBuilder handle it?
-    // ReportBuilder: `baseOrder.splice(toIndex, 0, movedItem)`.
-    // It assumes `toIndex` is relative to the ARRAY AFTER REMOVAL? No, relative to array generally?
-    // `baseOrder.splice(from, 1)` happens FIRST.
-    // So `toIndex` is relative to the array *minus the moved item*.
-
-    // Case 1: Drag Down (from < dropIndex)
-    // [A, B, C]. Drag A(0) to C(2). Drop Top (Before C).
-    // Remove A. [B, C].
-    // We want result [B, A, C].
-    // Insert at index 1.
-    // Target `toIndex` should be 1.
-    // `dropIndex` is 2. `dropPosition` is Top.
-    // If we pass 2: [B, C, A] (After C). Wrong.
-    // So for "Top" when dragging down, we need `dropIndex - 1`?
-    // Wait. In [B, C], C is at index 1.
-    // So we want to insert at 1.
-    // `dropIndex` (original) was 2. So `2 - 1` = 1.
-
-    // Case 2: Drag Up (from > dropIndex)
-    // [A, B, C]. Drag C(2) to A(0). Drop Bottom (After A).
-    // Remove C. [A, B].
-    // We want result [A, C, B].
-    // Insert at index 1.
-    // `dropIndex` is 0. `dropPosition` is Bottom.
-    // If we pass `0 + 1` = 1.
-    // `splice(1, 0, C)` -> [A, C, B]. Correct.
-
-    // Case 3: Drag Up. Drop Top (Before A).
-    // [A, B, C]. C(2) -> A(0) Top.
-    // Remove C. [A, B].
-    // Result [C, A, B]. Insert at 0.
-    // `dropIndex` 0. `dropPosition` Top.
-    // Pass 0. Correct.
-
-    // So the rule seems to be:
-    // Calculate logical target index in the *original* list coordinates first:
-    // "Top" -> dropIndex.
-    // "Bottom" -> dropIndex + 1.
-
-    // Then adjust for the "shifting" caused by removing 'fromIndex'.
-    // If fromIndex < targetIndex: The item we removed was *before* our target slot.
-    // So everything shifted down by 1. We must subtract 1 from target.
-    // If fromIndex >= targetIndex: The removal happened *after* (or at) our target slot.
-    // No shift affects the target slot index.
-
+    // Index-based logic as requested
     let targetIndex = dropIndex;
+
+    // Adjust target based on drop position relative to the item
     if (dropPosition === "bottom") {
       targetIndex = dropIndex + 1;
     }
 
-    // Adjustment logic:
+    // Adjust for the shift that occurs when the dragged item is removed
+    // If we drag an item from above the target, removing it shifts the target index down by 1.
     if (draggedIndex < targetIndex) {
       targetIndex = targetIndex - 1;
     }
@@ -299,31 +206,41 @@ function WidgetsPageSideComponent({
         pages: { innerlabel: string; sublabel: string }[];
       }[] = [];
 
-      // Map integration slides (source === "integration") to actual integrations
+      // 1. Process explicit integration slides (source === "integration")
+      // OR any slide that has ID < 1000 (Self-Healing for corrupted "custom" slides)
       const integrationSlides = slidesMeta.filter(
-        (s) => s.source === "integration"
+        (s) => s.source === "integration" || Number(s.id) < 1000
       );
+
+      // Track processed IDs so we don't duplicate them in the Custom pass
+      const processedIds = new Set(integrationSlides.map(s => Number(s.id)));
+
       integrationSlides.forEach((slide) => {
         // Use integrationIndex if available, otherwise fallback to slide id
-        const idxToUse = slide.integrationIndex !== undefined ? slide.integrationIndex : Number(slide.id);
+        // Ensure index is valid for lookups
+        const numId = Number(slide.id);
+        const idxToUse = slide.integrationIndex !== undefined ? slide.integrationIndex : numId;
+
         const integration = integrations[idxToUse];
         const platformConfig = integration
           ? getPlatformConfig(integration.platform)
           : undefined;
+
+        // Determine effective title
+        const effectiveTitle = (slide.title && !slide.title.startsWith("Untitled"))
+          ? slide.title
+          : (platformConfig?.name || integration?.platform || "Integration");
 
         combined.push({
           label: platformConfig?.name || integration?.platform || "Integration",
           integrationId: integration
             ? integration.id
             : `integration-${slide.id}`,
-          slideIndex: Number(slide.id),
-          isCustom: false,
+          slideIndex: numId,
+          isCustom: false, // FORCE FALSE for integration-like slides
           pages: [
             {
-              // Use integration name if slide.title is empty or starts with "Untitled"
-              innerlabel: (slide.title && !slide.title.startsWith("Untitled"))
-                ? slide.title
-                : (platformConfig?.name || integration?.platform || "Integration"),
+              innerlabel: effectiveTitle,
               sublabel:
                 slide.subtitle ||
                 integration?.accountName ||
@@ -333,9 +250,10 @@ function WidgetsPageSideComponent({
         });
       });
 
-      // Map custom slides (source === "custom") to "Custom" group
+      // 2. Map custom slides (source === "custom") 
+      // EXCLUDING any that we already treated as integration slides (IDs < 1000)
       const customSlides = slidesMeta.filter(
-        (s) => s.source === "custom" || !s.source
+        (s) => (s.source === "custom" || !s.source) && !processedIds.has(Number(s.id))
       );
       customSlides.forEach((slide) => {
         combined.push({
@@ -631,7 +549,7 @@ function WidgetsPageSideComponent({
         ) : pages.length > 0 || (pageOrder && pageOrder.length > 0) ? (
           pages.map((p, groupIndex) => (
             <div
-              key={`${p.integrationId}-${groupIndex}`}
+              key={groupIndex}
               className={`flex flex-col gap-1.5 md:gap-2 ${groupIndex === 0 ? "" : "my-3 md:my-4"
                 }`}
             >

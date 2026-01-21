@@ -62,3 +62,9 @@ export const markNotificationRead = async (notificationId: number) => {
     );
     return response.data;
 };
+
+export const testAlertCheck = async (clientId: number, alertId: number) => {
+    const response = await api.post(`/alerts/clients/${clientId}/alerts/${alertId}/test`);
+    return response.data;
+};
+

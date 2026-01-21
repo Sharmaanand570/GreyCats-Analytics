@@ -71,7 +71,12 @@ export type WooCommerceTrendsResponse = {
 
 export type WooCommercePerProductPaginatedResponse = {
   success: boolean;
-  products: (WooCommerceProduct & { revenue: number; qty: number })[];
+  products: {
+    productId: string;
+    name: string;
+    revenue: number;
+    qty: number;
+  }[];
   page: number;
   limit: number;
   total: number;
@@ -202,21 +207,141 @@ export const getWooCommerceTrends = async (
 };
 
 // ============================================================================
-// ACCOUNT MANAGEMENT
+// DIRECT INTEGRATION ENDPOINTS (woocommerce.routes.ts)
 // ============================================================================
-// For WooCommerce account management operations, use the generic integration API:
-//
-// 1. Get available accounts:
-//    import { getAvailableAccounts } from '@/api/integrationApi';
-//    const accounts = await getAvailableAccounts('woocommerce');
-//
-// 2. Assign account to client:
-//    import { assignAccountToClient } from '@/api/integrationApi';
-//    await assignAccountToClient(clientId, 'woocommerce', accountId);
-//
-// 3. Remove account from client:
-//    import { removeAccountFromClient } from '@/api/integrationApi';
-//    await removeAccountFromClient(clientId, 'woocommerce', accountId);
-//
-// These functions are consistent across all integrations and handle proper
-// endpoint routing and data normalization automatically.
+
+// Per-product paginated analytics
+export const getWooCommercePerProductPaginated = async (
+  clientId: number, // kept for signature compatibility, unused by backend endpoint
+  params: { accountId: number; page: number; limit: number; sort: string; direction: string } | null
+): Promise<WooCommercePerProductPaginatedResponse> => {
+  if (!params) return { success: true, products: [], page: 1, limit: 10, total: 0, totalPages: 0 };
+
+  try {
+    const response = await api.get<WooCommercePerProductPaginatedResponse>(
+      `/woocommerce/analytics/per-product`,
+      { params }
+    );
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching WooCommerce per-product analytics:', error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch product analytics.');
+  }
+};
+
+// Agency rollup
+export const getWooCommerceAgencyRollup = async (
+  clientId: number // kept for signature compatibility
+): Promise<WooCommerceAgencyRollupResponse> => {
+  try {
+    const response = await api.get<WooCommerceAgencyRollupResponse>(
+      `/woocommerce/agency/rollup`
+    );
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching WooCommerce agency rollup:', error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch agency rollup.');
+  }
+};
+
+// Sync status
+export const getWooCommerceSyncStatus = async (
+  clientId: number,
+  accountId: number | null
+): Promise<WooCommerceSyncStatusResponse> => {
+  if (!accountId) return { success: true, sync: { id: 0, isActive: false, lastProductsSync: null, lastOrdersSync: null } };
+
+  try {
+    const response = await api.get<{ success: boolean; sync: any }>(
+      `/woocommerce/sync/status`,
+      { params: { accountId } }
+    );
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching WooCommerce sync status:', error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch sync status.');
+  }
+};
+
+// Account info
+// Note: Backend returns list of accounts. We filter for the specific one.
+export const getWooCommerceAccountInfo = async (
+  clientId: number,
+  accountId: number | null
+): Promise<WooCommerceAccountInfoResponse> => {
+  // If no accountId, we can't fetch a specific account info
+  if (!accountId) {
+    return { success: true, account: { id: 0, storeUrl: '', isActive: false, lastProductsSync: null, lastOrdersSync: null } };
+  }
+
+  try {
+    const response = await api.get<{ success: boolean; accounts: any[] }>(
+      `/woocommerce/accounts`
+    );
+
+    if (response.data.success && response.data.accounts) {
+      const account = response.data.accounts.find((acc: any) => acc.id === accountId);
+      if (account) {
+        return { success: true, account };
+      }
+    }
+
+    // Fallback if not found
+    return { success: false, account: { id: 0, storeUrl: '', isActive: false, lastProductsSync: null, lastOrdersSync: null } };
+  } catch (error: any) {
+    console.error('Error fetching WooCommerce account info:', error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch account info.');
+  }
+};
+
+// Single product detail
+export const getWooCommerceProduct = async (
+  clientId: number,
+  productId: string,
+  accountId: number
+): Promise<WooCommerceProductDetailResponse> => {
+  try {
+    const response = await api.get<{ success: boolean; product: any }>(
+      `/woocommerce/products/${productId}`,
+      { params: { accountId } }
+    );
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching WooCommerce product:', error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch product details.');
+  }
+};
+
+// Single order detail
+export const getWooCommerceOrder = async (
+  clientId: number,
+  orderId: string | null,
+  accountId: number | null
+): Promise<WooCommerceOrderDetailResponse> => {
+  if (!orderId || !accountId) return { success: true, order: null };
+
+  try {
+    const response = await api.get<{ success: boolean; order: any }>(
+      `/woocommerce/orders/${orderId}`,
+      { params: { accountId } }
+    );
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching WooCommerce order:', error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch order details.');
+  }
+};
+
+// Sync operations
+export const syncWooProducts = async (accountId: number): Promise<any> => {
+  const response = await api.post(`/woocommerce/sync/products`, { accountId });
+  return response.data;
+};
+
+export const syncWooOrders = async (accountId: number): Promise<any> => {
+  const response = await api.post(`/woocommerce/sync/orders`, { accountId });
+  return response.data;
+};
+
+// Account Management (keep comments for reference, but implementation is generic)
+// The generic integrationApi functions should be used for connect/disconnect/assign

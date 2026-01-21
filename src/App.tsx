@@ -2,7 +2,6 @@ import { lazy, Suspense, useEffect } from "react";
 import { Routes, Route, useLocation, useNavigate, Navigate } from "react-router-dom";
 import MainSideBar from "./components/MainSideBar";
 import AuthParentComp from "./features/Authantication/componenets/AuthParentComp";
-import { ImpersonationBanner } from "./components/ImpersonationBanner";
 import ShopifyCallbackHandler from "./features/shopify/componenets/ShopifyCallbackHandler";
 import MetaCallbackHandler from "./features/meta/components/MetaCallbackHandler";
 import { isValidPath } from "./utils/routeConfig";
@@ -75,6 +74,8 @@ const UserSubscriptionsPage = lazy(() => import("./features/admin/pages/UserSubs
 const SystemStatsPage = lazy(() => import("./features/admin/pages/SystemStatsPage"));
 const ActivityTimelinePage = lazy(() => import("./features/admin/pages/ActivityTimelinePage"));
 const IntegrationHealthPage = lazy(() => import("./features/admin/pages/IntegrationHealthPage"));
+const FeatureFlagsPage = lazy(() => import("./features/admin/pages/FeatureFlagsPage"));
+const SystemConfigPage = lazy(() => import("./features/admin/pages/SystemConfigPage"));
 const RoleGuard = lazy(() => import("./components/RoleGuard"));
 
 const LoadingFallback = () => (
@@ -195,6 +196,8 @@ function App() {
               <Route path="monitoring/stats" element={<SystemStatsPage />} />
               <Route path="monitoring/activity" element={<ActivityTimelinePage />} />
               <Route path="monitoring/integrations" element={<IntegrationHealthPage />} />
+              <Route path="features" element={<FeatureFlagsPage />} />
+              <Route path="system" element={<SystemConfigPage />} />
               <Route path="*" element={<Navigate to="dashboard" replace />} />
             </Route>
           </Route>

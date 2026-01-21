@@ -142,19 +142,16 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
     return <div>Loading client...</div>;
   }
 
+
+
   const Content = (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full h-full flex flex-col space-y-4">
       {viewMode === "full" && (
         <div className="w-full h-[4.8em] border-b flex justify-between items-center px-5 ">
           <span className="font-medium text-xl">Reports</span>
           <div className="flex items-center">
-            <span className="mx-2 text-lg text-gray-500">
-              <FiSearch />
-            </span>
-            <span className="mx-2 text-lg text-gray-500 ">
-              {" "}
-              <FiBell />
-            </span>
+            <span className="mx-2 text-lg text-gray-500"><FiSearch /></span>
+            <span className="mx-2 text-lg text-gray-500 "><FiBell /></span>
             <span className="ml-4">
               <Button
                 className="rounded-[0.4rem]"
@@ -168,8 +165,6 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
         </div>
       )}
 
-      {/* Toolbar - Sticky for usage? No requests for sticky yet. */}
-      {/* In embedded mode, maybe we want 'Create Report' here if main header is gone? */}
       <div className="w-full justify-between items-center flex px-5 py-6">
         <div className="flex w-full md:w-[60%] lg:w-[40%] gap-3">
           <div className="w-full">
@@ -185,7 +180,6 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
             <DropDownFilter />
           </div>
         </div>
-
         {viewMode === "embedded" && (
           <div>
             <Button
@@ -200,46 +194,18 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
       </div>
 
       <div className="w-full px-5 pb-10">
-        {isLoading && (
-          <div className="w-full border rounded-2xl py-16 flex flex-col items-center justify-center text-gray-500 text-sm">
-            Loading reports...
-          </div>
-        )}
-        {!isLoading && isError && (
-          <div className="w-full border rounded-2xl py-16 flex flex-col items-center justify-center text-gray-500 text-sm gap-4">
-            <span>Unable to load reports right now.</span>
-            <Button onClick={() => refetch()} variant="outline" size="sm">
-              Retry
-            </Button>
-          </div>
-        )}
-        {!isLoading && !isError && showTable && (
-          <div className={`${viewMode === 'embedded' ? 'border rounded-2xl overflow-hidden' : ''}`}>
-            <TableComponent header={TABLE_HEADERS} bodyData={tableRows} />
-          </div>
-        )}
-        {!isLoading && !isError && !showTable && (
-          <div className="w-full border border-dashed rounded-2xl py-16 flex flex-col items-center justify-center text-center px-6 gap-4 bg-gradient-to-br from-white to-zinc-50">
-            <div>
-              <p className="text-lg font-semibold text-gray-900">
-                No reports yet
-              </p>
-              <p className="text-sm text-gray-500">
-                Create a template in the builder or connect an integration
-                to start generating reports.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <Button
-                onClick={handleCreateReportClick}
-                disabled={isLoadingIntegrations}
-              >
-                Create Report
-              </Button>
-              <Button variant="outline" onClick={() => refetch()}>
-                Refresh
-              </Button>
-            </div>
+        {isLoading ? (
+          <div>Loading templates...</div>
+        ) : isError ? (
+          <div>Error loading templates</div>
+        ) : showTable ? (
+          <TableComponent
+            header={TABLE_HEADERS}
+            bodyData={tableRows}
+          />
+        ) : (
+          <div className="text-center py-10 opacity-60">
+            No report templates found. Create one to get started.
           </div>
         )}
       </div>
@@ -258,5 +224,7 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
     </div>
   );
 }
+
+
 
 export default Reports;

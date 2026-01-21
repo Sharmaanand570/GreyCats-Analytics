@@ -222,10 +222,10 @@ export const reconnectGoogleConsole = async (
   clientId: number
 ): Promise<GoogleConsoleReconnectResponse> => {
   try {
-    const response = await api.post<GoogleConsoleReconnectResponse>(
-      `/clients/${clientId}/google-search-console/reconnect`,
-      {},
+    const response = await api.get<GoogleConsoleReconnectResponse>(
+      `/google-seo/reconnect`,
       {
+        params: { clientId },
         headers: seoHeaders,
       }
     );
@@ -247,8 +247,8 @@ export const disconnectGoogleConsole = async (
 ): Promise<GoogleConsoleDisconnectResponse> => {
   try {
     const response = await api.post<GoogleConsoleDisconnectResponse>(
-      `/clients/${clientId}/google-search-console/disconnect`,
-      {},
+      `/google-seo/disconnect`,
+      { clientId },
       {
         headers: seoHeaders,
       }
@@ -271,8 +271,9 @@ export const getGoogleConsoleProperties = async (
 ): Promise<GoogleConsolePropertiesResponse> => {
   try {
     const response = await api.get<GoogleConsolePropertiesResponse>(
-      `/clients/${clientId}/google-search-console/properties`,
+      `/google-seo/properties`,
       {
+        params: { clientId },
         headers: seoHeaders,
       }
     );
@@ -296,8 +297,8 @@ export const selectGoogleConsoleProperty = async (
 ): Promise<GoogleConsoleSelectPropertyResponse> => {
   try {
     const response = await api.post<GoogleConsoleSelectPropertyResponse>(
-      `/clients/${clientId}/google-search-console/properties/select`,
-      body,
+      `/google-seo/select-property`,
+      { ...body, clientId },
       {
         headers: seoHeaders,
       }

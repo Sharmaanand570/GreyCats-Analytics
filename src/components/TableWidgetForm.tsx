@@ -126,6 +126,44 @@ function TableWidgetForm({
               />
             </div>
 
+            {/* Colors */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="block text-xs text-gray-600 mb-2">Background</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="color"
+                    value={data?.backgroundColor || "#ffffff"}
+                    onChange={(e) => handleChange({ backgroundColor: e.target.value })}
+                    className="h-8 w-10 p-0 border-none"
+                  />
+                  <Input
+                    value={data?.backgroundColor || "#ffffff"}
+                    onChange={(e) => handleChange({ backgroundColor: e.target.value })}
+                    placeholder="#ffffff"
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="block text-xs text-gray-600 mb-2">Text Color</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="color"
+                    value={data?.textColor || "#000000"}
+                    onChange={(e) => handleChange({ textColor: e.target.value })}
+                    className="h-8 w-10 p-0 border-none"
+                  />
+                  <Input
+                    value={data?.textColor || "#000000"}
+                    onChange={(e) => handleChange({ textColor: e.target.value })}
+                    placeholder="#000000"
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="border-t pt-4 mt-2 space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-xs text-gray-600">Columns</Label>

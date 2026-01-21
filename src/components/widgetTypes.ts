@@ -20,6 +20,8 @@ export interface TableWidgetData {
     name: string;
     width?: string;
   }[];
+  backgroundColor?: string;
+  textColor?: string;
 }
 
 export interface ChartWidgetData {
@@ -27,6 +29,8 @@ export interface ChartWidgetData {
   data?: unknown;
   chartImageUrl?: string; // Base64 image URL from html2canvas conversion
   title?: string;
+  backgroundColor?: string;
+  chartColor?: string;
 }
 
 export interface MapWidgetData {
@@ -44,6 +48,8 @@ export interface MetricWidgetData {
   trendDirection?: "up" | "down" | "neutral";
   widgetImageUrl?: string; // Base64 image URL from html2canvas conversion
   hideDataPoints?: boolean;
+  backgroundColor?: string;
+  textColor?: string;
 }
 
 export interface ImageWidgetData {

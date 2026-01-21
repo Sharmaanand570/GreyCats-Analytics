@@ -36,20 +36,6 @@ function TitleWidgetForm({ data, onChange }: TitleWidgetFormProps): React.JSX.El
           </button>
         </div>
 
-        {/* Title Type */}
-        <div className="mb-5">
-          <Label className="block text-xs text-gray-600 mb-2">Title Type</Label>
-          <Select defaultValue="section-name">
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="section-name">Section Name</SelectItem>
-              <SelectItem value="section-subtitle">Section Subtitle</SelectItem>
-              <SelectItem value="body-title">Body Title</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
 
         {/* Title */}
         <div className="mb-5">
