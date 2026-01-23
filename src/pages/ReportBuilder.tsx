@@ -14,7 +14,7 @@ import EmbedWidgetForm from "../components/EmbedWidgetForm";
 import { DataSyncBanner } from "../components/DataSyncBanner";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { type DateRange } from "react-day-picker";
-import { format, subDays } from "date-fns";
+import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfYear } from "date-fns";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -355,7 +355,12 @@ function pickDefaultMetricsForIntegration(
   console.log(`🔍 [pickMetrics] perAccount keys for '${normalized}':`, Object.keys(perAccount));
 
   // For Shopify, WooCommerce, and Meta Ads/Business, if no metrics are found (cold start), force the curated list immediately
-  const coldStartPlatforms = ['shopify', 'woo', 'woocommerce', 'meta-ads', 'meta-business', 'meta-social', 'google-search-console', 'google-console'];
+  const coldStartPlatforms = [
+    'shopify', 'woo', 'woocommerce',
+    'meta-ads', 'meta-business', 'meta-social', 'meta-facebook', 'meta-instagram', 'meta',
+    'google-search-console', 'google-console', 'google-analytics', 'google',
+    'youtube'
+  ];
 
   // LOGIC CHECK: Is cold start triggered?
   const isColdStart = coldStartPlatforms.includes(normalized) && (!perAccount || Object.keys(perAccount).length === 0);
@@ -554,7 +559,7 @@ function buildDefaultWidgetsForIntegration(
       widgetType: type,
       data: isMetricCard
         ? { label, value: 0, hideDataPoints: true }  // Use proper label for metric cards
-        : { chartType: "line", title: label },  // Use proper title for charts
+        : { chartType: "column", title: label },  // Use proper title for charts
       metricConfig: {
         id,
         metricKey: metric.metricKey,
@@ -562,7 +567,7 @@ function buildDefaultWidgetsForIntegration(
         accountId: metric.accountId,
         groupBy: isMetricCard ? "none" : "day",
         aggregation: "sum",
-        type: isMetricCard ? "metric_card" : "line_chart",
+        type: isMetricCard ? "metric_card" : "bar_chart",
         displayName: label,
         layout: {
           slideId,
@@ -1765,6 +1770,29 @@ interface ReportBuilderProps {
   initialData?: any;
 }
 
+const getRangeFromPreset = (preset: string): DateRange | undefined => {
+  switch (preset) {
+    case "Today":
+      return { from: new Date(), to: new Date() };
+    case "Yesterday":
+      return { from: subDays(new Date(), 1), to: subDays(new Date(), 1) };
+    case "Last 7 Days":
+      return { from: subDays(new Date(), 6), to: new Date() };
+    case "Last 30 Days":
+      return { from: subDays(new Date(), 29), to: new Date() };
+    case "Last 90 Days":
+      return { from: subDays(new Date(), 89), to: new Date() };
+    case "This Month":
+      return { from: startOfMonth(new Date()), to: endOfMonth(new Date()) };
+    case "Last Month":
+      return { from: startOfMonth(subMonths(new Date(), 1)), to: endOfMonth(subMonths(new Date(), 1)) };
+    case "This Year":
+      return { from: startOfYear(new Date()), to: new Date() };
+    default:
+      return undefined;
+  }
+};
+
 function ReportBuilder({ readOnly = false, providedReportId, shareToken, initialData }: ReportBuilderProps = {}) {
   const params = useParams<{ clientId: string; id?: string }>();
   const parsedClientId = params.clientId ? parseInt(params.clientId) : null;
@@ -1844,6 +1872,9 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
   const [dateRange, setDateRange] = useState<DateRange | undefined>(
     getInitialDateRange()
   );
+  // Date Preset State (e.g. "Last 30 Days") to allow dynamic recalculation in Shared Reports
+  const [datePreset, setDatePreset] = useState<string | undefined>();
+
   const [isNameDialogOpen, setIsNameDialogOpen] = useState(false);
   const [newReportName, setNewReportName] = useState("");
   const templateBootstrapRef = useRef(false);
@@ -2028,116 +2059,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
     staleTime: 60 * 1000,
   });
 
-  const handleConfirmNewReport = useCallback(() => {
-    const trimmedName = newReportName.trim();
-    if (!trimmedName) {
-      toast.error("Please enter a report name");
-      return;
-    }
 
-    // Prevent creating a report if there are no connected integrations
-    if ((integrationsData?.integrations?.length ?? 0) === 0) {
-
-      toast.error(
-        "You need to connect at least one data source before creating a report."
-      );
-      return;
-    }
-
-    // Build default widgets for all connected integrations
-    const widgets: ReportWidgetDefinition[] = [];
-    const slidesMeta: ReportSlideMeta[] = [];
-    const pageOrder: number[] = [];
-
-    integrationsData?.integrations.forEach((integration, index) => {
-      // 1. Pick default metrics for this integration
-      // Use the groupedMetrics from the hook, falling back if needed
-      console.log(`[CreateReport] Picking defaults for ${integration.platform} (Account: ${integration.accountId})`);
-      const metrics = pickDefaultMetricsForIntegration(
-        integration.platform,
-        integration.accountId,
-        groupedMetrics,
-        (msg) => console.log(msg) // valid fallback logger
-      );
-
-
-
-      // 2. Build widgets from these metrics
-      const integrationWidgets = buildDefaultWidgetsForIntegration(index, metrics);
-      console.log(`[CreateReport] Generated ${integrationWidgets.length} widgets for ${integration.platform}`);
-
-      // 3. Map to API Widget Definitions
-      integrationWidgets.forEach((w) => {
-        if (w.metricConfig) {
-          // Normalize integration name for backend (e.g. google-analytics -> google_analytics)
-          // Exception: google-search-console uses hyphens
-          // Exception: woocommerce uses 'woo'
-          let backendIntegration = w.metricConfig.integration || "";
-
-          // Force lowercase to handle "Meta Ads" -> "meta ads"
-          backendIntegration = backendIntegration.toLowerCase();
-
-          if (backendIntegration === 'woocommerce') {
-            backendIntegration = 'woo';
-          } else if (backendIntegration !== 'google-search-console' && !backendIntegration.includes('meta-ads') && !backendIntegration.includes('meta ads')) {
-            // Replace hyphens AND spaces with underscores for standard integrations (google-analytics -> google_analytics)
-            backendIntegration = backendIntegration.replace(/[- ]/g, '_');
-          } else if (backendIntegration.includes('meta ads') || backendIntegration.includes('meta-ads')) {
-            // Force Meta Ads to use hyphens to match platformMapping
-            backendIntegration = 'meta-ads';
-          }
-
-          const widgetDef = {
-            ...w.metricConfig,
-            id: w.i,
-            // Ensure integration is set to the normalized backend value
-            integration: backendIntegration,
-            layout: {
-              slideId: index,
-              x: w.x,
-              y: w.y,
-              w: w.w,
-              h: w.h,
-            },
-            type: w.widgetType,
-            // Ensure any necessary data is preserved in config
-            ...(w.data ? { widgetData: w.data } : {}),
-          };
-          widgets.push(widgetDef as any);
-        }
-      });
-      console.log(`[CreateReport] Total widgets count so far: ${widgets.length}`);
-
-      // 4. Create Slide Meta
-      slidesMeta.push({
-        id: index,
-        title: "", // Will fallback to integration name in sidebar
-        subtitle: "",
-        source: "integration",
-        integrationIndex: index,
-      });
-
-      // 5. Add to page order
-      pageOrder.push(index);
-    });
-
-    const payload: CreateTemplatePayload = {
-      ...defaultTemplatePayload,
-      name: trimmedName,
-      widgets: widgets.length > 0 ? widgets : defaultTemplatePayload.widgets,
-      slidesMeta: slidesMeta,
-      pageOrder: pageOrder,
-    };
-
-    console.log('Sending Report Template Payload:', payload);
-    // DEBUG: Show user what is being saved
-    const customPageCount = slidesMeta.filter(s => s.source === 'custom').length;
-    const integrationPageCount = slidesMeta.filter(s => s.source === 'integration').length;
-    toast.info(`Saving: ${customPageCount} Custom, ${integrationPageCount} Int. Pages`);
-
-    createTemplate(payload);
-    setIsNameDialogOpen(false);
-  }, [createTemplate, defaultTemplatePayload, newReportName, integrationsData, groupedMetrics]);
 
 
   // Apply saved default date range from template (if present)
@@ -2183,6 +2105,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
   useEffect(() => {
     // Only initialize if we don't have template data and integrations are loaded
     if (
+      isTemplateLoading || // CRITICAL FIX: Wait for template to load before deciding to initialize empty!
       templateQuery.data?.widgets ||
       (templateQuery.data?.slides && templateQuery.data.slides.length > 0) ||
       (templateQuery.data?.slidesMeta && templateQuery.data.slidesMeta.length > 0) ||
@@ -2218,7 +2141,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
     }
 
     setIsDashboardsInitialized(true);
-  }, [integrationsData, templateQuery.data, isDashboardsInitialized]);
+  }, [integrationsData, templateQuery.data, isDashboardsInitialized, isTemplateLoading]);
 
   // Ensure pageOrder always matches current slide IDs (integrations + custom pages)
   // Skip this if we have template data with a saved pageOrder (to preserve template order)
@@ -2296,28 +2219,48 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
 
     // CRITICAL FIX: Wait for integrations to load so we can properly rescue/map IDs (Backend ID 500 -> Index 0)
     // If we run too early, rescue fails and we get duplicates.
-    if (isLoadingIntegrations || !integrationsData?.integrations) return;
+    // SHARED REPORT FIX: In readOnly mode, integrations never load, so we skip this check.
+    if (!readOnly && (isLoadingIntegrations || !integrationsData?.integrations)) return;
 
     // CRITICAL FIX: Only run hydration once to avoid resetting local state/drag position on background refetches
     if (isDashboardsInitialized) return;
 
     // Restore saved date range if available
     if ((templateQuery.data as any).defaultDateFrom && (templateQuery.data as any).defaultDateTo) {
-      const from = new Date((templateQuery.data as any).defaultDateFrom);
-      const to = new Date((templateQuery.data as any).defaultDateTo);
-      // Only set if valid dates
-      if (!isNaN(from.getTime()) && !isNaN(to.getTime())) {
-        setDateRange(prev => {
-          // If we already have a date range and it matches the saved one, don't trigger update
-          if (prev?.from?.getTime() === from.getTime() && prev?.to?.getTime() === to.getTime()) {
-            return prev;
+      // Feature: Dynamic Date Presets
+      // If we have a saved preset (e.g. "Last 30 Days") AND we are in read-only mode (Shared),
+      // we should ignore the static dates and calculate fresh ones based on the preset.
+      const savedPreset = (templateQuery.data as any).datePreset;
+      if (savedPreset) {
+        setDatePreset(savedPreset);
+      }
+
+      if (readOnly && savedPreset) {
+        const dynamicRange = getRangeFromPreset(savedPreset);
+        if (dynamicRange && dynamicRange.from && dynamicRange.to) {
+          console.log(`📅 [Dynamic Dates] Applied preset '${savedPreset}':`, dynamicRange);
+          setDateRange(dynamicRange);
+        } else {
+          // Fallback to static dates if preset invalid or unknown
+          const from = new Date((templateQuery.data as any).defaultDateFrom);
+          const to = new Date((templateQuery.data as any).defaultDateTo);
+          if (!isNaN(from.getTime()) && !isNaN(to.getTime())) {
+            setDateRange({ from, to });
           }
-          // IMPORTANT: If the user has already interacted, we might not want to overwrite?
-          // For now, let's assume template load is authoritative on first mount.
-          // To avoid overwriting user edits during background re-fetches, we could check a "isInitialized" flag if one existed for dates.
-          // However, given the "Live Link" nature, keeping in sync with the backend is often desired.
-          return { from, to };
-        });
+        }
+      } else {
+        // Standard static date restore (Builder or no preset)
+        const from = new Date((templateQuery.data as any).defaultDateFrom);
+        const to = new Date((templateQuery.data as any).defaultDateTo);
+        // Only set if valid dates
+        if (!isNaN(from.getTime()) && !isNaN(to.getTime())) {
+          setDateRange(prev => {
+            if (prev?.from?.getTime() === from.getTime() && prev?.to?.getTime() === to.getTime()) {
+              return prev;
+            }
+            return { from, to };
+          });
+        }
       }
     }
 
@@ -2393,7 +2336,56 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
     // Prevent race condition: If integrations are still loading, numIntegrations will be 0.
     // This causes legitimate slides (e.g. index 0) to be seen as ghosts and deleted.
     // We must wait for integrationsData to be fully loaded before running this logic.
+    // ALSO: In Read-Only mode (Shared Reports), integrationsData is NEVER loaded. We must skip
+    // ghost cleanup entirely and trust the template data.
     if ((!readOnly && isLoadingIntegrations) || (!readOnly && !integrationsData?.integrations)) {
+      return;
+    }
+
+    // SHARED REPORT FIX: If readOnly, we don't have integrations to validate against.
+    // SHARED REPORT FIX: If readOnly, we don't have integrations to validate against.
+    // We should skip the rescue/cleanup logic below entirely to avoid deleting valid slides.
+    if (readOnly) {
+      // Just populate the map from the template directly
+      const map = buildDashboardMapFromTemplate(
+        (templateQuery.data.widgets ?? []) as ReportWidgetDefinition[]
+      );
+
+      // Need to ensure dashboards state is set
+      setDashboards(map);
+
+      // Also ensure pageOrder matches template, ensuring strictly Number() types
+      // to match the DashboardMap keys (which are numbers).
+      if (templateQuery.data.pageOrder && templateQuery.data.pageOrder.length > 0) {
+        let order = templateQuery.data.pageOrder.map((id: any) => Number(id));
+
+        // FIX: SLIDE ORDER MISMATCH (Shared Report)
+        // If the saved order has ID 0 (legacy first integration) but our map uses a new ID 
+        // (e.g. 6402) for those widgets, we must map 0 -> 6402 to preserve position.
+        // We detect this if order has 0, map DOES NOT have 0, but map has keys effectively.
+        if (order.includes(0) && !map.has(0) && map.size > 0) {
+          const mapKeys = Array.from(map.keys());
+          // Heuristic: If we have one ID in map that IS NOT in order, assume it replaces 0.
+          // This covers the case where 0 was the integration slide, and 6402 is its new ID.
+          const orphanedKeys = mapKeys.filter(k => !order.includes(k));
+
+          if (orphanedKeys.length === 1) {
+            console.log(`✨ [ReadOnly Fix] Remapping legacy ID 0 to available ID ${orphanedKeys[0]} in pageOrder`);
+            order = order.map((id: number) => (id === 0 ? orphanedKeys[0] : id));
+          } else {
+            // If multiple orphans, append them to ensure they are at least visible
+            // (better to show at end than hide completely)
+            console.log(`⚠️ [ReadOnly Fix] Orphaned slides detected: ${orphanedKeys}. Appending to order.`);
+            order = [...order.filter((id: number) => id !== 0), ...orphanedKeys];
+          }
+        }
+
+        setPageOrder(order);
+      } else {
+        setPageOrder(Array.from(map.keys()).sort((a, b) => a - b));
+      }
+
+      setIsDashboardsInitialized(true);
       return;
     }
 
@@ -2477,11 +2469,11 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
           });
 
           if (existing.length === 0) {
-            map.set(targetIndex, updatedWidgets);
+            map.set(targetIndex, updatedWidgets as DashboardLayout[]);
             console.log(`[ReportBuilder] Rescued ${ghostWidgets.length} widgets from ghost ${backendId} to ${targetIndex} (${integrationsData.integrations[targetIndex].platform})`);
           } else {
             // If data already exists, merge it
-            map.set(targetIndex, [...existing, ...updatedWidgets]);
+            map.set(targetIndex, [...existing, ...updatedWidgets] as DashboardLayout[]);
             console.log(`[ReportBuilder] Merged ${ghostWidgets.length} widgets from ghost ${backendId} into existing slide ${targetIndex}`);
           }
 
@@ -2603,12 +2595,12 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
 
                   const moved = ghosts.map(w => {
                     const layout = (w as any).layout || {};
-                    const finalAccountId = w.accountId || targetIntegrationDetails?.accountId;
+                    const finalAccountId = (w as any).accountId || targetIntegrationDetails?.accountId;
                     const metricConfigAccountId = (w.metricConfig as any)?.accountId || finalAccountId;
 
                     if (widgetMatchIndex === 0) { // Meta Business debugging
                       console.log(`[RescueDebug] Widget ${w.i} (Int 0):`);
-                      console.log(`  - widget.accountId: ${w.accountId}`);
+                      console.log(`  - widget.accountId: ${(w as any).accountId}`);
                       console.log(`  - metricConfig.accountId: ${(w.metricConfig as any)?.accountId}`);
                       console.log(`  - integration.accountId: ${targetIntegrationDetails?.accountId}`);
                       console.log(`  - Final widget.accountId: ${finalAccountId}`);
@@ -2631,7 +2623,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
                     };
                   });
 
-                  map.set(widgetMatchIndex, [...target, ...moved]);
+                  map.set(widgetMatchIndex, [...target, ...moved] as DashboardLayout[]);
                   map.delete(backendId);
                   return;
                 }
@@ -2642,7 +2634,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
           // PRIORITY 2: Check if this "Custom" page is a disguised Integration page via Title.
           // This happens if a previous save incorrectly marked it as custom or if widgets are missing.
           const matchingIntegrationIndex = integrationsData?.integrations?.findIndex(i => {
-            const plat = i.platform.toLowerCase().replace(/_/g, '-');
+            // const plat = i.platform.toLowerCase().replace(/_/g, '-');
             // Check exact title match or platform name match
             const configName = getPlatformConfig(i.platform)?.name;
             return slide.title === i.platform || slide.title === configName || slide.title === i.accountName;
@@ -3486,11 +3478,11 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
             // Backend expects 'config', so map our data there for persistence
             config: widget.data as unknown,
             // Persist the snapshot data: Use resolved live data if available, otherwise fall back to existing snapshot/data
-            snapshotData: resolvedWidgets[widget.metricConfig?.id ?? widget.i] ?? widget.snapshotData,
+            snapshotData: resolvedWidgets[widgetId] ?? widget.snapshotData,
             filters: {
               ...existingFilters,
-              widgetData: (resolvedWidgets[widget.metricConfig?.id ?? widget.i] || widget.data) as unknown,
-              snapshotData: resolvedWidgets[widget.metricConfig?.id ?? widget.i] ?? widget.snapshotData,
+              widgetData: (resolvedWidgets[widgetId] || widget.data) as unknown,
+              snapshotData: resolvedWidgets[widgetId] ?? widget.snapshotData,
               displayName,
               // Bake slide info into first widget as a recovery beacon
               ...(indexInSlide === 0 ? { slideTitle: slideMeta?.title, slideSubtitle: slideMeta?.subtitle } : {}),
@@ -3524,6 +3516,138 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
       resolvedWidgets,
       dateRange
     ]);
+
+  // MOVED: handleConfirmNewReport now lives here to access buildTemplatePayloadFromDashboards
+  const handleConfirmNewReport = useCallback(() => {
+    const trimmedName = newReportName.trim();
+    if (!trimmedName) {
+      toast.error("Please enter a report name");
+      return;
+    }
+
+    // Prevent creating a report if there are no connected integrations
+    if ((integrationsData?.integrations?.length ?? 0) === 0) {
+      toast.error("You need to connect at least one data source before creating a report.");
+      return;
+    }
+
+    // FIX: Prefer "WYSIWYG" (What You See Is What You Get)
+    // If dashboards have been auto-populated (which they should be, due to the useEffect),
+    // we should use the visually generated widgets instead of regenerating them blindly.
+    // This avoids race conditions where groupedMetrics might be empty during 'save' but the
+    // UI has already successfully rendered widgets via cold-start or subsequent updates.
+
+    let payload: CreateTemplatePayload;
+
+    // Generate WYSIWYG payload first
+    const basePayload = buildTemplatePayloadFromDashboards();
+    const hasVisualWidgets = basePayload.widgets && basePayload.widgets.length > 0;
+
+    if (dashboards.size > 0 && hasVisualWidgets) {
+      console.log('✨ [CreateReport] Using WYSIWYG dashboards state for initial save.');
+      payload = {
+        ...basePayload,
+        name: trimmedName,
+      };
+    } else {
+      console.warn('⚠️ [CreateReport] Dashboards empty or no widgets, falling back to manual generation (Legacy Path).');
+      // FALLBACK: Manual Generation (Original Logic)
+      // Only runs if the UI is somehow completely empty.
+
+      const widgets: ReportWidgetDefinition[] = [];
+      const slidesMeta: ReportSlideMeta[] = [];
+      const pageOrder: number[] = [];
+
+      integrationsData?.integrations.forEach((integration, index) => {
+        const metrics = pickDefaultMetricsForIntegration(
+          integration.platform,
+          integration.accountId,
+          groupedMetrics ?? {}, // Handle null
+          (msg) => console.log(msg)
+        );
+
+        // --- START FIX: Force Default Metrics if Lookup Failed ---
+        // If groupedMetrics was loading/empty, 'metrics' might be empty.
+        // We force standard defaults here so the report isn't created empty.
+        if (metrics.length === 0) {
+          console.log(`[CreateReport] No metrics found for ${integration.platform}, forcing defaults.`);
+          const normalized = integration.platform.toLowerCase().replace(/[ _]/g, '-');
+
+          // Find matching defaults keys
+          const defaultKeys = CURATED_DEFAULTS[normalized] ||
+            CURATED_DEFAULTS[integration.platform] ||
+            CURATED_DEFAULTS['meta-ads']; // Safe fallback
+
+          if (defaultKeys && defaultKeys.length > 0) {
+            metrics = defaultKeys.map(key => ({
+              metricKey: key,
+              integration: integration.platform,
+              accountId: integration.accountId,
+              displayName: prettifyMetricLabel(key),
+            }));
+          }
+        }
+        // --- END FIX ---
+
+        const integrationWidgets = buildDefaultWidgetsForIntegration(index, metrics);
+
+        integrationWidgets.forEach((w) => {
+          if (w.metricConfig) {
+            let backendIntegration = (w.metricConfig.integration || "").toLowerCase();
+            // ... (normalization logic) ...
+            if (backendIntegration === 'woocommerce') backendIntegration = 'woo';
+            else if (!backendIntegration.includes('meta-ads') && !backendIntegration.includes('meta ads') && backendIntegration !== 'google-search-console') {
+              backendIntegration = backendIntegration.replace(/[- ]/g, '_');
+            } else if (backendIntegration.includes('meta-ads')) {
+              backendIntegration = 'meta-ads';
+            }
+
+            widgets.push({
+              ...w.metricConfig,
+              id: w.i,
+              integration: backendIntegration,
+              layout: { slideId: index, x: w.x, y: w.y, w: w.w, h: w.h },
+              type: w.widgetType,
+              ...(w.data ? { widgetData: w.data } : {}),
+            } as any);
+          }
+        });
+
+        slidesMeta.push({
+          id: index,
+          title: "",
+          subtitle: "",
+          source: "integration",
+          integrationIndex: index,
+        });
+        pageOrder.push(index);
+      });
+
+      payload = {
+        ...defaultTemplatePayload,
+        name: trimmedName,
+        widgets: widgets,
+        slidesMeta: slidesMeta,
+        pageOrder: pageOrder,
+      };
+    }
+
+    console.log('sending Report Template Payload:', payload);
+    const customPageCount = (payload.slidesMeta || []).filter((s: any) => s.source === 'custom').length;
+    const integrationPageCount = (payload.slidesMeta || []).filter((s: any) => s.source === 'integration').length;
+    toast.info(`Saving: ${customPageCount} Custom, ${integrationPageCount} Int. Pages`);
+
+    createTemplate(payload);
+    setIsNameDialogOpen(false);
+  }, [
+    createTemplate,
+    defaultTemplatePayload,
+    newReportName,
+    integrationsData,
+    groupedMetrics,
+    dashboards,
+    buildTemplatePayloadFromDashboards // Dependency on the WYSIWYG builder
+  ]);
 
   const { mutate: saveTemplate, isPending: isSavingTemplate } = useMutation({
     mutationFn: async (payload: CreateTemplatePayload) => {
@@ -3594,8 +3718,8 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
     const basePayload = buildTemplatePayloadFromDashboards();
 
     // DEBUG: Show user what is being saved
-    const customPageCount = basePayload.slidesMeta.filter(s => s.source === 'custom').length;
-    const integrationPageCount = basePayload.slidesMeta.filter(s => s.source === 'integration').length;
+    const customPageCount = (basePayload.slidesMeta || []).filter(s => s.source === 'custom').length;
+    const integrationPageCount = (basePayload.slidesMeta || []).filter(s => s.source === 'integration').length;
     toast.info(`Saving: ${customPageCount} Custom, ${integrationPageCount} Int. Pages`);
 
     // DATA SYNC FIX: Inject live data from reportDataQuery into the payload
@@ -5190,6 +5314,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
                 onChange={(range) => {
                   setDateRange(range);
                 }}
+                onPresetChange={setDatePreset}
               />
             ) : dateRange?.from && dateRange?.to && (
               <div className="flex items-center gap-2 border rounded-md px-3 py-2 bg-gray-50 text-sm text-gray-600">
@@ -5551,7 +5676,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
                         )
                       ) : (
                         <AutoWidthGrid
-                          className="layout"
+                          className="layout w-full"
                           layout={layout}
                           cols={currentGridConfig.cols}
                           rowHeight={currentGridConfig.rowHeight}

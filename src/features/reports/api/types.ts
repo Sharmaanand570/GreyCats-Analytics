@@ -121,6 +121,7 @@ export interface ReportTemplate {
   // Optional default date range to use when loading this template
   defaultDateFrom?: string;
   defaultDateTo?: string;
+  datePreset?: string;
   // Optional page order for multi-slide reports
   pageOrder?: number[];
   // Optional slide metadata (titles/subtitles) for each logical page.
@@ -190,6 +191,7 @@ export interface ApiReportTemplate {
   description?: string;
   defaultDateFrom?: string;
   defaultDateTo?: string;
+  datePreset?: string;
   /**
    * New backend field that stores logical page ordering.
    */
@@ -212,6 +214,8 @@ export interface CreateTemplatePayload {
   // Optional default date range to persist with the template
   defaultDateFrom?: string;
   defaultDateTo?: string;
+  // Optional preset name (e.g. "Last 30 Days") to allow dynamic date calculation
+  datePreset?: string;
   // Optional page order for multi-slide reports
   pageOrder?: number[];
   /**

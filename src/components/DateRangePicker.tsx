@@ -10,12 +10,14 @@ import { cn } from "@/lib/utils";
 type DateRangePickerProps = {
   value?: DateRange;
   onChange?: (range: DateRange) => void;
+  onPresetChange?: (preset: string | undefined) => void;
   className?: string;
 };
 
 export function DateRangePicker({
   value,
   onChange,
+  onPresetChange,
   className,
 }: DateRangePickerProps) {
   const [open, setOpen] = React.useState(false);
@@ -43,6 +45,9 @@ export function DateRangePicker({
     if (onChange) {
       onChange(tempRange);
     }
+    if (onPresetChange) {
+      onPresetChange(undefined);
+    }
     setOpen(false);
   };
 
@@ -51,6 +56,9 @@ export function DateRangePicker({
     setTempRange(clearedRange);
     if (onChange) {
       onChange(clearedRange);
+    }
+    if (onPresetChange) {
+      onPresetChange(undefined);
     }
     setOpen(false);
   };
@@ -119,6 +127,9 @@ export function DateRangePicker({
     setTempRange(range);
     if (onChange) {
       onChange(range);
+    }
+    if (onPresetChange) {
+      onPresetChange(preset.label);
     }
     setOpen(false);
   };

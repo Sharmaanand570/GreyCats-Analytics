@@ -5,6 +5,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { toast } from 'sonner';
 import type { Alert, CreateAlertData, UpdateAlertData, AlertCondition, AlertInterval } from '../types/alert.types';
 import type { ClientWithIntegrations } from '../types/client.types';
 
@@ -64,6 +65,28 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, clientName, clie
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
+        // Validate required fields
+        if (!integration) {
+            toast.error('Please select an integration');
+            return;
+        }
+        if (!accountId) {
+            toast.error('Please select an account');
+            return;
+        }
+        if (!metricKey) {
+            toast.error('Please select a metric to monitor');
+            return;
+        }
+        if (!triggerValue) {
+            toast.error('Please enter a threshold value');
+            return;
+        }
+        if (notifyEmail && !emailTo) {
+            toast.error('Please enter an email address for notifications');
+            return;
+        }
+
         // Find metric label
         let metricLabel = initialData?.metricLabel || '';
         if (metricKey && integration && accountId && groupedMetrics) {
@@ -74,7 +97,7 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, clientName, clie
 
         const payload: CreateAlertData = {
             integration, // Send exactly as selected (e.g. google_analytics)
-            accountId: Number(accountId),  // Convert string to number for API
+            accountId: accountId,  // Keep as string - backend expects String type
             metricKey,
             metricLabel,
             condition,
@@ -136,7 +159,7 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, clientName, clie
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Integration Selection */}
                 <div className="space-y-2">
-                    <Label>Integration</Label>
+                    <Label>Integration <span className="text-red-500">*</span></Label>
                     <Select value={integration} onValueChange={handleIntegrationChange} disabled={!!initialData}>
                         <SelectTrigger>
                             <SelectValue placeholder="Select Integration" />
@@ -151,7 +174,7 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, clientName, clie
 
                 {/* Account Selection */}
                 <div className="space-y-2">
-                    <Label>Account</Label>
+                    <Label>Account <span className="text-red-500">*</span></Label>
                     <Select value={accountId} onValueChange={handleAccountChange} disabled={!integration || !!initialData}>
                         <SelectTrigger>
                             <SelectValue placeholder="Select Account" />
@@ -162,11 +185,14 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, clientName, clie
                             ))}
                         </SelectContent>
                     </Select>
+                    {!integration && (
+                        <p className="text-xs text-amber-600">⚠️ Please select an integration first</p>
+                    )}
                 </div>
 
                 {/* Metric Selection */}
                 <div className="space-y-2 md:col-span-2">
-                    <Label>Metric</Label>
+                    <Label>Metric <span className="text-red-500">*</span></Label>
                     <Select value={metricKey} onValueChange={setMetricKey} disabled={!accountId || !!initialData}>
                         <SelectTrigger>
                             <SelectValue placeholder="Select Metric to Monitor" />
@@ -183,6 +209,9 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, clientName, clie
                             )}
                         </SelectContent>
                     </Select>
+                    {!accountId && integration && (
+                        <p className="text-xs text-amber-600">⚠️ Please select an account first</p>
+                    )}
                     {metrics.length === 0 && integration && accountId && (
                         <p className="text-xs text-amber-600">
                             ⚠️ No metrics found. Please ensure this integration has data synced.
@@ -210,7 +239,7 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, clientName, clie
 
                 {/* Trigger Value */}
                 <div className="space-y-2">
-                    <Label>Threshold Value</Label>
+                    <Label>Threshold Value <span className="text-red-500">*</span></Label>
                     <Input
                         type="number"
                         value={triggerValue}
@@ -272,7 +301,10 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, clientName, clie
 
             <div className="flex justify-end gap-3 pt-4">
                 <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-                <Button type="submit" disabled={isLoading || statsLoading}>
+                <Button
+                    type="submit"
+                    disabled={isLoading || statsLoading || !integration || !accountId || !metricKey || !triggerValue}
+                >
                     {isLoading ? 'Saving...' : initialData ? 'Update Alert' : 'Create Alert'}
                 </Button>
             </div>

@@ -184,8 +184,8 @@ export const adminApi = {
         return response.data;
     },
 
-    transferClient: async (clientId: number, newOwnerId: number) => {
-        const response = await api.post(`/admin/clients/${clientId}/transfer`, { newOwnerId });
+    transferClient: async (clientId: number, newUserId: number) => {
+        const response = await api.post(`/admin/clients/${clientId}/transfer`, { newUserId });
         return response.data;
     },
 
