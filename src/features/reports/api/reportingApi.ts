@@ -25,6 +25,7 @@ import type {
   UpdateReportSchedulePayload,
   ReportScheduleResponse,
   ReportScheduleMessageResponse,
+  GetReportScheduleResponse,
 } from "./types";
 import { buildApiError, type AxiosApiError } from "./types";
 import { prettifyMetricLabel } from "@/utils/labelUtils";

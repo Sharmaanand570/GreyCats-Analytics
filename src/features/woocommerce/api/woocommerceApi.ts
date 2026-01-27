@@ -212,7 +212,7 @@ export const getWooCommerceTrends = async (
 
 // Per-product paginated analytics
 export const getWooCommercePerProductPaginated = async (
-  clientId: number, // kept for signature compatibility, unused by backend endpoint
+  _clientId: number, // kept for signature compatibility, unused by backend endpoint
   params: { accountId: number; page: number; limit: number; sort: string; direction: string } | null
 ): Promise<WooCommercePerProductPaginatedResponse> => {
   if (!params) return { success: true, products: [], page: 1, limit: 10, total: 0, totalPages: 0 };
@@ -231,7 +231,7 @@ export const getWooCommercePerProductPaginated = async (
 
 // Agency rollup
 export const getWooCommerceAgencyRollup = async (
-  clientId: number // kept for signature compatibility
+  _clientId: number // kept for signature compatibility
 ): Promise<WooCommerceAgencyRollupResponse> => {
   try {
     const response = await api.get<WooCommerceAgencyRollupResponse>(
@@ -246,7 +246,7 @@ export const getWooCommerceAgencyRollup = async (
 
 // Sync status
 export const getWooCommerceSyncStatus = async (
-  clientId: number,
+  _clientId: number,
   accountId: number | null
 ): Promise<WooCommerceSyncStatusResponse> => {
   if (!accountId) return { success: true, sync: { id: 0, isActive: false, lastProductsSync: null, lastOrdersSync: null } };
@@ -266,7 +266,7 @@ export const getWooCommerceSyncStatus = async (
 // Account info
 // Note: Backend returns list of accounts. We filter for the specific one.
 export const getWooCommerceAccountInfo = async (
-  clientId: number,
+  _clientId: number,
   accountId: number | null
 ): Promise<WooCommerceAccountInfoResponse> => {
   // If no accountId, we can't fetch a specific account info
@@ -296,7 +296,7 @@ export const getWooCommerceAccountInfo = async (
 
 // Single product detail
 export const getWooCommerceProduct = async (
-  clientId: number,
+  _clientId: number,
   productId: string,
   accountId: number
 ): Promise<WooCommerceProductDetailResponse> => {
@@ -314,7 +314,7 @@ export const getWooCommerceProduct = async (
 
 // Single order detail
 export const getWooCommerceOrder = async (
-  clientId: number,
+  _clientId: number,
   orderId: string | null,
   accountId: number | null
 ): Promise<WooCommerceOrderDetailResponse> => {

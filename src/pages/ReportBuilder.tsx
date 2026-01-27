@@ -1873,7 +1873,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
     getInitialDateRange()
   );
   // Date Preset State (e.g. "Last 30 Days") to allow dynamic recalculation in Shared Reports
-  const [datePreset, setDatePreset] = useState<string | undefined>();
+  const [_datePreset, setDatePreset] = useState<string | undefined>();
 
   const [isNameDialogOpen, setIsNameDialogOpen] = useState(false);
   const [newReportName, setNewReportName] = useState("");
@@ -3559,7 +3559,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
       const pageOrder: number[] = [];
 
       integrationsData?.integrations.forEach((integration, index) => {
-        const metrics = pickDefaultMetricsForIntegration(
+        let metrics = pickDefaultMetricsForIntegration(
           integration.platform,
           integration.accountId,
           groupedMetrics ?? {}, // Handle null

@@ -365,7 +365,7 @@ const PulseCard = ({ alert, onDelete, onEdit }: CardProps) => {
         <div className="flex items-baseline gap-2">
           {typeof alert.currentValue === 'number' ? (
             <span className="text-3xl font-bold text-zinc-900">
-              {type === 'financial' ? `$${alert.currentValue.toLocaleString()}` : alert.currentValue}
+              {type === 'financial' ? `${alert.currentValue.toLocaleString()}` : alert.currentValue}
             </span>
           ) : (
             <span className="flex items-center gap-2 text-zinc-400 text-lg font-medium bg-zinc-50 px-3 py-1 rounded-full">
@@ -423,7 +423,7 @@ const MonitorCard = ({ alert, onDelete, onEdit }: CardProps) => {
         <div>
           {typeof alert.currentValue === 'number' ? (
             <span className="text-lg font-semibold text-zinc-700">
-              {type === 'financial' ? `$${alert.currentValue.toLocaleString()}` : alert.currentValue}
+              {type === 'financial' ? `${alert.currentValue.toLocaleString()}` : alert.currentValue}
             </span>
           ) : (
             <span className="flex items-center gap-1.5 text-zinc-400 text-sm font-medium">
