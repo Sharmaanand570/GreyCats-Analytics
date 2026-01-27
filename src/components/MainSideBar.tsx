@@ -12,6 +12,8 @@ import {
   SidebarProvider,
 } from "./ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import GreycatsLogo01 from "@/assets/images/greycats 01 logo.png";
+import GreycatsWhiteLogo from "@/assets/images/greycats-white-logo.png";
 import type React from "react";
 import {
   Bell,
@@ -167,16 +169,15 @@ function MainSideBar(): React.JSX.Element {
               <SidebarGroup>
                 <SidebarGroupLabel className="p-0 w-full relative justify-between px-2 py-8 pb-4">
                   <div
-                    className={`flex items-center gap-2 transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${collabsState ? "justify-center w-full" : "px-0"
+                    className={`flex items-center transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${collabsState ? "justify-center w-full" : "justify-center w-full px-4"
                       }`}
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-900 font-bold">
-                      G
-                    </div>
-                    {!collabsState && (
-                      <span className="font-semibold text-lg tracking-tight text-white whitespace-nowrap overflow-hidden">
-                        GreyCats
-                      </span>
+                    {collabsState ? (
+                      <div className="bg-white rounded-lg p-1">
+                        <img src={GreycatsLogo01} alt="Greycats Logo" className="h-8 w-auto" />
+                      </div>
+                    ) : (
+                      <img src={GreycatsWhiteLogo} alt="Greycats Logo" className="h-10 w-auto object-contain" />
                     )}
                   </div>
                   <span
