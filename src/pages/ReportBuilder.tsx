@@ -115,6 +115,8 @@ import {
   YAxis,
 } from "recharts";
 import { exportAllSlidesToPDF } from "../components/functions/reportfunctions";
+import { useSyncStatus } from "@/features/reports/hooks/useSyncStatus";
+import { Loader2 } from "lucide-react";
 
 // Re-export for external use
 export type {
@@ -338,7 +340,7 @@ function pickDefaultMetricsForIntegration(
   // This handles "Meta Ads" -> "meta-ads"
   const normalized = integrationKey.toLowerCase().replace(/[ _]/g, "-");
 
-  console.log(`🔍 [pickMetrics] Input: '${integrationKey}', Normalized: '${normalized}', Account: '${accountId}'`);
+  // console.log(`🔍 [pickMetrics] Input: '${integrationKey}', Normalized: '${normalized}', Account: '${accountId}'`);
 
   // Special case: meta-business... (keep existing)
 
@@ -352,7 +354,7 @@ function pickDefaultMetricsForIntegration(
     groupedMetrics[normalized === "google-console" ? "google-search-console" : ""] ??
     {};
 
-  console.log(`🔍 [pickMetrics] perAccount keys for '${normalized}':`, Object.keys(perAccount));
+  // console.log(`🔍 [pickMetrics] perAccount keys for '${normalized}':`, Object.keys(perAccount));
 
   // For Shopify, WooCommerce, and Meta Ads/Business, if no metrics are found (cold start), force the curated list immediately
   const coldStartPlatforms = [
@@ -364,10 +366,10 @@ function pickDefaultMetricsForIntegration(
 
   // LOGIC CHECK: Is cold start triggered?
   const isColdStart = coldStartPlatforms.includes(normalized) && (!perAccount || Object.keys(perAccount).length === 0);
-  console.log(`❄️ [pickMetrics] Cold Start Check: Platform supported? ${coldStartPlatforms.includes(normalized)}, Empty? ${(!perAccount || Object.keys(perAccount).length === 0)}, Triggered? ${isColdStart}`);
+  // console.log(`❄️ [pickMetrics] Cold Start Check: Platform supported? ${coldStartPlatforms.includes(normalized)}, Empty? ${(!perAccount || Object.keys(perAccount).length === 0)}, Triggered? ${isColdStart}`);
 
   if (isColdStart) {
-    console.log(`❄️ ${integrationKey} cold start detected - using forced defaults`);
+    // console.log(`❄️ ${integrationKey} cold start detected - using forced defaults`);
     const defaults = CURATED_DEFAULTS[normalized] ?? CURATED_DEFAULTS['meta-ads'] ?? [];
     return defaults.map(key => ({
       metricKey: key,
@@ -384,7 +386,7 @@ function pickDefaultMetricsForIntegration(
 
   // Special handling for Meta Business: aggregate from sub-integrations if essentially empty
   if (normalized === 'meta-business' && candidates.length === 0) {
-    console.log('✨ aggregating Meta Business metrics from sub-platforms');
+    // console.log('✨ aggregating Meta Business metrics from sub-platforms');
     const ads = groupedMetrics['meta-ads'] || groupedMetrics['meta_ads'] || {};
     const fb = groupedMetrics['meta-facebook'] || groupedMetrics['meta_facebook'] || {};
     const ig = groupedMetrics['meta-instagram'] || groupedMetrics['meta_instagram'] || {};
@@ -1793,7 +1795,7 @@ const getRangeFromPreset = (preset: string): DateRange | undefined => {
   }
 };
 
-function ReportBuilder({ readOnly = false, providedReportId, shareToken, initialData }: ReportBuilderProps = {}) {
+function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, initialData }: ReportBuilderProps = {}) {
   const params = useParams<{ clientId: string; id?: string }>();
   const parsedClientId = params.clientId ? parseInt(params.clientId) : null;
   const navigate = useNavigate();
@@ -1809,6 +1811,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
     return new Map([[0, []]]);
   });
   const [isDashboardsInitialized, setIsDashboardsInitialized] = useState(false);
+  const [deletedSlideIds, setDeletedSlideIds] = useState<Set<number>>(new Set());
 
   // Custom pages state (pages added by user, not from integrations)
   const [customPages, setCustomPages] = useState<
@@ -2824,6 +2827,9 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
       const updated = new Map(prev);
 
       integrationIds.forEach((id) => {
+        // Skip if explicitly deleted in this session
+        if (deletedSlideIds.has(id)) return;
+
         if (!updated.has(id)) {
           // Slide doesn't exist yet - create it
           if (ENABLE_AUTO_DEFAULT_WIDGETS && groupedMetrics && !isLoadingAvailableMetrics) {
@@ -2880,6 +2886,9 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
       const existing = new Set(base);
       let changed = false;
       integrationIds.forEach((id) => {
+        // Skip if explicitly deleted
+        if (deletedSlideIds.has(id)) return;
+
         if (!existing.has(id)) {
           base.push(id);
           existing.add(id);
@@ -2896,6 +2905,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
     isDashboardsInitialized,
     params.id,
     isTemplateLoading,
+    deletedSlideIds,
     // We intentionally omit full objects/arrays that might be referentially unstable
     // integrationsData?.integrations, groupedMetrics, templateQuery.data
   ]);
@@ -3055,7 +3065,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
 
           // Debug Meta Business API calls
           if (normalizedIntegration === 'meta-facebook' || normalizedIntegration === 'meta-instagram') {
-            console.log(`🔍 [Meta Business API] Integration: ${normalizedIntegration}, MetricKey: ${widget.metricKey}, Params:`, params);
+            // console.log(`🔍 [Meta Business API] Integration: ${normalizedIntegration}, MetricKey: ${widget.metricKey}, Params:`, params);
           }
 
           if (normalizedIntegration === 'shopify') {
@@ -3103,7 +3113,9 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
             }
           }
 
+          console.log('🚀 [UnifiedMetric] Request:', params);
           const data = await fetchUnifiedMetric(effectiveClientId, params);
+          console.log('✅ [UnifiedMetric] Response:', data);
 
           return { hash, widgets: localWidgets, data };
         } catch (error) {
@@ -3150,7 +3162,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
 
         // Standard API Response: Must have rows to process
         if (!data || !data.rows || !Array.isArray(data.rows)) {
-          console.warn(`⚠️ Widget ${id} has no valid data, using empty state`);
+          // console.warn(`⚠️ Widget ${id} has no valid data, using empty state`);
           merged[id] = { value: 0, total: 0, rawCount: 0, rows: [], series: [] };
           return;
         }
@@ -3160,12 +3172,8 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
         }
 
         // Filter rows by accountId and metricKey
-        // For metric cards and charts, also filter out dimensional data (dimensionType should be empty)
-        // EXCEPTION: WooCommerce uses dimensionType="date" for time-series, which we want to include
-        // EXCEPTION: meta-ads returns all campaigns, so we don't filter by accountId
-        // For tables, keep dimensional data
 
-        // Helper to normalize integration names (handle underscores, specific mappings)
+        // Helper to normalize integration names
         const normalizeIntegration = (name: string) => {
           const lower = (name || '').toLowerCase();
           if (lower === 'woo' || lower === 'woocommerce') return 'woocommerce';
@@ -3180,22 +3188,45 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
 
         const widgetIntegration = normalizeIntegration(widget.integration);
 
-        // Check if the widget's integration is a Meta integration (e.g., meta_facebook, meta_instagram, meta_ads)
-        // This is used to relax accountId filtering for Meta integrations, as they often return data
-        // across multiple accounts or for a "business" container rather than a specific ad account.
-        // const isMetaIntegration = widgetIntegration.startsWith('meta_');
+        // Smart Account ID Comparator (handles act_ prefix)
+
 
         // Loose Matching Logic for accountId mismatch fallback
         // First try strict match
         let matchingRows = data.rows.filter((row: any) => {
-          const rowIntegration = normalizeIntegration(row.integration || '');
-          const strictMatch = (widgetIntegration.startsWith('meta_') || widgetIntegration === 'meta-business' || widgetIntegration === 'woocommerce')
-            ? (row.metricKey === widget.metricKey)
-            : (row.metricKey === widget.metricKey &&
-              // Handle null vs undefined mismatch (e.g. widget.accountId=null, row.accountId=undefined)
-              (row.accountId == widget.accountId || String(row.accountId) === String(widget.accountId)) &&
-              rowIntegration === widgetIntegration);
-          return strictMatch;
+          // Normalize Integration: 'meta_ads' == 'meta-ads'
+          const rowInteg = (row.integration || '').replace(/_/g, '-').toLowerCase();
+          const widgetInteg = (widget.integration || '').replace(/_/g, '-').toLowerCase();
+
+          if (rowInteg !== widgetInteg) return false;
+
+          let accountMatch = true;
+          // Only check account ID if it's a Meta integration or widget has an accountId
+          // And ignore 'act_' prefix
+          if (rowInteg.startsWith('meta') || widget.accountId) {
+            const rowAcc = String(row.accountId || '').replace(/^act_/, '');
+            const widAcc = String(widget.accountId || '').replace(/^act_/, '');
+            accountMatch = (rowAcc === widAcc);
+
+            // Special case: If widget is 'meta-business', allow all accounts
+            if (widgetInteg === 'meta-business') accountMatch = true;
+          }
+
+          // Special bypass for Meta Business aggregation (it might aggregate multiple accounts)
+          // If the widget is 'meta-business', we don't strictly filter by accountId at this stage,
+          // as the backend might return data for multiple accounts under the business.
+          if (widgetIntegration === 'meta-business') accountMatch = true;
+
+          // Double Safety: Check Client ID if available to avoid cross-client data leakage
+          let clientMatch = true;
+          if (effectiveClientId && row.clientId) {
+            clientMatch = String(row.clientId) === String(effectiveClientId);
+          }
+
+          return row.metricKey === widget.metricKey &&
+            rowInteg === widgetInteg &&
+            accountMatch &&
+            clientMatch;
         });
 
         // If strict match fails, try loose match (ignore account ID) for ANY integration
@@ -3210,7 +3241,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
             return looseMatch;
           });
           if (matchingRows.length > 0) {
-            console.log(`⚠️ Widget ${id} caused accountId mismatch. Falling back to simple metric key match. (Expected: ${widget.accountId})`);
+            // console.log(`⚠️ Widget ${id} caused accountId mismatch. Falling back to simple metric key match. (Expected: ${widget.accountId})`);
           }
         }
 
@@ -3230,25 +3261,134 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
           const isYouTubeDimension = widget.metricKey.startsWith('youtube.') && (dimType === 'video' || row.dimensionType === 'video');
 
           // Include if: not dimensional OR is a time dimension OR is YouTube video dimension
-          return (!isDimensional || isTimeDimension || isYouTubeDimension);
+          // OR is Meta Ads campaign/adset dimension (since API might return only these)
+          const isMetaAdsDimension = widget.metricKey.startsWith('meta.') && (dimType === 'campaign' || dimType === 'adset' || dimType === 'ad');
+
+          return (!isDimensional || isTimeDimension || isYouTubeDimension || isMetaAdsDimension);
         });
 
+        // Check for rate metrics vs countable metrics
+        const isRateMetric =
+          widget.metricKey?.toLowerCase().includes("cpc") ||
+          widget.metricKey?.toLowerCase().includes("ctr") ||
+          widget.metricKey?.toLowerCase().includes("cpm") ||
+          widget.metricKey?.toLowerCase().includes("bouncerate") ||
+          widget.metricKey?.toLowerCase().includes("average") ||
+          widget.metricKey?.toLowerCase().includes("avg") || // Covers avgOrderValue
+          widget.metricKey?.toLowerCase().includes("rate") || // Covers conversionRate, engagementRate
+          widget.metricKey?.toLowerCase().includes("duration") || // Covers averageSessionDuration
+          widget.metricKey?.toLowerCase().includes("perview"); // Covers likesPerView, commentsPerView
+
+        if (isRateMetric && widget.metricKey) {
+          // console.log(`🔍 [Dashboard] Metric ${widget.metricKey} identified as RATE (Average aggregation)`);
+        } else if (widget.metricKey) {
+          // console.log(`➕ [Dashboard] Metric ${widget.metricKey} identified as COUNTABLE (Sum aggregation)`);
+        }
+
+
         // Calculate total value
-        const total = filteredRows.reduce((sum: number, row: any) => sum + (row.value || 0), 0);
+        let total = 0;
+
+        // Try to use API-provided summary (Blended Calculation) first
+        // This is critical for rate metrics (CPC, CTR) to be accurate (Weighted vs Simple Average)
+        const summary = (data as any).summary;
+        const metricSuffix = widget.metricKey.split('.').pop()?.toLowerCase(); // e.g. 'cpc' from 'meta.ads.cpc'
+
+        if (summary) {
+          // Normalize metric key for summary lookup
+          let summaryKey = widget.metricKey.split('.').pop()?.toLowerCase() || '';
+
+          // Map common variations to summary keys
+          if (summaryKey === 'cost_per_click') summaryKey = 'cpc';
+          if (summaryKey === 'click_through_rate') summaryKey = 'ctr';
+          if (summaryKey === 'cost_per_mille') summaryKey = 'cpm';
+          if (summaryKey === 'amount_spent') summaryKey = 'spend';
+
+          if (summaryKey && typeof summary[summaryKey] === 'number') {
+            total = summary[summaryKey];
+          }
+        }
+
+        // Fallback to row aggregation if summary is missing (and total wasn't set from summary)
+        // Note: We check if total is still 0/default, but technically summary could be 0.
+        // Better to use a flag or check if summary was used.
+        const summaryUsed = summary && typeof summary[widget.metricKey.split('.').pop()?.toLowerCase() || ''] === 'number';
+
+        if (!summaryUsed && filteredRows.length > 0) {
+
+          // Fallback: If summary is missing, try to calculate BLENDED metrics from raw rows if available
+          // (e.g. CPC = Sum(Spend) / Sum(Clicks)) rather than Average(CPC Rows)
+          let blendedCalculated = false;
+          const contextRows = data.rows; // Use valid raw rows
+
+          // Helpers to find sum of related metrics
+          const getSum = (keySuffix: string) => {
+            return contextRows
+              .filter((r: any) =>
+                r.metricKey.endsWith(keySuffix) &&
+                // Loose match for integration (meta_ads vs meta-ads)
+                (r.integration || '').replace('_', '-').toLowerCase() === (widgetIntegration || '').replace('_', '-').toLowerCase() &&
+                // Loose match for account ID
+                (widgetIntegration === 'meta-business' || String(r.accountId) === String(widget.accountId))
+              )
+              .reduce((sum: number, r: any) => sum + (Number(r.value) || 0), 0);
+          };
+
+          if (metricSuffix === 'cpc') {
+            const sumSpend = getSum('spend') || getSum('amount_spent');
+            const sumClicks = getSum('clicks');
+            if (sumClicks > 0) {
+              total = sumSpend / sumClicks;
+              blendedCalculated = true;
+            }
+          } else if (metricSuffix === 'ctr') {
+            const sumClicks = getSum('clicks');
+            const sumImpressions = getSum('impressions');
+            if (sumImpressions > 0) {
+              total = (sumClicks / sumImpressions) * 100;
+              blendedCalculated = true;
+            }
+          } else if (metricSuffix === 'cpm') {
+            const sumSpend = getSum('spend');
+            const sumImpressions = getSum('impressions');
+            if (sumImpressions > 0) {
+              total = (sumSpend / sumImpressions) * 1000;
+              blendedCalculated = true;
+            }
+          }
+
+          if (!blendedCalculated) {
+            if (isRateMetric) {
+              // For other rate metrics (or if blended data missing), fallback to simple average
+              const sum = filteredRows.reduce((a: number, b: any) => a + (b.value || 0), 0);
+              total = sum / filteredRows.length;
+            } else {
+              // For countable metrics (Spend, Impressions), SUM is correct
+              total = filteredRows.reduce((sum: number, row: any) => sum + (row.value || 0), 0);
+            }
+          }
+
+        }
 
         // Create time-series data for charts
         // For YouTube and other integrations with dimensional data, aggregate by date
-        const seriesMap = new Map<string, number>();
+        const seriesMap = new Map<string, { sum: number; count: number }>();
         filteredRows.forEach((row: any) => {
           const dateKey = row.date || row.dimensionValue || '';
           if (dateKey) {
-            const currentValue = seriesMap.get(dateKey) || 0;
-            seriesMap.set(dateKey, currentValue + (row.value || 0));
+            const current = seriesMap.get(dateKey) || { sum: 0, count: 0 };
+            seriesMap.set(dateKey, {
+              sum: current.sum + (row.value || 0),
+              count: current.count + 1
+            });
           }
         });
 
         const series = Array.from(seriesMap.entries())
-          .map(([x, y]) => ({ x, y }))
+          .map(([x, { sum, count }]) => {
+            const value = isRateMetric ? (sum / count) : sum;
+            return { x, y: value };
+          })
           .sort((a, b) => {
             // Sort by date if x is a date string, otherwise keep original order
             const dateA = new Date(a.x).getTime();
@@ -3896,6 +4036,16 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
 
     // Remove from page order
     setPageOrder((prev) => prev.filter((id) => id !== slideId));
+
+    // Remove from processedSlidesMeta to prevent ghost pages in sidebar
+    setProcessedSlidesMeta((prev) => prev.filter((s) => Number(s.id) !== slideId));
+
+    // Track explicitly deleted slides to prevent auto-restoration
+    setDeletedSlideIds((prev) => {
+      const updated = new Set(prev);
+      updated.add(slideId);
+      return updated;
+    });
 
     // Clear any references
     if (slidesRef.current[slideId]) {
@@ -4759,7 +4909,7 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
           (aliasPlatform ? CURATED_DEFAULTS[aliasPlatform] : undefined);
 
         if (defaults) {
-          console.log('⚠️ Sidebar: Using CURATED_DEFAULTS fallback for', platform);
+          // console.log('⚠️ Sidebar: Using CURATED_DEFAULTS fallback for', platform);
           metricsForAccount = defaults.map(metricKey => {
             // Generate a friendly name like "Meta Instagram Followers"
             const parts = metricKey.split('.');
@@ -5698,9 +5848,9 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
                             const dataKey = widget.metricConfig?.id ?? widget.i;
 
                             if (widget.widgetType === "metric" && (widget as any).snapshotData) {
-                              console.log(`🐛 [ReportBuilderLoop] Widget ${widget.i}, dataKey=${dataKey}`);
-                              console.log(`   Keys in resolvedWidgets:`, Object.keys(resolvedWidgets).slice(0, 10));
-                              console.log(`   Resolved entry:`, resolvedWidgets[dataKey]);
+                              // console.log(`🐛 [ReportBuilderLoop] Widget ${widget.i}, dataKey=${dataKey}`);
+                              // console.log(`   Keys in resolvedWidgets:`, Object.keys(resolvedWidgets).slice(0, 10));
+                              // console.log(`   Resolved entry:`, resolvedWidgets[dataKey]);
                             }
 
                             const widgetResolvedData: ResolvedWidgetData | undefined =
@@ -5791,5 +5941,59 @@ function ReportBuilder({ readOnly = false, providedReportId, shareToken, initial
     </div>
   );
 }
+
+const ReportBuilder = (props: ReportBuilderProps) => {
+  const { clientId } = useParams<{ clientId: string }>();
+  // Handle optional props or fallback to params
+
+
+  // Note: ReportBuilderContent uses its own useParams to get clientId too, 
+  // but we need it here for the guard.
+  // If providedReportId is passed (embedded mode), we might not have clientId in params?
+  // Actually, standard usage URL is /clients/:clientId/reports/...
+  // Let's rely on parsedClientId logic similar to inside the component.
+
+  const parsedClientId = clientId ? parseInt(clientId) : null;
+  const { overallProgress } = useSyncStatus(parsedClientId);
+
+  if (parsedClientId && overallProgress.isSyncing && !props.readOnly) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/95 backdrop-blur-sm">
+        <div className="flex flex-col items-center max-w-md p-8 text-center bg-white rounded-xl shadow-xl border border-zinc-200">
+          <div className="mb-6 p-4 bg-amber-50 rounded-full">
+            <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
+          </div>
+          <h2 className="text-2xl font-bold text-zinc-900 mb-2">Data Synchronization in Progress</h2>
+          <p className="text-zinc-600 mb-8">
+            We are currently syncing the latest data for this client.
+            Please wait until the process is complete ensuring your reports are accurate.
+          </p>
+          <div className="flex gap-3">
+            <div className="flex flex-col gap-2 w-full">
+              <div className="w-full bg-zinc-100 rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-amber-500 h-full transition-all duration-500 ease-out"
+                  style={{ width: `${overallProgress.percent}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-zinc-500">
+                <span>Syncing integrations...</span>
+                <span>{Math.round(overallProgress.percent)}%</span>
+              </div>
+            </div>
+          </div>
+          <a
+            href="/reports"
+            className="mt-8 w-full inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+          >
+            Go back to Reports
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  return <ReportBuilderContent {...props} />;
+};
 
 export default ReportBuilder;

@@ -53,23 +53,23 @@ interface MetaResponse {
 }
 
 export const metaAdsApi = {
-    getMeta: async (clientId: number): Promise<MetaResponse> => {
-        const response = await api.get(`/clients/${clientId}/meta-ads/meta`);
+    getMeta: async (clientId: number, params?: { startDate?: string; endDate?: string }): Promise<MetaResponse> => {
+        const response = await api.get(`/clients/${clientId}/meta-ads/meta`, { params });
         return response.data;
     },
 
-    getSummary: async (clientId: number): Promise<SummaryResponse> => {
-        const response = await api.get(`/clients/${clientId}/meta-ads/summary`);
+    getSummary: async (clientId: number, params?: { startDate?: string; endDate?: string }): Promise<SummaryResponse> => {
+        const response = await api.get(`/clients/${clientId}/meta-ads/summary`, { params });
         return response.data;
     },
 
-    getCampaigns: async (clientId: number): Promise<CampaignsResponse> => {
-        const response = await api.get(`/clients/${clientId}/meta-ads/campaigns`);
+    getCampaigns: async (clientId: number, params?: { startDate?: string; endDate?: string }): Promise<CampaignsResponse> => {
+        const response = await api.get(`/clients/${clientId}/meta-ads/campaigns`, { params });
         return response.data;
     },
 
-    getTrends: async (clientId: number): Promise<TrendsResponse> => {
-        const response = await api.get(`/clients/${clientId}/meta-ads/trends`);
+    getTrends: async (clientId: number, params?: { startDate?: string; endDate?: string }): Promise<TrendsResponse> => {
+        const response = await api.get(`/clients/${clientId}/meta-ads/trends`, { params });
         return response.data;
     },
 };

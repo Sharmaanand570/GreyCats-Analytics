@@ -243,9 +243,13 @@ function Dashboard({
             return { id: widget.id, widget, data: null };
           }
 
-          // Handle 90-day limit for Meta integrations
+          // Handle 90-day limit for Meta integrations (Organic Social only)
           let effectiveDateFrom = dateFrom;
-          const isMetaLimitIntegration = ['meta_facebook', 'meta_instagram'].includes(normalizedIntegration) || normalizedIntegration.startsWith('meta-');
+          // Exclude 'meta-ads' and 'meta_ads' from this limit as ads data is often needed for longer periods
+          const isMetaLimitIntegration =
+            (['meta_facebook', 'meta_instagram'].includes(normalizedIntegration) ||
+              (normalizedIntegration.startsWith('meta-') && !normalizedIntegration.includes('ads'))) &&
+            normalizedIntegration !== 'meta_ads'; // Explicitly check underscore variant
 
           if (isMetaLimitIntegration) {
             const ninetyDaysAgo = subDays(new Date(), 90);
@@ -256,11 +260,15 @@ function Dashboard({
             }
           }
 
+          // For Meta Ads, do NOT send accountId to backend, fetch all and filter in frontend to handle act_ prefix
+          const shouldIncludeAccountId = !['meta-facebook', 'meta-instagram', 'meta-ads', 'meta_ads'].includes(normalizedIntegration);
+
           const params: Record<string, string> = {
             integration: normalizedIntegration,
             metricKey: widget.metricKey!,
             startDate: effectiveDateFrom,
             endDate: dateTo,
+            ...(shouldIncludeAccountId && widget.accountId ? { accountId: widget.accountId } : {}),
           };
 
           console.log(`📤 [Dashboard] GET /unified-metrics params for ${widget.metricKey}:`, params);
@@ -282,15 +290,7 @@ function Dashboard({
           });
 
           // Log the full API response for debugging
-          console.log(`📡 [Dashboard] GET /unified-metrics response for ${widget.metricKey}:`, {
-            hasData: !!data,
-            dataKeys: data ? Object.keys(data) : [],
-            hasRows: data?.rows ? 'YES' : 'NO',
-            rowsType: data?.rows ? typeof data.rows : 'N/A',
-            isArray: Array.isArray(data?.rows),
-            rowsLength: data?.rows?.length || 0,
-            fullResponse: data
-          });
+          // console.log(`📡 [Dashboard] GET raw response...`);
 
           return { id: widget.id, widget, data };
         } catch (error) {
@@ -322,14 +322,6 @@ function Dashboard({
         }
 
         if (!rows || !Array.isArray(rows)) {
-          console.log(`⚠️ [Dashboard] Widget ${id} (${widget.metricKey}) has no data rows:`, {
-            dataType: typeof data,
-            dataKeys: data ? Object.keys(data) : [],
-            hasRows: !!data?.rows,
-            hasData: !!data?.data,
-            isDataArray: Array.isArray(data),
-            fullResponse: data
-          });
           merged[id] = { value: 0, total: 0, rawCount: 0, rows: [], series: [] };
           return;
         }
@@ -337,22 +329,18 @@ function Dashboard({
         // Use the found rows
         data.rows = rows;
 
-        console.log(`📊 [Dashboard] Processing widget ${id} (${widget.metricKey}):`, {
-          rawRowsCount: data.rows.length,
-          integration: widget.integration,
-          type: widget.type
-        });
-
         // Filter rows by integration and metricKey match
-
-
         const normalizeIntegration = (name: string) => {
           if (name === 'woo') return 'woocommerce';
-          // Special case: Meta integrations keep underscores (meta-facebook, meta-instagram, meta-ads)
-          if (name.startsWith('meta_')) {
-            return name; // Keep underscores for Meta integrations
-          }
-          return name.replace(/_/g, '-');
+          return (name || '').toLowerCase().replace(/_/g, '-');
+        };
+
+        // Smart Account ID Comparator
+        const areAccountIdsEqual = (id1: any, id2: any) => {
+          if (!id1 || !id2) return true;
+          const s1 = String(id1).replace(/^act_/, '');
+          const s2 = String(id2).replace(/^act_/, '');
+          return s1 === s2;
         };
 
         const filteredRows = data.rows.filter((row: any) => {
@@ -361,27 +349,28 @@ function Dashboard({
 
           // Debug logging for Meta Ads
           if (widget.integration === 'meta-ads' || row.integration === 'meta_ads' || row.integration === 'meta-ads') {
-            console.log('📘 [Dashboard] Meta Ads filtering:', {
-              rowIntegration: row.integration,
-              normalizedRowIntegration: rowIntegration,
-              widgetIntegration: widget.integration,
-              normalizedWidgetIntegration: widgetIntegration,
-              rowMetricKey: row.metricKey,
-              widgetMetricKey: widget.metricKey,
-              integrationMatch: rowIntegration === widgetIntegration,
-              metricMatch: row.metricKey === widget.metricKey
-            });
+            // console.log('📘 [Dashboard] Meta Ads filtering...');
           }
 
-          // Define isMetaIntegration helper
-          const isMetaIntegration = widgetIntegration.startsWith('meta_');
+          const isMeta = widgetIntegration.startsWith('meta_');
 
-          // Reverted strict filtering: trust metricKey for Meta and Meta Business
-          const matchesBasic = isMetaIntegration || widgetIntegration === 'meta-business'
-            ? (row.metricKey === widget.metricKey)
-            : (row.metricKey === widget.metricKey &&
-              String(row.accountId) === String(widget.accountId) &&
-              rowIntegration === widgetIntegration);
+          let accountMatch = true;
+          if (isMeta || widget.accountId) {
+            accountMatch = areAccountIdsEqual(row.accountId, widget.accountId);
+          }
+          if (widgetIntegration === 'meta-business') accountMatch = true;
+
+
+          // Double Safety: Check Client ID if available to avoid cross-client data leakage
+          let clientMatch = true;
+          if (clientId && row.clientId) {
+            clientMatch = String(row.clientId) === String(clientId);
+          }
+
+          const matchesBasic = (row.metricKey === widget.metricKey) &&
+            (rowIntegration === widgetIntegration) &&
+            accountMatch &&
+            clientMatch;
 
           // For tables, we want dimensional data
           if (widget.type === 'table') {
@@ -394,9 +383,11 @@ function Dashboard({
           const isDimensional = row.dimensionType && row.dimensionType !== "";
           const isWooDateDimension = widget.metricKey?.startsWith('woo.') && row.dimensionType === 'date';
           const isYouTubeDimension = widget.metricKey?.startsWith('youtube.') && row.dimensionType === 'video';
-          const isMetaDateDimension = (widget.metricKey?.startsWith('meta') || widget.metricKey?.startsWith('meta_')) && row.dimensionType === 'date';
+          // Allow specific dimension types for Meta Ads (campaign, adset, ad) as these are the primary data rows
+          const isMetaSpecificDimension = (widget.metricKey?.startsWith('meta') || widget.metricKey?.startsWith('meta_')) &&
+            ['campaign', 'adset', 'ad', 'date'].includes(row.dimensionType);
 
-          return matchesBasic && (!isDimensional || isWooDateDimension || isYouTubeDimension || isMetaDateDimension);
+          return matchesBasic && (!isDimensional || isWooDateDimension || isYouTubeDimension || isMetaSpecificDimension);
         });
 
         console.log(`📊 [Dashboard] Widget ${id} filtered rows:`, {
@@ -406,22 +397,104 @@ function Dashboard({
           metricKey: widget.metricKey
         });
 
+        // Check for rate metrics vs countable metrics
+        const isRateMetric =
+          widget.metricKey?.toLowerCase().includes("cpc") ||
+          widget.metricKey?.toLowerCase().includes("ctr") ||
+          widget.metricKey?.toLowerCase().includes("cpm") ||
+          widget.metricKey?.toLowerCase().includes("bouncerate") ||
+          widget.metricKey?.toLowerCase().includes("average") ||
+          widget.metricKey?.toLowerCase().includes("avg") || // Covers avgOrderValue
+          widget.metricKey?.toLowerCase().includes("rate") || // Covers conversionRate, engagementRate
+          widget.metricKey?.toLowerCase().includes("duration") || // Covers averageSessionDuration
+          widget.metricKey?.toLowerCase().includes("perview"); // Covers likesPerView, commentsPerView
+
         // Calculate total value
-        const total = filteredRows.reduce((sum: number, row: any) => sum + (row.value || 0), 0);
+        let total = 0;
+
+        // Try to use API-provided summary (Blended Calculation) first
+        const summary = (data as any).summary;
+        const metricSuffix = widget.metricKey?.split('.').pop()?.toLowerCase();
+        let summaryUsed = false;
+
+        if (summary && metricSuffix) {
+          let summaryKey = metricSuffix;
+          // Map common variations
+          if (summaryKey === 'cost_per_click') summaryKey = 'cpc';
+          else if (summaryKey === 'click_through_rate') summaryKey = 'ctr';
+          else if (summaryKey === 'cost_per_mille') summaryKey = 'cpm';
+          else if (summaryKey === 'amount_spent') summaryKey = 'spend';
+
+          if (typeof summary[summaryKey] === 'number') {
+            total = summary[summaryKey];
+            summaryUsed = true;
+          }
+        }
+
+        if (!summaryUsed && filteredRows.length > 0) {
+          // Manual Blended Calculation Fallback
+          let blendedCalculated = false;
+          const contextRows = data.rows || [];
+          const widgetInteg = normalizeIntegration(widget.integration || '');
+
+          const getSum = (keySuffix: string) => {
+            return contextRows
+              .filter((r: any) =>
+                (r.metricKey || '').endsWith(keySuffix) &&
+                normalizeIntegration(r.integration || '') === widgetInteg &&
+                (widgetInteg === 'meta-business' || areAccountIdsEqual(r.accountId, widget.accountId))
+              )
+              .reduce((sum: number, r: any) => sum + (Number(r.value) || 0), 0);
+          };
+
+          if (metricSuffix === 'cpc') {
+            const sumSpend = getSum('spend') || getSum('amount_spent');
+            const sumClicks = getSum('clicks');
+            if (sumClicks > 0) { total = sumSpend / sumClicks; blendedCalculated = true; }
+          } else if (metricSuffix === 'ctr') {
+            const sumClicks = getSum('clicks');
+            const sumImpressions = getSum('impressions');
+            if (sumImpressions > 0) { total = (sumClicks / sumImpressions) * 100; blendedCalculated = true; }
+          } else if (metricSuffix === 'cpm') {
+            const sumSpend = getSum('spend') || getSum('amount_spent');
+            const sumImpressions = getSum('impressions');
+            if (sumImpressions > 0) { total = (sumSpend / sumImpressions) * 1000; blendedCalculated = true; }
+          }
+
+          if (!blendedCalculated) {
+            if (isRateMetric) {
+              // For rate metrics like CPC/CTR, calculate AVERAGE instead of SUM
+              const sum = filteredRows.reduce((a: number, b: any) => a + (b.value || 0), 0);
+              total = sum / filteredRows.length;
+            } else {
+              // For countable metrics (Spend, Impressions), SUM is correct
+              total = filteredRows.reduce((sum: number, row: any) => sum + (row.value || 0), 0);
+            }
+          }
+        }
 
         // Create time-series data for charts
         // For YouTube and other integrations with dimensional data, aggregate by date
-        const seriesMap = new Map<string, number>();
+        const seriesMap = new Map<string, { sum: number; count: number }>();
         filteredRows.forEach((row: any) => {
           const dateKey = row.date || row.dimensionValue || '';
           if (dateKey) {
-            const currentValue = seriesMap.get(dateKey) || 0;
-            seriesMap.set(dateKey, currentValue + (row.value || 0));
+            const current = seriesMap.get(dateKey) || { sum: 0, count: 0 };
+            seriesMap.set(dateKey, {
+              sum: current.sum + (row.value || 0),
+              count: current.count + 1
+            });
           }
         });
 
         const series = Array.from(seriesMap.entries())
-          .map(([x, y]) => ({ x, y }))
+          .map(([x, { sum, count }]) => {
+            // If the WIDGET metric is a rate, the daily value is likely already an average for that day.
+            // However, if we have multiple rows for the same day (e.g. from multiple accounts),
+            // we should average them for that day too if it's a rate metric.
+            const value = isRateMetric ? (sum / count) : sum;
+            return { x, y: value };
+          })
           .sort((a, b) => {
             // Sort by date if x is a date string, otherwise keep original order
             const dateA = new Date(a.x).getTime();

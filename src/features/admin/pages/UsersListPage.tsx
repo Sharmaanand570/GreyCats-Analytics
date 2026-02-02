@@ -230,7 +230,7 @@ export default function UsersListPage() {
 
                                                             toast.success(`Now impersonating ${user.fullName}`);
                                                             setTimeout(() => {
-                                                                window.location.href = '/';
+                                                                window.location.href = '/#/';
                                                             }, 100);
                                                         } else {
                                                             toast.error('Failed to start impersonation session');

@@ -197,7 +197,7 @@ function WidgetsPageSideComponent({
     // If we have slide metadata from the template, use that as the primary source
     // of truth for page labels. This keeps integration pages from being treated
     // as "Untitled" or "Custom" just because their slide IDs don't match indices.
-    if (slidesMeta && slidesMeta.length > 0) {
+    if (slidesMeta) {
       const combined: {
         label: string;
         integrationId: string | number;

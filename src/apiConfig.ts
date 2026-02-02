@@ -48,7 +48,7 @@ api.interceptors.response.use(
       if (!isSharedEndpoint && !isLoginEndpoint && !skipRedirect) {
         console.warn("Unauthorized — redirecting to login…");
         removeAuthToken(StorageKey.ANALYTICS_TOKEN);
-        window.location.href = "/auth/login?reason=session_expired";
+        window.location.href = "/#/auth/login?reason=session_expired";
       }
     }
 

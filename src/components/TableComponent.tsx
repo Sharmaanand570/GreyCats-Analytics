@@ -34,6 +34,7 @@ type ReportRow = {
   onDelete?: () => void;
   // Optional link for the report name
   link?: string;
+  disabled?: boolean;
 };
 
 type AlertRow = {
@@ -247,7 +248,7 @@ function TableComponent({ header, bodyData, backgroundColor, textColor }: TableT
                 {isReportRow(row) && (
                   <>
                     <td className="pl-6 pr-6 text-sm font-medium text-gray-700 whitespace-nowrap">
-                      {row.id ? (
+                      {row.id && !row.disabled ? (
                         <Link
                           to={row.link || `/reports/${row.id}`}
                           className="text-accent-foreground hover:underline"
@@ -255,12 +256,13 @@ function TableComponent({ header, bodyData, backgroundColor, textColor }: TableT
                           {row.name}
                         </Link>
                       ) : (
-                        <span className="text-sm font-medium">
+                        <span className={`text-sm font-medium ${row.disabled ? 'text-gray-400 cursor-not-allowed' : ''}`}>
                           {row.name}
+                          {row.disabled && <span className="ml-2 text-xs italic opacity-70">(Syncing...)</span>}
                         </span>
                       )}
                     </td>
-                    <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">
+                    <td className={`pl-2 pr-6 text-sm whitespace-nowrap ${row.disabled ? 'text-gray-300' : 'text-gray-600'}`}>
                       {row.created}
                     </td>
                     {row.onDelete && (
@@ -268,10 +270,12 @@ function TableComponent({ header, bodyData, backgroundColor, textColor }: TableT
                         <button
                           type="button"
                           onClick={(e) => {
+                            if (row.disabled) return;
                             e.stopPropagation();
                             row.onDelete?.();
                           }}
-                          className="text-red-500 hover:text-red-700 text-sm font-medium"
+                          disabled={row.disabled}
+                          className={`text-sm font-medium ${row.disabled ? 'text-gray-300 cursor-not-allowed' : 'text-red-500 hover:text-red-700'}`}
                         >
                           Delete
                         </button>

@@ -9,4 +9,12 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    proxy: {
+      "/api": {
+        target: "http://srv842241.hstgr.cloud:5000",
+        changeOrigin: true,
+      },
+    },
+  },
 });

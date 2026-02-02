@@ -1,0 +1,22 @@
+server {
+    listen 80;
+    server_name yourdomain.com; # Replace with your actual domain
+
+    root /var/www/html; # Replace with the actual path to your build folder (e.g. /dist)
+    index index.html;
+
+    location / {
+        # This is the critical part for React Router (SPA)
+        # It tries to find the file matches the URI, if not found, it serves index.html
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Optional: Cache control for static assets (js, css, images) usually found in /assets
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, no-transform";
+    }
+
+    # Optional: Handle 404 explicitly if needed, but try_files usually covers standard SPA usage
+    error_page 404 /index.html;
+}

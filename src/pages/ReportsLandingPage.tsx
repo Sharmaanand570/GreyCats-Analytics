@@ -2,7 +2,8 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClients } from '../hooks/useClients';
-import { Building2, FileText, ArrowUpDown, Search } from 'lucide-react';
+import { useSyncStatus } from '../features/reports/hooks/useSyncStatus';
+import { Building2, FileText, ArrowUpDown, Search, Loader2 } from 'lucide-react';
 import { FiBell } from "react-icons/fi";
 import { Input } from "../components/ui/input";
 import { Skeleton } from "../components/ui/skeleton";
@@ -139,46 +140,13 @@ const ReportsLandingPage: React.FC = () => {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {processedClients.map((client) => {
-                                            // Dynamic counting of all integrations directly from the API count object
-                                            // Dynamic counting: prioritize integrations array length
-                                            const totalIntegrations = (client.integrations?.length || 0) > 0
-                                                ? client.integrations.length
-                                                : (client._count
-                                                    ? Object.values(client._count).reduce((acc: number, curr: any) => acc + (typeof curr === 'number' ? curr : 0), 0)
-                                                    : 0);
-
-                                            return (
-                                                <TableRow
-                                                    key={client.id}
-                                                    onClick={() => handleClientClick(client.id)}
-                                                    className="cursor-pointer hover:bg-zinc-50/80 transition-colors group"
-                                                >
-                                                    <TableCell className="font-medium">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="h-10 w-10 rounded-lg bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-500 group-hover:bg-white group-hover:shadow-sm transition-all">
-                                                                <Building2 className="w-5 h-5" />
-                                                            </div>
-                                                            <div>
-                                                                <div className="font-semibold text-zinc-900">{client.name}</div>
-                                                                <div className="text-xs text-zinc-500 line-clamp-1">{client.description || "No description"}</div>
-                                                            </div>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-medium text-zinc-700">{totalIntegrations}</span>
-                                                            <span className="text-zinc-500 text-xs">Connected</span>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <span className="text-sm font-medium text-blue-600">
-                                                            View Reports &rarr;
-                                                        </span>
-                                                    </TableCell>
-                                                </TableRow>
-                                            );
-                                        })}
+                                        {processedClients.map((client) => (
+                                            <ClientRow
+                                                key={client.id}
+                                                client={client}
+                                                onClick={handleClientClick}
+                                            />
+                                        ))}
                                     </TableBody>
                                 </Table>
                             </div>
@@ -187,6 +155,61 @@ const ReportsLandingPage: React.FC = () => {
                 </div>
             </div>
         </div>
+    );
+};
+
+interface ClientRowProps {
+    client: any;
+    onClick: (id: number) => void;
+}
+
+const ClientRow: React.FC<ClientRowProps> = ({ client, onClick }) => {
+    const { overallProgress } = useSyncStatus(client.id);
+
+    // Dynamic counting
+    const totalIntegrations = (client.integrations?.length || 0) > 0
+        ? client.integrations.length
+        : (client._count
+            ? Object.values(client._count).reduce((acc: number, curr: any) => acc + (typeof curr === 'number' ? curr : 0), 0)
+            : 0);
+
+    const isSyncing = overallProgress.isSyncing;
+
+    return (
+        <TableRow
+            onClick={() => !isSyncing && onClick(client.id)}
+            className={`transition-colors group ${isSyncing ? 'cursor-not-allowed opacity-70 bg-zinc-50' : 'cursor-pointer hover:bg-zinc-50/80'}`}
+        >
+            <TableCell className="font-medium">
+                <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-500 group-hover:bg-white group-hover:shadow-sm transition-all">
+                        <Building2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <div className="font-semibold text-zinc-900">{client.name}</div>
+                        <div className="text-xs text-zinc-500 line-clamp-1">{client.description || "No description"}</div>
+                    </div>
+                </div>
+            </TableCell>
+            <TableCell>
+                <div className="flex items-center gap-2">
+                    <span className="font-medium text-zinc-700">{totalIntegrations}</span>
+                    <span className="text-zinc-500 text-xs">Connected</span>
+                </div>
+            </TableCell>
+            <TableCell className="text-right">
+                {isSyncing ? (
+                    <div className="flex items-center justify-end gap-2 text-amber-600">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <span className="text-sm font-medium">Syncing data...</span>
+                    </div>
+                ) : (
+                    <span className="text-sm font-medium text-blue-600">
+                        View Reports &rarr;
+                    </span>
+                )}
+            </TableCell>
+        </TableRow>
     );
 };
 

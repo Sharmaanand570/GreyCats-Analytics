@@ -13,6 +13,8 @@ import type { ReportTemplateSummary } from "@/features/reports/api/types";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useIntegrations } from "@/features/DataSources/hooks/useIntegrations";
+import { useSyncStatus } from "@/features/reports/hooks/useSyncStatus";
+import { Loader2 } from "lucide-react";
 
 const TABLE_HEADERS = [
   "Name",
@@ -75,6 +77,10 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
     isLoading: isLoadingIntegrations,
   } = useIntegrations(parsedClientId);
 
+  // New: Check sync status
+  const { overallProgress } = useSyncStatus(parsedClientId);
+  const isSyncing = overallProgress.isSyncing;
+
   const hasIntegrations =
     (integrationsData?.integrations?.length ?? 0) > 0;
 
@@ -83,10 +89,11 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
     integrationsData,
     hasIntegrations,
     isLoadingIntegrations,
+    isSyncing
   });
 
   const handleCreateReportClick = () => {
-    if (isLoadingIntegrations) {
+    if (isLoadingIntegrations || isSyncing) {
       return;
     }
 
@@ -133,8 +140,9 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
       ...mapTemplateToRow(template),
       link: `/clients/${parsedClientId}/reports/${template.id}`,
       onDelete: () => deleteTemplate(template.id),
+      disabled: isSyncing, // Disable row if syncing
     }));
-  }, [filteredTemplates, deleteTemplate]);
+  }, [filteredTemplates, deleteTemplate, isSyncing, parsedClientId]);
 
   const showTable = tableRows.length > 0;
 
@@ -156,9 +164,16 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
               <Button
                 className="rounded-[0.4rem]"
                 onClick={handleCreateReportClick}
-                disabled={isLoadingIntegrations}
+                disabled={isLoadingIntegrations || isSyncing}
               >
-                Create Report
+                {isSyncing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  "Create Report"
+                )}
               </Button>
             </span>
           </div>
@@ -185,9 +200,16 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
             <Button
               className="rounded-[0.4rem]"
               onClick={handleCreateReportClick}
-              disabled={isLoadingIntegrations}
+              disabled={isLoadingIntegrations || isSyncing}
             >
-              Create Report
+              {isSyncing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                "Create Report"
+              )}
             </Button>
           </div>
         )}

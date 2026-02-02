@@ -15,7 +15,7 @@ export const ImpersonationBanner = () => {
             toast.success('Stopped impersonating user');
             // Use window.location.href to force a full reload
             setTimeout(() => {
-                window.location.href = '/admin/users';
+                window.location.href = '/#/admin/users';
             }, 100);
         } catch (error) {
             console.error('Stop impersonation error:', error);

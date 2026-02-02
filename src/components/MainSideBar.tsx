@@ -80,7 +80,7 @@ function MainSideBar(): React.JSX.Element {
   const handleLogout = () => {
     removeAuthToken(StorageKey.ANALYTICS_TOKEN);
     // Force a hard reload to clear any in-memory state or query caches, then go to login
-    window.location.href = "/auth/login";
+    window.location.href = "/#/auth/login";
   };
 
   const handleChangeURL = (path: string): void => {

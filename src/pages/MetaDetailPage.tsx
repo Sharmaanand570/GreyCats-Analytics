@@ -10,6 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { addDays, format, subDays } from "date-fns";
+import type { DateRange } from "react-day-picker";
+import { DateRangePicker } from "@/components/DateRangePicker";
 import {
   TrendingUp,
   TrendingDown,
@@ -119,6 +122,12 @@ function MetaDetailPage() {
   const navigate = useNavigate();
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
 
+  // Default to Dec 1, 2025 - Dec 31, 2025 as requested
+  const [date, setDate] = useState<DateRange | undefined>({
+    from: new Date(2025, 11, 1),
+    to: new Date(2025, 11, 31),
+  });
+
   const { data: clientsData } = useClients();
   const clients = clientsData || [];
 
@@ -127,10 +136,16 @@ function MetaDetailPage() {
     setSelectedClientId(clients[0].id);
   }
 
-  const { data: metaData, isLoading: isLoadingMeta } = useMetaAdsMeta(selectedClientId || 0);
-  const { data: summaryData, isLoading: isLoadingSummary } = useMetaAdsSummary(selectedClientId || 0);
-  const { data: campaignsData, isLoading: isLoadingCampaigns } = useMetaAdsCampaigns(selectedClientId || 0);
-  const { data: trendsData, isLoading: isLoadingTrends } = useMetaAdsTrends(selectedClientId || 0);
+  // Format dates for API
+  const apiParams = {
+    startDate: date?.from ? format(date.from, "yyyy-MM-dd") : undefined,
+    endDate: date?.to ? format(date.to, "yyyy-MM-dd") : undefined,
+  };
+
+  const { data: metaData, isLoading: isLoadingMeta } = useMetaAdsMeta(selectedClientId || 0, apiParams);
+  const { data: summaryData, isLoading: isLoadingSummary } = useMetaAdsSummary(selectedClientId || 0, apiParams);
+  const { data: campaignsData, isLoading: isLoadingCampaigns } = useMetaAdsCampaigns(selectedClientId || 0, apiParams);
+  const { data: trendsData, isLoading: isLoadingTrends } = useMetaAdsTrends(selectedClientId || 0, apiParams);
 
   const campaigns = summaryData?.campaigns || [];
   const allCampaigns = campaignsData?.campaigns || [];
@@ -194,10 +209,8 @@ function MetaDetailPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              <Button variant="outline" size="sm" className="hidden lg:flex gap-2 h-10 border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300">
-                <Calendar className="w-4 h-4" />
-                <span>Last 30 Days</span>
-              </Button>
+              <DateRangePicker value={date} onChange={setDate} />
+
 
               {/* Client Selector */}
               <Select value={selectedClientId?.toString()} onValueChange={(v: string) => setSelectedClientId(Number(v))}>
@@ -233,40 +246,31 @@ function MetaDetailPage() {
                   title="Total Spend"
                   value={`₹${totalSpend.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
                   icon={DollarSign}
-                  trend={12.5}
                   color="emerald"
-                  subValue="Budget paced well"
                 />
                 <MetricCard
                   title="Impressions"
                   value={totalImpressions.toLocaleString('en-IN')}
                   icon={Eye}
-                  trend={8.3}
                   color="blue"
-                  subValue="Reach expanded"
                 />
                 <MetricCard
                   title="Clicks"
                   value={totalClicks.toLocaleString('en-IN')}
                   icon={MousePointerClick}
-                  trend={-2.1}
                   color="violet"
-                  subValue="Engagement steady"
                 />
                 <MetricCard
                   title="Avg CTR"
                   value={`${avgCTR.toFixed(2)}%`}
                   icon={Target}
-                  trend={5.7}
                   color="amber"
-                  subValue="Ad relevance high"
                 />
                 <MetricCard
                   title="Avg CPM"
                   value={`₹${avgCPM.toFixed(2)}`}
                   icon={TrendingUp}
                   color="rose"
-                  subValue="Cost per 1k views"
                 />
               </>
             )}

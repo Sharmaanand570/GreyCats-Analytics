@@ -149,7 +149,7 @@ export default function UserDetailsPage() {
 
                                     // Small delay to ensure localStorage writes complete, then reload
                                     setTimeout(() => {
-                                        window.location.href = '/';
+                                        window.location.href = '/#/';
                                     }, 100);
                                 } else {
                                     toast.error('Failed to start impersonation session');
