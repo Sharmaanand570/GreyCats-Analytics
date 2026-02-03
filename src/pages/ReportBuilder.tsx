@@ -79,6 +79,7 @@ import {
   createReportTemplate,
   getReportTemplate,
   fetchUnifiedMetric,
+  fetchMetaStoredPosts,
   updateReportTemplate,
   listReportSchedules,
   type UnifiedMetricRow,
@@ -238,26 +239,30 @@ const CURATED_DEFAULTS: Record<string, string[]> = {
     "google-console.billing.cost",
   ],
   "meta": [
-    "meta.page.impressions",
-    "meta.page.engagement",
-    "meta.page.fanAdds",
+    "meta.facebook.followers",
+    "meta.facebook.postsCount",
+    "meta.facebook.post.engagement",
     "meta.instagram.followers",
   ],
   "meta-facebook": [
-    // Facebook Page Metrics (Organic)
-    "meta.page.impressions",
-    "meta.page.uniqueImpressions",
-    "meta.page.engagement",
+    // Page Metrics
     "meta.page.fans",
-    "meta.page.postImpressions",
-    "meta.page.views",
-    "meta.page.actions",
-    // Facebook Post-level Metrics (NEW)
+    "meta.page.engagement",
+
+    // Media Views (New)
+    "meta.facebook.mediaViews",
+    "meta.facebook.mediaViews.paid",
+    "meta.facebook.mediaViews.organic",
+
+    // Post Metrics
     "meta.facebook.post.likes",
     "meta.facebook.post.comments",
     "meta.facebook.post.shares",
     "meta.facebook.post.reactions",
     "meta.facebook.post.engagement",
+
+    // Special: Top Performing Posts Table
+    "meta.facebook.recent_posts",
   ],
   "meta-instagram": [
     // Instagram Account-level Metrics (ONLY metrics that exist in DB)
@@ -273,10 +278,8 @@ const CURATED_DEFAULTS: Record<string, string[]> = {
   ],
   "meta-business": [
     // Meta Business integration - combines Facebook + Instagram metrics
-    // Facebook Metrics (actual metric keys from API)
     "meta.facebook.followers",
     "meta.facebook.postsCount",
-    // Instagram Account Metrics
     "meta.instagram.followers",
     "meta.instagram.mediaCount",
   ],
@@ -1064,6 +1067,8 @@ const renderWidgetContent = (
         metricConfig?.metricKey === "ga.top_pages_views" &&
         !!metricConfig?.integration;
 
+      const isRecentPostsTable = metricConfig?.metricKey === 'meta.facebook.recent_posts';
+
       const generateColumnsFromRows = (rows: any[]) => {
         if (!rows.length) return [];
         const sample = rows[0] as Record<string, unknown>;
@@ -1110,6 +1115,7 @@ const renderWidgetContent = (
       // 2-column table from the series (label + value).
       let seriesRows =
         !isGaTopPagesTable &&
+          !isRecentPostsTable && // Recent posts is its own thing
           !gaRows &&
           !dimensionalRows &&  // Don't use series if we have dimensional data
           (!metricConfig?.groupBy || metricConfig.groupBy === 'none' || metricConfig.groupBy === 'date') && // Only show series (time-series) if grouping is date-based or none. Don't show dates for 'device' tables.
@@ -1121,6 +1127,7 @@ const renderWidgetContent = (
       // Fallback: if metric returns only a single value/total, build a 1-row series
       if (
         !isGaTopPagesTable &&
+        !isRecentPostsTable &&
         !gaRows &&
         (!seriesRows || seriesRows.length === 0) &&
         metricConfig?.metricKey &&
@@ -1167,7 +1174,7 @@ const renderWidgetContent = (
         !usingSeriesRows &&
         !!resolvedRows &&
         resolvedRows.length > 0 &&
-        (!metricConfig?.groupBy || metricConfig.groupBy === 'none' || metricConfig.groupBy === 'date');
+        (isRecentPostsTable || !metricConfig?.groupBy || metricConfig.groupBy === 'none' || metricConfig.groupBy === 'date');
       const usingTableData =
         !usingGaRows &&
         !usingDimensionalRows &&
@@ -1184,6 +1191,19 @@ const renderWidgetContent = (
         (usingSeriesRows ? (seriesRows as any[]) : null) ??
         (usingTableData ? tableData?.rows : null) ??
         (metricConfig?.metricKey ? [] : reportTableRows);
+
+      if (isRecentPostsTable) {
+        console.log("🔍 [Table Render] Recent Posts Data Sources:", {
+          usingGaRows,
+          usingDimensionalRows,
+          usingResolvedRows,
+          usingSeriesRows,
+          usingTableData,
+          resolvedRowsCount: resolvedRows?.length || 0,
+          finalRowsCount: rows?.length || 0,
+          metricKey: metricConfig?.metricKey
+        });
+      }
 
       const autoColumns =
         resolvedRows &&
@@ -1205,7 +1225,9 @@ const renderWidgetContent = (
         tableData?.caption ??
         (isGaTopPagesTable
           ? "Pages with the highest number of views."
-          : "Queue of report deliveries.");
+          : isRecentPostsTable
+            ? "Recent posts from your Facebook Page."
+            : "Queue of report deliveries.");
 
       const columns =
         isGaTopPagesTable
@@ -1214,27 +1236,38 @@ const renderWidgetContent = (
             { name: "Title", width: "35%" },
             { name: "Views" },
           ]
-          : usingDimensionalRows
+          : isRecentPostsTable
             ? [
-              { name: dimensionType.charAt(0).toUpperCase() + dimensionType.slice(1), width: "60%" },
-              { name: metricName.charAt(0).toUpperCase() + metricName.slice(1) },
+              { name: "Date", width: "15%" },
+              { name: "Post", width: "40%" },
+              { name: "Impressions" },
+              { name: "Clicks" },
+              { name: "Likes" },
+              { name: "Comments" },
+              { name: "Shares" },
+              { name: "Reactions" }
             ]
-            : usingSeriesRows
+            : usingDimensionalRows
               ? [
-                { name: "Metric", width: "60%" },
-                { name: "Value" },
+                { name: dimensionType.charAt(0).toUpperCase() + dimensionType.slice(1), width: "60%" },
+                { name: metricName.charAt(0).toUpperCase() + metricName.slice(1) },
               ]
-              : usingResolvedRows && autoColumns
-                ? autoColumns
-                : tableData?.columns && tableData.columns.length
-                  ? tableData.columns
-                  : [
-                    { name: "Report", width: "35%" },
-                    { name: "Audience" },
-                    { name: "Status" },
-                    { name: "Last Run" },
-                    { name: "Next Send" },
-                  ];
+              : usingSeriesRows
+                ? [
+                  { name: "Metric", width: "60%" },
+                  { name: "Value" },
+                ]
+                : usingResolvedRows && autoColumns
+                  ? autoColumns
+                  : tableData?.columns && tableData.columns.length
+                    ? tableData.columns
+                    : [
+                      { name: "Report", width: "35%" },
+                      { name: "Audience" },
+                      { name: "Status" },
+                      { name: "Last Run" },
+                      { name: "Next Send" },
+                    ];
 
       const rawCount =
         typeof resolvedData?.rawCount === "number" ? resolvedData.rawCount : 0;
@@ -1286,6 +1319,17 @@ const renderWidgetContent = (
                                 : col.name === "Views"
                                   ? gaRow.views
                                   : "";
+                        } else if (isRecentPostsTable) {
+                          const pRow = row as any;
+                          cellValue = col.name === "Date" ? pRow.date
+                            : col.name === "Post" ? pRow.post
+                              : col.name === "Impressions" ? (pRow.impressions ?? 0)
+                                : col.name === "Clicks" ? (pRow.clicks ?? 0)
+                                  : col.name === "Likes" ? pRow.likes
+                                    : col.name === "Comments" ? pRow.comments
+                                      : col.name === "Shares" ? pRow.shares
+                                        : col.name === "Reactions" ? pRow.reactions
+                                          : "";
                         } else if (usingDimensionalRows) {
                           const dimRow = row as { dimension: string; value: number };
                           cellValue =
@@ -1345,6 +1389,27 @@ const renderWidgetContent = (
                               >
                                 {String(cellValue)}
                               </span>
+                            </TableCell>
+                          );
+                        }
+
+                        // Special rendering for "Post" column with image
+                        if (col.name === "Post" && (row as any).fullPicture) {
+                          return (
+                            <TableCell key={colIndex} className="px-2 md:px-4 py-2">
+                              <div className="flex items-center gap-2 md:gap-3">
+                                <div className="w-8 h-8 md:w-10 md:h-10 flex-shrink-0 bg-gray-100 rounded overflow-hidden border">
+                                  <img
+                                    src={(row as any).fullPicture}
+                                    alt="Post"
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => (e.currentTarget.style.display = 'none')}
+                                  />
+                                </div>
+                                <span className="line-clamp-2 whitespace-normal text-[10px] md:text-sm min-w-0 flex-1 leading-tight">
+                                  {String(cellValue ?? "")}
+                                </span>
+                              </div>
                             </TableCell>
                           );
                         }
@@ -2293,8 +2358,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             if (slide.source === "custom") return true;
 
             // If source is 'integration', verify it effectively maps to one.
-            // If the backend wipes integrationIndex and source, we must check if 
-            // the slide title/subtitle matches a known integration to avoid duplicate "Custom" pages 
+            // If the backend wipes integrationIndex and source, we must check if
+            // the slide title/subtitle matches a known integration to avoid duplicate "Custom" pages
             // for real integrations.
             if (slide.source === "integration") {
               // If we have an index, trust it (it's an integration page)
@@ -2363,7 +2428,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         let order = templateQuery.data.pageOrder.map((id: any) => Number(id));
 
         // FIX: SLIDE ORDER MISMATCH (Shared Report)
-        // If the saved order has ID 0 (legacy first integration) but our map uses a new ID 
+        // If the saved order has ID 0 (legacy first integration) but our map uses a new ID
         // (e.g. 6402) for those widgets, we must map 0 -> 6402 to preserve position.
         // We detect this if order has 0, map DOES NOT have 0, but map has keys effectively.
         if (order.includes(0) && !map.has(0) && map.size > 0) {
@@ -3113,6 +3178,69 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             }
           }
 
+          // Special: Recent Posts Table (Meta Facebook)
+          if (widget.metricKey === 'meta.facebook.recent_posts') {
+            try {
+              // Identify the account ID. If it's a Meta Business widget, it might not have one set directly,
+              // but we might be able to infer it or we might need to skip if missing.
+              // For now, assume user has selected an account or we use the first available one if we could find it (not easy here).
+              // If effectiveClientId is present but no specific account, we might be stuck.
+              // However, the widget configuration should typically have accountId for specific feeds.
+              const targetAccountId = widget.accountId;
+              console.log("🔍 [Recent Posts] Fetching with Account ID:", targetAccountId);
+
+              if (targetAccountId) {
+                const postsData = await fetchMetaStoredPosts(targetAccountId);
+                console.log("✅ [Recent Posts] API Response:", postsData);
+                if (postsData && postsData.success && Array.isArray(postsData.posts)) {
+                  console.log("📊 [Recent Posts] Processing", postsData.posts.length, "posts");
+                  const rows = postsData.posts.map((p) => ({
+                    id: p.id,
+                    metricKey: widget.metricKey,
+                    integration: normalizedIntegration, // 'meta-facebook'
+                    accountId: targetAccountId,
+                    date: p.createdTime ? new Date(p.createdTime).toLocaleDateString() : "",
+                    value: p.likes || 0, // Default value for charts/metrics if used wrongly
+                    // Custom props for the table renderer (matches Guide columns)
+                    post: p.message || "(No caption)",
+                    impressions: p.impressions || 0,
+                    clicks: p.clicks || 0,
+                    likes: p.likes,
+                    comments: p.comments,
+                    shares: p.shares,
+                    reactions: p.reactions,
+                    fullPicture: p.fullPicture,
+                    permalinkUrl: p.permalinkUrl
+                  }));
+
+                  return {
+                    hash,
+                    widgets: localWidgets,
+                    data: {
+                      success: true,
+                      rows: rows as any[],
+                      pagination: { page: 1, limit: rows.length, total: rows.length, totalPages: 1 },
+                      // Hint for table component to render specific columns
+                      columns: [
+                        { name: "Date", width: "15%" },
+                        { name: "Post", width: "40%" },
+                        { name: "Impressions" },
+                        { name: "Clicks" },
+                        { name: "Likes" },
+                        { name: "Comments" },
+                        { name: "Shares" },
+                        { name: "Reactions" }
+                      ]
+                    }
+                  };
+                }
+              }
+            } catch (err) {
+              console.error("Failed to fetch recent posts", err);
+              // Fallthrough to unified metric (which will likely return empty) or return null
+            }
+          }
+
           console.log('🚀 [UnifiedMetric] Request:', params);
           const data = await fetchUnifiedMetric(effectiveClientId, params);
           console.log('✅ [UnifiedMetric] Response:', data);
@@ -3198,7 +3326,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           const rowInteg = (row.integration || '').replace(/_/g, '-').toLowerCase();
           const widgetInteg = (widget.integration || '').replace(/_/g, '-').toLowerCase();
 
-          if (rowInteg !== widgetInteg) return false;
+          if (rowInteg !== widgetInteg && widgetInteg !== 'meta-business') return false;
 
           let accountMatch = true;
           // Only check account ID if it's a Meta integration or widget has an accountId
@@ -3208,14 +3336,16 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             const widAcc = String(widget.accountId || '').replace(/^act_/, '');
             accountMatch = (rowAcc === widAcc);
 
-            // Special case: If widget is 'meta-business', allow all accounts
-            if (widgetInteg === 'meta-business') accountMatch = true;
-          }
+            // Special case: If widget is 'meta-business', allow all accounts AND all meta sub-integrations
+            if (widgetInteg === 'meta-business') {
+              accountMatch = true;
+            }
 
-          // Special bypass for Meta Business aggregation (it might aggregate multiple accounts)
-          // If the widget is 'meta-business', we don't strictly filter by accountId at this stage,
-          // as the backend might return data for multiple accounts under the business.
-          if (widgetIntegration === 'meta-business') accountMatch = true;
+            // Special bypass for Meta Business aggregation (it might aggregate multiple accounts)
+            // If the widget is 'meta-business', we don't strictly filter by accountId at this stage,
+            // as the backend might return data for multiple accounts under the business.
+            if (widgetIntegration === 'meta-business') accountMatch = true;
+          }
 
           // Double Safety: Check Client ID if available to avoid cross-client data leakage
           let clientMatch = true;
@@ -3223,8 +3353,9 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             clientMatch = String(row.clientId) === String(effectiveClientId);
           }
 
+          // Final Check with corrected integration/account logic
           return row.metricKey === widget.metricKey &&
-            rowInteg === widgetInteg &&
+            (rowInteg === widgetInteg || (widgetInteg === 'meta-business' && rowInteg.startsWith('meta'))) &&
             accountMatch &&
             clientMatch;
         });
@@ -3233,10 +3364,19 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         // This fixes the issue where cloned templates have stale account IDs but the API returns valid data for the client
         if (matchingRows.length === 0) {
           matchingRows = data.rows.filter((row: any) => {
-            const rowIntegration = normalizeIntegration(row.integration || '');
+            const rowIntegration = (row.integration || '').replace(/_/g, '-').toLowerCase();
+            const widgetInteg = (widgetIntegration || '').replace(/_/g, '-').toLowerCase();
+
+            // Special handling: Meta Business widgets can consume data from any Meta sub-integration
+            const isMetaBusinessWidget = widgetInteg === 'meta-business';
+            const isMetaRow = rowIntegration.startsWith('meta');
+
             const looseMatch = (
               row.metricKey === widget.metricKey &&
-              rowIntegration === widgetIntegration
+              (
+                rowIntegration === widgetInteg ||
+                (isMetaBusinessWidget && isMetaRow)
+              )
             );
             return looseMatch;
           });
@@ -4900,6 +5040,26 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         metricsForAccount = Object.values(metricsByAccount).flat();
       }
 
+      // INJECT SYNTHETIC METRICS (e.g. Recent Posts Table)
+      // These are frontend-only widgets that don't come from the backend metrics API.
+      // We explicitly add them so they are selectable.
+      if (normalizedPlatform === 'meta-facebook' || normalizedPlatform === 'meta-business') {
+        const recentPostsKey = 'meta.facebook.recent_posts';
+        // Check if already present to avoid duplicates
+        const hasRecentPosts = metricsForAccount.some(m => m.metricKey === recentPostsKey);
+
+        if (!hasRecentPosts) {
+          metricsForAccount.unshift({
+            metricKey: recentPostsKey,
+            integration: platform, // Use current platform context
+            accountId: accountId,
+            displayName: "Recent posts",
+            category: "Posts",
+            value: 0
+          });
+        }
+      }
+
       // Fallback 2: If still empty, use CURATED_DEFAULTS for this platform
       // This handles cases where the API returns no metrics (e.g. Meta Ads/Business in some clients)
       // but we want to allow the user to select them anyway.
@@ -5168,9 +5328,10 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                       handleDragStart(e, selectedMetricWidgetType, {
                         metricKey: metric.metricKey,
                         integration: metric.integration,
-                        // Do NOT hardcode widget.accountId here.
-                        // Leave it undefined so Self-Healing logic can detect it's a "Global" metric and clear the accountId in the saved template.
-                        accountId: "",
+                        // Do NOT hardcode widget.accountId here generally.
+                        // Leave it undefined so Self-Healing logic can detect it's a "Global" metric.
+                        // EXCEPTION: Recent Posts table explicit needs the account ID to fetch data.
+                        accountId: metric.metricKey.includes('recent_posts') ? metric.accountId || accountId : "",
                         label: metric.displayName,
                         ...(metric.filters
                           ? { filters: metric.filters }

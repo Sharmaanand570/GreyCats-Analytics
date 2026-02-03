@@ -402,3 +402,32 @@ export const buildApiError = (error: AxiosApiError): ApiError => {
   };
 };
 
+
+export interface MetaPost {
+  id: string;
+  userId: number;
+  clientId: number;
+  pageId: string;
+  message?: string;
+  createdTime: string;
+  fullPicture?: string;
+  permalinkUrl?: string;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  reactions?: number;
+  impressions?: number | null;
+  clicks?: number | null;
+  reach?: number | null;
+  lastSyncedAt?: string;
+}
+
+export type MetaStoredPostsResponse = ApiSuccessResponse<{
+  pagination: {
+    limit: number;
+    offset: number;
+    total: number;
+    hasMore: boolean;
+  };
+  posts: MetaPost[];
+}>;

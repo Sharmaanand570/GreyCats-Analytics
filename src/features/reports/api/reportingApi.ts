@@ -26,9 +26,27 @@ import type {
   ReportScheduleResponse,
   ReportScheduleMessageResponse,
   GetReportScheduleResponse,
+  MetaStoredPostsResponse,
 } from "./types";
 import { buildApiError, type AxiosApiError } from "./types";
 import { prettifyMetricLabel } from "@/utils/labelUtils";
+
+// New API function for Stored Posts
+export const fetchMetaStoredPosts = (
+  accountId: string,
+  limit: number = 25,
+  sortBy: string = 'createdTime',
+  order: string = 'desc'
+) =>
+  handleRequest<MetaStoredPostsResponse>(async () => {
+    const response = await api.get<MetaStoredPostsResponse>(
+      `/metabusiness/facebook/stored-posts/${accountId}`,
+      {
+        params: { limit, sortBy, order }
+      }
+    );
+    return response.data;
+  });
 
 // Sync Status Types
 export interface SyncStatusAccount {
