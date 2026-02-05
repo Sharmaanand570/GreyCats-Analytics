@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useClients } from '../hooks/useClients';
-import { Plus, Building2, Activity, ArrowUpDown } from 'lucide-react';
+import { useClients, useDeleteClient } from '../hooks/useClients';
+import { Plus, Building2, Activity, ArrowUpDown, Trash2 } from 'lucide-react';
 import { FiSearch, FiBell } from "react-icons/fi";
 import { Button } from '../components/ui/button';
 import { Input } from "../components/ui/input";
@@ -13,6 +13,17 @@ import {
     SelectTrigger,
     SelectValue,
 } from "../components/ui/select"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "../components/ui/alert-dialog";
 import AddClientModal from '../components/clients/AddClientModal';
 import { cn } from "@/lib/utils";
 
@@ -36,6 +47,7 @@ const getClientHealth = (client: any) => {
 const ClientsPage: React.FC = () => {
     const navigate = useNavigate();
     const { data: clients, isLoading } = useClients();
+    const { mutate: deleteClient } = useDeleteClient();
     const [showAddModal, setShowAddModal] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [sortBy, setSortBy] = useState("name-asc");
@@ -197,13 +209,56 @@ const ClientsPage: React.FC = () => {
 
                                             <div className="flex flex-col items-start w-full relative z-10">
                                                 <div className="flex justify-between w-full mb-4">
-                                                    <div className={cn(
-                                                        "h-10 w-10 rounded-md border flex items-center justify-center transition-colors",
-                                                        status === 'healthy' ? "bg-zinc-50 border-zinc-100 text-zinc-900 group-hover:bg-zinc-100" :
-                                                            status === 'warning' ? "bg-amber-100/50 border-amber-100 text-amber-700" :
-                                                                "bg-red-100/50 border-red-100 text-red-700"
-                                                    )}>
-                                                        <Building2 className="w-5 h-5" />
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={cn(
+                                                            "h-10 w-10 rounded-md border flex items-center justify-center transition-colors relative",
+                                                            status === 'healthy' ? "bg-zinc-50 border-zinc-100 text-zinc-900 group-hover:bg-zinc-100" :
+                                                                status === 'warning' ? "bg-amber-100/50 border-amber-100 text-amber-700" :
+                                                                    "bg-red-100/50 border-red-100 text-red-700"
+                                                        )}>
+                                                            <Building2 className="w-5 h-5" />
+                                                        </div>
+                                                        {client.isActive && (
+                                                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-100/50 border border-green-200">
+                                                                <span className="relative flex h-2 w-2">
+                                                                    <span className="animate-pulse-green absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                                                </span>
+                                                                <span className="text-[10px] font-bold text-green-700 tracking-wide">LIVE</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                                        <AlertDialog>
+                                                            <AlertDialogTrigger asChild>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </Button>
+                                                            </AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader>
+                                                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                                    <AlertDialogDescription>
+                                                                        This action cannot be undone. This will permanently delete the client
+                                                                        <span className="font-semibold text-zinc-900"> "{client.name}" </span>
+                                                                        and remove their data from our servers.
+                                                                    </AlertDialogDescription>
+                                                                </AlertDialogHeader>
+                                                                <AlertDialogFooter>
+                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                    <AlertDialogAction
+                                                                        onClick={() => deleteClient(client.id)}
+                                                                        className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                                                                    >
+                                                                        Delete Client
+                                                                    </AlertDialogAction>
+                                                                </AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
                                                     </div>
                                                 </div>
 

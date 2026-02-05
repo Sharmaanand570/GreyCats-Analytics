@@ -117,7 +117,7 @@ export function PlanModal({ isOpen, onClose, onSave, plan, isLoading }: PlanModa
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
+            <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0">
                 <DialogHeader className="px-6 py-4 border-b">
                     <DialogTitle>{plan ? "Edit Plan" : "Create New Plan"}</DialogTitle>
                     <DialogDescription>
@@ -128,7 +128,7 @@ export function PlanModal({ isOpen, onClose, onSave, plan, isLoading }: PlanModa
                 <ScrollArea className="flex-1 px-6 py-4">
                     <form id="plan-form" onSubmit={handleSubmit} className="space-y-6">
                         {/* Basic Info */}
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="displayName">Display Name</Label>
                                 <Input
@@ -162,7 +162,7 @@ export function PlanModal({ isOpen, onClose, onSave, plan, isLoading }: PlanModa
                         </div>
 
                         {/* Pricing */}
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="price">Price</Label>
                                 <Input
@@ -213,7 +213,7 @@ export function PlanModal({ isOpen, onClose, onSave, plan, isLoading }: PlanModa
                         {/* Limits */}
                         <div className="space-y-4 border rounded-md p-4 bg-slate-50 dark:bg-slate-900">
                             <h4 className="font-medium text-sm text-slate-900 dark:text-slate-100">Plan Limits</h4>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="maxClients">Max Clients</Label>
                                     <Input
@@ -268,7 +268,7 @@ export function PlanModal({ isOpen, onClose, onSave, plan, isLoading }: PlanModa
                         {/* Features */}
                         <div className="space-y-2">
                             <Label>Features</Label>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {DEFAULT_FEATURES.map((feature) => (
                                     <div key={feature} className="flex items-center space-x-2">
                                         <Switch

@@ -1,4 +1,5 @@
 import api from "@/apiConfig";
+import { withRetry, classifyError, type SyncError } from "@/utils/errorHandling";
 
 // ============================================================================
 // CURRENT CLIENT-SPECIFIC ENDPOINTS (matching Google Analytics pattern)
@@ -334,13 +335,45 @@ export const getWooCommerceOrder = async (
 
 // Sync operations
 export const syncWooProducts = async (accountId: number): Promise<any> => {
-  const response = await api.post(`/woocommerce/sync/products`, { accountId });
-  return response.data;
+  try {
+    return await withRetry(
+      async () => {
+        const response = await api.post(`/woocommerce/sync/products`, { accountId });
+        return response.data;
+      },
+      {
+        maxRetries: 3,
+        timeoutMs: 60000,
+      }
+    );
+  } catch (error) {
+    const syncError = error as SyncError;
+    if (syncError.type) {
+      throw syncError;
+    }
+    throw classifyError(error);
+  }
 };
 
 export const syncWooOrders = async (accountId: number): Promise<any> => {
-  const response = await api.post(`/woocommerce/sync/orders`, { accountId });
-  return response.data;
+  try {
+    return await withRetry(
+      async () => {
+        const response = await api.post(`/woocommerce/sync/orders`, { accountId });
+        return response.data;
+      },
+      {
+        maxRetries: 3,
+        timeoutMs: 60000,
+      }
+    );
+  } catch (error) {
+    const syncError = error as SyncError;
+    if (syncError.type) {
+      throw syncError;
+    }
+    throw classifyError(error);
+  }
 };
 
 // Account Management (keep comments for reference, but implementation is generic)

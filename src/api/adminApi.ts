@@ -83,38 +83,7 @@ export interface AdminSubscription {
     autoRenew: boolean;
 }
 
-export interface FeatureFlag {
-    id: string;
-    name: string;
-    description?: string;
-    enabled: boolean;
-    rolloutPercentage: number;
-    createdAt: string;
-    updatedAt: string;
-}
-
 export const adminApi = {
-    // Feature Flags
-    getFeatureFlags: async (): Promise<FeatureFlag[]> => {
-        const response = await api.get('/superadmin/features');
-        return response.data.flags;
-    },
-
-    createFeatureFlag: async (data: Partial<FeatureFlag>) => {
-        const response = await api.post('/superadmin/features', data);
-        return response.data;
-    },
-
-    updateFeatureFlag: async (name: string, data: Partial<FeatureFlag>) => {
-        const response = await api.patch(`/superadmin/features/${name}`, data);
-        return response.data;
-    },
-
-    setUserFeatureOverride: async (userId: number, features: Record<string, boolean>) => {
-        const response = await api.post(`/superadmin/users/${userId}/features`, { features });
-        return response.data;
-    },
-
     // Users
     getUsers: async (page = 1, limit = 20, search = "", role?: string): Promise<AdminUsersResponse> => {
         const params = new URLSearchParams();

@@ -24,6 +24,7 @@ import type {
 import { toast } from "sonner";
 import { subDays, format } from "date-fns";
 import { useAvailableMetrics } from "@/features/reports/hooks/useAvailableMetrics";
+import { getMetricAggregation } from '@/utils/facebookMetrics';
 import { useClients } from "@/hooks/useClients";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "./ui/skeleton";
@@ -356,7 +357,12 @@ function Dashboard({
 
           let accountMatch = true;
           if (isMeta || widget.accountId) {
-            accountMatch = areAccountIdsEqual(row.accountId, widget.accountId);
+            // Fix: If row.accountId is empty but we have dimensionValue for page/account, use that for matching
+            if (!row.accountId && (row.dimensionType === 'page' || row.dimensionType === 'account') && row.dimensionValue) {
+              accountMatch = areAccountIdsEqual(row.dimensionValue, widget.accountId);
+            } else {
+              accountMatch = areAccountIdsEqual(row.accountId, widget.accountId);
+            }
           }
           if (widgetIntegration === 'meta-business') accountMatch = true;
 
@@ -384,8 +390,9 @@ function Dashboard({
           const isWooDateDimension = widget.metricKey?.startsWith('woo.') && row.dimensionType === 'date';
           const isYouTubeDimension = widget.metricKey?.startsWith('youtube.') && row.dimensionType === 'video';
           // Allow specific dimension types for Meta Ads (campaign, adset, ad) as these are the primary data rows
+          // Fix: Allow 'page' and 'account' dimensions for Meta metrics
           const isMetaSpecificDimension = (widget.metricKey?.startsWith('meta') || widget.metricKey?.startsWith('meta_')) &&
-            ['campaign', 'adset', 'ad', 'date'].includes(row.dimensionType);
+            ['campaign', 'adset', 'ad', 'date', 'page', 'account'].includes(row.dimensionType);
 
           return matchesBasic && (!isDimensional || isWooDateDimension || isYouTubeDimension || isMetaSpecificDimension);
         });
@@ -432,45 +439,76 @@ function Dashboard({
         }
 
         if (!summaryUsed && filteredRows.length > 0) {
-          // Manual Blended Calculation Fallback
-          let blendedCalculated = false;
-          const contextRows = data.rows || [];
-          const widgetInteg = normalizeIntegration(widget.integration || '');
 
-          const getSum = (keySuffix: string) => {
-            return contextRows
-              .filter((r: any) =>
-                (r.metricKey || '').endsWith(keySuffix) &&
-                normalizeIntegration(r.integration || '') === widgetInteg &&
-                (widgetInteg === 'meta-business' || areAccountIdsEqual(r.accountId, widget.accountId))
-              )
-              .reduce((sum: number, r: any) => sum + (Number(r.value) || 0), 0);
-          };
+          // Check for Cumulative Metrics (Facebook Page Likes, etc.)
+          // These should take the LATEST value, not the SUM/AVG
+          const aggregationType = getMetricAggregation(widget.metricKey);
 
-          if (metricSuffix === 'cpc') {
-            const sumSpend = getSum('spend') || getSum('amount_spent');
-            const sumClicks = getSum('clicks');
-            if (sumClicks > 0) { total = sumSpend / sumClicks; blendedCalculated = true; }
-          } else if (metricSuffix === 'ctr') {
-            const sumClicks = getSum('clicks');
-            const sumImpressions = getSum('impressions');
-            if (sumImpressions > 0) { total = (sumClicks / sumImpressions) * 100; blendedCalculated = true; }
-          } else if (metricSuffix === 'cpm') {
-            const sumSpend = getSum('spend') || getSum('amount_spent');
-            const sumImpressions = getSum('impressions');
-            if (sumImpressions > 0) { total = (sumSpend / sumImpressions) * 1000; blendedCalculated = true; }
-          }
+          if (aggregationType === 'latest') {
+            // Group by date to handle multiple accounts correctly (sum across accounts for the same day)
+            const dateMap = new Map<string, number>();
 
-          if (!blendedCalculated) {
-            if (isRateMetric) {
-              // For rate metrics like CPC/CTR, calculate AVERAGE instead of SUM
-              const sum = filteredRows.reduce((a: number, b: any) => a + (b.value || 0), 0);
-              total = sum / filteredRows.length;
-            } else {
-              // For countable metrics (Spend, Impressions), SUM is correct
-              total = filteredRows.reduce((sum: number, row: any) => sum + (row.value || 0), 0);
+            filteredRows.forEach((row: any) => {
+              // Ensure we have a valid date
+              const dateKey = row.date ? row.date.split('T')[0] : '';
+              if (dateKey) {
+                dateMap.set(dateKey, (dateMap.get(dateKey) || 0) + (Number(row.value) || 0));
+              }
+            });
+
+            // Sort dates descending
+            const sortedDates = Array.from(dateMap.keys()).sort((a, b) =>
+              new Date(b).getTime() - new Date(a).getTime()
+            );
+
+            if (sortedDates.length > 0) {
+              // Take the value of the latest date
+              total = dateMap.get(sortedDates[0]) || 0;
             }
+
+          } else {
+            // Manual Blended Calculation Fallback
+            let blendedCalculated = false;
+            const contextRows = data.rows || [];
+            const widgetInteg = normalizeIntegration(widget.integration || '');
+
+            const getSum = (keySuffix: string) => {
+              return contextRows
+                .filter((r: any) =>
+                  (r.metricKey || '').endsWith(keySuffix) &&
+                  normalizeIntegration(r.integration || '') === widgetInteg &&
+                  (widgetInteg === 'meta-business' || areAccountIdsEqual(r.accountId, widget.accountId))
+                )
+                .reduce((sum: number, r: any) => sum + (Number(r.value) || 0), 0);
+            };
+
+            if (metricSuffix === 'cpc') {
+              const sumSpend = getSum('spend') || getSum('amount_spent');
+              const sumClicks = getSum('clicks');
+              if (sumClicks > 0) { total = sumSpend / sumClicks; blendedCalculated = true; }
+            } else if (metricSuffix === 'ctr') {
+              const sumClicks = getSum('clicks');
+              const sumImpressions = getSum('impressions');
+              if (sumImpressions > 0) { total = (sumClicks / sumImpressions) * 100; blendedCalculated = true; }
+            } else if (metricSuffix === 'cpm') {
+              const sumSpend = getSum('spend') || getSum('amount_spent');
+              const sumImpressions = getSum('impressions');
+              if (sumImpressions > 0) { total = (sumSpend / sumImpressions) * 1000; blendedCalculated = true; }
+            }
+
+            if (!blendedCalculated) {
+              if (isRateMetric) {
+                // For rate metrics like CPC/CTR, calculate AVERAGE instead of SUM
+                const sum = filteredRows.reduce((a: number, b: any) => a + (b.value || 0), 0);
+                total = sum / filteredRows.length;
+              } else {
+                // For countable metrics (Spend, Impressions), SUM is correct
+                total = filteredRows.reduce((sum: number, row: any) => sum + (row.value || 0), 0);
+              }
+            }
+
           }
+
         }
 
         // Create time-series data for charts
@@ -707,6 +745,38 @@ function Dashboard({
               </div>
             )}
           </div>
+        ) : dashboardsQuery.isLoading ? (
+          // Loading Skeleton for Dashboard Layout
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 animate-in fade-in duration-500">
+            {/* Hero Widget Skeleton */}
+            <div className="col-span-1 md:col-span-2 lg:col-span-2 row-span-2 bg-white rounded-3xl border border-zinc-100/60 p-6 shadow-sm h-[380px] flex flex-col gap-4">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-8 w-8 rounded-md" />
+                  <div className="space-y-1">
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                </div>
+              </div>
+              <div className="flex-1 w-full mt-4">
+                <Skeleton className="w-full h-full rounded-xl" />
+              </div>
+            </div>
+            {/* Metric Card Skeletons */}
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-white rounded-3xl border border-zinc-100/60 p-6 shadow-sm h-40 flex flex-col justify-between">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-8 w-8 rounded-md" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-20" />
+                  <Skeleton className="h-4 w-12 opacity-50" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : dashboardWidgets.length === 0 ? (
           <div className="w-full px-5 py-24 text-center text-zinc-500 bg-white/50 backdrop-blur-sm rounded-3xl border border-dashed border-zinc-200 flex flex-col items-center justify-center transition-all hover:bg-white/80">
             <div className="p-5 rounded-full bg-zinc-50 mb-6 shadow-sm">
@@ -724,6 +794,36 @@ function Dashboard({
               const data = resolvedWidgets[widget.id];
               const brandColor = getBrandColor(widget.integration || '');
               const isHero = ['line_chart', 'area_chart', 'bar_chart'].includes(widget.type || '');
+
+              // Determine if this specific widget is loading (if we had granular loading)
+              // For now, we rely on the main queries. 
+              // But we can check if data is undefined but query is fetching.
+
+              if (widgetDataQuery.isLoading) {
+                return (
+                  <div
+                    key={widget.id}
+                    className={cn(
+                      "bg-white rounded-3xl border border-zinc-100/60 p-6 shadow-sm flex flex-col gap-4",
+                      isHero ? "col-span-1 md:col-span-2 lg:col-span-2 row-span-2 h-[380px]" : "h-40"
+                    )}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-8 w-8 rounded-md" />
+                        <div className="space-y-1">
+                          <Skeleton className="h-3 w-24" />
+                          <Skeleton className="h-3 w-16" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-2 mt-auto">
+                      <Skeleton className="h-8 w-32" />
+                      <Skeleton className="h-6 w-1/2 opacity-50" />
+                    </div>
+                  </div>
+                );
+              }
 
               // Value resolution
               const value = (typeof data?.total === "number" ? data.total : undefined) ??

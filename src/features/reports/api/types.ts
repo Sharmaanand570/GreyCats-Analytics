@@ -431,3 +431,33 @@ export type MetaStoredPostsResponse = ApiSuccessResponse<{
   };
   posts: MetaPost[];
 }>;
+
+export interface InstagramMedia {
+  id: string;
+  userId: number;
+  clientId: number | null;
+  instagramBusinessId: string;
+  caption: string | null;
+  mediaType: 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM' | 'REELS';
+  timestamp: string; // ISO 8601
+  mediaUrl: string | null;
+  permalinkUrl: string | null;
+  likeCount: number;
+  commentsCount: number;
+  views: number | null;
+  reach: number | null;
+  shares: number | null;
+  saved: number | null;
+  totalInteractions: number | null;
+  follows: number | null;
+  profileVisits: number | null;
+  lastSyncedAt: string; // ISO 8601
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
+}
+
+export interface InstagramMediaResponse {
+  success: boolean;
+  count: number;
+  media: InstagramMedia[];
+}

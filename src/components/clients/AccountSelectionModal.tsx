@@ -14,6 +14,7 @@ import { FiSearch, FiCheck, FiAlertCircle, FiLoader } from "react-icons/fi";
 import { getAvailableAccounts, assignAccountToClient } from "@/api/integrationApi";
 import type { IntegrationType, AvailableAccount } from "@/types/integration.types";
 import { getPlatformConfig } from "@/utils/platformMapping";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface AccountSelectionModalProps {
     open: boolean;
@@ -38,6 +39,7 @@ export function AccountSelectionModal({
     const [assigning, setAssigning] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedAccount, setSelectedAccount] = useState<AvailableAccount | null>(null);
+    const queryClient = useQueryClient();
 
     // Reset state when modal opens
     useEffect(() => {
@@ -72,6 +74,11 @@ export function AccountSelectionModal({
                 integration,
                 selectedAccount.id
             );
+
+            // Invalidate queries to refresh ReportBuilder sidebar
+            queryClient.invalidateQueries({ queryKey: ["integrations", clientId] });
+            queryClient.invalidateQueries({ queryKey: ["available-metrics", clientId] });
+
             toast.success(`Successfully connected ${selectedAccount.name}`);
             onSuccess();
             onOpenChange(false);

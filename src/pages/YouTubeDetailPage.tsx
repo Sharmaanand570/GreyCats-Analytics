@@ -242,7 +242,7 @@ function YouTubeDetailPage() {
           </div>
 
           <div className="w-full px-5 py-6 space-y-6 overflow-y-auto pb-20">
-            {!isLoadingSummary && !summaryData?.summary && <DataSyncBanner autoHide={false} />}
+            {!isLoadingSummary && !summaryData?.summary && <DataSyncBanner />}
             {/* 1. Channel Info & Summary Cards */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Channel Profile */}

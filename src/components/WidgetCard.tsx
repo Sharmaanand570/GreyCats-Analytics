@@ -3,6 +3,8 @@ import { MdDragIndicator } from "react-icons/md";
 import { FiTrash2 } from "react-icons/fi";
 import type { DashboardLayout } from "../pages/ReportBuilder";
 import { prettifyMetricLabel } from "@/utils/labelUtils";
+import { FaFacebook, FaInstagram, FaGoogle, FaShopify, FaYoutube, FaChartLine } from "react-icons/fa";
+import { SiGoogleanalytics, SiGooglesearchconsole, SiWoo } from "react-icons/si";
 
 type WidgetCardProps = {
   widget: DashboardLayout;
@@ -11,6 +13,32 @@ type WidgetCardProps = {
   onDelete?: (widget: DashboardLayout) => void;
   children: React.ReactNode;
   readOnly?: boolean;
+};
+
+const getIntegrationIcon = (integration?: string, metricKey?: string, label?: string) => {
+  const normIntegration = (integration || "").toLowerCase().replace(/[ _]/g, "-");
+  const normKey = (metricKey || "").toLowerCase();
+  const normLabel = (label || "").toLowerCase();
+
+  // 1. Explicit Metric/Label overrides (High precision)
+  if (normKey.includes("instagram") || normLabel.includes("instagram")) return <FaInstagram className="text-pink-600" />;
+  if (normKey.includes("facebook") || normLabel.includes("facebook")) return <FaFacebook className="text-blue-600" />;
+
+  // 2. Integration Name checks
+  if (normIntegration.includes("instagram")) return <FaInstagram className="text-pink-600" />;
+  if (normIntegration.includes("facebook") || normIntegration.includes("meta-social")) return <FaFacebook className="text-blue-600" />;
+
+  if (normIntegration.includes("google-analytics") || normIntegration.includes("google_analytics")) return <SiGoogleanalytics className="text-orange-500" />;
+  if (normIntegration.includes("google-search-console") || normIntegration.includes("google_search_console")) return <SiGooglesearchconsole className="text-blue-500" />;
+  if (normIntegration.includes("google-console")) return <FaGoogle className="text-blue-500" />; // Fallback for generic google
+  if (normIntegration.includes("youtube")) return <FaYoutube className="text-red-600" />;
+  if (normIntegration.includes("shopify")) return <FaShopify className="text-green-600" />;
+  if (normIntegration.includes("woo")) return <SiWoo className="text-purple-600" />;
+
+  // 3. Meta Fallback (Lowest priority)
+  if (normIntegration.includes("meta")) return <FaFacebook className="text-blue-600" />;
+
+  return <FaChartLine className="text-gray-400" />; // Default icon
 };
 
 export default function WidgetCard({
@@ -25,6 +53,9 @@ export default function WidgetCard({
   // OR if we are in read-only mode, we might want a cleaner look (or keep borders?)
   // For now keeping borders but disabling interaction.
   const shouldHideBorder = widget.widgetType === 'title' || widget.widgetType === 'image' || widget.widgetType === 'custom';
+
+  // Extract integration from metricConfig or try to find it in other places if structure varies
+  const integration = widget.metricConfig?.integration || (widget as any).integration || (widget as any).config?.integration;
 
   return (
     <div
@@ -46,23 +77,34 @@ export default function WidgetCard({
           } ${readOnly ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
         aria-label="Widget header"
       >
-        <span className="text-sm font-semibold text-gray-700 leading-normal truncate flex-1 py-0.5">
-          {prettifyMetricLabel(
-            (widget.data as any)?.label && (widget.data as any).label !== "Metric" ? (widget.data as any).label :
-              widget.metricConfig?.displayName ||
-              (widget as any).displayName ||
-              (widget as any).title ||
-              widget.metricConfig?.metricKey ||
-              resolvedData?.metricLabel ||
-              resolvedData?.label ||
-              resolvedData?.displayName ||
-              resolvedData?.title ||
-              (widget.data as any)?.label ||
-              (widget.data as any)?.displayName ||
-              (widget.data as any)?.title ||
-              widget.widgetType
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {!shouldHideBorder && integration && (
+            <div className="shrink-0 text-lg">
+              {getIntegrationIcon(
+                integration,
+                widget.metricConfig?.metricKey || (widget as any).data?.metricKey,
+                (widget.data as any)?.label || widget.metricConfig?.displayName || (widget as any).displayName || (widget as any).title
+              )}
+            </div>
           )}
-        </span>
+          <span className="text-sm font-semibold text-gray-700 leading-normal truncate py-0.5">
+            {prettifyMetricLabel(
+              (widget.data as any)?.label && (widget.data as any).label !== "Metric" ? (widget.data as any).label :
+                widget.metricConfig?.displayName ||
+                (widget as any).displayName ||
+                (widget as any).title ||
+                widget.metricConfig?.metricKey ||
+                resolvedData?.metricLabel ||
+                resolvedData?.label ||
+                resolvedData?.displayName ||
+                resolvedData?.title ||
+                (widget.data as any)?.label ||
+                (widget.data as any)?.displayName ||
+                (widget.data as any)?.title ||
+                widget.widgetType
+            )}
+          </span>
+        </div>
 
         {!readOnly && (
           <div className="absolute right-2 md:right-3 flex items-center gap-1">

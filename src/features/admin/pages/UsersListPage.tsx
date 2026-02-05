@@ -24,6 +24,7 @@ import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import {
     Dialog,
     DialogContent,
@@ -43,6 +44,7 @@ import { Label } from "@/components/ui/label";
 
 export default function UsersListPage() {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const [loading, setLoading] = useState(true);
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [search, setSearch] = useState("");
@@ -227,6 +229,9 @@ export default function UsersListPage() {
                                                             }
                                                             localStorage.setItem('impersonationToken', response.impersonationToken);
                                                             localStorage.setItem(TOKEN_KEY, response.impersonationToken);
+
+                                                            // Clear all cached queries to prevent stale data
+                                                            queryClient.clear();
 
                                                             toast.success(`Now impersonating ${user.fullName}`);
                                                             setTimeout(() => {

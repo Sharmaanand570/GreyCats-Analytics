@@ -22,6 +22,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { Skeleton } from './ui/skeleton';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -110,7 +111,49 @@ export const ReportSchedules: React.FC<ReportSchedulesProps> = ({ clientId }) =>
     };
 
     if (isLoading || isTemplatesLoading) {
-        return <div className="p-8 text-center text-muted-foreground">Loading schedules...</div>;
+        return (
+            <div className="w-full h-full flex flex-col space-y-6">
+                <div className="flex justify-between items-center px-1">
+                    <div>
+                        <h2 className="text-2xl font-semibold tracking-tight">Scheduled Reports</h2>
+                        <p className="text-sm text-muted-foreground">Automate your reporting workflow with recurring schedules.</p>
+                    </div>
+                    <Button disabled>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create Schedule
+                    </Button>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {[1, 2, 3].map((i) => (
+                        <Card key={i} className="relative overflow-hidden">
+                            <div className="absolute left-0 top-0 w-1 h-full bg-zinc-100" />
+                            <CardHeader className="pb-2 pl-6">
+                                <div className="flex justify-between items-start">
+                                    <div className="space-y-2 w-full">
+                                        <Skeleton className="h-5 w-3/4" />
+                                        <Skeleton className="h-3 w-1/2" />
+                                    </div>
+                                    <Skeleton className="h-8 w-8 rounded-md" />
+                                </div>
+                            </CardHeader>
+                            <CardContent className="pl-6 pt-2 pb-4 space-y-4">
+                                <div className="flex items-center gap-2">
+                                    <Skeleton className="h-4 w-4 rounded-full" />
+                                    <Skeleton className="h-4 w-24" />
+                                    <Skeleton className="h-4 w-4 rounded-full" />
+                                    <Skeleton className="h-4 w-16" />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Skeleton className="h-2 w-2 rounded-full" />
+                                    <Skeleton className="h-3 w-32" />
+                                </div>
+                                <Skeleton className="h-6 w-48 rounded-md" />
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            </div>
+        );
     }
 
     if (isError) {

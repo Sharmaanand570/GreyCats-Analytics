@@ -1,6 +1,11 @@
 import { FiBell, FiSearch, FiCalendar } from "react-icons/fi";
+import { FaFacebook, FaInstagram } from "react-icons/fa";
 import { Button } from "../components/ui/button";
 import { RadioButtonGroup } from "../components/RadioButtonGroup";
+import {
+  Sheet,
+  SheetContent,
+} from "../components/ui/sheet";
 import WidgetsPageSideComponent from "../components/WidgetsPageSideComponent";
 import ReportElements from "../components/ReportElements";
 import TitleWidgetForm from "../components/TitleWidgetForm";
@@ -8,7 +13,10 @@ import MetricWidgetForm from "../components/MetricWidgetForm";
 import CustomWidgetForm from "../components/CustomWidgetForm";
 import TasksWidgetForm from "../components/TasksWidgetForm";
 import ChartWidgetForm from "../components/ChartWidgetForm";
-import TableWidgetForm from "../components/TableWidgetForm";
+import TableWidgetForm, {
+  DEFAULT_RECENT_POSTS_COLUMNS,
+  DEFAULT_INSTAGRAM_MEDIA_COLUMNS,
+} from "../components/TableWidgetForm";
 import ImageWidgetForm from "../components/ImageWidgetForm";
 import EmbedWidgetForm from "../components/EmbedWidgetForm";
 import { DataSyncBanner } from "../components/DataSyncBanner";
@@ -18,6 +26,7 @@ import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfYear } fro
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import api from "@/apiConfig";
 
 // Layout lib
 import GridLayout, { type Layout, WidthProvider } from "react-grid-layout";
@@ -80,6 +89,7 @@ import {
   getReportTemplate,
   fetchUnifiedMetric,
   fetchMetaStoredPosts,
+  fetchInstagramStoredMedia,
   updateReportTemplate,
   listReportSchedules,
   type UnifiedMetricRow,
@@ -100,6 +110,7 @@ import type {
 import { useIntegrations } from "@/features/DataSources/hooks/useIntegrations";
 import { getPlatformConfig } from "@/utils/platformMapping";
 import { useAvailableMetrics } from "@/features/reports/hooks/useAvailableMetrics";
+import { getMetricAggregation } from '@/utils/facebookMetrics';
 import {
   Area,
   AreaChart,
@@ -268,20 +279,58 @@ const CURATED_DEFAULTS: Record<string, string[]> = {
     // Instagram Account-level Metrics (ONLY metrics that exist in DB)
     "meta.instagram.followers",
     "meta.instagram.mediaCount",
-    // NOTE: The following metrics are defined but not yet in the database:
-    // "meta.instagram.profileViews",
-    // "meta.instagram.media.likes",
-    // "meta.instagram.media.comments",
-    // "meta.instagram.media.impressions",
-    // "meta.instagram.media.reach",
-    // "meta.instagram.media.engagement",
+
+    // Instagram Aggregated Metrics (Historical)
+    "meta.instagram.media.aggregated.likes",
+    "meta.instagram.media.aggregated.comments",
+    "meta.instagram.media.aggregated.saves",
+    "meta.instagram.media.aggregated.shares",
+    "meta.instagram.media.aggregated.reach",
+    "meta.instagram.reach",
+    "meta.instagram.follows",
   ],
   "meta-business": [
     // Meta Business integration - combines Facebook + Instagram metrics
     "meta.facebook.followers",
     "meta.facebook.postsCount",
+
+    // Facebook Page
+    "meta.page.fans",
+    "meta.page.engagement",
+    "meta.page.impressions",
+    "meta.page.views",
+    "meta.page.uniqueImpressions",
+    "meta.page.postImpressions",
+
+    // Facebook Posts
+    "meta.facebook.post.likes",
+    "meta.facebook.post.comments",
+    "meta.facebook.post.shares",
+    "meta.facebook.post.reactions",
+    "meta.facebook.post.engagement",
+    "meta.facebook.post.clicks",
+    "meta.facebook.post.impressions",
+    "meta.facebook.post.reach",
+    "meta.facebook.post.engagedUsers",
+
+    // Facebook Media
+    "meta.facebook.mediaViews",
+
+    // Instagram
     "meta.instagram.followers",
     "meta.instagram.mediaCount",
+
+    // Instagram Aggregated Metrics (Historical)
+    "meta.instagram.media.aggregated.likes",
+    "meta.instagram.media.aggregated.comments",
+    "meta.instagram.media.aggregated.saves",
+    "meta.instagram.media.aggregated.shares",
+    "meta.instagram.media.aggregated.reach",
+
+    // Instagram Daily Metrics
+    "meta.instagram.reach",
+    "meta.instagram.follows",
+    "meta.instagram.profileViews",
   ],
   "meta-ads": [
     // Meta Ads Campaign Metrics (Paid)
@@ -833,6 +882,68 @@ const renderWidgetContent = (
         </div>
       );
     }
+    if (widget.widgetType === "title") {
+      return (
+        <div className="h-full flex items-center justify-center p-4">
+          <Skeleton className="h-8 w-3/4" />
+        </div>
+      );
+    }
+    if (widget.widgetType === "image") {
+      return (
+        <div className="h-full flex items-center justify-center p-4">
+          <Skeleton className="h-full w-full rounded-lg" />
+        </div>
+      );
+    }
+    if (widget.widgetType === "embed") {
+      return (
+        <div className="h-full flex flex-col p-2 space-y-2">
+          <Skeleton className="h-4 w-1/3" />
+          <Skeleton className="flex-1 w-full rounded-md" />
+        </div>
+      );
+    }
+    if (widget.widgetType === "custom") {
+      const customData = widget.data as CustomWidgetData | undefined;
+      if (customData?.type === "tasks") {
+        return (
+          <div className="h-full flex flex-col p-3 space-y-2">
+            <Skeleton className="h-4 w-1/3" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-5/6" />
+            <Skeleton className="h-3 w-4/5" />
+          </div>
+        );
+      }
+      if (customData?.type === "toc") {
+        return (
+          <div className="h-full flex flex-col p-3 space-y-2">
+            <Skeleton className="h-4 w-1/3" />
+            <div className="space-y-1">
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-full" />
+            </div>
+          </div>
+        );
+      }
+      // Default custom text block
+      return (
+        <div className="h-full flex flex-col p-3 space-y-2">
+          <Skeleton className="h-3 w-full" />
+          <Skeleton className="h-3 w-5/6" />
+          <Skeleton className="h-3 w-4/5" />
+        </div>
+      );
+    }
+    if (widget.widgetType === "map") {
+      return (
+        <div className="h-full flex items-center justify-center p-4">
+          <Skeleton className="h-full w-full rounded-lg" />
+        </div>
+      );
+    }
 
     // Default skeleton
     return (
@@ -859,15 +970,30 @@ const renderWidgetContent = (
       const series = Array.isArray((resolvedData as ResolvedWidgetData)?.series)
         ? ((resolvedData as ResolvedWidgetData).series as WidgetSeriesPoint[])
         : [];
-      const hasData = series.length > 0;
+      const hasData =
+        series.length > 0 ||
+        typeof (resolvedData as ResolvedWidgetData)?.total === "number" ||
+        typeof (resolvedData as ResolvedWidgetData)?.value === "number";
 
       const chartColor = (widgetData as ChartWidgetData)?.chartColor || "#2563EB";
       const backgroundColor = (widgetData as ChartWidgetData)?.backgroundColor;
 
-      const chartData = series.map((point) => ({
-        label: point.x,
-        value: point.y,
-      }));
+      // Generate chart data from series, or create a single point from total/value
+      const chartData = series.length > 0
+        ? series.map((point) => ({
+          label: point.x,
+          value: point.y,
+        }))
+        : (() => {
+          const value = (resolvedData as ResolvedWidgetData)?.total ?? (resolvedData as ResolvedWidgetData)?.value;
+          if (typeof value === "number") {
+            const metricName = widget.metricConfig?.displayName ||
+              widget.metricConfig?.metricKey?.split('.').pop() ||
+              "Total";
+            return [{ label: metricName, value }];
+          }
+          return [];
+        })();
 
       if (widget.metricConfig?.metricKey?.startsWith('youtube.')) {
         console.log(`[YouTubeData] Widget ${widget.i}: hasData=${hasData}, seriesCount=${series.length}, firstPoints=`, series.slice(0, 3));
@@ -1067,7 +1193,15 @@ const renderWidgetContent = (
         metricConfig?.metricKey === "ga.top_pages_views" &&
         !!metricConfig?.integration;
 
-      const isRecentPostsTable = metricConfig?.metricKey === 'meta.facebook.recent_posts';
+      console.log('🔍 [TableRender] Config:', {
+        key: metricConfig?.metricKey,
+        integration: metricConfig?.integration,
+        resolvedDataColumns: (resolvedData as any)?.columns,
+        tableDataColumns: tableData?.columns
+      });
+
+      // Check if it's a recent posts/media table (requires special list rendering)
+      const isRecentPostsTable = metricConfig?.metricKey === 'meta.facebook.recent_posts' || metricConfig?.metricKey === 'meta.instagram.recent_media';
 
       const generateColumnsFromRows = (rows: any[]) => {
         if (!rows.length) return [];
@@ -1237,16 +1371,60 @@ const renderWidgetContent = (
             { name: "Views" },
           ]
           : isRecentPostsTable
-            ? [
-              { name: "Date", width: "15%" },
-              { name: "Post", width: "40%" },
-              { name: "Impressions" },
-              { name: "Clicks" },
-              { name: "Likes" },
-              { name: "Comments" },
-              { name: "Shares" },
-              { name: "Reactions" }
-            ]
+            ? (() => {
+              // Check if tableData has generic "Name/Value" columns (legacy default)
+              const hasGenericColumns = tableData?.columns?.length === 2 &&
+                tableData.columns[0]?.name === 'Name' &&
+                tableData.columns[1]?.name === 'Value';
+
+              // If we have generic columns, ignore them and use proper defaults
+              if (hasGenericColumns) {
+                return metricConfig?.metricKey === 'meta.instagram.recent_media'
+                  ? [
+                    { name: "Date", width: "15%", dataKey: "date" },
+                    { name: "Full Picture", dataKey: "fullPicture" },
+                    { name: "Post Message", width: "35%", dataKey: "post" },
+                    { name: "Impressions", dataKey: "impressions" },
+                    { name: "Clicks", dataKey: "clicks" },
+                    { name: "Likes", dataKey: "likes" },
+                    { name: "Shares", dataKey: "shares" }
+                  ]
+                  : [
+                    { name: "Date", width: "15%", dataKey: "date" },
+                    { name: "Post", width: "40%", dataKey: "post" },
+                    { name: "Impressions", dataKey: "impressions" },
+                    { name: "Clicks", dataKey: "clicks" },
+                    { name: "Likes", dataKey: "likes" },
+                    { name: "Comments", dataKey: "comments" },
+                    { name: "Shares", dataKey: "shares" }
+                  ];
+              }
+
+              // Otherwise use existing columns if present
+              return tableData?.columns && tableData.columns.length > 0
+                ? tableData.columns
+                : (resolvedData as any)?.columns && (resolvedData as any).columns.length > 0
+                  ? (resolvedData as any).columns
+                  : metricConfig?.metricKey === 'meta.instagram.recent_media'
+                    ? [
+                      { name: "Date", width: "15%", dataKey: "date" },
+                      { name: "Full Picture", dataKey: "fullPicture" },
+                      { name: "Post Message", width: "35%", dataKey: "post" },
+                      { name: "Impressions", dataKey: "impressions" },
+                      { name: "Clicks", dataKey: "clicks" },
+                      { name: "Likes", dataKey: "likes" },
+                      { name: "Shares", dataKey: "shares" }
+                    ]
+                    : [
+                      { name: "Date", width: "15%", dataKey: "date" },
+                      { name: "Post", width: "40%", dataKey: "post" },
+                      { name: "Impressions", dataKey: "impressions" },
+                      { name: "Clicks", dataKey: "clicks" },
+                      { name: "Likes", dataKey: "likes" },
+                      { name: "Comments", dataKey: "comments" },
+                      { name: "Shares", dataKey: "shares" }
+                    ];
+            })()
             : usingDimensionalRows
               ? [
                 { name: dimensionType.charAt(0).toUpperCase() + dimensionType.slice(1), width: "60%" },
@@ -1291,7 +1469,7 @@ const renderWidgetContent = (
                 </TableCaption>
                 <TableHeader>
                   <TableRow>
-                    {columns.map((col) => (
+                    {columns.map((col: { name: string; width?: string }) => (
                       <TableHead
                         key={col.name}
                         className="truncate px-2 md:px-4"
@@ -1305,7 +1483,7 @@ const renderWidgetContent = (
                 <TableBody>
                   {rows.map((row, index) => (
                     <TableRow key={row.name || index}>
-                      {columns.map((col, colIndex) => {
+                      {columns.map((col: { name: string; width?: string; dataKey?: string }, colIndex: number) => {
                         // For dynamic columns, we need to map column names to row properties
                         let cellValue: unknown;
 
@@ -1321,15 +1499,25 @@ const renderWidgetContent = (
                                   : "";
                         } else if (isRecentPostsTable) {
                           const pRow = row as any;
-                          cellValue = col.name === "Date" ? pRow.date
-                            : col.name === "Post" ? pRow.post
-                              : col.name === "Impressions" ? (pRow.impressions ?? 0)
-                                : col.name === "Clicks" ? (pRow.clicks ?? 0)
-                                  : col.name === "Likes" ? pRow.likes
-                                    : col.name === "Comments" ? pRow.comments
-                                      : col.name === "Shares" ? pRow.shares
-                                        : col.name === "Reactions" ? pRow.reactions
-                                          : "";
+                          // Use dataKey if available, otherwise fallback to name mapping or direct property access
+                          let key = (col as any).dataKey;
+
+                          if (!key) {
+                            // Fallback for legacy columns without dataKey
+                            const nameLower = col.name.toLowerCase();
+                            if (col.name === "Date") key = "date";
+                            else if (col.name === "Post" || col.name === "Post Message") key = "post";
+                            else if (col.name === "Full Picture") key = "fullPicture";
+                            else if (col.name === "Permalink URL") key = "permalinkUrl";
+                            else key = nameLower;
+                          }
+
+                          cellValue = pRow[key];
+
+                          // Handle numeric defaults if needed (though API processing usually sets defaults)
+                          if (key === 'impressions' || key === 'clicks') {
+                            cellValue = cellValue ?? 0;
+                          }
                         } else if (usingDimensionalRows) {
                           const dimRow = row as { dimension: string; value: number };
                           cellValue =
@@ -1409,6 +1597,26 @@ const renderWidgetContent = (
                                 <span className="line-clamp-2 whitespace-normal text-[10px] md:text-sm min-w-0 flex-1 leading-tight">
                                   {String(cellValue ?? "")}
                                 </span>
+                              </div>
+                            </TableCell>
+                          );
+                        }
+
+                        // Special rendering for "Full Picture" column - show image thumbnail
+                        if (col.name === "Full Picture" && cellValue) {
+                          return (
+                            <TableCell key={colIndex} className="px-2 md:px-4 py-2">
+                              <div className="w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded overflow-hidden border">
+                                <img
+                                  src={String(cellValue)}
+                                  alt="Media"
+                                  className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    e.currentTarget.parentElement!.innerHTML = '<span class="text-xs text-gray-400">No image</span>';
+                                  }}
+                                  onClick={() => window.open(String(cellValue), '_blank')}
+                                />
                               </div>
                             </TableCell>
                           );
@@ -1677,7 +1885,7 @@ const renderWidgetContent = (
                 No tasks yet. Use the editor to add tasks.
               </span>
             ) : (
-              <ul className="list-disc list-inside space-y-1">
+              <ul className={`list-disc list-inside space-y-1 ${customData.fontSize || ''} ${customData.fontWeight || ''}`}>
                 {tasks.map((task, idx) => (
                   <li key={idx} className="break-words">
                     {task}
@@ -1697,43 +1905,48 @@ const renderWidgetContent = (
             .map((t) => t.trim())
             .filter(Boolean) || [];
 
+        // Parse lines to extract section name and page number
+        // Format: "Section Name | 3" or just "Section Name" (auto-number)
+        const parsedLines = lines.map((line, idx) => {
+          const parts = line.split("|").map(p => p.trim());
+          if (parts.length >= 2) {
+            return {
+              section: parts[0],
+              page: parts[1]
+            };
+          }
+          return {
+            section: line,
+            page: String(idx + 3) // Auto-number starting from page 3
+          };
+        });
+
         return (
           <div
-            className="h-full flex flex-col items-stretch justify-start text-xs md:text-sm text-gray-800 px-3 py-2 rounded-md"
+            className="h-full flex flex-col items-stretch justify-start px-6 py-4 rounded-md"
             style={customStyle}
           >
-            <div className="font-semibold mb-2">
+            <div className="text-center font-bold text-lg mb-6 text-gray-700 dark:text-gray-300">
               {heading ?? "Table of Contents"}
             </div>
-            {lines.length === 0 ? (
-              <span className="text-[11px] text-gray-400">
-                Add one entry per line in the editor to build the table of
-                contents.
+            {parsedLines.length === 0 ? (
+              <span className="text-xs text-gray-400 text-center">
+                Add entries like "Section Name | 3" (one per line)
               </span>
             ) : (
-              <div className="w-full overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="py-1 pr-2 w-8 text-[11px] text-gray-500">
-                        #
-                      </th>
-                      <th className="py-1 text-[11px] text-gray-500">
-                        Section
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lines.map((line, idx) => (
-                      <tr key={idx} className="border-b last:border-b-0">
-                        <td className="py-1 pr-2 align-top text-gray-500">
-                          {idx + 1}
-                        </td>
-                        <td className="py-1 align-top break-words">{line}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="w-full space-y-2.5">
+                {parsedLines.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex items-baseline gap-2 text-gray-700 dark:text-gray-300 ${customData.fontSize || 'text-sm'} ${customData.fontWeight || 'font-normal'}`}
+                  >
+                    <span className="flex-shrink-0">{item.section}</span>
+                    <span className="flex-1 border-b border-dotted border-gray-400 dark:border-gray-600 mb-1"></span>
+                    <span className="flex-shrink-0 font-medium text-gray-600 dark:text-gray-400 tabular-nums">
+                      {item.page}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -1790,7 +2003,7 @@ const renderWidgetContent = (
 
       return (
         <div
-          className="h-full flex flex-col items-start justify-start text-xs md:text-sm text-gray-800 px-3 py-2 rounded-md w-full overflow-y-auto whitespace-pre-wrap break-words"
+          className={`h-full flex flex-col items-start justify-start text-gray-800 px-3 py-2 rounded-md w-full overflow-y-auto whitespace-pre-wrap break-words ${customData?.fontSize || 'text-xs md:text-sm'} ${customData?.fontWeight || 'font-normal'}`}
           style={customStyle}
         >
           {heading && (
@@ -1865,6 +2078,59 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   const parsedClientId = params.clientId ? parseInt(params.clientId) : null;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  // Detect if we're on tablet (using window width)
+  const [isTablet, setIsTablet] = useState(false);
+
+  useEffect(() => {
+    const checkTablet = () => {
+      const width = window.innerWidth;
+      setIsTablet(width >= 768 && width < 1024);
+    };
+
+    checkTablet();
+    window.addEventListener("resize", checkTablet);
+    return () => window.removeEventListener("resize", checkTablet);
+  }, []);
+
+  // Detect if we're on mobile (using window width)
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const width = window.innerWidth;
+      setIsMobile(width < 768);
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Detect if we should use overlay layout (Mobile + Tablet + Small Desktop < 1280px)
+  const [isOverlayLayout, setIsOverlayLayout] = useState(false);
+
+  useEffect(() => {
+    const checkOverlay = () => {
+      const width = window.innerWidth;
+      setIsOverlayLayout(width < 1280);
+    };
+
+    checkOverlay();
+    window.addEventListener("resize", checkOverlay);
+    return () => window.removeEventListener("resize", checkOverlay);
+  }, []);
+
+  // Mobile Sidebar States
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(false);
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
+
+  // Use appropriate grid config based on screen size
+  const currentGridConfig = isMobile ? {
+    cols: 2,
+    rowHeight: 80,
+    margin: [8, 8] as [number, number],
+  } : isTablet ? TABLET_GRID_CONFIG : GRID_CONFIG;
+
 
   // Template State
   const [templateId, setTemplateId] = useState<number | null>(
@@ -3181,16 +3447,26 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           // Special: Recent Posts Table (Meta Facebook)
           if (widget.metricKey === 'meta.facebook.recent_posts') {
             try {
-              // Identify the account ID. If it's a Meta Business widget, it might not have one set directly,
-              // but we might be able to infer it or we might need to skip if missing.
-              // For now, assume user has selected an account or we use the first available one if we could find it (not easy here).
-              // If effectiveClientId is present but no specific account, we might be stuck.
-              // However, the widget configuration should typically have accountId for specific feeds.
-              const targetAccountId = widget.accountId;
-              console.log("🔍 [Recent Posts] Fetching with Account ID:", targetAccountId);
+              // Use widget.accountId if set, otherwise fall back to effectiveClientId
+              // This ensures data loads on first drag (like it does after refresh)
+              const targetAccountId = widget.accountId || effectiveClientId;
+              console.log("🔍 [Recent Posts] Fetching with Account ID:", targetAccountId, "(from widget:", widget.accountId, ", effective:", effectiveClientId, ")");
 
               if (targetAccountId) {
-                const postsData = await fetchMetaStoredPosts(targetAccountId);
+                // Use the date range from the report builder
+                const startDate = dateFrom;
+                const endDate = dateTo;
+
+                console.log("📅 [Recent Posts] Date Range used:", { startDate, endDate, widgetDateFrom: widget.dateFrom, widgetDateTo: widget.dateTo });
+
+                const postsData = await fetchMetaStoredPosts(
+                  targetAccountId,
+                  25, // limit
+                  'createdTime', // sortBy
+                  'desc', // order
+                  startDate,
+                  endDate
+                );
                 console.log("✅ [Recent Posts] API Response:", postsData);
                 if (postsData && postsData.success && Array.isArray(postsData.posts)) {
                   console.log("📊 [Recent Posts] Processing", postsData.posts.length, "posts");
@@ -3238,6 +3514,143 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             } catch (err) {
               console.error("Failed to fetch recent posts", err);
               // Fallthrough to unified metric (which will likely return empty) or return null
+            }
+          }
+
+          // Special: Recent Media Table (Instagram)
+          if (widget.metricKey === 'meta.instagram.recent_media') {
+            try {
+              console.log("🔍 [Instagram Media] Widget details:", {
+                widgetAccountId: widget.accountId,
+                widgetIntegration: widget.integration,
+                effectiveClientId,
+                widget
+              });
+
+              // Get the Instagram page ID
+              let targetAccountId = widget.accountId;
+
+              // If widget.accountId is empty, try to get Instagram page ID from client integrations
+              if (!targetAccountId) {
+                try {
+                  let integrations = integrationsData?.integrations;
+
+                  if (!integrations) {
+                    console.log("🔍 [Instagram Media] integrationsData not ready, fetching...");
+                    const integrationsResponse = await api.get(`/integrations/client/${effectiveClientId}`);
+                    // Handle both array and object response formats
+                    integrations = Array.isArray(integrationsResponse.data)
+                      ? integrationsResponse.data
+                      : (integrationsResponse.data?.integrations || integrationsResponse.data);
+                  }
+
+                  console.log("🔍 [Instagram Media] Integrations source:", integrations ? "Cache/API" : "None");
+
+                  // Search for any integration that contains an Instagram account
+                  if (Array.isArray(integrations)) {
+                    // Log for debugging
+                    console.log("🔍 [Instagram Media] Checking", integrations.length, "integrations");
+
+                    // 1. Try to find explicit instagram platform
+                    let found = integrations.find((int: any) =>
+                      int.platform && int.platform.toLowerCase().includes('instagram')
+                    );
+
+                    // 2. If not found, try to find Meta Business integration that IS NOT the client ID
+                    // The client ID (e.g. 28) is often used as a placeholder, but we want the real Page ID
+                    if (!found) {
+                      found = integrations.find((int: any) =>
+                        (int.platform === 'meta-business' || int.platform === 'meta_business') &&
+                        int.accountId && String(int.accountId) !== String(effectiveClientId)
+                      );
+                    }
+
+                    if (found) {
+                      targetAccountId = found.accountId;
+                      console.log("✅ [Instagram Media] Found account:", found.accountName, "(ID:", targetAccountId, ")");
+                    } else {
+                      console.log("⚠️ [Instagram Media] No suitable account found in integrations");
+                    }
+                  } else {
+                    console.warn("⚠️ [Instagram Media] Integrations data is not an array:", integrations);
+                  }
+
+                } catch (err) {
+                  console.error("Failed to fetch Instagram page ID from integrations", err);
+                }
+              }
+
+              // Fallback to effectiveClientId if still not found
+              if (!targetAccountId) {
+                targetAccountId = effectiveClientId;
+                console.warn("⚠️ [Instagram Media] Using client ID as fallback - this may not work correctly");
+              }
+
+              console.log("🔍 [Instagram Media] Fetching with Account ID:", targetAccountId, "(from widget:", widget.accountId, ", effective:", effectiveClientId, ")");
+
+              if (targetAccountId) {
+                const startDate = dateFrom;
+                const endDate = dateTo;
+
+                console.log("📅 [Instagram Media] Date Range:", { startDate, endDate, dateFrom, dateTo });
+                console.log("📤 [Instagram Media] API Call Params:", {
+                  accountId: targetAccountId,
+                  limit: 25,
+                  startDate,
+                  endDate
+                });
+
+                const mediaData = await fetchInstagramStoredMedia(
+                  targetAccountId,
+                  25,
+                  startDate,
+                  endDate
+                );
+                console.log("✅ [Instagram Media] API Response:", mediaData);
+
+                if (mediaData && mediaData.success && Array.isArray(mediaData.media)) {
+                  console.log("📊 [Instagram Media] Processing", mediaData.media.length, "items");
+                  const rows = mediaData.media.map((m) => ({
+                    id: m.id,
+                    metricKey: widget.metricKey,
+                    integration: normalizedIntegration, // 'meta-instagram'
+                    accountId: targetAccountId,
+                    date: m.timestamp ? new Date(m.timestamp).toLocaleDateString() : "",
+                    value: m.views || 0,
+                    // Custom props
+                    post: m.caption || "(No caption)",
+                    impressions: m.views || 0, // Using views as a proxy for impressions since it's requested
+                    clicks: 0, // Not available in current API response
+                    likes: m.likeCount,
+                    shares: m.shares,
+                    fullPicture: m.mediaUrl,
+                    permalinkUrl: m.permalinkUrl
+                  }));
+
+
+                  console.log("🎯 [Instagram Media] Returning data with", rows.length, "rows");
+                  return {
+                    hash,
+                    widgets: localWidgets,
+                    data: {
+                      success: true,
+                      rows: rows as any[],
+                      pagination: { page: 1, limit: rows.length, total: rows.length, totalPages: 1 },
+                      columns: [
+                        { name: "Date", width: "15%", dataKey: "date" },
+                        { name: "Full Picture", dataKey: "fullPicture" },
+                        { name: "Post Message", width: "35%", dataKey: "post" },
+                        { name: "Impressions", dataKey: "impressions" },
+                        { name: "Clicks", dataKey: "clicks" },
+                        { name: "Likes", dataKey: "likes" },
+                        { name: "Shares", dataKey: "shares" }
+                      ]
+                    }
+                  };
+                }
+              }
+            } catch (err) {
+              console.error("Failed to fetch Instagram media", err);
             }
           }
 
@@ -3334,7 +3747,15 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           if (rowInteg.startsWith('meta') || widget.accountId) {
             const rowAcc = String(row.accountId || '').replace(/^act_/, '');
             const widAcc = String(widget.accountId || '').replace(/^act_/, '');
-            accountMatch = (rowAcc === widAcc);
+
+            // Fix: If row.accountId is empty (API fallback), check if dimensionValue matches widget accountId
+            // This handles cases where API returns dimension-keyed data without explicit accountId col
+            if (!rowAcc && (row.dimensionType === 'page' || row.dimensionType === 'account') && row.dimensionValue) {
+              const dimVal = String(row.dimensionValue).replace(/^act_/, '');
+              accountMatch = (dimVal === widAcc);
+            } else {
+              accountMatch = (rowAcc === widAcc);
+            }
 
             // Special case: If widget is 'meta-business', allow all accounts AND all meta sub-integrations
             if (widgetInteg === 'meta-business') {
@@ -3402,7 +3823,9 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
           // Include if: not dimensional OR is a time dimension OR is YouTube video dimension
           // OR is Meta Ads campaign/adset dimension (since API might return only these)
-          const isMetaAdsDimension = widget.metricKey.startsWith('meta.') && (dimType === 'campaign' || dimType === 'adset' || dimType === 'ad');
+          // OR is Meta Page/Account dimension (Fix for missing accountId in rows)
+          const isMetaAdsDimension = widget.metricKey.startsWith('meta.') &&
+            (dimType === 'campaign' || dimType === 'adset' || dimType === 'ad' || dimType === 'page' || dimType === 'account');
 
           return (!isDimensional || isTimeDimension || isYouTubeDimension || isMetaAdsDimension);
         });
@@ -3456,55 +3879,86 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
         if (!summaryUsed && filteredRows.length > 0) {
 
-          // Fallback: If summary is missing, try to calculate BLENDED metrics from raw rows if available
-          // (e.g. CPC = Sum(Spend) / Sum(Clicks)) rather than Average(CPC Rows)
-          let blendedCalculated = false;
-          const contextRows = data.rows; // Use valid raw rows
+          // Check for Cumulative Metrics (Facebook Page Likes, etc.)
+          // These should take the LATEST value, not the SUM/AVG
+          const aggregationType = getMetricAggregation(widget.metricKey);
 
-          // Helpers to find sum of related metrics
-          const getSum = (keySuffix: string) => {
-            return contextRows
-              .filter((r: any) =>
-                r.metricKey.endsWith(keySuffix) &&
-                // Loose match for integration (meta_ads vs meta-ads)
-                (r.integration || '').replace('_', '-').toLowerCase() === (widgetIntegration || '').replace('_', '-').toLowerCase() &&
-                // Loose match for account ID
-                (widgetIntegration === 'meta-business' || String(r.accountId) === String(widget.accountId))
-              )
-              .reduce((sum: number, r: any) => sum + (Number(r.value) || 0), 0);
-          };
+          if (aggregationType === 'latest') {
+            // Group by date to handle multiple accounts correctly (sum across accounts for the same day)
+            const dateMap = new Map<string, number>();
 
-          if (metricSuffix === 'cpc') {
-            const sumSpend = getSum('spend') || getSum('amount_spent');
-            const sumClicks = getSum('clicks');
-            if (sumClicks > 0) {
-              total = sumSpend / sumClicks;
-              blendedCalculated = true;
-            }
-          } else if (metricSuffix === 'ctr') {
-            const sumClicks = getSum('clicks');
-            const sumImpressions = getSum('impressions');
-            if (sumImpressions > 0) {
-              total = (sumClicks / sumImpressions) * 100;
-              blendedCalculated = true;
-            }
-          } else if (metricSuffix === 'cpm') {
-            const sumSpend = getSum('spend');
-            const sumImpressions = getSum('impressions');
-            if (sumImpressions > 0) {
-              total = (sumSpend / sumImpressions) * 1000;
-              blendedCalculated = true;
-            }
-          }
+            filteredRows.forEach((row: any) => {
+              // Ensure we have a valid date
+              const dateKey = row.date ? row.date.split('T')[0] : '';
+              if (dateKey) {
+                dateMap.set(dateKey, (dateMap.get(dateKey) || 0) + (Number(row.value) || 0));
+              }
+            });
 
-          if (!blendedCalculated) {
-            if (isRateMetric) {
-              // For other rate metrics (or if blended data missing), fallback to simple average
-              const sum = filteredRows.reduce((a: number, b: any) => a + (b.value || 0), 0);
-              total = sum / filteredRows.length;
-            } else {
-              // For countable metrics (Spend, Impressions), SUM is correct
-              total = filteredRows.reduce((sum: number, row: any) => sum + (row.value || 0), 0);
+            // Sort dates descending
+            const sortedDates = Array.from(dateMap.keys()).sort((a, b) =>
+              new Date(b).getTime() - new Date(a).getTime()
+            );
+
+            if (sortedDates.length > 0) {
+              // Take the value of the latest date
+              total = dateMap.get(sortedDates[0]) || 0;
+              // console.log(`✅ [Dashboard] Cumulative Metric ${widget.metricKey}: Using latest value from ${sortedDates[0]} = ${total}`);
+            }
+
+          } else {
+            // Standard Logic for Daily Metrics
+
+            // Fallback: If summary is missing, try to calculate BLENDED metrics from raw rows if available
+            // (e.g. CPC = Sum(Spend) / Sum(Clicks)) rather than Average(CPC Rows)
+            let blendedCalculated = false;
+            const contextRows = data.rows; // Use valid raw rows
+
+            // Helpers to find sum of related metrics
+            const getSum = (keySuffix: string) => {
+              return contextRows
+                .filter((r: any) =>
+                  r.metricKey.endsWith(keySuffix) &&
+                  // Loose match for integration (meta_ads vs meta-ads)
+                  (r.integration || '').replace('_', '-').toLowerCase() === (widgetIntegration || '').replace('_', '-').toLowerCase() &&
+                  // Loose match for account ID
+                  (widgetIntegration === 'meta-business' || String(r.accountId) === String(widget.accountId))
+                )
+                .reduce((sum: number, r: any) => sum + (Number(r.value) || 0), 0);
+            };
+
+            if (metricSuffix === 'cpc') {
+              const sumSpend = getSum('spend') || getSum('amount_spent');
+              const sumClicks = getSum('clicks');
+              if (sumClicks > 0) {
+                total = sumSpend / sumClicks;
+                blendedCalculated = true;
+              }
+            } else if (metricSuffix === 'ctr') {
+              const sumClicks = getSum('clicks');
+              const sumImpressions = getSum('impressions');
+              if (sumImpressions > 0) {
+                total = (sumClicks / sumImpressions) * 100;
+                blendedCalculated = true;
+              }
+            } else if (metricSuffix === 'cpm') {
+              const sumSpend = getSum('spend');
+              const sumImpressions = getSum('impressions');
+              if (sumImpressions > 0) {
+                total = (sumSpend / sumImpressions) * 1000;
+                blendedCalculated = true;
+              }
+            }
+
+            if (!blendedCalculated) {
+              if (isRateMetric) {
+                // For other rate metrics (or if blended data missing), fallback to simple average
+                const sum = filteredRows.reduce((a: number, b: any) => a + (b.value || 0), 0);
+                total = sum / filteredRows.length;
+              } else {
+                // For countable metrics (Spend, Impressions), SUM is correct
+                total = filteredRows.reduce((sum: number, row: any) => sum + (row.value || 0), 0);
+              }
             }
           }
 
@@ -4019,7 +4473,12 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           const isMetric = w.type === 'metric' || (w as any).widgetType === 'metric';
 
           // Create a shallow copy to modify
-          const optimizedData = { ...liveData };
+          // FIX: Merge live data rows/values BUT preserve UI config (columns, title, caption) from the builder state
+          const originalData = w.widgetData as any || {};
+          const optimizedData = {
+            ...originalData,
+            ...liveData
+          };
 
           if (isMetric) {
             // Metrics rely on 'value'/'total'/'series'. They rarely need the full 'rows' dump.
@@ -4464,7 +4923,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
   const handleDrop = useCallback(
     (_layoutArr: Layout[], layoutItem: Layout, e: DragEvent, id: number) => {
-      const widgetType = e.dataTransfer?.getData(
+      let widgetType = e.dataTransfer?.getData(
         "widgetType"
       ) as ReportWidgetType | null;
       if (!widgetType) return;
@@ -4488,6 +4947,11 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         } catch (err) {
           console.error("Failed to parse metric data:", err);
         }
+      }
+
+      // Force Recent Posts to be a Table
+      if (metricData?.metricKey === 'meta.facebook.recent_posts') {
+        widgetType = 'table';
       }
 
       // Enforce dropping metrics only on their matching integration slide
@@ -4539,7 +5003,19 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       }
 
       // ✅ Use defaults or fallbacks
-      const { w, h } = WIDGET_SIZE_MAP[widgetType] ?? { w: 4, h: 3 };
+      let { w, h } = WIDGET_SIZE_MAP[widgetType] ?? { w: 4, h: 3 };
+
+      // Strict Safety Check: Only affect "metric" type widgets (Metric Cards)
+      if (metricData && widgetType === 'metric') {
+        const key = (metricData.metricKey || "").toLowerCase();
+        const integration = (metricData.integration || "").toLowerCase().replace(/_/g, '-');
+
+        // Scope strictly to Meta Ads integration or metric keys (Handles both 'meta-ads' and 'meta_ads')
+        if (integration === 'meta-ads' || key.startsWith('meta.ads')) {
+          w = 3; // Force 1/4 width (standard for metrics)
+          h = 3; // Force standard height
+        }
+      }
 
       // 🧠 Use descriptive IDs for better fallback reconstruction on shared reports
       const safeLabel = (metricData?.label || widgetType).replace(/[^a-zA-Z0-9]/g, '_');
@@ -4558,6 +5034,16 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         }
         // Bake the displayName into the widget data so it's persisted in snapshots
         (widgetData as any).displayName = metricData.label;
+      }
+
+      // FIX: Inject correct default columns for Meta Recent Posts/Media
+      if (metricData?.metricKey === 'meta.facebook.recent_posts' && widgetData && 'columns' in widgetData) {
+        (widgetData as any).columns = DEFAULT_RECENT_POSTS_COLUMNS;
+        // Start empty, data will be fetched
+        (widgetData as any).rows = [];
+      } else if (metricData?.metricKey === 'meta.instagram.recent_media' && widgetData && 'columns' in widgetData) {
+        (widgetData as any).columns = DEFAULT_INSTAGRAM_MEDIA_COLUMNS;
+        (widgetData as any).rows = [];
       }
 
       // If this is a custom Content Block with a specific kind, annotate it in data
@@ -4625,6 +5111,13 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
   const createLayoutChangeHandler = useCallback(
     (id: number, currentLayout: DashboardLayout[]) => (newLayout: Layout[]) => {
+      // 🛡️ CRITICAL: Ignore layout changes when in mobile view
+      // This prevents the responsive 2-col/1-col reflow from overwriting the saved 12-col desktop layout.
+      if (isMobile) {
+        console.log('[ReportBuilder] Ignoring layout change in mobile view');
+        return;
+      }
+
       const mergedLayout = currentLayout.map((item) => {
         const updated = newLayout.find((n) => n.i === item.i);
         return updated ? { ...item, ...updated } : item;
@@ -4632,7 +5125,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
       updateDashboard(id, mergedLayout);
     },
-    [updateDashboard]
+    [updateDashboard, isMobile]
   );
 
   const handleDragStart = useCallback(
@@ -4765,13 +5258,16 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           />
         );
       }
-      case "table":
+      case "table": {
+        const layoutItem = dashboards.get(widgetFormState.slideId)?.find(w => w.i === widgetFormState.widgetId);
         return (
           <TableWidgetForm
             data={widgetFormState.data as TableWidgetData}
             onChange={changeHandler}
+            metricKey={layoutItem?.metricConfig?.metricKey}
           />
         );
+      }
       case "image":
         return (
           <ImageWidgetForm
@@ -4813,6 +5309,54 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     widgetFormState.widgetId,
     createWidgetFormChangeHandler,
   ]);
+
+  // Helper to update all widgets of a platform to a new account ID
+  const updateWidgetsForAccount = useCallback((platform: string, newAccountId: string, accountName: string) => {
+    if (!platform || !newAccountId) return;
+
+    setDashboards((prev) => {
+      const next = new Map(prev);
+      let updatedCount = 0;
+      const normalize = (p: string) => (p || "").toLowerCase().replace(/_/g, '-');
+      const targetPlatform = normalize(platform);
+
+      // Special handling for Meta Business to match sub-platforms
+      const isMetaBusiness = targetPlatform === 'meta-business' || targetPlatform === 'meta';
+
+      for (const [slideId, widgets] of next.entries()) {
+        const newWidgets = widgets.map(w => {
+          // Check if widget has integration matching the switched platform
+          const wPlatform = normalize(w.metricConfig?.integration || "");
+
+          // Match logic: Exact match OR is sub-platform of Meta Business
+          const isMatch = wPlatform === targetPlatform ||
+            (isMetaBusiness && (wPlatform === 'meta-facebook' || wPlatform === 'meta-instagram'));
+
+          if (isMatch && w.metricConfig?.accountId && w.metricConfig.accountId !== newAccountId) {
+            updatedCount++;
+            return {
+              ...w,
+              metricConfig: {
+                ...w.metricConfig!,
+                accountId: newAccountId
+              }
+            };
+          }
+          return w;
+        });
+
+        // Update layout for this slide if changed
+        if (newWidgets.some((w, i) => w !== widgets[i])) {
+          next.set(slideId, newWidgets);
+        }
+      }
+
+      if (updatedCount > 0) {
+        toast.info(`Updated ${updatedCount} widget${updatedCount !== 1 ? 's' : ''} to use ${accountName}`);
+      }
+      return next;
+    });
+  }, []);
 
   // Memoize right panel content
   const rightPanelContent = useMemo(() => {
@@ -4870,13 +5414,15 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                     <button
                       key={`${integration.platform}-${integration.accountId}`}
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
                         setSelectedIntegrationForMetrics({
                           platform: integration.platform,
                           accountId: integration.accountId,
                           accountName: integration.accountName,
-                        })
-                      }
+                        });
+                        // Automatically update existing widgets to use the newly selected account
+                        updateWidgetsForAccount(integration.platform, integration.accountId, integration.accountName);
+                      }}
                       className="w-full flex items-center gap-3 px-3 py-2.5 border-b text-left hover:bg-gray-50 transition-colors"
                     >
                       {platformConfig && (
@@ -5040,26 +5586,6 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         metricsForAccount = Object.values(metricsByAccount).flat();
       }
 
-      // INJECT SYNTHETIC METRICS (e.g. Recent Posts Table)
-      // These are frontend-only widgets that don't come from the backend metrics API.
-      // We explicitly add them so they are selectable.
-      if (normalizedPlatform === 'meta-facebook' || normalizedPlatform === 'meta-business') {
-        const recentPostsKey = 'meta.facebook.recent_posts';
-        // Check if already present to avoid duplicates
-        const hasRecentPosts = metricsForAccount.some(m => m.metricKey === recentPostsKey);
-
-        if (!hasRecentPosts) {
-          metricsForAccount.unshift({
-            metricKey: recentPostsKey,
-            integration: platform, // Use current platform context
-            accountId: accountId,
-            displayName: "Recent posts",
-            category: "Posts",
-            value: 0
-          });
-        }
-      }
-
       // Fallback 2: If still empty, use CURATED_DEFAULTS for this platform
       // This handles cases where the API returns no metrics (e.g. Meta Ads/Business in some clients)
       // but we want to allow the user to select them anyway.
@@ -5087,6 +5613,40 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
               category: "General",
               value: 0
             };
+          });
+        }
+      }
+
+      // INJECT SYNTHETIC METRICS (e.g. Recent Posts Table)
+      // These are frontend-only widgets that don't come from the backend metrics API.
+      // We explicitly add them so they are selectable.
+      if (normalizedPlatform === 'meta-facebook' || normalizedPlatform === 'meta-business' || normalizedPlatform === 'meta') {
+        const recentPostsKey = 'meta.facebook.recent_posts';
+        const recentMediaKey = 'meta.instagram.recent_media';
+
+        // Check if already present to avoid duplicates
+        const hasRecentPosts = metricsForAccount.some(m => m.metricKey === recentPostsKey);
+        const hasRecentMedia = metricsForAccount.some(m => m.metricKey === recentMediaKey);
+
+        if (!hasRecentPosts) {
+          metricsForAccount.unshift({
+            metricKey: recentPostsKey,
+            integration: platform, // Use current platform context
+            accountId: accountId,
+            displayName: "Facebook - Recent Posts",
+            category: "Posts",
+            value: 0
+          });
+        }
+
+        if (!hasRecentMedia) {
+          metricsForAccount.unshift({
+            metricKey: recentMediaKey,
+            integration: platform, // Use current platform context
+            accountId: accountId,
+            displayName: "Instagram - Recent Media",
+            category: "Media",
+            value: 0
           });
         }
       }
@@ -5152,6 +5712,20 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           metric.metricKey.toLowerCase().includes(search)
         );
       });
+
+      // Filter based on supported visualization types
+      const viewableMetrics = filteredMetrics.filter(metric => {
+        const isListMetric = metric.metricKey === 'meta.facebook.recent_posts' || metric.metricKey === 'meta.instagram.recent_media';
+
+        if (selectedMetricWidgetType === 'table') {
+          // Table mode: ONLY show list metrics (Recent Posts/Media)
+          // User request: "table should work for only data that is can be showen in table"
+          return isListMetric;
+        } else {
+          // Chart/Metric modes: Hide list metrics (they can't be scalars)
+          return !isListMetric;
+        }
+      });
       const metricTypeOptions: Array<{ type: ReportWidgetType; label: string }> =
         [
           { type: "metric", label: "#" },
@@ -5161,9 +5735,9 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         ];
 
       return (
-        <div className="w-full h-full flex flex-col overflow-y-auto">
+        <div className="w-full h-full flex flex-col overflow-hidden">
           {/* Header with back + integration name */}
-          <div className="px-3 pt-3 pb-2 border-b space-y-2">
+          <div className="px-3 pt-3 pb-2 border-b space-y-2 flex-shrink-0">
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -5288,27 +5862,39 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           </div>
 
           {/* Metrics list */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto min-h-0 pb-20">
             {isLoadingAvailableMetrics ? (
               <div className="px-4 py-4 text-xs text-gray-500">
                 Loading metrics...
+              </div>
+            ) : (viewableMetrics.length === 0 && filteredMetrics.length > 0) ? (
+              <div className="px-4 py-4 text-xs text-gray-500">
+                No metrics available for the selected visualization type.
               </div>
             ) : filteredMetrics.length === 0 ? (
               <div className="px-4 py-4 text-xs text-gray-500">
                 No metrics found for this integration.
               </div>
             ) : (
-              filteredMetrics.map((metric) => (
+              viewableMetrics.map((metric) => (
                 <div
                   key={metric.metricKey}
                   className="flex items-center gap-2 px-3 py-2 border-b hover:bg-gray-50"
                 >
-                  {platformConfig && (
-                    <platformConfig.icon
-                      className="w-4 h-4 flex-shrink-0"
-                      style={{ color: platformConfig.color }}
-                    />
-                  )}
+                  {(() => {
+                    const isFacebook = metric.metricKey?.includes('facebook') || metric.displayName?.includes('Facebook');
+                    const isInstagram = metric.metricKey?.includes('instagram') || metric.displayName?.includes('Instagram');
+
+                    if (isFacebook) return <FaFacebook className="w-4 h-4 text-[#1877F2] flex-shrink-0" />;
+                    if (isInstagram) return <FaInstagram className="w-4 h-4 text-[#E4405F] flex-shrink-0" />;
+
+                    return platformConfig && (
+                      <platformConfig.icon
+                        className="w-4 h-4 flex-shrink-0"
+                        style={{ color: platformConfig.color }}
+                      />
+                    );
+                  })()}
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-medium text-gray-900 truncate">
                       {metric.displayName}
@@ -5484,24 +6070,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     }
   };
 
-  // Detect if we're on tablet (using window width)
-  const [isTablet, setIsTablet] = useState(false);
-
-  useEffect(() => {
-    const checkTablet = () => {
-      const width = window.innerWidth;
-      setIsTablet(width >= 768 && width < 1024);
-    };
-
-    checkTablet();
-    window.addEventListener("resize", checkTablet);
-    return () => window.removeEventListener("resize", checkTablet);
-  }, []);
-
   const showFullPageSkeleton = isTemplateLoading || !isDashboardsInitialized;
 
-  // Use appropriate grid config based on screen size
-  const currentGridConfig = isTablet ? TABLET_GRID_CONFIG : GRID_CONFIG;
 
   return (
     <div className="w-full h-screen flex flex-col bg-gray-50 overflow-hidden">
@@ -5553,7 +6123,19 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       {!readOnly && (
         <div className="sticky z-50 top-0 py-3 md:py-[1.3em]  border-b flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-3 md:px-5">
           <div className="flex flex-col">
-            <span className="font-medium text-lg md:text-xl">Report Builder</span>
+            <div className="flex items-center gap-2">
+              {isMobile && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden mr-2"
+                  onClick={() => setIsLeftSidebarOpen(true)}
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+                </Button>
+              )}
+              <span className="font-medium text-lg md:text-xl">Report Builder</span>
+            </div>
             <div className="flex items-center gap-2">
               <span className="text-xs md:text-sm text-gray-500">
                 {showFullPageSkeleton ? "Loading template..." : templateName}
@@ -5581,6 +6163,16 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             <span className="mx-1 md:mx-2 text-base md:text-lg text-gray-500 cursor-pointer">
               <FiBell />
             </span>
+            {isOverlayLayout && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="xl:hidden ml-1 h-8 w-8 p-0"
+                onClick={() => setIsRightSidebarOpen(true)}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+              </Button>
+            )}
             <Button
               variant="outline"
               className="rounded-[0.4rem] text-xs md:text-sm px-2 md:px-4 py-1.5 md:py-2"
@@ -5683,7 +6275,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         ) : (
           <>
             {/* Left Sidebar */}
-            {!readOnly && (
+            {/* Desktop: Static Sidebar (Only for XL screens) */}
+            {!readOnly && !isOverlayLayout && (
               <div className="sticky top-[calc(var(--rb-header)+var(--rb-subheader))] left-0 w-48 md:w-52 lg:w-[15.5rem]  border-r h-[calc(100vh-(var(--rb-header)+var(--rb-subheader)))] overflow-y-auto transition-all duration-300 z-30">
                 <div className="w-full h-full">
                   <WidgetsPageSideComponent
@@ -5994,9 +6587,9 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                           autoSize={true}
                           margin={currentGridConfig.margin}
                           containerPadding={isTablet ? [8, 8] : [14, 14]}
-                          isDroppable={!readOnly}
-                          isDraggable={!readOnly}
-                          isResizable={!readOnly}
+                          isDroppable={!readOnly && !isMobile}
+                          isDraggable={!readOnly && !isMobile}
+                          isResizable={!readOnly && !isMobile}
                           compactType={null}
                           draggableHandle=".drag-handle"
                           draggableCancel=".non-draggable"
@@ -6047,9 +6640,12 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                                 >
                                   {renderWidgetContent(widget, widgetResolvedData, {
                                     isLoading:
-                                      (shouldResolveWidgets &&
-                                        reportDataQuery.status === "pending") ||
-                                      (reportDataQuery.isFetching && !widgetResolvedData),
+                                      // Show loading if data is being fetched
+                                      reportDataQuery.isFetching ||
+                                      // OR if query is pending (initial load)
+                                      reportDataQuery.status === "pending" ||
+                                      // OR if this specific widget doesn't have data yet (but query isn't in error state)
+                                      (!widgetResolvedData && !reportDataQuery.isError && widget.metricConfig?.metricKey),
                                     onConnectIntegration: handleConnectIntegration,
                                     readOnly: readOnly,
                                   })}
@@ -6066,19 +6662,22 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             </div>
 
             {/* Right Sidebar */}
-            {!readOnly && (
+            {/* Desktop: Static Sidebar (Only for XL screens) */}
+            {!readOnly && !isOverlayLayout && (
               <div className="sticky top-[calc(var(--rb-header)+var(--rb-subheader))] right-0 flex  border-l h-[calc(100vh-(var(--rb-header)+var(--rb-subheader)))] overflow-y-visible z-20">
                 <div
                   className={`${rightPanelTitle !== ""
                     ? "w-48 md:w-56 lg:w-[16.25rem]"
                     : "w-0 overflow-hidden"
-                    } h-full transition-all duration-300`}
+                    } h-full transition-all duration-300 flex flex-col`}
                 >
-                  <div className="w-full p-3 md:p-4 border-b font-semibold text-sm md:text-base text-accent-foreground">
+                  <div className="w-full p-3 md:p-4 border-b font-semibold text-sm md:text-base text-accent-foreground flex-shrink-0">
                     {rightPanelTitle}
                   </div>
 
-                  {rightPanelContent}
+                  <div className="flex-1 overflow-hidden min-h-0">
+                    {rightPanelContent}
+                  </div>
                 </div>
 
                 <div
@@ -6095,6 +6694,114 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                   setWidgetFormState={setWidgetFormState}
                 />
               </div>
+            )}
+
+            {/* Mobile: Sheet Sidebars */}
+            {/* Mobile/Tablet/Small Desktop: Sheet Sidebars */}
+            {!readOnly && isOverlayLayout && (
+              <>
+                <Sheet open={isLeftSidebarOpen} onOpenChange={setIsLeftSidebarOpen}>
+                  <SheetContent side="left" className="p-0 w-[85vw] max-w-[300px]">
+                    <div className="w-full h-full pt-6"> {/* Add padding for close button space */}
+                      <WidgetsPageSideComponent
+                        activeSlideId={activeSlideId}
+                        onSlideClick={(id) => {
+                          handleScrollToSlide(id);
+                          setIsLeftSidebarOpen(false); // Close sidebar on selection
+                        }}
+                        customPages={customPages}
+                        pageOrder={effectivePageOrder}
+                        onAddPage={addCustomPage}
+                        onDeletePage={handleDeletePage}
+                        onRenamePage={handleRenamePage}
+                        onReorderPages={handleReorderPages}
+                        onAddIntegrationPage={handleAddIntegrationPage}
+                        availableIntegrations={integrationsData?.integrations?.map((integ, idx) => ({
+                          index: idx,
+                          platform: integ.platform,
+                          accountName: integ.accountName
+                        })).filter(integ => !dashboards.has(integ.index)) ?? []}
+                        slidesMeta={(() => {
+                          const rawBase = (processedSlidesMeta as ReportSlideMeta[] | undefined) ?? [];
+                          const numIntegrations = integrationsData?.integrations?.length ?? 0;
+                          const base = rawBase.filter(s => {
+                            if (s.source === "integration") {
+                              const idx = typeof s.integrationIndex === 'number' ? s.integrationIndex : Number(s.id);
+                              if (!isNaN(idx) && idx >= numIntegrations) return false;
+                            }
+                            return true;
+                          });
+                          const existingIds = new Set(base.map((s) => Number(s.id)));
+                          const extras = customPages.filter((p) => !existingIds.has(Number(p.id))).map((p) => ({
+                            id: p.id, title: p.name, subtitle: p.subtitle, source: "custom" as const,
+                          }));
+                          const integrationExtras: ReportSlideMeta[] = [];
+                          if (integrationsData?.integrations) {
+                            Array.from(dashboards.keys()).forEach(slideId => {
+                              const numId = Number(slideId);
+                              if (!existingIds.has(numId) && !customPages.find(p => Number(p.id) === numId)) {
+                                const integration = integrationsData.integrations[numId];
+                                if (integration) {
+                                  integrationExtras.push({
+                                    id: numId, title: "", subtitle: "", source: "integration", integrationIndex: numId
+                                  });
+                                }
+                              }
+                            });
+                          }
+                          const augmentedBase = base.map(s => {
+                            let updated = { ...s };
+                            const customOverride = customPages.find(p => Number(p.id) === Number(s.id));
+                            if (customOverride) {
+                              updated.title = customOverride.name;
+                              updated.subtitle = customOverride.subtitle || updated.subtitle;
+                            }
+                            if (Number(updated.id) < 1000) updated.source = "integration";
+                            if (updated.source === "integration" && updated.integrationIndex === undefined) updated.integrationIndex = Number(updated.id);
+                            if (updated.source === "integration") {
+                              const idx = typeof updated.integrationIndex === 'number' ? updated.integrationIndex : Number(updated.id);
+                              const integration = integrationsData?.integrations?.[idx];
+                              if (integration && (!updated.title || updated.title === "" || updated.title.startsWith("Untitled"))) {
+                                const platformConfig = getPlatformConfig(integration.platform);
+                                updated.title = platformConfig?.name || integration.platform || "Integration";
+                                if (!updated.subtitle) updated.subtitle = integration.accountName;
+                              }
+                            }
+                            return updated;
+                          });
+                          return [...augmentedBase, ...extras, ...integrationExtras];
+                        })()}
+                      />
+                    </div>
+                  </SheetContent>
+                </Sheet>
+
+                <Sheet open={isRightSidebarOpen} onOpenChange={setIsRightSidebarOpen}>
+                  <SheetContent side="right" className="p-0 w-[85vw] max-w-[400px]">
+                    <div className="w-full h-full flex flex-col pt-6">
+                      <div className="w-full p-3 md:p-4 border-b font-semibold text-sm md:text-base text-accent-foreground flex-shrink-0">
+                        {rightPanelTitle}
+                      </div>
+
+                      <div className="flex-1 overflow-hidden min-h-0">
+                        {rightPanelContent}
+                      </div>
+
+                      <div className={`${widgetFormState.widgetType !== "" ? "flex-1" : "hidden"} overflow-y-auto`}>
+                        {widgetFormSections}
+                      </div>
+
+                      <div className="mt-auto border-t">
+                        <ReportElements
+                          setRightPanelTitle={setRightPanelTitle}
+                          setWidgetFormState={setWidgetFormState}
+                          orientation="horizontal"
+                        />
+                      </div>
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              </>
             )}
           </>
         )}

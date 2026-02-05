@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 const Textarea = React.forwardRef<
   HTMLTextAreaElement,
   React.ComponentProps<"textarea">
->(({ className, ...props }, ref) => {
+>(({ className, maxLength = 5000, ...props }, ref) => {
   return (
     <textarea
       className={cn(
@@ -13,6 +13,7 @@ const Textarea = React.forwardRef<
         className
       )}
       ref={ref}
+      maxLength={maxLength}
       {...props}
     />
   )

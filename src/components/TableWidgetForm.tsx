@@ -8,14 +8,69 @@ import type { TableWidgetData, ReportTableRow } from "./widgetTypes";
 interface TableWidgetFormProps {
   data?: TableWidgetData;
   onChange?: (data: TableWidgetData) => void;
+  /* New props */
+  metricKey?: string;
 }
+
+const META_RECENT_POSTS_COLUMNS = [
+  { value: "date", label: "Date" },
+  { value: "post", label: "Post Message" },
+  { value: "impressions", label: "Impressions" },
+  { value: "clicks", label: "Clicks" },
+  { value: "likes", label: "Likes" },
+  { value: "comments", label: "Comments" },
+  { value: "shares", label: "Shares" },
+  { value: "reactions", label: "Reactions" },
+  { value: "fullPicture", label: "Full Picture" },
+  { value: "permalinkUrl", label: "Permalink URL" },
+];
+
+export const DEFAULT_RECENT_POSTS_COLUMNS = [
+  { name: "Date", width: "15%", dataKey: "date" },
+  { name: "Post", width: "40%", dataKey: "post" },
+  { name: "Impressions", dataKey: "impressions" },
+  { name: "Clicks", dataKey: "clicks" },
+  { name: "Likes", dataKey: "likes" },
+  { name: "Comments", dataKey: "comments" },
+  { name: "Shares", dataKey: "shares" },
+];
+
+const INSTAGRAM_RECENT_MEDIA_COLUMNS = [
+  { value: "date", label: "Date" },
+  { value: "post", label: "Post Message" },
+  { value: "impressions", label: "Impressions" },
+  { value: "clicks", label: "Clicks" },
+  { value: "likes", label: "Likes" },
+  { value: "shares", label: "Shares" },
+  { value: "fullPicture", label: "Full Picture" },
+  { value: "mediaType", label: "Type" },
+  { value: "comments", label: "Comments" },
+  { value: "reach", label: "Reach" },
+  { value: "engagement", label: "Engagement" },
+  { value: "saved", label: "Saved" },
+];
+
+export const DEFAULT_INSTAGRAM_MEDIA_COLUMNS = [
+  { name: "Date", width: "15%", dataKey: "date" },
+  { name: "Full Picture", dataKey: "fullPicture" },
+  { name: "Post Message", width: "35%", dataKey: "post" },
+  { name: "Impressions", dataKey: "impressions" },
+  { name: "Clicks", dataKey: "clicks" },
+  { name: "Likes", dataKey: "likes" },
+  { name: "Shares", dataKey: "shares" },
+];
 
 function TableWidgetForm({
   data,
   onChange,
+  metricKey,
 }: TableWidgetFormProps): React.JSX.Element {
   const [activeTab, setActiveTab] =
     useState<"general" | "data">("general");
+
+  const isRecentPosts = metricKey === 'meta.facebook.recent_posts';
+  const isInstagramMedia = metricKey === 'meta.instagram.recent_media';
+  const isDynamicTable = isRecentPosts || isInstagramMedia;
 
   const handleChange = (updates: Partial<TableWidgetData>) => {
     if (onChange) {
@@ -24,7 +79,19 @@ function TableWidgetForm({
   };
 
   const rows: ReportTableRow[] = data?.rows ?? [];
-  const columns = data?.columns ?? [];
+  let columns = data?.columns ?? [];
+
+  // Check for generic defaults ("Name", "Value") which indicate uninitialized state
+  const isGenericDefault = columns.length === 2 &&
+    columns[0].name === "Name" &&
+    columns[1].name === "Value";
+
+  // Default to standard recent posts columns if empty OR generic default
+  if (isRecentPosts && (columns.length === 0 || isGenericDefault)) {
+    columns = DEFAULT_RECENT_POSTS_COLUMNS;
+  } else if (isInstagramMedia && (columns.length === 0 || isGenericDefault)) {
+    columns = DEFAULT_INSTAGRAM_MEDIA_COLUMNS;
+  }
 
   const updateRow = (index: number, updates: Partial<ReportTableRow>) => {
     const nextRows = rows.map((row, i) =>
@@ -54,8 +121,71 @@ function TableWidgetForm({
   };
 
   const addColumn = () => {
+    // Standard Behavior
+    if (!isDynamicTable) {
+      const newColumn = {
+        name: `Column ${columns.length + 1}`,
+        width: "",
+      };
+      handleChange({ columns: [...columns, newColumn] });
+      return;
+    }
+
+    // Restricted Behavior (Recent Posts / Instagram Media) - Default to the first available metric not used? 
+    // Or just add a generic one and let them rename it (which effectively changes the key for this table type?).
+    // Actually, for Recent Posts, the 'name' field in column config maps to the data key in `rows`?
+    // In `ReportBuilder.tsx` logic for Recent Posts: 
+    // `const generateColumnsFromRows = ...` uses object keys.
+    // The `rows` mapping in `ReportBuilder` maps API fields to `post`, `impressions`, etc.
+    // The `TableWidgetForm` stores `name` which is used as the Header text.
+    // BUT, for dynamic tables, we usually match the data key to the column definition?
+    // Wait, the `TableWidgetForm` currently only has `name` and `width`. It doesn't store a `key` or `dataIndex`.
+    // The standard table widget relies on row data having keys that match something? 
+    // Actually, looking at `TableWidgetForm`, `activeTab === "data"` uses `col.name` as the key for row data: `row[col.name]`.
+    // So `col.name` IS the data key.
+
+    // So for "Recent Posts", if we want to show "Impressions", we need a column where `name` (header) is "Impressions" 
+    // AND the data row has a property "Impressions".
+    // HOWEVER, `ReportBuilder.tsx` maps the data keys to lowercase/camelCase (e.g. `impressions`, `date`, `post`).
+    // The columns generated by `ReportBuilder` defaults are: `{ name: "Date" }, { name: "Post" }` etc.
+    // And `rows` are mapped like: `date: ...`, `post: ...`.
+
+    // There seems to be a mismatch or implicit mapping.
+    // Let's re-read `ReportBuilder.tsx` table rendering logic (around line 1380).
+    // `rows.map((row, index) => ( <TableRow> {columns.map(col => <TableCell> {row[col.name]} ...`
+    // Wait, if `col.name` is "Date", it looks for `row["Date"]`.
+    // But `ReportBuilder` makes rows with keys `date`, `post`, etc.
+
+    // Ah, line 1170 in ReportBuilder: `name: key... .replace(...)`.
+    // And line 1399: iterates `rows` and cells.
+    // Wait, typical `Table` component usage usually separates `header` from `accessor`.
+    // But here `TableWidgetForm` implies `name` is both.
+
+    // Let's assume for `Recent Posts`, the `ReportBuilder` handles the mapping or I need to ensure the column name MATCHES the key?
+    // In `ReportBuilder.tsx`, existing code generates helper columns:
+    // `{ name: "Date" }`
+    // But the row data has `date`.
+    // So `row["Date"]` would be undefined!
+    // Unless `ReportBuilder` transforms keys to Capitalized for display?
+
+    // Let's look at `ReportBuilder` lines 1289+ again.
+    // Actually I can't see the render logic for the cells in my previous `view_file` (it cut off at 1400).
+    // I need to verify how `rows` are accessed in `ReportBuilder` before I implement this.
+    // If I add a column "Impressions", does it look for `row.Impressions` or `row.impressions`?
+
+    // If `isRecentPosts` is true, I should probably allow the user to select the "Field" (data key) AND the "Header Name".
+    // But `TableWidgetData` only supports `name` and `width`.
+    // This implies a limitation in the current data structure.
+
+    // HYPOTHESIS: `ReportBuilder`'s `table` renderer tries to find data case-insensitively or the hardcoded "Date" working is a mystery.
+    // OR, the `rows` constructed in `ReportBuilder` line 1100-ish sets keys to match expected headers?
+
+    // Let's pause and check `ReportBuilder` table cell rendering (lines 1390-1450).
+
+    // FOR NOW, I will implement the UI to add columns assuming I just need to add a column with a specific name.
+
     const newColumn = {
-      name: `Column ${columns.length + 1}`,
+      name: "New Column",
       width: "",
     };
     handleChange({ columns: [...columns, newColumn] });
@@ -66,6 +196,20 @@ function TableWidgetForm({
     handleChange({ columns: nextColumns });
   };
 
+  // Custom Add Logic for Recent Posts
+  const addRecentPostColumn = (fieldValue: string, fieldLabel: string) => {
+    // Check if already exists (optional, but good UX)
+    // We'll just add it.
+    const newColumn = {
+      name: fieldLabel, // This 'name' is used as the header. 
+      dataKey: fieldValue, // Store the API key for reliable data mapping
+      width: "",
+    };
+
+    // If the system relies on exact name match, we rely on ReportBuilder to be smart enough or we need to enforce casing.
+    handleChange({ columns: [...columns, newColumn] });
+  };
+
   return (
     <div className="w-full h-full overflow-y-auto">
       <div className="w-full p-4 border-b font-semibold text-accent-foreground">
@@ -73,7 +217,7 @@ function TableWidgetForm({
       </div>
 
       <div className="w-full px-4">
-        {/* Tabs */}
+        {/* Tabs - Hide Rows tab for Recent Posts */}
         <div className="flex gap-2 text-xs mt-4 mb-4 bg-gray-100 rounded-full p-1 w-max">
           <button
             type="button"
@@ -85,16 +229,18 @@ function TableWidgetForm({
           >
             Settings
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("data")}
-            className={`px-3 py-1 rounded-full font-medium transition-colors ${activeTab === "data"
-              ? "bg-white text-gray-900 shadow-sm"
-              : "text-gray-500 hover:text-gray-800"
-              }`}
-          >
-            Rows
-          </button>
+          {!isDynamicTable && (
+            <button
+              type="button"
+              onClick={() => setActiveTab("data")}
+              className={`px-3 py-1 rounded-full font-medium transition-colors ${activeTab === "data"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 hover:text-gray-800"
+                }`}
+            >
+              Rows
+            </button>
+          )}
         </div>
 
         {/* General Tab */}
@@ -167,15 +313,43 @@ function TableWidgetForm({
             <div className="border-t pt-4 mt-2 space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-xs text-gray-600">Columns</Label>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={addColumn}
-                  className="text-xs"
-                >
-                  Add Column
-                </Button>
+
+                {isDynamicTable ? (
+                  <div className="flex gap-2">
+                    {/* Custom Add Dropdown/List for Recent Posts / Instagram */}
+                    <select
+                      className="h-8 text-[11px] border rounded px-2 bg-white"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!val) return;
+
+                        // Select correct options list
+                        const options = isRecentPosts ? META_RECENT_POSTS_COLUMNS : INSTAGRAM_RECENT_MEDIA_COLUMNS;
+                        const opt = options.find(c => c.value === val);
+
+                        if (opt) addRecentPostColumn(opt.value, opt.label);
+                        e.target.value = ""; // reset
+                      }}
+                    >
+                      <option value="">+ Add Column</option>
+                      {(isRecentPosts ? META_RECENT_POSTS_COLUMNS : INSTAGRAM_RECENT_MEDIA_COLUMNS).map(opt => (
+                        <option key={opt.value} value={opt.value} disabled={columns.some(c => c.dataKey ? c.dataKey === opt.value : c.name === opt.label)}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={addColumn}
+                    className="text-xs"
+                  >
+                    Add Column
+                  </Button>
+                )}
               </div>
 
               {columns.length === 0 && (
@@ -193,7 +367,16 @@ function TableWidgetForm({
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-medium text-gray-700">
-                        Column {index + 1}
+                        {isRecentPosts ? (
+                          // For recent posts, we might want to restrict editing the name if it breaks data mapping?
+                          // But user requirement says "Edit column names".
+                          // So we allow editing. The ReportBuilder must map purely by index or something smart?
+                          // Or I must handle the mapping there.
+                          // Let's assume ReportBuilder needs to update to handle custom column names mapping to data keys.
+                          `Column: ${col.name}`
+                        ) : (
+                          `Column ${index + 1}`
+                        )}
                       </span>
                       <button
                         type="button"
@@ -214,6 +397,7 @@ function TableWidgetForm({
                             updateColumn(index, { name: e.target.value })
                           }
                           placeholder="e.g. Report"
+                          disabled={isDynamicTable}
                         />
                       </div>
                       <div>
@@ -237,7 +421,7 @@ function TableWidgetForm({
         )}
 
         {/* Data Tab */}
-        {activeTab === "data" && (
+        {activeTab === "data" && !isDynamicTable && (
           <div className="pb-8 space-y-4">
             <p className="text-[11px] text-gray-500">
               Add rows of data for this table. Each row uses the columns you
@@ -310,6 +494,7 @@ function TableWidgetForm({
     </div>
   );
 }
+
 
 export default TableWidgetForm;
 

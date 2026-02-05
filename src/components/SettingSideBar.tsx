@@ -21,12 +21,7 @@ export default function SettingSideBar({ activeTab, setActive }: SettingSideBarP
         { id: "security-settings", label: "Security Settings" },
       ]
     },
-    {
-      category: "Billing",
-      items: [
-        { id: "billing-info", label: "Billing Information" },
-      ]
-    }
+
   ];
 
   return (

@@ -111,7 +111,13 @@ export default function ClientDetailsPage() {
                             <span className="text-sm text-muted-foreground flex items-center gap-2">
                                 <Building2 className="h-4 w-4" /> Status
                             </span>
-                            <Badge variant={client.status === "ACTIVE" ? "outline" : "secondary"} className={client.status === "ACTIVE" ? "text-green-600 border-green-600" : ""}>
+                            <Badge variant={client.status === "ACTIVE" ? "outline" : "secondary"} className={client.status === "ACTIVE" ? "text-green-600 border-green-600 flex items-center gap-1.5" : ""}>
+                                {client.status === "ACTIVE" && (
+                                    <span className="relative flex h-2 w-2">
+                                        <span className="animate-pulse-green absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                    </span>
+                                )}
                                 {client.status}
                             </Badge>
                         </div>

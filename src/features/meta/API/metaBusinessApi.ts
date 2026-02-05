@@ -1,5 +1,6 @@
 import api from "@/apiConfig";
 import type { AxiosError } from "axios";
+import { withRetry, classifyError, type SyncError } from "@/utils/errorHandling";
 
 // ==================== TYPES ====================
 
@@ -557,21 +558,30 @@ export const syncMetaBusinessDaily = async (
   date?: string
 ): Promise<MetaBusinessSyncResponse> => {
   try {
-    const response = await api.post<MetaBusinessSyncResponse>(
-      `/metabusiness/sync-daily/${accountId}`,
-      {},
+    return await withRetry(
+      async () => {
+        const response = await api.post<MetaBusinessSyncResponse>(
+          `/metabusiness/sync-daily/${accountId}`,
+          {},
+          {
+            params: { date },
+          }
+        );
+        return response.data;
+      },
       {
-        params: { date },
+        maxRetries: 3,
+        timeoutMs: 60000,
       }
     );
-    return response.data;
   } catch (error) {
-    const axiosError = error as AxiosError<ApiErrorResponse>;
-    throw new Error(
-      axiosError.response?.data?.message ||
-      axiosError.response?.data?.error ||
-      "Failed to sync daily data"
-    );
+    const syncError = error as SyncError;
+    if (syncError.type) {
+      // Already classified by withRetry
+      throw syncError;
+    }
+    // Fallback for unexpected errors
+    throw classifyError(error);
   }
 };
 
@@ -584,21 +594,28 @@ export const syncMetaBusinessFacebook = async (
   date?: string
 ): Promise<MetaBusinessFacebookSyncResponse> => {
   try {
-    const response = await api.post<MetaBusinessFacebookSyncResponse>(
-      `/metabusiness/sync-facebook/${accountId}`,
-      {},
+    return await withRetry(
+      async () => {
+        const response = await api.post<MetaBusinessFacebookSyncResponse>(
+          `/metabusiness/sync-facebook/${accountId}`,
+          {},
+          {
+            params: { date },
+          }
+        );
+        return response.data;
+      },
       {
-        params: { date },
+        maxRetries: 3,
+        timeoutMs: 60000,
       }
     );
-    return response.data;
   } catch (error) {
-    const axiosError = error as AxiosError<ApiErrorResponse>;
-    throw new Error(
-      axiosError.response?.data?.message ||
-      axiosError.response?.data?.error ||
-      "Failed to sync Facebook data"
-    );
+    const syncError = error as SyncError;
+    if (syncError.type) {
+      throw syncError;
+    }
+    throw classifyError(error);
   }
 };
 
@@ -611,21 +628,28 @@ export const syncMetaBusinessInstagram = async (
   date?: string
 ): Promise<MetaBusinessInstagramSyncResponse> => {
   try {
-    const response = await api.post<MetaBusinessInstagramSyncResponse>(
-      `/metabusiness/sync-instagram/${accountId}`,
-      {},
+    return await withRetry(
+      async () => {
+        const response = await api.post<MetaBusinessInstagramSyncResponse>(
+          `/metabusiness/sync-instagram/${accountId}`,
+          {},
+          {
+            params: { date },
+          }
+        );
+        return response.data;
+      },
       {
-        params: { date },
+        maxRetries: 3,
+        timeoutMs: 60000,
       }
     );
-    return response.data;
   } catch (error) {
-    const axiosError = error as AxiosError<ApiErrorResponse>;
-    throw new Error(
-      axiosError.response?.data?.message ||
-      axiosError.response?.data?.error ||
-      "Failed to sync Instagram data"
-    );
+    const syncError = error as SyncError;
+    if (syncError.type) {
+      throw syncError;
+    }
+    throw classifyError(error);
   }
 };
 

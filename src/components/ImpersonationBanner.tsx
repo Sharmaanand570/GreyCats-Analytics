@@ -3,14 +3,19 @@ import { isImpersonating, stopImpersonating } from "@/api/adminApi";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { UserX } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 
 export const ImpersonationBanner = () => {
     // const navigate = useNavigate();
+    const queryClient = useQueryClient();
 
     if (!isImpersonating()) return null;
 
     const handleStop = () => {
         try {
+            // Clear all cached queries before stopping impersonation
+            queryClient.clear();
+
             stopImpersonating();
             toast.success('Stopped impersonating user');
             // Use window.location.href to force a full reload

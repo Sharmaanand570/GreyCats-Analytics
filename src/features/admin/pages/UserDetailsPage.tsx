@@ -12,10 +12,12 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function UserDetailsPage() {
     const { userId } = useParams();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const [user, setUser] = useState<AdminUser | null>(null);
     const [clients, setClients] = useState<AdminClient[]>([]);
     const [subscriptions, setSubscriptions] = useState<AdminSubscription[]>([]);
@@ -144,6 +146,9 @@ export default function UserDetailsPage() {
                                     console.log('- originalToken:', localStorage.getItem('originalToken'));
                                     console.log('- ANALYTICS_TOKEN_KEY_:', localStorage.getItem(TOKEN_KEY));
                                     console.log('- impersonationToken:', localStorage.getItem('impersonationToken'));
+
+                                    // Clear all cached queries to prevent stale data
+                                    queryClient.clear();
 
                                     toast.success(`Now impersonating ${user.fullName}`);
 

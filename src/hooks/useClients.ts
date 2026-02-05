@@ -10,6 +10,7 @@ import type {
 } from '../types/client.types';
 import { useClientContext } from '../context/ClientContext';
 import { toast } from 'sonner';
+import { useUserStore } from '@/utils/useUserStore';
 
 // Query Keys
 export const clientKeys = {
@@ -23,6 +24,7 @@ export const clientKeys = {
 // Fetch all clients
 export const useClients = () => {
   const { setClients } = useClientContext();
+  const { user } = useUserStore();
 
   return useQuery({
     queryKey: clientKeys.lists(),
@@ -62,6 +64,12 @@ export const useClients = () => {
           return []; // Return empty array instead of throwing
         }
 
+        // IMPORTANT: Do NOT return empty array for 401 (Unauthorized) errors
+        // This prevents React Query from caching "success: []" when the user is simply not logged in yet or session expired.
+        if (error.response?.status === 401) {
+          throw error;
+        }
+
         // For other errors, show error message but still return empty array
         toast.error(error.response?.data?.message || 'Failed to fetch clients');
         setClients([]);
@@ -71,6 +79,7 @@ export const useClients = () => {
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: false, // Don't retry on network errors
     refetchOnWindowFocus: false,
+    enabled: !!user, // Only fetch if user is logged in
   });
 };
 

@@ -212,9 +212,9 @@ function ConnectDataSource({
     <div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>{children}</DialogTrigger>
-        <DialogContent className="w-[95vw] max-w-[95vw] sm:w-[90vw] sm:max-w-[90vw] md:w-[75vw] md:max-w-[75vw] lg:w-[60vw] lg:max-w-[60vw] xl:w-[55vw] xl:max-w-[55vw] max-h-[95vh] sm:max-h-[90vh] md:max-h-[85vh] lg:max-h-[80vh] mx-2 sm:mx-4 md:mx-6">
+        <DialogContent className="w-full max-w-2xl max-h-[90vh] mx-4">
           <DialogHeader>
-            <DialogTitle className="text-base sm:text-lg md:text-xl lg:text-2xl">Choose your Metrics</DialogTitle>
+            <DialogTitle className="text-base sm:text-lg md:text-xl lg:text-2xl">Select a Data Source</DialogTitle>
             <DialogDescription className="text-xs sm:text-sm md:text-base">
               Select an integration to connect and track your metrics
             </DialogDescription>
@@ -233,7 +233,7 @@ function ConnectDataSource({
               </div>
 
               {/* Integrations List */}
-              <div className="mt-3 sm:mt-4 md:mt-5 h-[350px] sm:h-[400px] md:h-[450px] overflow-y-auto border rounded-lg">
+              <div className="mt-4 max-h-[50vh] overflow-y-auto border rounded-lg">
                 {filteredDataSources.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-gray-500">
                     <p className="text-sm sm:text-base">No integrations found</p>
@@ -245,33 +245,34 @@ function ConnectDataSource({
                         onClick={() => setSelectedSource(option)}
                         id={String(option.id)}
                         key={String(option.id)}
-                        className={`flex items-center justify-between p-3 sm:p-4 hover:bg-slate-50 cursor-pointer transition-colors ${String(SelectedSource.id) === String(option.id)
+                        className={`flex items-center gap-3 p-4 hover:bg-slate-50 cursor-pointer transition-colors ${String(SelectedSource.id) === String(option.id)
                           ? "bg-slate-100"
                           : ""
                           }`}
                       >
-                        <div className="flex items-center gap-3">
+                        {/* Radio Button */}
+                        <div className="flex-shrink-0">
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${String(SelectedSource.id) === String(option.id)
+                            ? "border-blue-600 bg-blue-600"
+                            : "border-gray-300"
+                            }`}>
+                            {String(SelectedSource.id) === String(option.id) && (
+                              <div className="w-2 h-2 rounded-full bg-white" />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Icon and Name */}
+                        <div className="flex items-center gap-3 flex-1">
                           <option.icon
-                            className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0"
+                            className="h-6 w-6 flex-shrink-0"
                             style={option.color ? { color: option.color } : undefined}
                           />
-                          <span className="text-sm sm:text-base font-medium">{option.name}</span>
-                          {option.name === "Meta Business" && <span className="text-xs text-gray-400 font-light">(facebook & instagram)</span>}
-
+                          <div className="flex items-center gap-2">
+                            <span className="text-base font-medium">{option.name}</span>
+                            {option.name === "Meta Business" && <span className="text-xs text-gray-400 font-light">(facebook & instagram)</span>}
+                          </div>
                         </div>
-                        <svg
-                          className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 5l7 7-7 7"
-                          />
-                        </svg>
                       </div>
                     ))}
                   </div>
@@ -279,9 +280,9 @@ function ConnectDataSource({
               </div>
 
               {/* Footer */}
-              <DialogFooter className="mt-4 sm:mt-5 md:mt-6 flex-col sm:flex-row gap-2 sm:gap-3">
+              <DialogFooter className="mt-6 flex-col sm:flex-row gap-2">
                 <DialogClose asChild>
-                  <Button variant="outline" className="w-full sm:w-auto text-sm sm:text-base">
+                  <Button variant="outline" className="w-full sm:w-auto">
                     Cancel
                   </Button>
                 </DialogClose>
@@ -392,7 +393,7 @@ function ConnectDataSource({
                     }
                   }}
                   type="button"
-                  className="w-full sm:w-auto text-sm sm:text-base"
+                  className="w-full sm:w-auto"
                 >
                   {isConnecting ? "Connecting..." : "Next"}
                 </Button>

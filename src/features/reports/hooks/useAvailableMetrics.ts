@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchUnifiedMetricsList } from "../api/reportingApi";
 import type { DebugMetric } from "../api/types";
 import { useMemo } from "react";
+import { FACEBOOK_DAILY_METRICS, FACEBOOK_CUMULATIVE_METRICS } from "../../../utils/facebookMetrics";
 
 export interface AvailableMetric {
   metricKey: string;
@@ -21,6 +22,13 @@ export interface MetricsByIntegration {
 
 // Helper function to extract display name from metricKey
 const getMetricDisplayName = (metricKey: string): string => {
+  // Special handling for aggregated metrics
+  if (metricKey.includes('aggregated')) {
+    const parts = metricKey.split('.');
+    const metricName = parts[parts.length - 1]; // e.g. 'likes'
+    return `Aggregated ${metricName.charAt(0).toUpperCase() + metricName.slice(1)}`;
+  }
+
   // Extract the last part after the last dot
   const parts = metricKey.split('.');
   const name = parts[parts.length - 1];
@@ -134,6 +142,66 @@ export const useAvailableMetrics = (clientId: number | null, options?: { enabled
         displayName: getMetricDisplayName(metric.metricKey),
         category: getMetricCategory(metric.metricKey),
       });
+    });
+
+    // Manually inject 'Recent Media/Posts' table metrics if they are missing
+    // identifying accounts based on the presence of other metrics
+    Object.keys(grouped).forEach((integration) => {
+      // Check Meta Business / Meta integrations (handle both hyphen and underscore)
+      const normalizedInt = integration.toLowerCase().replace(/_/g, '-');
+      if (normalizedInt === 'meta-business' || normalizedInt === 'meta') {
+        Object.keys(grouped[integration]).forEach((accountId) => {
+          const metrics = grouped[integration][accountId];
+
+          // Check for Instagram logic
+          // For Meta Business, we want to ensure all Instagram metrics are available
+          const hasInstagram = metrics.some(m => m.metricKey.includes('instagram'));
+
+          if (hasInstagram || normalizedInt === 'meta-business' || normalizedInt === 'meta') {
+            // 1. Ensure Recent Media widget is present
+            if (!metrics.some(m => m.metricKey === 'meta.instagram.recent_media')) {
+              metrics.push({
+                metricKey: 'meta.instagram.recent_media',
+                integration,
+                accountId,
+                displayName: 'Instagram - Recent Media',
+                category: 'General'
+              });
+            }
+
+            // 2. Inject all other known Instagram metrics if missing
+            // This ensures users see them in the sidebar even if the API hasn't returned data for them yet
+            const allKnownInstagramMetrics = [
+              ...FACEBOOK_DAILY_METRICS,
+              ...FACEBOOK_CUMULATIVE_METRICS
+            ].filter(key => key.includes('instagram') && key !== 'meta.instagram.recent_media');
+
+            allKnownInstagramMetrics.forEach(key => {
+              if (!metrics.some(m => m.metricKey === key)) {
+                metrics.push({
+                  metricKey: key,
+                  integration,
+                  accountId,
+                  displayName: getMetricDisplayName(key),
+                  category: getMetricCategory(key)
+                });
+              }
+            });
+          }
+
+          // Check for Facebook logic (optional but good for consistency)
+          const hasFacebook = metrics.some(m => m.metricKey.includes('facebook') || m.metricKey.includes('page_'));
+          if (hasFacebook && !metrics.some(m => m.metricKey === 'meta.facebook.recent_posts')) {
+            metrics.push({
+              metricKey: 'meta.facebook.recent_posts',
+              integration,
+              accountId,
+              displayName: 'Facebook - Recent Posts',
+              category: 'General'
+            });
+          }
+        });
+      }
     });
 
     // Sort metrics within each account by display name

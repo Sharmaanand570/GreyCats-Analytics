@@ -84,6 +84,7 @@ function MetaBusinessDetailPage() {
     const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
     const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
     const [syncingPageId, setSyncingPageId] = useState<string | null>(null);
+    const [syncError, setSyncError] = useState<{ accountId: string; message: string } | null>(null);
 
     // Instagram State
     const [selectedIgMediaId, setSelectedIgMediaId] = useState<string | null>(null);
@@ -169,9 +170,13 @@ function MetaBusinessDetailPage() {
     const handleSyncBoth = async (accountId: number) => {
         try {
             setSyncingPageId(accountId.toString());
+            setSyncError(null); // Clear previous errors
             await syncBoth({ accountId });
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
+            // Display user-friendly error message
+            const errorMessage = error?.userMessage || error?.message || "Failed to sync data. Please try again.";
+            setSyncError({ accountId: accountId.toString(), message: errorMessage });
         } finally {
             setSyncingPageId(null);
         }
@@ -220,6 +225,29 @@ function MetaBusinessDetailPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* Sync Error Alert */}
+                {syncError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                            <h3 className="text-sm font-semibold text-red-900 mb-1">Sync Failed</h3>
+                            <p className="text-sm text-red-700">{syncError.message}</p>
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                const accountId = parseInt(syncError.accountId);
+                                handleSyncBoth(accountId);
+                            }}
+                            className="text-red-600 border-red-300 hover:bg-red-100"
+                        >
+                            <RefreshCw className="w-4 h-4 mr-1.5" />
+                            Retry
+                        </Button>
+                    </div>
+                )}
 
                 {/* --- 2. Accounts Overview Grid --- */}
                 {selectedClientId ? (

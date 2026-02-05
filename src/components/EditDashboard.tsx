@@ -253,17 +253,43 @@ function EditDashboard() {
     if (activeDashboard?.widgets) {
       const entries = Object.entries(activeDashboard.widgets);
       if (entries.length > 0) {
-        setWidgets(
-          entries
-            .map(([id, widget]) => ({
-              ...(widget as DashboardWidget),
-              id,
-            }))
-            .sort((a, b) => (a.layout?.y ?? 0) - (b.layout?.y ?? 0))
-        );
+        const allWidgets = entries
+          .map(([id, widget]) => ({
+            ...(widget as DashboardWidget),
+            id,
+          }))
+          .sort((a, b) => (a.layout?.y ?? 0) - (b.layout?.y ?? 0));
+
+        // Filter out orphaned widgets (widgets referencing disconnected integrations)
+        // Only filter if groupedMetrics is available
+        if (groupedMetrics && Object.keys(groupedMetrics).length > 0) {
+          const validWidgets = allWidgets.filter(widget => {
+            // Check if this widget's integration+account exists in available metrics
+            const hasMetrics = groupedMetrics[widget.integration]?.[widget.accountId || ''];
+            return !!hasMetrics;
+          });
+
+          // Show notification if widgets were filtered out
+          const removedCount = allWidgets.length - validWidgets.length;
+          if (removedCount > 0) {
+            toast.info(
+              `${removedCount} widget${removedCount > 1 ? 's' : ''} removed due to disconnected data sources`,
+              { duration: 5000 }
+            );
+          }
+
+          setWidgets(validWidgets);
+        } else {
+          // If no metrics available yet, set all widgets (will be filtered on next render)
+          setWidgets(allWidgets);
+        }
+      } else {
+        setWidgets([]);
       }
+    } else {
+      setWidgets([]);
     }
-  }, [activeDashboard]);
+  }, [activeDashboard, groupedMetrics]);
 
 
   // --- Helper: Get available metrics for a widget ---
@@ -342,8 +368,20 @@ function EditDashboard() {
     mutationFn: async () => {
       if (!clientId) throw new Error("Client ID missing");
 
+      // Filter out any widgets that don't have valid metrics (defensive check)
+      const validWidgets = widgets.filter(widget => {
+        const hasMetrics = groupedMetrics[widget.integration]?.[widget.accountId || ''];
+        return !!hasMetrics;
+      });
+
+      // Warn if widgets were filtered during save
+      if (validWidgets.length < widgets.length) {
+        const removedCount = widgets.length - validWidgets.length;
+        console.warn(`Filtered out ${removedCount} invalid widget(s) during save`);
+      }
+
       // Convert flat array to map for API, injecting 'y' order
-      const widgetsMap: Record<string, DashboardWidget> = widgets.reduce(
+      const widgetsMap: Record<string, DashboardWidget> = validWidgets.reduce(
         (acc, widget, index) => {
           const layout = widget.layout
             ? { ...widget.layout, y: index }

@@ -6,7 +6,7 @@ import CompanyDetailsForm from "@/components/CompanyDetailsForm";
 import PersonalInformation from "@/components/settings/PersonalInformation";
 import ReportSettings from "@/components/settings/ReportSettings";
 import SecuritySettings from "@/components/settings/SecuritySettings";
-import BillingInformation from "@/components/settings/BillingInformation";
+
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("personal-info");
@@ -22,8 +22,6 @@ export default function SettingsPage() {
         return <ReportSettings />;
       case "security-settings":
         return <SecuritySettings />;
-      case "billing-info":
-        return <BillingInformation />;
       default:
         return <PersonalInformation />;
     }

@@ -1,11 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSyncStatus, type SyncStatusResponse } from "../api/reportingApi";
 import { useEffect, useState } from "react";
+import type { SyncError } from "@/utils/errorHandling";
 
 export const useSyncStatus = (clientId: number | null) => {
     const [shouldPoll, setShouldPoll] = useState(true);
+    const [pollInterval, setPollInterval] = useState(5000); // Start with 5 seconds
+    const [errorCount, setErrorCount] = useState(0);
+    const queryClient = useQueryClient();
 
-    const query = useQuery<SyncStatusResponse, Error>({
+    const query = useQuery<SyncStatusResponse, SyncError>({
         queryKey: ["sync-status", clientId],
         queryFn: async () => {
             if (!clientId) throw new Error("Client ID required");
@@ -14,9 +18,25 @@ export const useSyncStatus = (clientId: number | null) => {
         enabled: !!clientId,
         refetchInterval: (_query) => {
             if (!shouldPoll) return false;
-            return 5000; // Poll every 5 seconds
+            return pollInterval;
         },
+        retry: 3, // Retry failed requests up to 3 times
+        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
     });
+
+    // Handle errors with exponential backoff
+    useEffect(() => {
+        if (query.isError) {
+            setErrorCount(prev => prev + 1);
+            // Exponential backoff: 5s, 10s, 20s, 40s, max 60s
+            const newInterval = Math.min(5000 * Math.pow(2, errorCount), 60000);
+            setPollInterval(newInterval);
+        } else if (query.isSuccess) {
+            // Reset error count and interval on success
+            setErrorCount(0);
+            setPollInterval(5000);
+        }
+    }, [query.isError, query.isSuccess, errorCount]);
 
     useEffect(() => {
         if (query.data?.data) {
@@ -99,10 +119,21 @@ export const useSyncStatus = (clientId: number | null) => {
         return { total, synced, isSynced: integration.allSynced };
     };
 
+    // Retry function to manually retry sync status fetch
+    const retrySync = () => {
+        setErrorCount(0);
+        setPollInterval(5000);
+        setShouldPoll(true);
+        queryClient.invalidateQueries({ queryKey: ["sync-status", clientId] });
+    };
+
     return {
         ...query,
         isAccountSyncing,
         getIntegrationCounts,
-        overallProgress
+        overallProgress,
+        hasError: query.isError,
+        errorMessage: query.error?.userMessage || query.error?.message || (query.isError ? "Failed to fetch sync status" : undefined),
+        retrySync,
     };
 };

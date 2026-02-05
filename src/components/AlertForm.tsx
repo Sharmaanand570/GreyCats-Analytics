@@ -156,7 +156,7 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, clientName, clie
             )}
 
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* Integration Selection */}
                 <div className="space-y-2">
                     <Label>Integration <span className="text-red-500">*</span></Label>

@@ -1,5 +1,6 @@
 import api from "@/apiConfig";
 import type { AxiosError } from "axios";
+import { withRetry, type SyncError } from "@/utils/errorHandling";
 
 // ==================== TYPES ====================
 
@@ -478,11 +479,23 @@ export const syncYouTube = async (
   clientId: number
 ): Promise<YouTubeSyncResponse> => {
   try {
-    const response = await api.post<YouTubeSyncResponse>(
-      `/clients/${clientId}/youtube/sync`
+    return await withRetry(
+      async () => {
+        const response = await api.post<YouTubeSyncResponse>(
+          `/clients/${clientId}/youtube/sync`
+        );
+        return response.data;
+      },
+      {
+        maxRetries: 3,
+        timeoutMs: 60000,
+      }
     );
-    return response.data;
   } catch (error) {
+    const syncError = error as SyncError;
+    if (syncError.type) {
+      throw syncError;
+    }
     const axiosError = error as AxiosError<ApiErrorResponse>;
     throw new Error(
       axiosError.response?.data?.message ||

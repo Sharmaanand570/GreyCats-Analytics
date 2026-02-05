@@ -19,6 +19,7 @@ export interface TableWidgetData {
   columns?: {
     name: string;
     width?: string;
+    dataKey?: string;
   }[];
   backgroundColor?: string;
   textColor?: string;
@@ -73,6 +74,8 @@ export interface CustomWidgetData {
   align?: "left" | "center" | "right";
   backgroundColor?: string;
   textColor?: string;
+  fontSize?: string;
+  fontWeight?: string;
 }
 
 // Union type for all widget data

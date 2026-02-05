@@ -107,10 +107,40 @@ const ReportsLandingPage: React.FC = () => {
                         </div>
 
                         {isLoading ? (
-                            <div className="space-y-4">
-                                {[1, 2, 3, 4, 5].map((i) => (
-                                    <Skeleton key={i} className="h-16 w-full rounded-xl" />
-                                ))}
+                            <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-sm">
+                                <Table>
+                                    <TableHeader className="bg-zinc-50/50">
+                                        <TableRow>
+                                            <TableHead className="w-[400px]">Client Name</TableHead>
+                                            <TableHead>Integrations</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {[1, 2, 3, 4, 5].map((i) => (
+                                            <TableRow key={i}>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-3">
+                                                        <Skeleton className="h-10 w-10 rounded-lg" />
+                                                        <div className="space-y-2">
+                                                            <Skeleton className="h-4 w-48" />
+                                                            <Skeleton className="h-3 w-32" />
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <Skeleton className="h-5 w-8" />
+                                                        <Skeleton className="h-3 w-16" />
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <Skeleton className="h-8 w-24 ml-auto rounded-md" />
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
                             </div>
                         ) : clients?.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-[60vh]">

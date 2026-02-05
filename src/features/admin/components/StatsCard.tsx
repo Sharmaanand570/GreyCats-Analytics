@@ -1,6 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
+import { AnimatedCounter } from "./AnimatedCounter";
+import { TrendIndicator } from "./TrendIndicator";
 
 interface StatsCardProps {
     title: string;
@@ -18,33 +20,49 @@ interface StatsCardProps {
 export function StatsCard({ title, value, description, icon: Icon, trend, className }: StatsCardProps) {
     return (
         <Card className={cn(
-            "overflow-hidden transition-all duration-200 hover:shadow-lg hover:border-gray-300 dark:hover:border-white/20",
-            "bg-white dark:bg-[#111] border-gray-200 dark:border-white/10",
+            "group relative overflow-hidden transition-all duration-300",
+            "hover:shadow-xl hover:-translate-y-1",
+            "bg-white dark:bg-[#111]",
+            "border border-gray-200 dark:border-white/10",
+            "hover:border-gray-300 dark:hover:border-white/20",
             className
         )}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</CardTitle>
-                <div className="h-8 w-8 rounded-full bg-gray-50 dark:bg-white/5 flex items-center justify-center">
-                    <Icon className="h-4 w-4 text-gray-900 dark:text-white" />
+            {/* Subtle gradient overlay on hover */}
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-50/50 to-transparent dark:from-white/5 dark:to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+            <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    {title}
+                </CardTitle>
+                <div className={cn(
+                    "h-10 w-10 rounded-xl flex items-center justify-center transition-all duration-300",
+                    "bg-gray-100 dark:bg-white/5",
+                    "group-hover:bg-gray-200 dark:group-hover:bg-white/10",
+                    "group-hover:scale-110"
+                )}>
+                    <Icon className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                 </div>
             </CardHeader>
-            <CardContent>
-                <div className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">{value}</div>
+
+            <CardContent className="relative">
+                <div className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                    <AnimatedCounter value={value} />
+                </div>
+
                 {(description || trend) && (
-                    <div className="flex items-center gap-2 mt-2">
+                    <div className="flex items-center gap-2 mt-3">
                         {trend && (
-                            <span className={cn(
-                                "flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-opacity-10",
-                                trend.direction === "up" ? "text-green-600 bg-green-500 dark:text-green-400 dark:bg-green-500/20" :
-                                    trend.direction === "down" ? "text-red-600 bg-red-500 dark:text-red-400 dark:bg-red-500/20" :
-                                        "text-gray-600 bg-gray-500 dark:text-gray-400 dark:bg-gray-500/20"
-                            )}>
-                                {trend.value > 0 ? "+" : ""}{trend.value}%
-                            </span>
+                            <TrendIndicator
+                                value={trend.value}
+                                label={trend.label}
+                                direction={trend.direction}
+                            />
                         )}
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {description || trend?.label}
-                        </p>
+                        {description && !trend && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {description}
+                            </p>
+                        )}
                     </div>
                 )}
             </CardContent>

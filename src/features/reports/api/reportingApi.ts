@@ -27,6 +27,7 @@ import type {
   ReportScheduleMessageResponse,
   GetReportScheduleResponse,
   MetaStoredPostsResponse,
+  InstagramMediaResponse,
 } from "./types";
 import { buildApiError, type AxiosApiError } from "./types";
 import { prettifyMetricLabel } from "@/utils/labelUtils";
@@ -36,14 +37,37 @@ export const fetchMetaStoredPosts = (
   accountId: string,
   limit: number = 25,
   sortBy: string = 'createdTime',
-  order: string = 'desc'
+  order: string = 'desc',
+  startDate?: string,
+  endDate?: string
 ) =>
   handleRequest<MetaStoredPostsResponse>(async () => {
+    const params: any = { limit, sortBy, order };
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+
     const response = await api.get<MetaStoredPostsResponse>(
       `/metabusiness/facebook/stored-posts/${accountId}`,
-      {
-        params: { limit, sortBy, order }
-      }
+      { params }
+    );
+    return response.data;
+  });
+
+// New API function for Instagram Stored Media
+export const fetchInstagramStoredMedia = (
+  accountId: string,
+  limit: number = 25,
+  startDate?: string,
+  endDate?: string
+) =>
+  handleRequest<InstagramMediaResponse>(async () => {
+    const params: any = { limit };
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+
+    const response = await api.get<InstagramMediaResponse>(
+      `/metabusiness/instagram/stored-media/${accountId}`,
+      { params }
     );
     return response.data;
   });
@@ -73,8 +97,6 @@ export const getSyncStatus = (clientId: number) =>
     const response = await api.get<SyncStatusResponse>(
       `/clients/${clientId}/sync-status`
     );
-
-    console.log(response.data, "hjvbjhvhjvjhvjhvjhvj");
     return response.data;
   });
 

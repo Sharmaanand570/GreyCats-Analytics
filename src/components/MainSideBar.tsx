@@ -35,13 +35,17 @@ import { useUserStore } from "@/utils/useUserStore";
 import { getProfileImageUrl } from "@/utils/imageUtils";
 
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
+import { useQueryClient } from "@tanstack/react-query";
+import { useClientContext } from "@/context/ClientContext";
 
 
 function MainSideBar(): React.JSX.Element {
   const location = useLocation();
   const [activeTab, setActive] = useState(location.pathname);
   const is404Page = location.pathname.startsWith("/404");
-  const { user, fetchProfile } = useUserStore();
+  const { user, fetchProfile, logout } = useUserStore();
+  const queryClient = useQueryClient();
+  const { setClients, setCurrentClient } = useClientContext();
   console.log("MainSideBar render user:", user, "role:", user?.role);
 
   useEffect(() => {
@@ -78,7 +82,20 @@ function MainSideBar(): React.JSX.Element {
   const navigate = useNavigate();
 
   const handleLogout = () => {
+    // 1. Clear React Query Cache (removes all cached data like clients, user profile, etc.)
+    queryClient.removeQueries();
+
+    // 2. Clear Context State (immediate UI update)
+    setClients([]);
+    setCurrentClient(null);
+
+    // 3. Clear User Store (Zustand)
+    logout();
+
+    // 4. Clear Token
     removeAuthToken(StorageKey.ANALYTICS_TOKEN);
+
+    // 5. Navigate to login
     // Force a hard reload to clear any in-memory state or query caches, then go to login
     window.location.href = "/#/auth/login";
   };

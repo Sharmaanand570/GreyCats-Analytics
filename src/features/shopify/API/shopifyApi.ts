@@ -1,5 +1,6 @@
 import api from "@/apiConfig";
 import type { AxiosError } from "axios";
+import { withRetry, type SyncError } from "@/utils/errorHandling";
 
 // ==================== TYPES ====================
 
@@ -229,9 +230,21 @@ export const handleShopifyCallback = async (
 
 export const syncShopifyProducts = async (clientId: number): Promise<ShopifySyncResponse> => {
   try {
-    const response = await api.get<ShopifySyncResponse>(`/clients/${clientId}/shopify/sync`);
-    return response.data;
+    return await withRetry(
+      async () => {
+        const response = await api.get<ShopifySyncResponse>(`/clients/${clientId}/shopify/sync`);
+        return response.data;
+      },
+      {
+        maxRetries: 3,
+        timeoutMs: 60000,
+      }
+    );
   } catch (error) {
+    const syncError = error as SyncError;
+    if (syncError.type) {
+      throw syncError;
+    }
     return handleApiError(error, "Failed to sync Shopify products");
   }
 };
@@ -521,18 +534,42 @@ export const getShopifyMeta = async (clientId: number): Promise<ShopifySummaryRe
 
 export const syncShopifyOrders = async (clientId: number): Promise<ShopifySyncResponse> => {
   try {
-    const response = await api.get<ShopifySyncResponse>(`/clients/${clientId}/shopify/orders`);
-    return response.data;
+    return await withRetry(
+      async () => {
+        const response = await api.get<ShopifySyncResponse>(`/clients/${clientId}/shopify/orders`);
+        return response.data;
+      },
+      {
+        maxRetries: 3,
+        timeoutMs: 60000,
+      }
+    );
   } catch (error) {
+    const syncError = error as SyncError;
+    if (syncError.type) {
+      throw syncError;
+    }
     return handleApiError(error, "Failed to sync Shopify orders");
   }
 };
 
 export const forceSyncProducts = async (clientId: number): Promise<ShopifySyncResponse> => {
   try {
-    const response = await api.get<ShopifySyncResponse>(`/clients/${clientId}/shopify/sync`);
-    return response.data;
+    return await withRetry(
+      async () => {
+        const response = await api.get<ShopifySyncResponse>(`/clients/${clientId}/shopify/sync`);
+        return response.data;
+      },
+      {
+        maxRetries: 3,
+        timeoutMs: 60000,
+      }
+    );
   } catch (error) {
+    const syncError = error as SyncError;
+    if (syncError.type) {
+      throw syncError;
+    }
     return handleApiError(error, "Failed to force sync Shopify products");
   }
 };

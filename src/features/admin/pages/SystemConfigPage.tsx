@@ -6,57 +6,26 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { adminApi, type FeatureFlag, type AdminStats } from "@/api/adminApi";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { adminApi, type AdminStats } from "@/api/adminApi";
 
 export default function SystemConfigPage() {
-    const [activeTab, setActiveTab] = useState("features");
-    const [features, setFeatures] = useState<FeatureFlag[]>([]);
+    const [activeTab, setActiveTab] = useState("config");
     const [stats, setStats] = useState<AdminStats | null>(null);
-    const [loading, setLoading] = useState(false);
 
     // Config form state placeholder
     const [systemConfig, setSystemConfig] = useState("");
 
     useEffect(() => {
-        if (activeTab === "features") loadFeatures();
         if (activeTab === "monitoring") loadStats();
     }, [activeTab]);
 
-    const loadFeatures = async () => {
-        setLoading(true);
-        try {
-            const data = await adminApi.getFeatureFlags();
-            setFeatures(data);
-        } catch (error) {
-            console.error(error);
-            toast.error("Failed to load feature flags");
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const loadStats = async () => {
-        setLoading(true);
         try {
             const data = await adminApi.getStats();
             setStats(data);
         } catch (error) {
             console.error(error);
             toast.error("Failed to load system stats");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleToggleFeature = async (flag: FeatureFlag) => {
-        try {
-            await adminApi.updateFeatureFlag(flag.name, { enabled: !flag.enabled });
-            toast.success(`Feature ${flag.name} updated`);
-            loadFeatures();
-        } catch (error) {
-            console.error(error);
-            toast.error("Failed to update feature");
         }
     };
 
@@ -64,57 +33,15 @@ export default function SystemConfigPage() {
         <div className="space-y-6">
             <AdminPageHeader
                 title="System Configuration"
-                description="Manage global system settings, feature flags, and monitoring."
+                description="Manage global system settings and monitoring."
             />
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
                 <TabsList>
-                    <TabsTrigger value="features">Feature Flags</TabsTrigger>
                     <TabsTrigger value="config">System Config</TabsTrigger>
                     <TabsTrigger value="security">Security & MFA</TabsTrigger>
                     <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
                 </TabsList>
-
-                <TabsContent value="features" className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Feature Flags</CardTitle>
-                            <CardDescription>Manage global feature toggles.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Feature Name</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead>Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {features.map((flag) => (
-                                        <TableRow key={flag.id}>
-                                            <TableCell className="font-medium">{flag.name}</TableCell>
-                                            <TableCell>
-                                                <Switch
-                                                    checked={flag.enabled}
-                                                    onChange={() => handleToggleFeature(flag)}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <Button variant="ghost" size="sm">Edit</Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                    {features.length === 0 && !loading && (
-                                        <TableRow>
-                                            <TableCell colSpan={3} className="text-center text-muted-foreground">No feature flags found.</TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
 
                 <TabsContent value="config" className="space-y-4">
                     <Card>

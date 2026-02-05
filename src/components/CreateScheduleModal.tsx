@@ -162,7 +162,7 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{isEditing ? 'Edit Schedule' : 'Create Schedule'}</DialogTitle>
                     <DialogDescription>
@@ -171,8 +171,8 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-6 py-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2 col-span-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2 md:col-span-2">
                             <Label>Schedule Name</Label>
                             <Input
                                 value={name}
@@ -182,7 +182,7 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
                             />
                         </div>
 
-                        <div className="space-y-2 col-span-2">
+                        <div className="space-y-2 md:col-span-2">
                             <Label>Report Template</Label>
                             <Select
                                 value={templateId}

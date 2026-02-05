@@ -22,7 +22,7 @@ createRoot(document.getElementById("root")!).render(
       <HashRouter>
         <ClientProvider>
           <App />
-          <Toaster />
+          <Toaster closeButton />
         </ClientProvider>
       </HashRouter>
     </QueryClientProvider>

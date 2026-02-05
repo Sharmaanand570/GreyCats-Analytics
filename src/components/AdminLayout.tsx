@@ -9,20 +9,28 @@ import {
     LogOut,
     ShieldAlert,
     Menu,
-    X,
-    Settings2
+    X
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useUserStore } from "@/utils/useUserStore";
 import { cn } from "@/lib/utils";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
+import { isImpersonating } from "@/api/adminApi";
 
 export default function AdminLayout() {
     const { user, logout } = useUserStore();
     const location = useLocation();
     const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+    // Prevent access to admin panel when impersonating
+    useEffect(() => {
+        if (isImpersonating()) {
+            // Redirect to main app if trying to access admin panel while impersonating
+            navigate("/", { replace: true });
+        }
+    }, [location.pathname, navigate]);
 
     const handleLogout = () => {
         logout();
@@ -79,12 +87,6 @@ export default function AdminLayout() {
             icon: ShieldAlert,
             roles: ["SUPER_ADMIN"],
         },
-        {
-            title: "Feature Flags",
-            href: "/admin/features",
-            icon: Settings2,
-            roles: ["SUPER_ADMIN"],
-        },
     ];
 
     const filteredNavItems = navItems.filter(
@@ -130,13 +132,16 @@ export default function AdminLayout() {
                                     key={item.href}
                                     to={item.href}
                                     className={cn(
-                                        "flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-200",
+                                        "group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200",
                                         isActive
-                                            ? "bg-black text-white shadow-lg shadow-black/5 dark:bg-white dark:text-black"
-                                            : "text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white"
+                                            ? "bg-black text-white shadow-lg shadow-black/10 dark:bg-white dark:text-black dark:shadow-white/10"
+                                            : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white hover:scale-[1.02]"
                                     )}
                                 >
-                                    <Icon className={cn("h-4 w-4", isActive ? "text-white dark:text-black" : "text-current")} />
+                                    <Icon className={cn(
+                                        "h-4 w-4 transition-transform duration-200",
+                                        isActive ? "text-white dark:text-black" : "text-current group-hover:scale-110"
+                                    )} />
                                     {item.title}
                                 </Link>
                             );

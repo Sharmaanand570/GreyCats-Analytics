@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -208,8 +209,65 @@ const AlertsPage: React.FC = () => {
               </p>
             </div>
           ) : isLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-zinc-900"></div>
+            <div className="space-y-8 animate-in fade-in duration-500">
+              {/* Critical Section Skeleton */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-4 w-32" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="bg-white rounded-xl border border-zinc-100 p-5 shadow-sm h-48 flex flex-col justify-between">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-3">
+                          <Skeleton className="w-10 h-10 rounded-lg" />
+                          <div className="space-y-2">
+                            <Skeleton className="h-4 w-24" />
+                            <Skeleton className="h-3 w-16" />
+                          </div>
+                        </div>
+                        <Skeleton className="h-3 w-3 rounded-full" />
+                      </div>
+                      <div className="space-y-2">
+                        <Skeleton className="h-8 w-20" />
+                        <Skeleton className="h-4 w-32 opacity-70" />
+                      </div>
+                      <div className="pt-4 border-t border-zinc-50 flex justify-between">
+                        <Skeleton className="h-3 w-20" />
+                        <div className="flex gap-1">
+                          <Skeleton className="h-8 w-8 rounded-md" />
+                          <Skeleton className="h-8 w-8 rounded-md" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Healthy Section Skeleton */}
+              <div className="space-y-4">
+                <Skeleton className="h-4 w-32" />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                    <div key={i} className="bg-white rounded-lg border border-zinc-100 p-4 shadow-sm h-32 flex flex-col justify-between">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2.5">
+                          <Skeleton className="w-8 h-8 rounded-md" />
+                          <div className="space-y-1.5">
+                            <Skeleton className="h-3 w-24" />
+                            <Skeleton className="h-2 w-16" />
+                          </div>
+                        </div>
+                        <Skeleton className="h-2 w-2 rounded-full" />
+                      </div>
+                      <div className="space-y-1">
+                        <Skeleton className="h-6 w-16" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : (
             <>
@@ -279,7 +337,7 @@ const AlertsPage: React.FC = () => {
 
       {/* Create Alert Modal */}
       <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create New Alert</DialogTitle>
           </DialogHeader>
@@ -298,7 +356,7 @@ const AlertsPage: React.FC = () => {
 
       {/* Edit Alert Modal */}
       <Dialog open={!!editingAlert} onOpenChange={(open) => !open && setEditingAlert(null)}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Alert</DialogTitle>
           </DialogHeader>

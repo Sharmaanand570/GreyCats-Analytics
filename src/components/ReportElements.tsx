@@ -51,13 +51,17 @@ const reportElements: ReportElementDefinition[] = [
 type ReportElementsType = {
   setRightPanelTitle: React.Dispatch<React.SetStateAction<string>>;
   setWidgetFormState: React.Dispatch<React.SetStateAction<WidgetFormState>>;
+  orientation?: "vertical" | "horizontal";
 };
 
-function ReportElements({ setRightPanelTitle, setWidgetFormState }: ReportElementsType) {
+function ReportElements({ setRightPanelTitle, setWidgetFormState, orientation = "vertical" }: ReportElementsType) {
 
 
   return (
-    <div className="w-16 md:w-20 lg:w-24 h-full border-l">
+    <div className={orientation === "vertical"
+      ? "w-16 md:w-20 lg:w-24 h-full border-l"
+      : "w-full h-auto flex flex-row justify-around items-center border-t py-2"
+    }>
       {reportElements.map(({ id, label, icon: Icon }) => (
         <div
           onKeyDown={(e) => {
@@ -88,7 +92,11 @@ function ReportElements({ setRightPanelTitle, setWidgetFormState }: ReportElemen
           role="button"
           tabIndex={0}
           aria-label={`Drag ${label} widget to dashboard`}
-          className="flex flex-col text-xs items-center justify-center text-center p-1.5 md:p-2 my-2 md:my-4 text-wrap gap-0.5 md:gap-1 cursor-pointer active:cursor-grabbing text-gray-600 hover:bg-gray-50 transition-colors"
+
+          className={`flex flex-col text-xs items-center justify-center text-center p-1.5 md:p-2 gap-0.5 md:gap-1 cursor-pointer active:cursor-grabbing text-gray-600 hover:bg-gray-50 transition-colors ${orientation === "vertical"
+            ? "my-2 md:my-4 text-wrap"
+            : "mx-1"
+            }`}
         >
           <Icon className="text-lg md:text-xl" aria-hidden="true" />
           <span className="text-[10px] md:text-xs text-gray-500 leading-tight">{label}</span>
