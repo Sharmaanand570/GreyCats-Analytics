@@ -5,60 +5,60 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { adminApi, type AdminClient } from "@/api/adminApi";
-import { ArrowLeft, Building2, Globe, Users } from "lucide-react";
+import { ArrowLeft, Building2, Globe, Users, Edit2 } from "lucide-react";
 import { format } from "date-fns";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { getProfileImageUrl } from "@/utils/imageUtils";
+import ClientFormModal from "@/components/clients/ClientFormModal";
+import type { Client } from "@/types/client.types";
 
 export default function ClientDetailsPage() {
     const { clientId } = useParams();
     const navigate = useNavigate();
     const [client, setClient] = useState<AdminClient | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+    const fetchClient = async () => {
+        if (!clientId) return;
+        setLoading(true);
+        try {
+            const data = await adminApi.getClientDetails(clientId);
+
+            // Backend might return { success: true, client: {...} }
+            const rawClient = (data as any).client || data;
+
+            // Map backend fields to frontend
+            const totalIntegrations = (rawClient.metaBusinessAccounts?.length || 0) +
+                (rawClient.shopifyAccounts?.length || 0) +
+                (rawClient.youtubeAccounts?.length || 0) +
+                (rawClient.wooCommerceAccounts?.length || 0) +
+                (rawClient.metaAdAccounts?.length || 0) +
+                (rawClient.googleSearchConsoleProperties?.length || 0) +
+                (rawClient.googleAnalyticsProperties?.length || 0) +
+                (rawClient.metaInsights?.length || 0);
+
+            const mappedClient = {
+                ...rawClient,
+                status: rawClient.isActive ? 'ACTIVE' : 'INACTIVE',
+                integrationsCount: totalIntegrations,
+                usersCount: rawClient.usersCount || 0,
+                ownerName: rawClient.user?.fullName || null,
+                ownerId: rawClient.user?.id || rawClient.userId
+            };
+
+            setClient(mappedClient);
+        } catch (error) {
+            console.error("Failed to fetch client details", error);
+            toast.error("Failed to load client details.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchClient = async () => {
-            if (!clientId) return;
-            setLoading(true);
-            try {
-                const data = await adminApi.getClientDetails(clientId);
-                console.log("Client Details Response:", data);
-
-                // Backend might return { success: true, client: {...} }
-                const rawClient = (data as any).client || data;
-
-                // Map backend fields to frontend
-                // Map backend fields to frontend
-                const totalIntegrations = (rawClient.metaBusinessAccounts?.length || 0) +
-                    (rawClient.shopifyAccounts?.length || 0) +
-                    (rawClient.youtubeAccounts?.length || 0) +
-                    (rawClient.wooCommerceAccounts?.length || 0) +
-                    (rawClient.metaAdAccounts?.length || 0) +
-                    (rawClient.googleSearchConsoleProperties?.length || 0) +
-                    (rawClient.googleAnalyticsProperties?.length || 0) +
-                    (rawClient.metaInsights?.length || 0);
-
-                const mappedClient = {
-                    ...rawClient,
-                    status: rawClient.isActive ? 'ACTIVE' : 'INACTIVE',
-                    integrationsCount: totalIntegrations,
-                    usersCount: rawClient.usersCount || 0,
-                    ownerName: rawClient.user?.fullName || null,
-                    ownerId: rawClient.user?.id || rawClient.userId
-                };
-
-                console.log("Mapped Client:", mappedClient);
-                console.log("Shopify Accounts:", rawClient.shopifyAccounts);
-                console.log("YouTube Accounts:", rawClient.youtubeAccounts);
-                setClient(mappedClient);
-            } catch (error) {
-                console.error("Failed to fetch client details", error);
-                toast.error("Failed to load client details.");
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchClient();
     }, [clientId]);
 
@@ -86,10 +86,15 @@ export default function ClientDetailsPage() {
                 <Button variant="ghost" size="sm" onClick={() => navigate("/admin/clients")} className="mb-4 pl-0 hover:pl-0 hover:bg-transparent text-muted-foreground hover:text-foreground">
                     <ArrowLeft className="mr-2 h-4 w-4" /> Back to Clients
                 </Button>
-                <AdminPageHeader
-                    title={client.name}
-                    description={`Client ID: ${client.id}`}
-                />
+                <div className="flex justify-between items-start">
+                    <AdminPageHeader
+                        title={client.name}
+                        description={`Client ID: ${client.id}`}
+                    />
+                    <Button onClick={() => setIsEditModalOpen(true)} variant="outline" size="sm">
+                        <Edit2 className="mr-2 h-4 w-4" /> Edit Client
+                    </Button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -97,7 +102,8 @@ export default function ClientDetailsPage() {
                 <Card className="md:col-span-1 h-fit">
                     <CardHeader>
                         <div className="flex items-center gap-4">
-                            <Avatar className="h-16 w-16 rounded-md">
+                            <Avatar className="h-16 w-16 rounded-md border border-zinc-100">
+                                <AvatarImage src={getProfileImageUrl(client.logo)} className="object-contain" />
                                 <AvatarFallback className="rounded-md text-2xl">{(client.name || "C").substring(0, 2).toUpperCase()}</AvatarFallback>
                             </Avatar>
                             <div>
@@ -125,7 +131,7 @@ export default function ClientDetailsPage() {
                             <span className="text-sm text-muted-foreground flex items-center gap-2">
                                 <Users className="h-4 w-4" /> Owner
                             </span>
-                            <span className="text-sm font-medium hover:underline cursor-pointer" onClick={() => client.ownerId && navigate(`/ admin / users / ${client.ownerId} `)}>
+                            <span className="text-sm font-medium hover:underline cursor-pointer" onClick={() => client.ownerId && navigate(`/admin/users/${client.ownerId}`)}>
                                 {client.ownerName || "Unassigned"}
                             </span>
                         </div>
@@ -140,7 +146,7 @@ export default function ClientDetailsPage() {
                     </CardContent>
                 </Card>
 
-                {/* Details Section - Removed tabs since backend doesn't provide integration/user details */}
+                {/* Details Section */}
                 <div className="md:col-span-2">
                     <Card>
                         <CardHeader>
@@ -191,6 +197,16 @@ export default function ClientDetailsPage() {
                     </Card>
                 </div>
             </div>
+
+            {/* Edit Client Modal */}
+            <ClientFormModal
+                open={isEditModalOpen}
+                onClose={() => {
+                    setIsEditModalOpen(false);
+                    fetchClient(); // Refresh data after close
+                }}
+                client={client as unknown as Client}
+            />
         </div>
     );
 }

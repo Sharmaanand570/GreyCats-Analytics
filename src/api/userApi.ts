@@ -44,6 +44,11 @@ export const userApi = {
         return response.data;
     },
 
+    deleteProfilePicture: async (): Promise<ApiResponse<void>> => {
+        const response = await api.delete("/user/profile/picture");
+        return response.data;
+    },
+
     uploadCompanyLogo: async (file: File): Promise<ApiResponse<{ companyLogo: string }>> => {
         const formData = new FormData();
         formData.append("logo", file);

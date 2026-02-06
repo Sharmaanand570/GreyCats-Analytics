@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClients, useDeleteClient } from '../hooks/useClients';
-import { Plus, Building2, Activity, ArrowUpDown, Trash2 } from 'lucide-react';
+import { Plus, Building2, Activity, ArrowUpDown, Trash2, Edit2 } from 'lucide-react';
 import { FiSearch, FiBell } from "react-icons/fi";
 import { Button } from '../components/ui/button';
 import { Input } from "../components/ui/input";
@@ -24,8 +24,11 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "../components/ui/alert-dialog";
-import AddClientModal from '../components/clients/AddClientModal';
+import ClientFormModal from '../components/clients/ClientFormModal';
 import { cn } from "@/lib/utils";
+import { getProfileImageUrl } from "@/utils/imageUtils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import type { Client } from "@/types/client.types";
 
 // Helper to determine status based on integrations (Simulated logic for demo)
 const getClientHealth = (client: any) => {
@@ -48,7 +51,8 @@ const ClientsPage: React.FC = () => {
     const navigate = useNavigate();
     const { data: clients, isLoading } = useClients();
     const { mutate: deleteClient } = useDeleteClient();
-    const [showAddModal, setShowAddModal] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingClient, setEditingClient] = useState<Client | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [sortBy, setSortBy] = useState("name-asc");
     const [filterStatus, setFilterStatus] = useState("all");
@@ -143,7 +147,10 @@ const ClientsPage: React.FC = () => {
                                     <FiBell className="text-lg" />
                                 </button>
                                 <Button
-                                    onClick={() => setShowAddModal(true)}
+                                    onClick={() => {
+                                        setEditingClient(null);
+                                        setIsModalOpen(true);
+                                    }}
                                     className="rounded-[0.4rem] bg-zinc-900 hover:bg-zinc-800 text-white shadow-lg shadow-zinc-900/10"
                                 >
                                     <Plus className="w-4 h-4 mr-2" />
@@ -210,14 +217,21 @@ const ClientsPage: React.FC = () => {
                                             <div className="flex flex-col items-start w-full relative z-10">
                                                 <div className="flex justify-between w-full mb-4">
                                                     <div className="flex items-center gap-3">
-                                                        <div className={cn(
-                                                            "h-10 w-10 rounded-md border flex items-center justify-center transition-colors relative",
-                                                            status === 'healthy' ? "bg-zinc-50 border-zinc-100 text-zinc-900 group-hover:bg-zinc-100" :
-                                                                status === 'warning' ? "bg-amber-100/50 border-amber-100 text-amber-700" :
-                                                                    "bg-red-100/50 border-red-100 text-red-700"
-                                                        )}>
-                                                            <Building2 className="w-5 h-5" />
-                                                        </div>
+                                                        <Avatar className="h-10 w-10 rounded-md border border-zinc-100">
+                                                            <AvatarImage
+                                                                src={client.logo ? `${getProfileImageUrl(client.logo)}?v=${new Date(client.updatedAt).getTime()}` : undefined}
+                                                                alt={client.name}
+                                                                className="object-contain"
+                                                            />
+                                                            <AvatarFallback className={cn(
+                                                                "rounded-md",
+                                                                status === 'healthy' ? "bg-zinc-50 text-zinc-900 group-hover:bg-zinc-100" :
+                                                                    status === 'warning' ? "bg-amber-100/50 text-amber-700" :
+                                                                        "bg-red-100/50 text-red-700"
+                                                            )}>
+                                                                <Building2 className="w-5 h-5" />
+                                                            </AvatarFallback>
+                                                        </Avatar>
                                                         {client.isActive && (
                                                             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-100/50 border border-green-200">
                                                                 <span className="relative flex h-2 w-2">
@@ -228,7 +242,19 @@ const ClientsPage: React.FC = () => {
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-gray-400 hover:text-blue-500 hover:bg-blue-50"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setEditingClient(client);
+                                                                setIsModalOpen(true);
+                                                            }}
+                                                        >
+                                                            <Edit2 className="w-4 h-4" />
+                                                        </Button>
                                                         <AlertDialog>
                                                             <AlertDialogTrigger asChild>
                                                                 <Button
@@ -291,8 +317,15 @@ const ClientsPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Add Client Modal */}
-            <AddClientModal open={showAddModal} onClose={() => setShowAddModal(false)} />
+            {/* Client Form Modal */}
+            <ClientFormModal
+                open={isModalOpen}
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setEditingClient(null);
+                }}
+                client={editingClient}
+            />
         </div>
     );
 };

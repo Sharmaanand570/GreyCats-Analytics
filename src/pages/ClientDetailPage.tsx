@@ -12,11 +12,15 @@ import Reports from '../components/Reports';
 import { AccountSelectionModal } from '../components/clients/AccountSelectionModal';
 import type { IntegrationType } from '../types/integration.types';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Loader2, LayoutDashboard, FileBarChart, Database, CalendarDays } from 'lucide-react';
+import { ChevronLeft, Loader2, LayoutDashboard, FileBarChart, Database, CalendarDays, Edit2 } from 'lucide-react';
 import { FiBell } from "react-icons/fi";
 import { ReportSchedules } from '../components/ReportSchedules';
+import ClientFormModal from '../components/clients/ClientFormModal';
+import { getProfileImageUrl } from "@/utils/imageUtils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 import { clientKeys } from '../hooks/useClients';
+import type { Client } from "@/types/client.types";
 
 const ClientDetailPage: React.FC = () => {
     const { clientId } = useParams<{ clientId: string }>();
@@ -28,6 +32,7 @@ const ClientDetailPage: React.FC = () => {
     const [accountModalOpen, setAccountModalOpen] = useState(false);
     const [pendingIntegration, setPendingIntegration] = useState<IntegrationType | null>(null);
     const [dateRange, setDateRange] = useState<DateRange | undefined>(getDefaultDateRange());
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const queryClient = useQueryClient();
 
     React.useEffect(() => {
@@ -89,6 +94,10 @@ const ClientDetailPage: React.FC = () => {
                             >
                                 <ChevronLeft className="w-5 h-5" />
                             </Button>
+                            <Avatar className="h-10 w-10 border border-zinc-200">
+                                <AvatarImage src={client.logo ? `${getProfileImageUrl(client.logo)}?v=${new Date(client.updatedAt).getTime()}` : undefined} className="object-contain" />
+                                <AvatarFallback>{client.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+                            </Avatar>
                             <div>
                                 <h1 className="font-semibold text-lg text-zinc-900 leading-none">{client.name}</h1>
                                 {client.description && (
@@ -102,6 +111,14 @@ const ClientDetailPage: React.FC = () => {
                         <div className="flex items-center gap-4">
                             {activeTab === 'overview' && parsedClientId && (
                                 <>
+                                    <Button
+                                        onClick={() => setIsEditModalOpen(true)}
+                                        variant="outline"
+                                        size="sm"
+                                        className="shadow-sm border-zinc-200 text-zinc-700 hover:bg-zinc-50"
+                                    >
+                                        <Edit2 className="mr-2 h-4 w-4" /> Edit Client
+                                    </Button>
                                     <Link to={`/clients/${parsedClientId}/edit-dashboard`}>
                                         <Button variant="outline" size="sm" className="shadow-sm border-zinc-200 text-zinc-700 hover:bg-zinc-50">
                                             Edit Layout
@@ -196,6 +213,12 @@ const ClientDetailPage: React.FC = () => {
                     onSuccess={handleAccountConnected}
                 />
             )}
+
+            <ClientFormModal
+                open={isEditModalOpen}
+                onClose={() => setIsEditModalOpen(false)}
+                client={client as unknown as Client}
+            />
         </div>
     );
 };

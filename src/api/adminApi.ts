@@ -9,6 +9,7 @@ export interface AdminUser {
     planName?: string;
     clientsCount: number;
     createdAt: string;
+    profilePicture?: string;
 }
 
 export interface AdminUsersResponse {
@@ -22,6 +23,7 @@ export interface AdminUsersResponse {
 export interface AdminClient {
     id: number;
     name: string;
+    logo?: string;
     status: 'ACTIVE' | 'INACTIVE';
     ownerId?: number;
     ownerName?: string;
@@ -102,7 +104,9 @@ export const adminApi = {
     },
 
     updateUserStatus: async (userId: number, status: 'ACTIVE' | 'SUSPENDED') => {
-        const response = await api.patch(`/admin/users/${userId}/status`, { status });
+        // Backend expects isActive boolean
+        const isActive = status === 'ACTIVE';
+        const response = await api.patch(`/admin/users/${userId}/status`, { isActive });
         return response.data;
     },
 

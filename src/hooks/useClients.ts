@@ -358,9 +358,20 @@ export const useCreateClient = () => {
   const { setCurrentClient } = useClientContext();
 
   return useMutation({
-    mutationFn: async (data: { name: string; description?: string }): Promise<Client> => {
+    mutationFn: async (data: { name: string; description?: string; logo?: File }): Promise<Client> => {
       try {
-        const response = await api.post<any>('/clients', data);
+        const formData = new FormData();
+        formData.append('name', data.name);
+        if (data.description) formData.append('description', data.description);
+        if (data.logo) formData.append('logo', data.logo);
+
+        // Axios/API wrapper usually handles Content-Type automatically when data is FormData
+        const response = await api.post<any>('/clients', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
         console.log('Create Client Response:', response.data);
         // Handle both nested data structure and flat structure
         const client = response.data?.data?.client || response.data?.client;
@@ -397,14 +408,30 @@ export const useUpdateClient = () => {
       data,
     }: {
       id: number;
-      data: Partial<Client>;
+      data: { name?: string; description?: string; logo?: File; isActive?: boolean };
     }): Promise<Client> => {
       try {
-        const response = await api.put<ApiResponse<{ client: Client }>>(
-          `/api/clients/${id}`,
-          data
+        const formData = new FormData();
+        if (data.name) formData.append('name', data.name);
+        if (data.description !== undefined) formData.append('description', data.description);
+        if (data.logo) formData.append('logo', data.logo);
+        if (data.isActive !== undefined) formData.append('isActive', String(data.isActive));
+
+        const response = await api.put<any>(
+          `/clients/${id}`,
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          }
         );
-        return response.data.data!.client;
+        const client = response.data?.data?.client || response.data?.client;
+        if (!client) {
+          // Optional: fallback or throw specific error
+          return response.data as unknown as Client; // Last resort if it matches Client directly
+        }
+        return client;
       } catch (error: any) {
         console.error('Error updating client:', error);
         toast.error(error.response?.data?.message || 'Failed to update client');
@@ -418,6 +445,31 @@ export const useUpdateClient = () => {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to update client');
+    },
+  });
+};
+
+// Delete client logo
+export const useDeleteClientLogo = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: number): Promise<void> => {
+      try {
+        await api.delete(`/clients/${id}/logo`);
+      } catch (error: any) {
+        console.error('Error deleting client logo:', error);
+        toast.error(error.response?.data?.message || 'Failed to delete client logo');
+        throw error;
+      }
+    },
+    onSuccess: (_, clientId) => {
+      queryClient.invalidateQueries({ queryKey: clientKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
+      toast.success('Client logo deleted successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to delete client logo');
     },
   });
 };

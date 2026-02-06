@@ -250,35 +250,34 @@ const CURATED_DEFAULTS: Record<string, string[]> = {
     "google-console.billing.cost",
   ],
   "meta": [
-    "meta.facebook.followers",
-    "meta.facebook.postsCount",
-    "meta.facebook.post.engagement",
-    "meta.instagram.followers",
+    "meta.facebook.page.page_follows",
+    "meta.facebook.post.count",
+    "meta.facebook.page.page_post_engagements",
+    "meta.instagram.followers.total",
   ],
   "meta-facebook": [
     // Page Metrics
-    "meta.page.fans",
-    "meta.page.engagement",
+    "meta.facebook.page.page_follows",
+    "meta.facebook.page.page_post_engagements",
 
-    // Media Views (New)
-    "meta.facebook.mediaViews",
-    "meta.facebook.mediaViews.paid",
-    "meta.facebook.mediaViews.organic",
+    // Media Views
+    "meta.facebook.page.page_media_view",
+    "meta.facebook.page.page_impressions_unique",
 
     // Post Metrics
     "meta.facebook.post.likes",
     "meta.facebook.post.comments",
     "meta.facebook.post.shares",
     "meta.facebook.post.reactions",
-    "meta.facebook.post.engagement",
+    "meta.facebook.post.engaged_users",
 
     // Special: Top Performing Posts Table
     "meta.facebook.recent_posts",
   ],
   "meta-instagram": [
-    // Instagram Account-level Metrics (ONLY metrics that exist in DB)
-    "meta.instagram.followers",
-    "meta.instagram.mediaCount",
+    // Instagram Account-level Metrics
+    "meta.instagram.followers.total",
+    "meta.instagram.media.count",
 
     // Instagram Aggregated Metrics (Historical)
     "meta.instagram.media.aggregated.likes",
@@ -286,51 +285,47 @@ const CURATED_DEFAULTS: Record<string, string[]> = {
     "meta.instagram.media.aggregated.saves",
     "meta.instagram.media.aggregated.shares",
     "meta.instagram.media.aggregated.reach",
+
+    // Daily
     "meta.instagram.reach",
     "meta.instagram.follows",
   ],
   "meta-business": [
-    // Meta Business integration - combines Facebook + Instagram metrics
-    "meta.facebook.followers",
-    "meta.facebook.postsCount",
+    // Meta Business - Mixed Facebook & Instagram
+    "meta.facebook.page.page_follows",
+    "meta.facebook.post.count",
 
     // Facebook Page
-    "meta.page.fans",
-    "meta.page.engagement",
-    "meta.page.impressions",
-    "meta.page.views",
-    "meta.page.uniqueImpressions",
-    "meta.page.postImpressions",
+    "meta.facebook.page.page_post_engagements",
+    "meta.facebook.page.page_impressions_unique",
+    "meta.facebook.page.page_media_view",
+    "meta.facebook.page.page_total_actions",
 
     // Facebook Posts
     "meta.facebook.post.likes",
     "meta.facebook.post.comments",
     "meta.facebook.post.shares",
     "meta.facebook.post.reactions",
-    "meta.facebook.post.engagement",
+    "meta.facebook.post.engaged_users",
     "meta.facebook.post.clicks",
     "meta.facebook.post.impressions",
     "meta.facebook.post.reach",
-    "meta.facebook.post.engagedUsers",
-
-    // Facebook Media
-    "meta.facebook.mediaViews",
 
     // Instagram
-    "meta.instagram.followers",
-    "meta.instagram.mediaCount",
+    "meta.instagram.followers.total",
+    "meta.instagram.media.count",
 
-    // Instagram Aggregated Metrics (Historical)
+    // Instagram Aggregated
     "meta.instagram.media.aggregated.likes",
     "meta.instagram.media.aggregated.comments",
     "meta.instagram.media.aggregated.saves",
     "meta.instagram.media.aggregated.shares",
     "meta.instagram.media.aggregated.reach",
 
-    // Instagram Daily Metrics
+    // Instagram Daily
     "meta.instagram.reach",
     "meta.instagram.follows",
-    "meta.instagram.profileViews",
+    "meta.instagram.profile_views",
   ],
   "meta-ads": [
     // Meta Ads Campaign Metrics (Paid)
@@ -2621,7 +2616,19 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             // REMOVED: Backend IDs can be > 1000, so this check is invalid.
             // if (Number(slide.id) >= 1000) return true;
 
-            if (slide.source === "custom") return true;
+            if (slide.source === "custom") {
+              // FIX: Ghost Check. If ID < 1000, it might be a disconnected integration saved as custom.
+              // Verify integration exists.
+              const sId = Number(slide.id);
+              if (sId < 1000) {
+                // Only filter if we have integration data loaded (not readOnly)
+                if (!readOnly && integrationsData?.integrations && !integrationsData.integrations[sId]) {
+                  console.log(`👻 [Hydration] Skipping ghost Custom Page ID ${sId}`);
+                  return false;
+                }
+              }
+              return true;
+            }
 
             // If source is 'integration', verify it effectively maps to one.
             // If the backend wipes integrationIndex and source, we must check if
@@ -2750,6 +2757,164 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     // causing duplicates in the sidebar.
     const idMapping = new Map<number, number>(); // backendId -> frontendId
     const numIntegrations = integrationsData?.integrations?.length ?? 0;
+
+    // CLEANUP: Remove ghost slides
+    // This cleans the UI immediately without waiting for a save.
+    if (!readOnly && integrationsData?.integrations && templateQuery.data?.slidesMeta) {
+      const validIndices = new Set(integrationsData.integrations.map((_, i) => i));
+      const ghostIds = new Set<number>();
+
+      // 1. Identify ghosts from Metadata
+      templateQuery.data.slidesMeta.forEach((s: any) => {
+        const sId = Number(s.id);
+
+        // UNIVERSAL GHOST CHECK:
+        // If a slide has an 'integrationIndex' property, it MUST point to a valid integration.
+        // This catches "Custom" pages (ID > 1000) that were originally integrations (e.g. index 1)
+        // but the integration was disconnected.
+        if (typeof s.integrationIndex === 'number') {
+          if (!validIndices.has(s.integrationIndex)) {
+            console.log(`👻 [Hydration] Identified Ghost (Invalid Index ref): ID=${sId}, Index=${s.integrationIndex}, Source=${s.source}`);
+            ghostIds.add(sId);
+            return; // Caught, next slide
+          }
+        }
+
+        // Scenario A: Explicit "integration" source but invalid index
+        if (s.source === 'integration') {
+          const idx = typeof s.integrationIndex === 'number' ? s.integrationIndex : sId;
+          // If index is invalid (missing from validIndices), it's a ghost
+          if (!validIndices.has(idx)) {
+            console.log(`👻 [Hydration] Inditified Ghost Integration Slide: ID=${sId}, Index=${idx}`);
+            ghostIds.add(sId);
+          }
+        }
+
+        // Scenario B: "Custom" source but actually an orphaned integration (ID < 1000)
+        // (Handled by map scan below, but reinforcing here)
+        if (s.source === 'custom' && sId < 1000) {
+          if (!integrationsData.integrations[sId]) {
+            console.log(`👻 [Hydration] Identified Ghost Custom-Masquerading Slide: ID=${sId}`);
+            ghostIds.add(sId);
+          }
+        }
+      });
+
+      // 1.5 Content-Based Detection (Scan widgets for disconnected integrations)
+      // This catches "Custom" pages that have lost their metadata link but contain stale content.
+      if (templateQuery.data.widgets) {
+        // get all known platform keys from connected integrations
+        const connectedPlatforms = new Set(integrationsData.integrations.map(i => i.platform));
+
+        // Group widgets by slideId
+        const slideWidgets = new Map<number, any[]>();
+        templateQuery.data.widgets.forEach((w: any) => {
+          const sId = Number(w.layout?.slideId ?? 0);
+          if (!slideWidgets.has(sId)) slideWidgets.set(sId, []);
+          slideWidgets.get(sId)?.push(w);
+        });
+
+        // Check every slide in slidesMeta (or identified in widgets)
+        const allSlideIds = new Set<number>([
+          ...templateQuery.data.slidesMeta.map((s: any) => Number(s.id)),
+          ...Array.from(slideWidgets.keys())
+        ]);
+
+        allSlideIds.forEach(sId => {
+          // Only scan "Custom" slides (ID >= 1000) or orphaned low-IDs not yet caught
+          if (sId >= 1000 || !validIndices.has(sId)) {
+            const widgets = slideWidgets.get(sId) || [];
+            if (widgets.length > 0) {
+              // Check if ALL widgets are from disconnected integrations
+              let hasDisconnectedContent = false;
+              let hasConnectedContent = false;
+              let hasGenericContent = false;
+
+              widgets.forEach(w => {
+                let integration = (w.metricConfig?.integration || w.integration || "").toLowerCase();
+                if (integration === 'woocommerce') integration = 'woo';
+
+                // Ignore generic/text/image widgets - if they exist, we keep the page
+                if (w.type === 'text' || w.type === 'image' || w.type === 'embed') {
+                  hasGenericContent = true;
+                  return;
+                }
+
+                // If no integration specified, it's generic or broken. Treat as generic.
+                if (!integration) {
+                  hasGenericContent = true;
+                  return;
+                }
+
+                // Check connection
+                // We need to match against platform keys (e.g. 'google-analytics', 'meta-business')
+                // The widget might have 'meta_business' or 'meta-ads'.
+                const normalizedInt = integration.replace(/[ _]/g, '-');
+
+                // Optimization: Check for 'meta' specifically if that's the issue
+                const isConnected = Array.from(connectedPlatforms).some(p => {
+                  const normP = p.replace(/[ _]/g, '-');
+                  return normalizedInt.includes(normP) || normP.includes(normalizedInt);
+                });
+
+                if (isConnected) {
+                  hasConnectedContent = true;
+                } else {
+                  hasDisconnectedContent = true;
+                }
+              });
+
+              // DECISION: If has disconnected content, BUT NO connected/generic content -> GHOST
+              if (hasDisconnectedContent && !hasConnectedContent && !hasGenericContent) {
+                console.log(`👻 [Hydration] Inditified Content-Based Ghost Slide: ID=${sId}. All widgets disconnected.`);
+                ghostIds.add(sId);
+              }
+            }
+          }
+        });
+      }
+
+      // 1.5.1 Identify ghosts from Dashboard Keys (orphaned IDs < 1000)
+      for (const [id] of map) {
+        if (typeof id === 'number' && id < 1000) {
+          if (!validIndices.has(id)) {
+            console.log(`👻 [Hydration] Detected ghost slide ${id} (No integration). Marking for removal.`);
+            ghostIds.add(id);
+          }
+        }
+      }
+
+      // Remove all identified ghosts from map
+      if (ghostIds.size > 0) {
+        ghostIds.forEach(id => map.delete(id));
+      }
+
+      // Remove ghosts from pageOrder
+      if (templateQuery.data.pageOrder) {
+        const newOrder = templateQuery.data.pageOrder
+          .map((id: any) => Number(id))
+          .filter((id: number) => {
+            // 1. Must not be a detected ghost
+            if (ghostIds.has(id)) return false;
+
+            // 2. CRITICAL: Strictly Only allow IDs that exist in the map OR are valid integrations.
+            const hasDashboard = map.has(id);
+            const isValidIntegration = validIndices.has(id);
+
+            if (!hasDashboard && !isValidIntegration) {
+              console.log(`👻 [Hydration] Removing orphaned PageOrder ID ${id} (No Dashboard, Not Valid Integration)`);
+              return false;
+            }
+            return true;
+          });
+
+        if (newOrder.length !== templateQuery.data.pageOrder.length) {
+          console.log(`👻 [Hydration] Cleaned pageOrder:`, newOrder);
+          setPageOrder(newOrder);
+          setHasUnsavedChanges(true); // Persist cleanup on next save
+        }
+      }
+    }
 
     // Use a local copy of slidesMeta for processing rescues
     // We will update this and set it to state at the end
@@ -4080,6 +4245,12 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           // FIX: If ID < 1000, force it to be an integration slide, even if backend mistakenly said "custom".
           // This self-heals corrupted templates where integration slides got saved as "Untitled... Custom...".
           if (slideIdNum < 1000) {
+            // NEW: Ghost check from existing metadata.
+            // If the integration is fully loaded and disconnected, drop this slide.
+            if (!readOnly && !isLoadingIntegrations && integrationsData?.integrations && !integrationsData.integrations[slideIdNum]) {
+              console.log(`👻 [SavePayload] removing existing ghost slide ${slideId} (Integration Disconnected)`);
+              return null;
+            }
             return {
               ...fromExisting,
               source: "integration" as const,
@@ -4087,6 +4258,16 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
               // If title matches generic "Untitled", allow it to be regenerated by Sidebar later
               title: fromExisting.title?.includes("Untitled") ? "" : fromExisting.title
             };
+          }
+
+          // FIX: Check for High-ID Integration Ghosts (ID >= 1000)
+          // If it claims to be an integration slide but the integration is gone, DROP IT.
+          if (!readOnly && !isLoadingIntegrations && integrationsData?.integrations && fromExisting.source === 'integration') {
+            const idx = typeof fromExisting.integrationIndex === 'number' ? fromExisting.integrationIndex : slideIdNum;
+            if (!integrationsData.integrations[idx]) {
+              console.log(`👻 [SavePayload] removing existing High-ID ghost slide ${slideId} (Integration Disconnected). Index=${idx}`);
+              return null;
+            }
           }
 
           // If existing has ID >= 1000, force it to be custom and strip integrationIndex
@@ -4114,6 +4295,14 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         // (even if integration data is missing/loading) rather than defaulting to "custom".
         // Custom pages always get assigned IDs >= 1000.
         if (Number(slideId) < 1000) {
+          // CRITICAL FIX: If integrations are fully loaded and this index is not found,
+          // then this is a "ghost" slide (integration disconnected). We MUST NOT save it.
+          // However, we must be extremely careful not to delete slides while data is just loading.
+          if (!readOnly && !isLoadingIntegrations && integrationsData?.integrations && !integrationsData.integrations[slideId]) {
+            console.log(`👻 [SavePayload] removing ghost slide ${slideId} (Integration Disconnected)`);
+            return null;
+          }
+
           return {
             id: slideId,
             title: "", // Empty title triggers sidebar to re-resolve name from integration data later
@@ -4123,7 +4312,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         }
 
         return { id: slideId, title: "Untitled page", source: "custom" as const };
-      });
+      }).filter((s): s is ReportSlideMeta => s !== null); // Filter out nulls (ghost slides)
 
       // Build widgets array from current dashboards/layouts
       dashboards.forEach((layout, slideId) => {
@@ -6304,10 +6493,30 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                           | ReportSlideMeta[]
                           | undefined) ?? [];
 
+                      // DEBUG: Inspect ghost slides
+                      console.log('👻 [SidebarDebug] rawBase:', rawBase.map(s => ({ id: s.id, source: s.source, title: s.title, integrationIndex: s.integrationIndex })));
+                      console.log('👻 [SidebarDebug] Integrations Count:', integrationsData?.integrations?.length);
+                      console.log('👻 [SidebarDebug] PageOrder:', pageOrder);
+                      console.log('👻 [SidebarDebug] Dashboards Keys:', Array.from(dashboards.keys()));
+
                       const numIntegrations = integrationsData?.integrations?.length ?? 0;
 
                       // Filter out ghost slides (integration slides with index out of bounds)
                       const base = rawBase.filter(s => {
+                        const sId = Number(s.id);
+
+                        // FIX: Aggressively remove any slide with ID < 1000 if it doesn't map to a valid integration
+                        // usage. This catches both explicit 'integration' source AND 'custom' source ghosts.
+                        if (sId < 1000) {
+                          // If it's an integration index, check if valid
+                          const idx = typeof s.integrationIndex === 'number' ? s.integrationIndex : sId;
+                          if (!isNaN(idx) && idx >= numIntegrations) {
+                            console.log(`👻 [Sidebar] Filtering out ghost slide ID ${sId} (Out of bounds)`);
+                            return false;
+                          }
+                        }
+
+                        // Double check explicit source
                         if (s.source === "integration") {
                           const idx = typeof s.integrationIndex === 'number' ? s.integrationIndex : Number(s.id);
                           if (!isNaN(idx) && idx >= numIntegrations) {

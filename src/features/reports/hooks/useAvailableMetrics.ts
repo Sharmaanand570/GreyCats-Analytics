@@ -149,15 +149,18 @@ export const useAvailableMetrics = (clientId: number | null, options?: { enabled
     Object.keys(grouped).forEach((integration) => {
       // Check Meta Business / Meta integrations (handle both hyphen and underscore)
       const normalizedInt = integration.toLowerCase().replace(/_/g, '-');
-      if (normalizedInt === 'meta-business' || normalizedInt === 'meta') {
+      const isMetaIntegration = ['meta-business', 'meta', 'meta-facebook', 'meta-instagram'].includes(normalizedInt);
+
+      if (isMetaIntegration) {
         Object.keys(grouped[integration]).forEach((accountId) => {
           const metrics = grouped[integration][accountId];
 
-          // Check for Instagram logic
-          // For Meta Business, we want to ensure all Instagram metrics are available
-          const hasInstagram = metrics.some(m => m.metricKey.includes('instagram'));
+          // --- Instagram Injection Logic ---
+          const hasInstagramMetrics = metrics.some(m => m.metricKey.includes('instagram'));
+          const isInstagramInt = normalizedInt === 'meta-instagram';
+          const shouldInjectInstagram = hasInstagramMetrics || isInstagramInt || normalizedInt === 'meta-business' || normalizedInt === 'meta';
 
-          if (hasInstagram || normalizedInt === 'meta-business' || normalizedInt === 'meta') {
+          if (shouldInjectInstagram) {
             // 1. Ensure Recent Media widget is present
             if (!metrics.some(m => m.metricKey === 'meta.instagram.recent_media')) {
               metrics.push({
@@ -169,8 +172,7 @@ export const useAvailableMetrics = (clientId: number | null, options?: { enabled
               });
             }
 
-            // 2. Inject all other known Instagram metrics if missing
-            // This ensures users see them in the sidebar even if the API hasn't returned data for them yet
+            // 2. Inject all known Instagram metrics
             const allKnownInstagramMetrics = [
               ...FACEBOOK_DAILY_METRICS,
               ...FACEBOOK_CUMULATIVE_METRICS
@@ -189,15 +191,39 @@ export const useAvailableMetrics = (clientId: number | null, options?: { enabled
             });
           }
 
-          // Check for Facebook logic (optional but good for consistency)
-          const hasFacebook = metrics.some(m => m.metricKey.includes('facebook') || m.metricKey.includes('page_'));
-          if (hasFacebook && !metrics.some(m => m.metricKey === 'meta.facebook.recent_posts')) {
-            metrics.push({
-              metricKey: 'meta.facebook.recent_posts',
-              integration,
-              accountId,
-              displayName: 'Facebook - Recent Posts',
-              category: 'General'
+          // --- Facebook Injection Logic ---
+          const hasFacebookMetrics = metrics.some(m => m.metricKey.includes('facebook') || m.metricKey.includes('page_'));
+          const isFacebookInt = normalizedInt === 'meta-facebook';
+          const shouldInjectFacebook = hasFacebookMetrics || isFacebookInt || normalizedInt === 'meta-business' || normalizedInt === 'meta';
+
+          if (shouldInjectFacebook) {
+            // 1. Ensure Recent Posts widget is present
+            if (!metrics.some(m => m.metricKey === 'meta.facebook.recent_posts')) {
+              metrics.push({
+                metricKey: 'meta.facebook.recent_posts',
+                integration,
+                accountId,
+                displayName: 'Facebook - Recent Posts',
+                category: 'General'
+              });
+            }
+
+            // 2. Inject all known Facebook metrics
+            const allKnownFacebookMetrics = [
+              ...FACEBOOK_DAILY_METRICS,
+              ...FACEBOOK_CUMULATIVE_METRICS
+            ].filter(key => (key.includes('facebook') || key.startsWith('meta.page')) && key !== 'meta.facebook.recent_posts');
+
+            allKnownFacebookMetrics.forEach(key => {
+              if (!metrics.some(m => m.metricKey === key)) {
+                metrics.push({
+                  metricKey: key,
+                  integration,
+                  accountId,
+                  displayName: getMetricDisplayName(key),
+                  category: getMetricCategory(key)
+                });
+              }
             });
           }
         });

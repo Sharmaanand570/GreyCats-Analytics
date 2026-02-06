@@ -100,6 +100,22 @@ export default function PersonalInformation() {
         },
     });
 
+    const deletePictureMutation = useMutation({
+        mutationFn: userApi.deleteProfilePicture,
+        onSuccess: (res) => {
+            if (res.success) {
+                toast.success("Profile picture removed");
+                queryClient.invalidateQueries({ queryKey: ["userProfile"] });
+                fetchProfile();
+            } else {
+                toast.error(res.message || "Failed to remove profile picture");
+            }
+        },
+        onError: (err: any) => {
+            toast.error(err.response?.data?.message || "Failed to remove profile picture");
+        },
+    });
+
     // 5. Email Change Logic
     const [isChangeEmailOpen, setIsChangeEmailOpen] = useState(false);
     const [emailChangeStep, setEmailChangeStep] = useState<"email" | "otp">("email");
@@ -231,7 +247,8 @@ export default function PersonalInformation() {
                                     variant="ghost"
                                     size="sm"
                                     className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                                    disabled={uploadPictureMutation.isPending}
+                                    disabled={uploadPictureMutation.isPending || deletePictureMutation.isPending}
+                                    onClick={() => deletePictureMutation.mutate()}
                                 >
                                     Remove
                                 </Button>

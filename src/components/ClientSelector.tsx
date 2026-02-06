@@ -1,5 +1,7 @@
 import * as React from "react"
 import { Check, ChevronsUpDown, Plus, LayoutGrid, Users } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { getProfileImageUrl } from "@/utils/imageUtils"
 import {
     Command,
     CommandEmpty,
@@ -45,7 +47,12 @@ export function ClientSelector({ isCollapsed }: { isCollapsed?: boolean }) {
                 <PopoverTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-10 w-10 p-0 rounded-full bg-zinc-800 hover:bg-zinc-700">
                         {selectedClient ? (
-                            <span className="font-bold text-sm text-white">{selectedClient.name.substring(0, 2).toUpperCase()}</span>
+                            <Avatar className="h-5 w-5">
+                                <AvatarImage src={getProfileImageUrl(selectedClient.logo)} className="object-contain" />
+                                <AvatarFallback className="bg-transparent font-bold text-sm text-white">
+                                    {selectedClient.name.substring(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                            </Avatar>
                         ) : (
                             <LayoutGrid className="h-5 w-5 text-zinc-400" />
                         )}
@@ -72,9 +79,12 @@ export function ClientSelector({ isCollapsed }: { isCollapsed?: boolean }) {
                                         className="cursor-pointer text-zinc-100 data-[selected=true]:bg-zinc-800 data-[selected=true]:text-zinc-50"
                                     >
                                         <div className="flex items-center gap-2 w-full">
-                                            <div className="h-6 w-6 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[10px] font-bold text-zinc-300">
-                                                {client.name.substring(0, 2).toUpperCase()}
-                                            </div>
+                                            <Avatar className="h-6 w-6 rounded-full border border-zinc-700">
+                                                <AvatarImage src={getProfileImageUrl(client.logo)} className="object-contain" />
+                                                <AvatarFallback className="bg-zinc-800 text-[10px] font-bold text-zinc-300">
+                                                    {client.name.substring(0, 2).toUpperCase()}
+                                                </AvatarFallback>
+                                            </Avatar>
                                             <span>{client.name}</span>
                                         </div>
                                         {selectedClient?.id === client.id && (
@@ -101,9 +111,12 @@ export function ClientSelector({ isCollapsed }: { isCollapsed?: boolean }) {
                 >
                     <div className="flex items-center gap-2 truncate">
                         {selectedClient ? (
-                            <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center text-[10px] font-bold text-primary-foreground">
-                                {selectedClient.name.substring(0, 2).toUpperCase()}
-                            </div>
+                            <Avatar className="h-5 w-5">
+                                <AvatarImage src={getProfileImageUrl(selectedClient.logo)} className="object-contain" />
+                                <AvatarFallback className="bg-primary text-[10px] font-bold text-primary-foreground">
+                                    {selectedClient.name.substring(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                            </Avatar>
                         ) : (
                             <LayoutGrid className="h-4 w-4 text-zinc-400" />
                         )}
@@ -135,9 +148,12 @@ export function ClientSelector({ isCollapsed }: { isCollapsed?: boolean }) {
                                     className="cursor-pointer text-zinc-100 data-[selected=true]:bg-zinc-800 data-[selected=true]:text-zinc-50"
                                 >
                                     <div className="flex items-center gap-2 w-full">
-                                        <div className="h-6 w-6 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[10px] font-bold text-zinc-300">
-                                            {client.name.substring(0, 2).toUpperCase()}
-                                        </div>
+                                        <Avatar className="h-6 w-6 rounded-full border border-zinc-700">
+                                            <AvatarImage src={getProfileImageUrl(client.logo)} className="object-contain" />
+                                            <AvatarFallback className="bg-zinc-800 text-[10px] font-bold text-zinc-300">
+                                                {client.name.substring(0, 2).toUpperCase()}
+                                            </AvatarFallback>
+                                        </Avatar>
                                         <span>{client.name}</span>
                                     </div>
                                     {selectedClient?.id === client.id && (

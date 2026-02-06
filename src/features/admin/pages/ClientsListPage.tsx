@@ -25,7 +25,7 @@ import { adminApi, type AdminClient } from "@/api/adminApi";
 import { useNavigate } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
     Dialog,
     DialogContent,
@@ -42,6 +42,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { getProfileImageUrl } from "@/utils/imageUtils";
 
 export default function ClientsListPage() {
     const navigate = useNavigate();
@@ -173,6 +174,7 @@ export default function ClientsListPage() {
                                     >
                                         <TableCell className="pl-6 py-4">
                                             <Avatar className="h-9 w-9 rounded-lg border border-gray-100 dark:border-white/10 bg-white dark:bg-white/5">
+                                                <AvatarImage src={getProfileImageUrl(client.logo)} alt={client.name} className="object-contain" />
                                                 <AvatarFallback className="rounded-lg bg-gray-50 dark:bg-white/10 text-gray-600 dark:text-gray-300">
                                                     {client.name.substring(0, 2).toUpperCase()}
                                                 </AvatarFallback>

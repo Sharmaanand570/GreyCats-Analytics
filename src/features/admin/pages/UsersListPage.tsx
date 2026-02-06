@@ -21,7 +21,7 @@ import {
 import { MoreHorizontal, Search, UserCog } from "lucide-react";
 import { adminApi, type AdminUser } from "@/api/adminApi";
 import { useNavigate } from "react-router-dom";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -41,6 +41,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { getProfileImageUrl } from "@/utils/imageUtils";
 
 export default function UsersListPage() {
     const navigate = useNavigate();
@@ -183,6 +184,7 @@ export default function UsersListPage() {
                                 <TableRow key={user.id} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900" onClick={() => handleRowClick(user.id)}>
                                     <TableCell onClick={(e) => e.stopPropagation()}>
                                         <Avatar className="h-8 w-8">
+                                            <AvatarImage src={getProfileImageUrl(user.profilePicture)} alt={user.fullName} className="object-cover" />
                                             <AvatarFallback>{user.fullName.substring(0, 2).toUpperCase()}</AvatarFallback>
                                         </Avatar>
                                     </TableCell>
