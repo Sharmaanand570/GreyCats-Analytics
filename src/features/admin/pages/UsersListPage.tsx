@@ -42,10 +42,12 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { getProfileImageUrl } from "@/utils/imageUtils";
+import { useUserStore } from "@/utils/useUserStore";
 
 export default function UsersListPage() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
+    const { user: currentUser, logout, fetchProfile } = useUserStore();
     const [loading, setLoading] = useState(true);
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [search, setSearch] = useState("");
@@ -55,6 +57,7 @@ export default function UsersListPage() {
     const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
     const [roleDialogOpen, setRoleDialogOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [selfDemoteWarning, setSelfDemoteWarning] = useState(false);
     const [newRole, setNewRole] = useState<'USER' | 'ADMIN' | 'SUPER_ADMIN'>('USER');
     const [actionLoading, setActionLoading] = useState(false);
 
@@ -101,11 +104,45 @@ export default function UsersListPage() {
 
     const handleUpdateRole = async () => {
         if (!selectedUser) return;
+
+        // SECURITY: Check if admin is trying to demote themselves
+        const isSelfDemotion = selectedUser.id === currentUser?.id &&
+            newRole === 'USER' &&
+            (currentUser.role === 'ADMIN' || currentUser.role === 'SUPER_ADMIN');
+
+        // Show warning dialog first if self-demoting
+        if (isSelfDemotion && !selfDemoteWarning) {
+            setSelfDemoteWarning(true);
+            return; // Don't proceed yet, wait for confirmation
+        }
+
         setActionLoading(true);
         try {
             await adminApi.updateUserRole(selectedUser.id, newRole);
+
+            // SECURITY: If user changed their own role
+            if (selectedUser.id === currentUser?.id) {
+                // If demoted to USER, force logout immediately
+                if (isSelfDemotion) {
+                    toast.success("Your role has been changed to USER. Logging out for security...");
+                    setRoleDialogOpen(false);
+                    setSelfDemoteWarning(false);
+
+                    // Force logout after brief delay
+                    setTimeout(() => {
+                        logout();
+                        navigate('/auth/login', { replace: true });
+                    }, 1500);
+                    return;
+                }
+
+                // If role changed but still admin, update the store
+                await fetchProfile();
+            }
+
             toast.success("User role updated");
             setRoleDialogOpen(false);
+            setSelfDemoteWarning(false);
             fetchUsers();
         } catch (error) {
             console.error(error);
@@ -338,6 +375,38 @@ export default function UsersListPage() {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
                         <Button variant="destructive" onClick={handleDeleteUser} disabled={actionLoading}>Delete</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Self-Demotion Warning Dialog */}
+            <Dialog open={selfDemoteWarning} onOpenChange={setSelfDemoteWarning}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <span className="text-2xl">⚠️</span>
+                            Warning: Self-Demotion
+                        </DialogTitle>
+                        <DialogDescription className="space-y-3 pt-2">
+                            <p>You are about to change your own role from <strong>{currentUser?.role}</strong> to <strong>USER</strong>.</p>
+                            <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900 rounded-lg p-3">
+                                <p className="font-semibold text-yellow-900 dark:text-yellow-200 mb-2">This will immediately:</p>
+                                <ul className="list-disc pl-5 space-y-1 text-yellow-800 dark:text-yellow-300 text-sm">
+                                    <li>Remove your admin access</li>
+                                    <li>Log you out of the admin panel</li>
+                                    <li>Require another admin to restore your privileges</li>
+                                </ul>
+                            </div>
+                            <p className="text-sm font-semibold">Are you absolutely sure you want to proceed?</p>
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setSelfDemoteWarning(false)} disabled={actionLoading}>
+                            Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={handleUpdateRole} disabled={actionLoading}>
+                            {actionLoading ? "Processing..." : "Yes, Demote Myself"}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

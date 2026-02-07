@@ -2997,16 +2997,11 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           // Only delete from map if successfully moved
           map.delete(backendId);
         } else {
-          console.warn(`[ReportBuilder] FAILED to rescue ghost ${backendId}. No matching integration found for widgetIntegration: '${widgetIntegration}'. Preserving slide.`);
-          // Fallback: Preserve the slide as a "Disconnected" slide
-          // Map ID to itself so pageOrder logic picks it up
-          idMapping.set(backendId, backendId);
-
-          // Update subtitle in localSlidesMeta to indicate disconnected state
-          const meta = localSlidesMeta.find(m => Number(m.id) === backendId);
-          if (meta) {
-            meta.subtitle = "(Disconnected)";
-          }
+          // User Request: "i dont want disconnected page"
+          // DELETE ghost slides that can't be rescued instead of preserving them
+          console.log(`[ReportBuilder] 🗑️ DELETING ghost ${backendId}. No matching integration found for widgetIntegration: '${widgetIntegration}'.`);
+          map.delete(backendId);
+          localSlidesMeta = localSlidesMeta.filter(m => Number(m.id) !== backendId);
         }
       } else {
         // console.log(`[RescueDebug] Ghost ${backendId} has no widgets to rescue.`);
@@ -3164,13 +3159,33 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             // Continue to next slide
             return;
           }
-          // But avoid adding if it looks like a ghost integration slide (large ID, no title, source=integration)
-          // This catches cases where integrationIndex might be missing but it's clearly an integration slide
-          // Only delete if it explicitly claims to be an integration but has no valid index AND is a low ID (<1000)
-          if (slide.source === 'integration' && numIntegrations > 0 && typeof slide.integrationIndex !== 'number' && backendId < 1000) {
-            console.warn(`[ReportBuilder] Ignoring malformed ghost slide id=${backendId} (source=integration but no index)`);
-            attemptRescue(backendId);
-            return;
+
+          // GHOST DETECTION: Check if this "Custom" page has a title matching a known platform
+          // but NO corresponding connected integration. This indicates it's a ghost from a disconnected integration.
+          // User Request: "i dont want disconnected page"
+          const knownPlatformNames = [
+            'Google Search Console', 'Google Analytics', 'Google Ads',
+            'Meta Business', 'Facebook', 'Instagram', 'Meta Ads',
+            'YouTube', 'TikTok', 'LinkedIn', 'Twitter', 'Shopify', 'WooCommerce'
+          ];
+
+          const looksLikeIntegration = knownPlatformNames.some(platform =>
+            slide.title?.includes(platform)
+          );
+
+          if (looksLikeIntegration) {
+            // Check if there's a connected integration matching this title
+            const hasMatchingIntegration = integrationsData?.integrations?.some(i => {
+              const configName = getPlatformConfig(i.platform)?.name;
+              return slide.title === i.platform || slide.title === configName || slide.title === i.accountName;
+            });
+
+            if (!hasMatchingIntegration) {
+              console.log(`[ReportBuilder] 🗑️ DELETING ghost custom page: "${slide.title}" (id=${backendId}) - looks like disconnected integration`);
+              map.delete(backendId);
+              localSlidesMeta = localSlidesMeta.filter(m => Number(m.id) !== backendId);
+              return;
+            }
           }
 
           if (!map.has(backendId)) {

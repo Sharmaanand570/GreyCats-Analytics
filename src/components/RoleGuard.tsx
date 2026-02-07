@@ -2,6 +2,7 @@ import { Navigate, Outlet } from "react-router-dom";
 import { useUserStore } from "@/utils/useUserStore";
 import { useEffect } from "react";
 import { StorageKey } from "@/utils/storage";
+import { toast } from "sonner";
 
 interface RoleGuardProps {
     allowedRoles: ("USER" | "ADMIN" | "SUPER_ADMIN")[];
@@ -42,7 +43,11 @@ export default function RoleGuard({ allowedRoles }: RoleGuardProps) {
     }
 
     if (!allowedRoles.includes(user.role)) {
-        // Role not authorized
+        // Role not authorized - show feedback to user
+        toast.error("Access Denied", {
+            description: "You don't have permission to access the admin panel.",
+            duration: 4000,
+        });
         return <Navigate to="/" replace />;
     }
 

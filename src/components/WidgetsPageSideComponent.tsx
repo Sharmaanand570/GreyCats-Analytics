@@ -232,7 +232,7 @@ function WidgetsPageSideComponent({
           : (platformConfig?.name || integration?.platform || "Integration");
 
         combined.push({
-          label: platformConfig?.name || integration?.platform || "Integration",
+          label: platformConfig?.name || integration?.platform || (slide.title && !slide.title.startsWith("Untitled") ? slide.title : "Integration"),
           integrationId: integration
             ? integration.id
             : `integration-${slide.id}`,
@@ -665,7 +665,7 @@ function WidgetsPageSideComponent({
                           Edit
                         </button>
                       )}
-                      {onDeletePage && (
+                      {onDeletePage && pages.length > 1 && (
                         <button
                           type="button"
                           className="ml-1 text-[10px] text-red-500 hover:text-red-700"

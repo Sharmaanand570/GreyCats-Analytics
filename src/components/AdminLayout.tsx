@@ -32,6 +32,14 @@ export default function AdminLayout() {
         }
     }, [location.pathname, navigate]);
 
+    // SECURITY: Additional safeguard - check user role
+    useEffect(() => {
+        if (user && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+            console.warn("Unauthorized access attempt to admin panel - user role:", user.role);
+            navigate("/", { replace: true });
+        }
+    }, [user, navigate]);
+
     const handleLogout = () => {
         logout();
         navigate("/auth/login");
