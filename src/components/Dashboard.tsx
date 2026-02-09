@@ -109,7 +109,7 @@ function Dashboard({
   const setDateRange = onDateRangeChange || setInternalDateRange;
 
   // Fetch clients only if no clientId is provided
-  const { data: clients, isLoading: isLoadingClients } = useClients();
+  const { data: clients, isLoading: isLoadingClients, isError: isClientsError, refetch: refetchClients } = useClients();
 
   const { groupedMetrics } = useAvailableMetrics(clientId ?? null);
 
@@ -652,6 +652,17 @@ function Dashboard({
                 {[1, 2, 3, 4].map((i) => (
                   <Skeleton key={i} className="h-56 w-full rounded-xl" />
                 ))}
+              </div>
+            ) : isClientsError ? (
+              <div className="w-full px-5 py-24 text-center text-zinc-500 bg-white/50 backdrop-blur-sm rounded-3xl border border-dashed border-red-200 flex flex-col items-center justify-center">
+                <div className="p-5 rounded-full bg-red-50 mb-6 shadow-sm">
+                  <Activity className="text-4xl text-red-400" />
+                </div>
+                <h3 className="text-2xl font-bold text-zinc-800 mb-3 tracking-tight">Failed to load clients</h3>
+                <p className="mb-8 max-w-sm text-zinc-500 font-medium">We encountered an issue while fetching your clients.</p>
+                <Button onClick={() => refetchClients()} size="lg" className="rounded-xl px-8 shadow-lg shadow-red-500/20 bg-red-600 hover:bg-red-700">
+                  Retry
+                </Button>
               </div>
             ) : clients?.length === 0 ? (
               // No Clients Found

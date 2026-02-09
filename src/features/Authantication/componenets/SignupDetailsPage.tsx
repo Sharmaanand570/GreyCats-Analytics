@@ -115,7 +115,7 @@ export default function SignupDetailsPage() {
                 companyPIN: data.pin,
             });
             toast.success("All set!");
-            navigate("/"); // Redirect to Dashboard
+            navigate("/clients"); // Redirect to Clients Page
         } catch (error) {
             toast.error("Failed to save address details.");
         } finally {
@@ -125,7 +125,7 @@ export default function SignupDetailsPage() {
 
     const handleSkip = () => {
         if (step === 2) setStep(3);
-        else if (step === 3) navigate("/");
+        else if (step === 3) navigate("/clients");
     };
 
     // ---------------------------

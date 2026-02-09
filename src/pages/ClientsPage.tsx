@@ -49,7 +49,7 @@ const getClientHealth = (client: any) => {
 
 const ClientsPage: React.FC = () => {
     const navigate = useNavigate();
-    const { data: clients, isLoading } = useClients();
+    const { data: clients, isLoading, isError, refetch } = useClients();
     const { mutate: deleteClient } = useDeleteClient();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -167,6 +167,19 @@ const ClientsPage: React.FC = () => {
                                 {[1, 2, 3].map((i) => (
                                     <Skeleton key={i} className="h-[200px] w-full rounded-xl" />
                                 ))}
+                            </div>
+                        ) : isError ? (
+                            <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+                                <div className="p-4 rounded-full bg-red-50 mb-4">
+                                    <Activity className="w-8 h-8 text-red-500" />
+                                </div>
+                                <h3 className="text-xl font-semibold text-zinc-900 mb-2">Failed to load clients</h3>
+                                <p className="text-gray-500 mb-6 max-w-sm">
+                                    We encountered an issue while fetching your clients. Please try again.
+                                </p>
+                                <Button onClick={() => refetch()} variant="outline">
+                                    Retry
+                                </Button>
                             </div>
                         ) : processedClients?.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-[60vh]">
@@ -324,7 +337,8 @@ const ClientsPage: React.FC = () => {
                     setIsModalOpen(false);
                     setEditingClient(null);
                 }}
-                client={editingClient}
+                // Pass the latest version of the client from the list if available
+                client={editingClient ? (clients?.find(c => c.id === editingClient.id) || editingClient) : null}
             />
         </div>
     );

@@ -94,10 +94,16 @@ export interface SyncStatusResponse {
 
 export const getSyncStatus = (clientId: number) =>
   handleRequest<SyncStatusResponse>(async () => {
-    const response = await api.get<SyncStatusResponse>(
-      `/clients/${clientId}/sync-status`
-    );
-    return response.data;
+    try {
+      console.log(`Fetching sync status for client ${clientId} at /clients/${clientId}/sync-status`);
+      const response = await api.get<SyncStatusResponse>(
+        `/clients/${clientId}/sync-status`
+      );
+      return response.data;
+    } catch (err: any) {
+      console.error(`Error fetching sync status for client ${clientId}:`, err.response?.status, err.message);
+      throw err;
+    }
   });
 
 const handleRequest = async <T>(fn: () => Promise<T>): Promise<T> => {

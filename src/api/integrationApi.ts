@@ -143,3 +143,18 @@ export const getConnectedIntegrations = async (): Promise<import('../types/integ
     throw error;
   }
 };
+
+export const getSyncProgress = async (
+  clientId: number,
+  integrationType: IntegrationType
+): Promise<import('../types/integration.types').SyncProgressResponse> => {
+  try {
+    const response = await api.get<import('../types/integration.types').SyncProgressResponse>(
+      `/sync-status/${clientId}/${integrationType}`
+    );
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching sync progress for ${integrationType}:`, error);
+    throw error;
+  }
+};

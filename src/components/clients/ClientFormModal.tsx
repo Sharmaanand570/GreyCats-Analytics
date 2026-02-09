@@ -30,6 +30,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({ open, onClose, client
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [logo, setLogo] = useState<File | null>(null);
+    const [isLogoDeleted, setIsLogoDeleted] = useState(false);
 
     // Hooks
     const createClient = useCreateClient();
@@ -44,11 +45,13 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({ open, onClose, client
             setName(client.name);
             setDescription(client.description || '');
             setLogo(null);
+            setIsLogoDeleted(false);
         } else if (!open) {
             // Reset when closed
             setName('');
             setDescription('');
             setLogo(null);
+            setIsLogoDeleted(false);
         }
     }, [client, open]);
 
@@ -89,6 +92,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({ open, onClose, client
         if (client && client.id && client.logo) {
             try {
                 await deleteClientLogo.mutateAsync(client.id);
+                setIsLogoDeleted(true);
             } catch (error) {
                 // Toasts handled in hook
             }
@@ -162,7 +166,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({ open, onClose, client
                         <div className="space-y-2">
                             <Label htmlFor="logo">Client Logo</Label>
 
-                            {isEditMode && client?.logo && !logo && (
+                            {isEditMode && client?.logo && !logo && !isLogoDeleted && (
                                 <div className="flex items-center gap-4 mb-2 p-2 border rounded-md bg-muted/30">
                                     <Avatar className="h-10 w-10 border border-zinc-200">
                                         <AvatarImage src={getProfileImageUrl(client.logo) + `?v=${new Date(client.updatedAt).getTime()}`} className="object-contain" />

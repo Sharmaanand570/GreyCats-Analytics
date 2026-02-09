@@ -5,7 +5,6 @@ import type {
   ClientsResponse,
   ClientDetailResponse,
   ClientWithIntegrations,
-  ApiResponse,
   IntegrationType,
 } from '../types/client.types';
 import { useClientContext } from '../context/ClientContext';
@@ -27,14 +26,13 @@ export const useClients = () => {
   const { user } = useUserStore();
 
   return useQuery({
-    queryKey: clientKeys.lists(),
+    queryKey: [...clientKeys.lists(), user?.id],
     queryFn: async (): Promise<ClientWithIntegrations[]> => {
       try {
         const response = await api.get<ClientsResponse>('/clients');
         const rawClients = response.data.clients || [];
 
         // Fetch detailed data for each client to ensure all integrations (like GA) are counted correctly
-        // The list endpoint misses some counts (e.g. googleAnalyticsProperties), so we need the detail view.
         const detailedClients = await Promise.all(
           rawClients.map(async (client) => {
             try {
@@ -50,7 +48,6 @@ export const useClients = () => {
         setClients(detailedClients);
         return detailedClients;
       } catch (error: any) {
-
         console.error('Error fetching clients:', error);
 
         // If backend is not available (development mode), return empty array
@@ -64,20 +61,13 @@ export const useClients = () => {
           return []; // Return empty array instead of throwing
         }
 
-        // IMPORTANT: Do NOT return empty array for 401 (Unauthorized) errors
+        // IMPORTANT: Do NOT return empty array for other errors
         // This prevents React Query from caching "success: []" when the user is simply not logged in yet or session expired.
-        if (error.response?.status === 401) {
-          throw error;
-        }
-
-        // For other errors, show error message but still return empty array
-        toast.error(error.response?.data?.message || 'Failed to fetch clients');
-        setClients([]);
-        return [];
+        throw error;
       }
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: false, // Don't retry on network errors
+    retry: 1, // Retry once
     refetchOnWindowFocus: false,
     enabled: !!user, // Only fetch if user is logged in
   });

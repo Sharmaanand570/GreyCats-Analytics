@@ -9,6 +9,8 @@ import {
   SelectValue,
 } from "./ui/select";
 import type { ImageWidgetData } from "./widgetTypes";
+import { validateImageFile } from "@/utils/fileValidation";
+import { logger } from "@/utils/logger";
 
 interface ImageWidgetFormProps {
   data?: ImageWidgetData;
@@ -131,11 +133,15 @@ function ImageWidgetForm({ data, onChange }: ImageWidgetFormProps): React.JSX.El
               e.preventDefault();
               const file = e.dataTransfer.files?.[0];
               if (file && file.type.startsWith("image/")) {
+                // Validate file
+                const validation = validateImageFile(file);
+                if (!validation.valid) return;
+
                 try {
                   const compressedSrc = await compressImage(file);
                   handleChange({ src: compressedSrc });
                 } catch (error) {
-                  console.error("Image compression failed:", error);
+                  logger.error("Image compression failed:", error);
                   // Fallback to original if compression fails
                   const reader = new FileReader();
                   reader.onload = (event) => {
@@ -167,11 +173,15 @@ function ImageWidgetForm({ data, onChange }: ImageWidgetFormProps): React.JSX.El
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (file) {
+                  // Validate file
+                  const validation = validateImageFile(file);
+                  if (!validation.valid) return;
+
                   try {
                     const compressedSrc = await compressImage(file);
                     handleChange({ src: compressedSrc });
                   } catch (error) {
-                    console.error("Image compression failed:", error);
+                    logger.error("Image compression failed:", error);
                     // Fallback
                     const reader = new FileReader();
                     reader.onload = (event) => {

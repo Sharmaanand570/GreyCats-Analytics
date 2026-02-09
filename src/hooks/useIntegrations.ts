@@ -150,3 +150,38 @@ export const useConnectedIntegrations = () => {
     retry: 2,
   });
 };
+
+// Fetch sync progress
+export const useSyncProgress = (clientId: number | null, integrationType: IntegrationType | null, enabled: boolean) => {
+  return useQuery({
+    queryKey: [...integrationKeys.all, 'sync-progress', clientId, integrationType] as const,
+    queryFn: async () => {
+      if (!clientId || !integrationType) throw new Error("Client ID and Integration Type required");
+      try {
+        const { getSyncProgress } = await import('../api/integrationApi');
+        const response = await getSyncProgress(clientId, integrationType);
+        return response;
+      } catch (error: any) {
+        console.error(`Error fetching sync progress for ${integrationType}:`, error);
+        throw error;
+      }
+    },
+    enabled: !!clientId && !!integrationType && enabled,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (data && (data.status === 'completed' || data.status === 'failed')) {
+        return false; // Stop polling
+      }
+      return 2500; // Poll every 2.5 seconds
+    },
+    retry: (failureCount, error: any) => {
+      // Create a type guard or check for status code property
+      const statusCode = error?.response?.status;
+      // Don't retry on 4xx errors
+      if (statusCode && statusCode >= 400 && statusCode < 500) {
+        return false;
+      }
+      return failureCount < 3;
+    },
+  });
+};

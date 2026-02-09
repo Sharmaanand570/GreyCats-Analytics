@@ -51,6 +51,34 @@ export interface AccountAssignmentResponse {
   assignment?: any;
 }
 
+// Response for Sync Progress API
+export interface SyncProgress {
+  synced: number;
+  failed: number;
+  total: number;
+  percentage: number;
+  successRate: number;
+  lastSyncedDate: string | null;
+  errorLog: {
+    error: string;
+    timestamp: string;
+  } | null;
+  currentStage: string | null;
+  estimatedEndTime: string | null;
+  estimatedMinutesRemaining: number | null;
+  startedAt: string | null;
+  elapsedSeconds: number | null;
+}
+
+export interface SyncProgressResponse {
+  success: boolean;
+  status: 'not_started' | 'in_progress' | 'completed' | 'failed';
+  progress: SyncProgress | null;
+  updatedAt: string;
+  message?: string; // For error cases
+  error?: string; // For error cases
+}
+
 // Configuration for mapping frontend to API
 export interface IntegrationConfig {
   name: string;
@@ -60,4 +88,5 @@ export interface IntegrationConfig {
   displayNameField: string;
   identifierField: string;
   color?: string;
+  link?: string; // Optional link override
 }

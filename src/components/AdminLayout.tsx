@@ -12,6 +12,8 @@ import {
     X
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import GreycatsBlackLogo from "@/assets/images/greycats-black-logo.png";
+import GreycatsWhiteLogo from "@/assets/images/greycats-white-logo.png";
 import { Button } from "@/components/ui/button";
 import { useUserStore } from "@/utils/useUserStore";
 import { cn } from "@/lib/utils";
@@ -112,10 +114,16 @@ export default function AdminLayout() {
             >
                 <div className="flex h-20 items-center px-8">
                     <Link to="/admin" className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-lg bg-black dark:bg-white flex items-center justify-center">
-                            <span className="text-white dark:text-black font-bold text-lg">G</span>
-                        </div>
-                        <span className="font-bold text-xl tracking-tight text-gray-900 dark:text-white">GreyCats</span>
+                        <img
+                            src={GreycatsBlackLogo}
+                            alt="GreyCats"
+                            className="h-8 w-auto block dark:hidden"
+                        />
+                        <img
+                            src={GreycatsWhiteLogo}
+                            alt="GreyCats"
+                            className="h-8 w-auto hidden dark:block"
+                        />
                     </Link>
                     <Button
                         variant="ghost"

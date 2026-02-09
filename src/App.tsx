@@ -8,7 +8,8 @@ import ScrollToTop from "./components/ScrollToTop";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 // Lazy load components
-const Dashboard = lazy(() => import("./components/Dashboard"));
+// Dashboard removed from App.tsx as it is now only used in ClientDetailPage
+
 const EditDashboard = lazy(() => import("./components/EditDashboard"));
 const AuthPage = lazy(
   () => import("./features/Authantication/componenets/AuthPage")
@@ -113,8 +114,8 @@ function App() {
                 <Route path=":clientId" element={<ClientDetailPage />} />
               </Route>
 
-              <Route index element={<Dashboard />} />
-              <Route path="edit-dashboard" element={<EditDashboard />} />
+              <Route index element={<Navigate to="clients" replace />} />
+
 
               <Route path="data-sources">
                 <Route index element={<Integrations />} />

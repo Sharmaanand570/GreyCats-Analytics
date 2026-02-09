@@ -9,6 +9,10 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    sourcemap: false, // Disable source maps in production for security
+    // Note: console.log removal will be handled by logger utility
+  },
   server: {
     proxy: {
       "/api": {

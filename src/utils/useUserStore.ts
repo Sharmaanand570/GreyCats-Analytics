@@ -44,9 +44,24 @@ export const useUserStore = create<UserState>()(
       },
 
       logout: () => {
+        // Clear all storage
         localStorage.removeItem("user-storage");
-        localStorage.removeItem("ANALYTICS_TOKEN_KEY_"); // Ensure token is cleared too
+        localStorage.removeItem("ANALYTICS_TOKEN_KEY_");
+
+        // Clear any cached data
+        localStorage.removeItem("pending_oauth_client_id");
+        localStorage.removeItem("pending_oauth_integration");
+        localStorage.removeItem("originalToken");
+        localStorage.removeItem("impersonationToken");
+
+        // Clear session storage
+        sessionStorage.clear();
+
+        // Reset state
         set({ user: null });
+
+        // Clear query cache if available (will be handled by App.tsx or similar if needed)
+        // window.location.href = '/'; // Optional: force full reload to clear memory
       },
       pageNotFound: false,
       setPageNotFound: (pageNotFound) => set({ pageNotFound }),

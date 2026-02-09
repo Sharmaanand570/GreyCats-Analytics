@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Check, ChevronsUpDown, Plus, LayoutGrid, Users } from "lucide-react"
+import { Check, ChevronsUpDown, Plus, LayoutGrid, Users, Activity } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { getProfileImageUrl } from "@/utils/imageUtils"
 import {
@@ -24,7 +24,7 @@ export function ClientSelector({ isCollapsed }: { isCollapsed?: boolean }) {
     const [open, setOpen] = React.useState(false)
     const navigate = useNavigate()
     const { clientId } = useParams<{ clientId: string }>()
-    const { data: clients } = useClients()
+    const { data: clients, isError, refetch } = useClients()
 
     const selectedClient = React.useMemo(() =>
         clients?.find(c => c.id === Number(clientId)),
@@ -62,7 +62,14 @@ export function ClientSelector({ isCollapsed }: { isCollapsed?: boolean }) {
                     <Command className="bg-zinc-950">
                         <CommandInput placeholder="Search client..." className="text-zinc-100 placeholder:text-zinc-500" />
                         <CommandList>
-                            <CommandEmpty className="py-6 text-center text-sm text-zinc-500">No client found.</CommandEmpty>
+                            {isError ? (
+                                <CommandItem onSelect={() => refetch()} className="cursor-pointer text-red-500 data-[selected=true]:bg-zinc-800">
+                                    <Activity className="mr-2 h-4 w-4" />
+                                    Failed to load. Click to retry.
+                                </CommandItem>
+                            ) : (
+                                <CommandEmpty className="py-6 text-center text-sm text-zinc-500">No client found.</CommandEmpty>
+                            )}
                             <CommandGroup heading="Suggestions" className="text-zinc-400">
                                 <CommandItem onSelect={handleSelectOverview} className="cursor-pointer text-zinc-100 data-[selected=true]:bg-zinc-800 data-[selected=true]:text-zinc-50">
                                     <Users className="mr-2 h-4 w-4" />
@@ -131,7 +138,14 @@ export function ClientSelector({ isCollapsed }: { isCollapsed?: boolean }) {
                 <Command className="bg-zinc-950">
                     <CommandInput placeholder="Search client..." className="text-zinc-100 placeholder:text-zinc-500" />
                     <CommandList className="max-h-[300px] overflow-y-auto custom-scrollbar">
-                        <CommandEmpty className="py-6 text-center text-sm text-zinc-500">No client found.</CommandEmpty>
+                        {isError ? (
+                            <CommandItem onSelect={() => refetch()} className="cursor-pointer text-red-500 data-[selected=true]:bg-zinc-800">
+                                <Activity className="mr-2 h-4 w-4" />
+                                Failed to load. Click to retry.
+                            </CommandItem>
+                        ) : (
+                            <CommandEmpty className="py-6 text-center text-sm text-zinc-500">No client found.</CommandEmpty>
+                        )}
                         <CommandGroup className="text-zinc-400">
                             <CommandItem onSelect={handleSelectOverview} className="cursor-pointer text-zinc-100 data-[selected=true]:bg-zinc-800 data-[selected=true]:text-zinc-50">
                                 <Users className="mr-2 h-4 w-4" />

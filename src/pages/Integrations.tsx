@@ -27,6 +27,7 @@ import { ScrollArea } from "../components/ui/scroll-area";
 import { Building2, ArrowRight } from "lucide-react";
 import { useSyncStatus } from "@/features/reports/hooks/useSyncStatus";
 import { SyncStatusBadge } from "@/components/SyncStatusBadge";
+import { SyncProgressBar } from "@/components/SyncProgressBar";
 
 import type { ConnectedIntegration } from "@/types/client.types";
 import { useShopifyPolling } from "@/features/shopify/hooks/useShopifyPolling";
@@ -172,7 +173,15 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
         iconColor: platformConfig?.color,
         link,
         label: integration.accountName,
-        status: <SyncStatusBadge isSyncing={isSyncing} statusText={capitalizeStatus("connected")} syncDetails={syncDetails} />,
+        status: isSyncing ? (
+          <SyncProgressBar
+            clientId={clientId!}
+            integrationType={integration.integrationType}
+            compact={true}
+          />
+        ) : (
+          <SyncStatusBadge isSyncing={isSyncing} statusText={capitalizeStatus("connected")} syncDetails={syncDetails} />
+        ),
         renderActions: () => (
           <div className="flex items-center gap-2">
             <Button
