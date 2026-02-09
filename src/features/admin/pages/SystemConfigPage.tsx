@@ -57,6 +57,7 @@ export default function SystemConfigPage() {
                                     value={systemConfig}
                                     onChange={(e) => setSystemConfig(e.target.value)}
                                     placeholder="{ ... }"
+                                    maxLength={50000}
                                 />
                             </div>
                             <Button disabled>Save Configuration (Not Implemented)</Button>

@@ -51,6 +51,10 @@ export interface MetricWidgetData {
   hideDataPoints?: boolean;
   backgroundColor?: string;
   textColor?: string;
+
+  // NEW: Sparkline support for graph+number widgets (Agency Analytics style)
+  showSparkline?: boolean;
+  sparklineData?: { x: string; y: number }[];
 }
 
 export interface ImageWidgetData {

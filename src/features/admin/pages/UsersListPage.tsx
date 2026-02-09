@@ -65,7 +65,21 @@ export default function UsersListPage() {
         setLoading(true);
         try {
             const data = await adminApi.getUsers(page, 20, search);
-            setUsers(data.users || []);
+
+            console.log("Users data:", data);
+
+            // Map backend fields to the interface
+            const mappedUsers = (data.users || []).map((user: any) => ({
+                ...user,
+                // isActive is now available in the API
+                status: user.isActive ? 'ACTIVE' : 'SUSPENDED',
+                // API returns 'clientCount', map to component's 'clientsCount'
+                clientsCount: typeof user.clientCount === 'number'
+                    ? user.clientCount
+                    : (user.clients?.length || user._count?.clients || 0)
+            }));
+
+            setUsers(mappedUsers);
             setTotalPages(data.totalPages || 1);
         } catch (error) {
             console.error("Failed to fetch users", error);
@@ -152,15 +166,25 @@ export default function UsersListPage() {
         }
     };
 
-    const handleSuspendUser = async (user: AdminUser) => {
-        const newStatus = user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+    const handleStatusUpdate = async (user: AdminUser, newStatus: 'ACTIVE' | 'SUSPENDED') => {
         try {
-            await adminApi.updateUserStatus(user.id, newStatus);
-            toast.success(`User ${newStatus.toLowerCase()} successfully`);
+            setActionLoading(true);
+            const response = await adminApi.updateUserStatus(user.id, newStatus);
+            console.log("DEBUG: Status update response:", response);
+
+            // Optimistically update local state for immediate UI feedback
+            setUsers(prevUsers => prevUsers.map(u =>
+                u.id === user.id ? { ...u, status: newStatus, isActive: newStatus === 'ACTIVE' } : u
+            ));
+
+            toast.success(`User ${newStatus === 'ACTIVE' ? 'activated' : 'suspended'} successfully.`);
+            // Silent refresh in the background
             fetchUsers();
         } catch (error) {
-            console.error(error);
-            toast.error("Failed to update status");
+            console.error("Failed to update user status", error);
+            toast.error("Failed to update user status.");
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -177,6 +201,7 @@ export default function UsersListPage() {
                         className="pl-8"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
+                        maxLength={100}
                     />
                 </div>
             </AdminPageHeader>
@@ -257,6 +282,9 @@ export default function UsersListPage() {
                                                 <DropdownMenuItem onClick={() => navigate(`/admin/users/${user.id}`)}>
                                                     View Details
                                                 </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleStatusUpdate(user, user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE')}>
+                                                    {user.status === 'ACTIVE' ? 'Suspend User' : 'Activate User'}
+                                                </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={async () => {
                                                     try {
                                                         const TOKEN_KEY = 'ANALYTICS_TOKEN_KEY_';
@@ -292,9 +320,6 @@ export default function UsersListPage() {
                                                     setRoleDialogOpen(true);
                                                 }}>
                                                     Change Role
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => handleSuspendUser(user)}>
-                                                    {user.status === 'ACTIVE' ? 'Suspend User' : 'Activate User'}
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem className="text-red-600" onClick={() => {
                                                     setSelectedUser(user);

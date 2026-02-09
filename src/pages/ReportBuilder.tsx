@@ -670,7 +670,7 @@ const normalizeWidgetType = (type?: string): ReportWidgetType => {
 const buildDashboardMapFromTemplate = (
   widgets: ReportWidgetDefinition[]
 ): DashboardMap => {
-  console.log(`[Hydrate] Building map from ${widgets.length} widgets`);
+  console.log(`[Hydrate] Building map from ${widgets.length} widgets`, widgets[0]); // Log first widget for inspection
   if (!widgets.length) {
     return new Map([[0, []]]);
   }
@@ -678,6 +678,7 @@ const buildDashboardMapFromTemplate = (
   const map: DashboardMap = new Map();
 
   widgets.forEach((widget, index) => {
+
     const layoutInfo = widget.layout;
     const slideId = Number(layoutInfo?.slideId ?? 0);
     ensureSlide(map, slideId);
@@ -1734,6 +1735,11 @@ const renderWidgetContent = (
       const finalValue = resolvedValue ?? metricData?.value ?? 0;
       const formattedValue = typeof finalValue === "number" ? Math.floor(finalValue * 10) / 10 : finalValue;
 
+      // NEW: Auto-populate sparklineData from resolved series
+      const sparklineData = resolvedData?.series && Array.isArray(resolvedData.series)
+        ? resolvedData.series.map((point: any) => ({ x: point.x, y: point.y }))
+        : metricData?.sparklineData || [];
+
       return (
         <div
           className="flex-1 w-full flex flex-col items-center justify-center text-xs md:text-sm px-2 text-center min-h-[100px]"
@@ -1756,6 +1762,24 @@ const renderWidgetContent = (
               </span>
             )}
           </span>
+
+          {/* NEW: Sparkline Chart (Agency Analytics style graph+number) */}
+          {(metricData?.showSparkline !== false) && sparklineData.length > 0 && (
+            <div className="w-full mt-3 px-2" style={{ height: '60px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sparklineData}>
+                  <Line
+                    type="monotone"
+                    dataKey="y"
+                    stroke={metricData?.textColor || "#2563eb"}
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
 
           {/* Trend & Comparison (Manual / Custom Metrics) */}
@@ -2444,6 +2468,17 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       return;
     }
 
+    // REGRESSION FIX: strictly prevent "New Report" default initialization for Existing Reports.
+    // If templateId exists, we MUST wait for the data to load (handled by other effects).
+    // We should NEVER fall back to creating empty integration slides for an existing report,
+    // as this creates a race condition where empty slides overwrite the actual report data.
+    if (templateId != null) {
+      console.log('🛡️ [ReportBuilder] Preventing default init for existing report:', templateId);
+      return;
+    }
+
+    console.log('⚠️ [ReportBuilder] Proceeding with default init for NEW report (templateId is null)');
+
     const integrations = integrationsData.integrations;
 
     if (integrations.length === 0) {
@@ -2680,8 +2715,14 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     // ALSO: In Read-Only mode (Shared Reports), integrationsData is NEVER loaded. We must skip
     // ghost cleanup entirely and trust the template data.
     if ((!readOnly && isLoadingIntegrations) || (!readOnly && !integrationsData?.integrations)) {
+      console.log('[Hydrate] Waiting for integrations...', { isLoading: isLoadingIntegrations, hasData: !!integrationsData });
       return;
     }
+
+    if (!readOnly && integrationsData.integrations.length === 0) {
+      console.warn('[Hydrate] Integrations loaded but EMPTY array. This might cause rescue failure.');
+    }
+
 
     // SHARED REPORT FIX: If readOnly, we don't have integrations to validate against.
     // SHARED REPORT FIX: If readOnly, we don't have integrations to validate against.
@@ -3143,6 +3184,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             // Move widgets
             const ghosts = map.get(backendId) || [];
             const target = map.get(matchingIntegrationIndex) || [];
+
+            console.log(`[RescueDebug] Moving ${ghosts.length} widgets from ${backendId} to ${matchingIntegrationIndex}`); // DEBUG LOG
 
             const moved = ghosts.map(w => {
               const layout = (w as any).layout || {};
@@ -4196,10 +4239,11 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             rows: filteredRows,
           };
         } else {
-          // For metric cards, just value and total
+          // For metric cards, include value, total, and series (for sparkline support)
           merged[id] = {
             value: total,
             total: total,
+            series: series, // NEW: Include series for sparkline charts
             rawCount: filteredRows.length,
             rows: filteredRows,
           };
@@ -5432,6 +5476,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       case "title":
         return (
           <TitleWidgetForm
+            id={widgetFormState.widgetId}
             data={widgetFormState.data as TitleWidgetData}
             onChange={changeHandler}
           />
@@ -5466,6 +5511,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         const layoutItem = dashboards.get(widgetFormState.slideId)?.find(w => w.i === widgetFormState.widgetId);
         return (
           <TableWidgetForm
+            id={widgetFormState.widgetId}
             data={widgetFormState.data as TableWidgetData}
             onChange={changeHandler}
             metricKey={layoutItem?.metricConfig?.metricKey}
@@ -5475,6 +5521,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       case "image":
         return (
           <ImageWidgetForm
+            id={widgetFormState.widgetId}
             data={widgetFormState.data as ImageWidgetData}
             onChange={changeHandler}
           />
@@ -5482,6 +5529,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       case "embed":
         return (
           <EmbedWidgetForm
+            id={widgetFormState.widgetId}
             data={widgetFormState.data as EmbedWidgetData}
             onChange={changeHandler}
           />
@@ -5491,6 +5539,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         if (customData?.type === "tasks") {
           return (
             <TasksWidgetForm
+              id={widgetFormState.widgetId}
               data={customData}
               onChange={changeHandler as (data: CustomWidgetData) => void}
             />
@@ -5498,6 +5547,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         }
         return (
           <CustomWidgetForm
+            id={widgetFormState.widgetId}
             data={customData}
             onChange={changeHandler as (data: CustomWidgetData) => void}
           />

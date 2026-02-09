@@ -19,17 +19,17 @@ import { Upload, ChevronRight, Building2, Globe, Check } from "lucide-react";
 // ---------------------------
 
 const step1Schema = z.object({
-    jobTitle: z.string().min(1, "Job Title is required"),
-    companyName: z.string().min(1, "Company Name is required"),
+    jobTitle: z.string().min(1, "Job Title is required").max(100, "Max 100 characters"),
+    companyName: z.string().min(1, "Company Name is required").max(100, "Max 100 characters"),
 });
 
 const step3Schema = z.object({
-    website: z.string().optional().or(z.literal("")),
-    streetAddress: z.string().optional(),
-    city: z.string().optional(),
-    state: z.string().optional(),
-    country: z.string().optional(),
-    pin: z.string().optional(),
+    website: z.string().max(200, "Max 200 characters").optional().or(z.literal("")),
+    streetAddress: z.string().max(200, "Max 200 characters").optional(),
+    city: z.string().max(100, "Max 100 characters").optional(),
+    state: z.string().max(100, "Max 100 characters").optional(),
+    country: z.string().max(100, "Max 100 characters").optional(),
+    pin: z.string().max(20, "Max 20 characters").optional(),
 });
 
 type Step1Values = z.infer<typeof step1Schema>;
@@ -166,6 +166,7 @@ export default function SignupDetailsPage() {
                                                 placeholder="e.g. Product Manager"
                                                 className="pl-10 h-10"
                                                 {...form1.register("jobTitle")}
+                                                maxLength={100}
                                             />
                                         </div>
                                         {form1.formState.errors.jobTitle && (
@@ -182,6 +183,7 @@ export default function SignupDetailsPage() {
                                                 placeholder="e.g. Acme Corp"
                                                 className="pl-10 h-10"
                                                 {...form1.register("companyName")}
+                                                maxLength={100}
                                             />
                                         </div>
                                         {form1.formState.errors.companyName && (
@@ -258,6 +260,7 @@ export default function SignupDetailsPage() {
                                                 placeholder="https://company.com"
                                                 className="pl-10 h-10"
                                                 {...form3.register("website")}
+                                                maxLength={200}
                                             />
                                         </div>
                                         {form3.formState.errors.website && (
@@ -268,27 +271,27 @@ export default function SignupDetailsPage() {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2 md:col-span-2">
                                             <Label htmlFor="streetAddress">Street Address</Label>
-                                            <Input id="streetAddress" {...form3.register("streetAddress")} />
+                                            <Input id="streetAddress" {...form3.register("streetAddress")} maxLength={200} />
                                         </div>
 
                                         <div className="space-y-2">
                                             <Label htmlFor="city">City</Label>
-                                            <Input id="city" {...form3.register("city")} />
+                                            <Input id="city" {...form3.register("city")} maxLength={100} />
                                         </div>
 
                                         <div className="space-y-2">
                                             <Label htmlFor="state">State</Label>
-                                            <Input id="state" {...form3.register("state")} />
+                                            <Input id="state" {...form3.register("state")} maxLength={100} />
                                         </div>
 
                                         <div className="space-y-2">
                                             <Label htmlFor="country">Country</Label>
-                                            <Input id="country" {...form3.register("country")} />
+                                            <Input id="country" {...form3.register("country")} maxLength={100} />
                                         </div>
 
                                         <div className="space-y-2">
                                             <Label htmlFor="pin">PIN / Zip Code</Label>
-                                            <Input id="pin" {...form3.register("pin")} />
+                                            <Input id="pin" {...form3.register("pin")} maxLength={20} />
                                         </div>
                                     </div>
                                 </div>

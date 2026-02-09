@@ -146,6 +146,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({ open, onClose, client
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 disabled={isLoading}
+                                maxLength={50}
                                 required
                                 autoFocus
                             />
@@ -159,6 +160,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({ open, onClose, client
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
                                 disabled={isLoading}
+                                maxLength={500}
                                 rows={3}
                             />
                         </div>

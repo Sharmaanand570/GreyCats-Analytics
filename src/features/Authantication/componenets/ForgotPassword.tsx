@@ -219,6 +219,7 @@ export default function ForgotPassword() {
                                     {...form1.register("email")}
                                     className="px-4 py-6 rounded-[0.4rem]"
                                     autoComplete="email"
+                                    maxLength={256}
                                 />
                                 {form1.formState.errors.email && (
                                     <p className="text-xs text-red-500">{form1.formState.errors.email.message}</p>
@@ -296,6 +297,7 @@ export default function ForgotPassword() {
                                         {...form3.register("newPassword")}
                                         className="px-4 py-6 rounded-[0.4rem] pr-10"
                                         autoComplete="new-password"
+                                        maxLength={100}
                                     />
                                     <button
                                         type="button"
@@ -324,6 +326,7 @@ export default function ForgotPassword() {
                                         {...form3.register("confirmPassword")}
                                         className="px-4 py-6 rounded-[0.4rem] pr-10"
                                         autoComplete="new-password"
+                                        maxLength={100}
                                     />
                                     <button
                                         type="button"
