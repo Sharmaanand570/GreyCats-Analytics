@@ -2719,7 +2719,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       return;
     }
 
-    if (!readOnly && integrationsData.integrations.length === 0) {
+    if (!readOnly && integrationsData?.integrations?.length === 0) {
       console.warn('[Hydrate] Integrations loaded but EMPTY array. This might cause rescue failure.');
     }
 
