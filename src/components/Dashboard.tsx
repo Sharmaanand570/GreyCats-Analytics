@@ -6,10 +6,11 @@ import { type DateRange } from "react-day-picker";
 import { useMemo, useState, useEffect } from "react";
 // Icons
 import { FiSearch, FiBell } from "react-icons/fi";
-import { LayoutGrid, BarChart3, LineChart, Building2, Activity } from "lucide-react";
+import { LayoutGrid, Building2, Activity } from "lucide-react";
 // Components
 import { MetricCard } from "./dashboard/MetricCard";
 import { getBrandColor } from "@/lib/brandColors";
+import { getPlatformConfig } from "@/utils/platformMapping"; // Import platform mapping
 import { useQuery } from "@tanstack/react-query";
 import {
   listDashboards,
@@ -506,7 +507,6 @@ function Dashboard({
                 total = filteredRows.reduce((sum: number, row: any) => sum + (row.value || 0), 0);
               }
             }
-
           }
 
         }
@@ -591,11 +591,9 @@ function Dashboard({
 
 
   const getIntegrationIcon = (integration: string, className?: string) => {
-    const norm = integration.toLowerCase();
-    if (norm.includes('google')) return <BarChart3 className={className} />;
-    if (norm.includes('meta')) return <LayoutGrid className={className} />;
-    if (norm.includes('youtube')) return <div className={className}>▶</div>;
-    return <LineChart className={className} />;
+    const platformConfig = getPlatformConfig(integration);
+    const Icon = platformConfig?.icon || LayoutGrid; // Default fallback if not found
+    return <Icon className={className} />;
   };
 
   useEffect(() => {

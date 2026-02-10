@@ -3,8 +3,9 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClients } from '../hooks/useClients';
 import { useSyncStatus } from '../features/reports/hooks/useSyncStatus';
-import { Building2, FileText, ArrowUpDown, Search, Loader2 } from 'lucide-react';
+import { FileText, ArrowUpDown, Search, Loader2 } from 'lucide-react';
 import { FiBell } from "react-icons/fi";
+import { getProfileImageUrl } from "@/utils/imageUtils";
 import { Input } from "../components/ui/input";
 import { Skeleton } from "../components/ui/skeleton";
 import {
@@ -212,9 +213,17 @@ const ClientRow: React.FC<ClientRowProps> = ({ client, onClick }) => {
         >
             <TableCell className="font-medium">
                 <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-500 group-hover:bg-white group-hover:shadow-sm transition-all">
-                        <Building2 className="w-5 h-5" />
-                    </div>
+                    {client.companyLogo ? (
+                        <img
+                            src={getProfileImageUrl(client.companyLogo)}
+                            alt={client.name}
+                            className="h-10 w-10 rounded-lg object-cover border border-zinc-200 group-hover:shadow-sm transition-all"
+                        />
+                    ) : (
+                        <div className="h-10 w-10 rounded-lg bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-700 font-semibold group-hover:bg-white group-hover:shadow-sm transition-all">
+                            {client.name.charAt(0).toUpperCase()}
+                        </div>
+                    )}
                     <div>
                         <div className="font-semibold text-zinc-900">{client.name}</div>
                         <div className="text-xs text-zinc-500 line-clamp-1">{client.description || "No description"}</div>

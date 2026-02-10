@@ -69,7 +69,7 @@ export const MetricCard = memo(({
                 </div>
             </div>
 
-            <div className="relative z-10 h-16 mt-4 -mx-2 -mb-2 opacity-80 group-hover:opacity-100 transition-opacity">
+            <div className="relative z-10 h-16 mt-4 px-2 opacity-80 group-hover:opacity-100 transition-opacity">
                 {hasData ? (
                     <ChartLineMultiple
                         data={series}

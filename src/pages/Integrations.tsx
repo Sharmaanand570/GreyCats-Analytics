@@ -1,7 +1,7 @@
 import { FiBell, FiSearch, FiLoader } from "react-icons/fi";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import DropDownFilter from "../components/DropDownFilter";
+import DropDownFilter, { type FilterGroup } from "../components/DropDownFilter";
 import TableComponent from "../components/TableComponent";
 import ConnectDataSource from "../components/ConnectDataSource";
 import { getPlatformConfig, capitalizeStatus } from "@/utils/platformMapping";
@@ -132,6 +132,43 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
 
   const { isAccountSyncing, getIntegrationCounts, overallProgress } = useSyncStatus(clientId);
 
+  const [sortOrder, setSortOrder] = useState<string>("date_desc");
+  const [platformFilter, setPlatformFilter] = useState<string>("all");
+
+  const availablePlatforms = useMemo(() => {
+    if (!client?.integrations) return [];
+    const platforms = new Set(client.integrations.map(i => i.integrationType));
+    return Array.from(platforms);
+  }, [client]);
+
+  const filterGroups = useMemo<FilterGroup[]>(() => [
+    {
+      id: "sort",
+      label: "Sort By",
+      value: sortOrder,
+      onChange: setSortOrder,
+      options: [
+        { label: "Newest First", value: "date_desc" },
+        { label: "Oldest First", value: "date_asc" },
+        { label: "Name (A-Z)", value: "name_asc" },
+        { label: "Name (Z-A)", value: "name_desc" },
+      ]
+    },
+    {
+      id: "platform",
+      label: "Platform",
+      value: platformFilter,
+      onChange: setPlatformFilter,
+      options: [
+        { label: "All Platforms", value: "all" },
+        ...availablePlatforms.map(p => ({
+          label: getPlatformConfig(p.toLowerCase().replace(/_/g, "-"))?.name || p,
+          value: p
+        }))
+      ]
+    }
+  ], [sortOrder, platformFilter, availablePlatforms]);
+
   const tableData = useMemo(() => {
     if (!client?.integrations) {
       return [];
@@ -140,7 +177,12 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
     console.log('Client data:', client);
     console.log('Client integrations:', client.integrations);
 
-    const integrations = client.integrations;
+    let integrations = [...client.integrations];
+
+    // Filter by platform
+    if (platformFilter !== 'all') {
+      integrations = integrations.filter(i => i.integrationType === platformFilter);
+    }
 
     // Filter by search query if present
     const filtered = searchQuery.trim()
@@ -149,6 +191,23 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
         (integration.integrationType || "").toLowerCase().includes(searchQuery.toLowerCase())
       )
       : integrations;
+
+    // Apply Sorting
+    filtered.sort((a, b) => {
+      switch (sortOrder) {
+        case "date_desc":
+          // Fallback to 0 if connectedAt is missing
+          return new Date(b.connectedAt || 0).getTime() - new Date(a.connectedAt || 0).getTime();
+        case "date_asc":
+          return new Date(a.connectedAt || 0).getTime() - new Date(b.connectedAt || 0).getTime();
+        case "name_asc":
+          return (a.accountName || "").localeCompare(b.accountName || "");
+        case "name_desc":
+          return (b.accountName || "").localeCompare(a.accountName || "");
+        default:
+          return 0;
+      }
+    });
 
     return filtered.map((integration) => {
       const platformKey = (integration.integrationType || "").toLowerCase().replace(/_/g, "-");
@@ -199,7 +258,7 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
         ),
       };
     });
-  }, [client, searchQuery, isAccountSyncing, clientId, getIntegrationCounts]);
+  }, [client, searchQuery, isAccountSyncing, clientId, getIntegrationCounts, sortOrder, platformFilter]);
 
 
 
@@ -240,7 +299,7 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
           </div>
 
           <div>
-            <DropDownFilter />
+            <DropDownFilter groups={filterGroups} />
           </div>
         </div>
         <div className="flex items-center gap-4">

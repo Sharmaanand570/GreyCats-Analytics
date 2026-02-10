@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { getProfileImageUrl } from "@/utils/imageUtils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Client } from "@/types/client.types";
+import { getPlatformConfig } from "@/utils/platformMapping";
 
 // Helper to determine status based on integrations (Simulated logic for demo)
 const getClientHealth = (client: any) => {
@@ -255,7 +256,7 @@ const ClientsPage: React.FC = () => {
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
@@ -301,19 +302,78 @@ const ClientsPage: React.FC = () => {
                                                     </div>
                                                 </div>
 
+
                                                 <h3 className="font-bold text-lg text-zinc-900 leading-tight line-clamp-1 text-left w-full group-hover:text-black transition-colors">
                                                     {client.name}
                                                 </h3>
 
-
                                             </div>
 
                                             <div className="flex items-center justify-between w-full mt-auto pt-4 border-t border-black/5 relative z-10">
-                                                <div className="flex items-center gap-1.5">
-                                                    <Activity className="w-3.5 h-3.5 text-zinc-400" />
-                                                    <span className="text-zinc-600 text-[11px] font-medium">
-                                                        {totalIntegrations} Connected
-                                                    </span>
+                                                <div className="flex items-center gap-1">
+                                                    {/* Integration Logos as Circles */}
+                                                    {client.integrations && client.integrations.length > 0 ? (
+                                                        <>
+                                                            <div className="flex -space-x-2">
+                                                                {client.integrations.slice(0, 4).map((integration: any, idx: number) => {
+                                                                    // Determine the actual platform type
+                                                                    let platformType = integration.integrationType;
+
+                                                                    // For meta-business and meta-insights, check if it's Facebook or Instagram
+                                                                    if (platformType === 'meta-business' || platformType === 'meta-insights') {
+                                                                        // Check account name or identifier for instagram keywords
+                                                                        const nameOrIdentifier = (integration.accountName || integration.accountIdentifier || '').toLowerCase();
+                                                                        if (nameOrIdentifier.includes('instagram') || integration.instagramBusinessId || integration.instagramUsername) {
+                                                                            platformType = 'meta-instagram';
+                                                                        } else if (integration.pageId || integration.pageName || nameOrIdentifier.includes('facebook') || nameOrIdentifier.includes('page')) {
+                                                                            platformType = 'meta-facebook';
+                                                                        }
+                                                                    }
+
+                                                                    console.log('🔍 Debug Integration:', {
+                                                                        type: integration.integrationType,
+                                                                        detectedAs: platformType,
+                                                                        accountName: integration.accountName,
+                                                                        full: integration
+                                                                    });
+
+                                                                    const platformConfig = getPlatformConfig(platformType);
+                                                                    const Icon = platformConfig?.icon;
+
+                                                                    return (
+                                                                        <div
+                                                                            key={idx}
+                                                                            className="h-7 w-7 rounded-full border-2 border-white flex items-center justify-center shadow-sm transition-transform group-hover:scale-110"
+                                                                            style={{ backgroundColor: platformConfig?.color || '#71717a' }}
+                                                                            title={platformConfig?.name || integration.accountName || platformType}
+                                                                        >
+                                                                            {Icon && <Icon className="w-3.5 h-3.5 text-white" />}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                                {client.integrations.length > 4 && (
+                                                                    <div className="h-7 w-7 rounded-full border-2 border-white flex items-center justify-center bg-zinc-200 shadow-sm">
+                                                                        <span className="text-[10px] font-bold text-zinc-600">+{client.integrations.length - 4}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <span className="text-zinc-500 text-[11px] font-medium ml-2">
+                                                                {client.integrations.length} {client.integrations.length === 1 ? 'integration' : 'integrations'}
+                                                            </span>
+                                                        </>
+                                                    ) : totalIntegrations > 0 ? (
+                                                        // Fallback to old display if integrations array not available
+                                                        <>
+                                                            <Activity className="w-3.5 h-3.5 text-zinc-400" />
+                                                            <span className="text-zinc-600 text-[11px] font-medium">
+                                                                {totalIntegrations} Connected
+                                                            </span>
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-zinc-400 text-[11px] font-medium italic">
+                                                            No integrations
+                                                        </span>
+                                                    )}
                                                 </div>
 
                                                 {/* Hover Action "Quick Peek" */}

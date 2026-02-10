@@ -57,8 +57,10 @@ export function ImageDisplayTab({ data, onChange }: ImageDisplayTabProps) {
 
                     ctx.drawImage(img, 0, 0, width, height);
 
-                    // Compress to JPEG
-                    const dataUrl = canvas.toDataURL("image/jpeg", QUALITY);
+                    // Preserve PNG format for transparency, use JPEG for others
+                    const isPNG = file.type === "image/png";
+                    const mimeType = isPNG ? "image/png" : "image/jpeg";
+                    const dataUrl = canvas.toDataURL(mimeType, QUALITY);
                     resolve(dataUrl);
                 };
                 img.onerror = (error) => reject(error);
@@ -91,7 +93,7 @@ export function ImageDisplayTab({ data, onChange }: ImageDisplayTabProps) {
             <div>
                 <Label className="block text-xs text-gray-600 mb-2">Image</Label>
                 <div
-                    className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-gray-400 transition-colors"
+                    className="relative border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-gray-400 transition-colors"
                     onDragOver={(e) => {
                         e.preventDefault();
                         e.dataTransfer.dropEffect = "copy";

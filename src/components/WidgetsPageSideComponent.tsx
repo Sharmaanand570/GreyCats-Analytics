@@ -203,6 +203,8 @@ function WidgetsPageSideComponent({
         integrationId: string | number;
         slideIndex: number;
         isCustom: boolean;
+        icon?: any; // Using any or IconType if imported, but optional
+        color?: string;
         pages: { innerlabel: string; sublabel: string }[];
       }[] = [];
 
@@ -221,7 +223,7 @@ function WidgetsPageSideComponent({
         const numId = Number(slide.id);
         const idxToUse = slide.integrationIndex !== undefined ? slide.integrationIndex : numId;
 
-        const integration = integrations[idxToUse];
+        const integration = integrationsData?.integrations?.[idxToUse] || integrations[idxToUse];
         const platformConfig = integration
           ? getPlatformConfig(integration.platform)
           : undefined;
@@ -238,6 +240,8 @@ function WidgetsPageSideComponent({
             : `integration-${slide.id}`,
           slideIndex: numId,
           isCustom: false, // FORCE FALSE for integration-like slides
+          icon: platformConfig?.icon,
+          color: platformConfig?.color,
           pages: [
             {
               innerlabel: effectiveTitle,
@@ -261,6 +265,8 @@ function WidgetsPageSideComponent({
           integrationId: `custom-${slide.id}`,
           slideIndex: Number(slide.id),
           isCustom: true,
+          icon: undefined,
+          color: undefined,
           pages: [
             {
               innerlabel: slide.title || "Untitled page",
@@ -292,6 +298,8 @@ function WidgetsPageSideComponent({
           integrationId: `page-${id}`,
           slideIndex: id,
           isCustom: true,
+          icon: undefined,
+          color: undefined,
           pages: [
             {
               innerlabel: "Untitled page",
@@ -318,6 +326,8 @@ function WidgetsPageSideComponent({
         integrationId: integration.id,
         slideIndex: idx,
         isCustom: false,
+        icon: platformConfig?.icon,
+        color: platformConfig?.color,
         pages: [
           {
             // Make the Pages sidebar label match the slide header title
@@ -335,6 +345,8 @@ function WidgetsPageSideComponent({
       integrationId: `custom-${customPage.id}`,
       slideIndex: customPage.id,
       isCustom: true,
+      icon: undefined,
+      color: undefined,
       pages: [
         {
           innerlabel: customPage.name,
@@ -363,6 +375,8 @@ function WidgetsPageSideComponent({
           integrationId: `slide-${id}`,
           slideIndex: id,
           isCustom: true,
+          icon: undefined,
+          color: undefined,
           pages: [
             {
               innerlabel: `Untitled page`,
@@ -597,6 +611,11 @@ function WidgetsPageSideComponent({
                     <div>
                       <IoIosMenu className="text-xl md:text-2xl text-gray-500" />
                     </div>
+                    {p.icon && (
+                      <div className="flex-shrink-0">
+                        <p.icon className="w-5 h-5 md:w-6 md:h-6" style={{ color: p.color || '#6b7280' }} />
+                      </div>
+                    )}
                     <div className="flex flex-col gap-[0.1rem] md:gap-[0.2rem] min-w-0 flex-1">
                       {editingSlideId === slideIdx ? (
                         <div className="flex items-center gap-1">

@@ -4842,10 +4842,24 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       const startId = Math.max(999, maxId);
       const nextId = startId + 1;
 
+      console.log(`[addCustomPage] Creating custom page with ID=${nextId}, name="${pageName}"`);
+
       // Add to custom pages
       setCustomPages((prev) => [
         ...prev,
         { id: nextId, name: pageName, subtitle },
+      ]);
+
+      // CRITICAL FIX: Add to processedSlidesMeta with source: 'custom'
+      // This ensures the page is saved with the correct metadata and persists after refresh
+      setProcessedSlidesMeta((prev) => [
+        ...prev,
+        {
+          id: nextId,
+          title: pageName,
+          subtitle: subtitle || 'Custom page',
+          source: 'custom' as const
+        }
       ]);
 
       // Add empty slide to dashboards immediately so it's "real"
@@ -4864,6 +4878,11 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         const base = prev.length > 0 ? prev : Array.from(dashboards.keys());
         return [...base, nextId];
       });
+
+      // Mark as unsaved to trigger auto-save
+      setHasUnsavedChanges(true);
+
+      toast.success(`Added custom page: ${pageName}`);
 
       return nextId;
     },

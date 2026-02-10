@@ -185,6 +185,16 @@ export const ReportSchedules: React.FC<ReportSchedulesProps> = ({ clientId }) =>
         // This acts as a safeguard if the API returns mixed data without clientIds
         const templateExists = templates.some(t => t.id === schedule.templateId);
         return templateExists;
+    }).sort((a, b) => {
+        // Sort by Active status first (Active = true, Paused = false)
+        // We want true (Active) first, so b.isActive - a.isActive? No, boolean subtraction isn't standard in TS without coercion.
+        // Number(true) = 1, Number(false) = 0.
+        // b (1) - a (0) = 1 -> b comes first (Desc order of boolean)
+        if (a.isActive !== b.isActive) {
+            return Number(b.isActive) - Number(a.isActive);
+        }
+        // Secondary sort by name for stability
+        return a.name.localeCompare(b.name);
     });
 
     return (

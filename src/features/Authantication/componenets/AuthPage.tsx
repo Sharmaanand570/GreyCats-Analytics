@@ -504,18 +504,19 @@ export default function AuthPage() {
           ref={imgRef}
           src={Screenshot}
           alt="Preview Screenshot"
-          className="absolute top-1/2 right-[-12rem] w-[68rem] -translate-y-1/2
-                     bg-white shadow-2xl rounded-2xl p-4 z-0"
+          className="absolute top-1/2 right-[-10rem] w-[68rem] -translate-y-1/2
+                      shadow-2xl rounded-2xl p-2 z-0 bg-gradient-to-bl from-black via-zinc-900 to-zinc-700
+"
         />
 
-        <blockquote className="relative mt-auto text-sm md:text-base italic text-accent z-10">
-          “This library has saved me countless hours of work and helped me
-          deliver stunning designs to my clients faster than ever before.”
-          <br />
-          <span className="mt-2 block not-italic text-muted-foreground font-medium">
-            – Sofia Davis
-          </span>
-        </blockquote>
+       <blockquote className="relative mt-auto text-sm md:text-base italic text-accent z-10">
+  “This platform gives me a complete view of all my client metrics in one place. Reporting that used to take hours now takes minutes.”
+  <br />
+  <span className="mt-2 block not-italic text-muted-foreground font-medium">
+    – Digital Marketing Manager
+  </span>
+</blockquote>
+
       </div>
     </div>
   );

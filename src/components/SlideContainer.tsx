@@ -36,12 +36,11 @@ export default function SlideContainer({ title, containerRef, children, id, date
       {/* Company Footer */}
       {/* Greycats Footer (Bottom Left) */}
       <div className="absolute bottom-4 left-6 flex items-center gap-2 opacity-50 pointer-events-none">
-        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-zinc-100 border border-zinc-200 text-zinc-900 font-bold text-xs">
-          G
-        </div>
-        <span className="text-xs text-gray-400 font-medium">
-          Greycats Analytics
-        </span>
+        <img
+          src="/src/assets/images/greycats-black-logo.png"
+          alt="GreyCats Analytics"
+          className="h-6 object-contain"
+        />
       </div>
 
       {/* Company/User Footer (Bottom Right) */}
