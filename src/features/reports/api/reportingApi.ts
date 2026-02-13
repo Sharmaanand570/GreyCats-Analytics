@@ -154,6 +154,7 @@ export const buildSlidesFromWidgets = (
         id: meta.id,
         title: meta.title,
         subtitle: meta.subtitle,
+        sortOrder: meta.sortOrder,
         widgets: [],
       });
     });
@@ -234,14 +235,46 @@ const mapApiTemplateToReportTemplate = (
   apiTemplate: ApiReportTemplate
 ): ReportTemplate => {
   const widgets: ReportWidgetDefinition[] = [];
-  // Prefer explicit backend pageOrder if present; otherwise derive from slides.
+
+  // 1. Prefer explicit backend pageOrder if present.
   let pageOrder: number[] = Array.isArray(apiTemplate.pageOrder)
     ? [...apiTemplate.pageOrder]
     : [];
 
+  console.log('📥 [MapTemplate] Received from Backend:', {
+    hasPageOrder: !!apiTemplate.pageOrder,
+    pageOrderLen: apiTemplate.pageOrder?.length,
+    pageOrder: apiTemplate.pageOrder,
+    slidesCount: apiTemplate.slides?.length,
+    slideSortOrders: apiTemplate.slides?.map(s => ({ id: s.id, sort: s.sortOrder }))
+  });
+
   const slidesMeta: ReportTemplate["slidesMeta"] = [];
 
-  apiTemplate.slides.forEach((slide, slideIndex) => {
+  // 2. Sort slides to match pageOrder (Primary) or sortOrder (Secondary)
+  const sortedSlides = [...apiTemplate.slides].sort((a, b) => {
+    const idA = a.id ?? -1;
+    const idB = b.id ?? -1;
+
+    // Priority A: pageOrder
+    if (pageOrder.length > 0) {
+      const idxA = pageOrder.indexOf(idA);
+      const idxB = pageOrder.indexOf(idB);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+    }
+
+    // Priority B: sortOrder (Fallback)
+    if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+      return a.sortOrder - b.sortOrder;
+    }
+
+    // Priority C: ID / Original
+    return 0;
+  });
+
+  sortedSlides.forEach((slide, slideIndex) => {
     const slideId = slide.id ?? slideIndex;
 
 
@@ -300,9 +333,9 @@ const mapApiTemplateToReportTemplate = (
     });
   });
 
-  // Fallback: If no pageOrder from backend, use the order of slides
+  // Fallback: If no pageOrder from backend, use the order of slides (which we sorted above)
   if (pageOrder.length === 0) {
-    pageOrder = apiTemplate.slides.map((s, i) => s.id ?? i);
+    pageOrder = slidesMeta.map(s => s.id);
   }
 
   return {
