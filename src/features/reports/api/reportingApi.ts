@@ -28,6 +28,7 @@ import type {
   GetReportScheduleResponse,
   MetaStoredPostsResponse,
   InstagramMediaResponse,
+  MetaAdsCampaignPerformanceResponse,
 } from "./types";
 import { buildApiError, type AxiosApiError } from "./types";
 import { prettifyMetricLabel } from "@/utils/labelUtils";
@@ -67,6 +68,25 @@ export const fetchInstagramStoredMedia = (
 
     const response = await api.get<InstagramMediaResponse>(
       `/metabusiness/instagram/stored-media/${accountId}`,
+      { params }
+    );
+    return response.data;
+  });
+
+// New API function for Meta Ads Campaign Performance
+export const fetchMetaAdsCampaignPerformance = (
+  clientId: number,
+  startDate?: string,
+  endDate?: string
+) =>
+  handleRequest<MetaAdsCampaignPerformanceResponse>(async () => {
+    const params: any = {};
+    if (clientId) params.clientId = clientId;
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+
+    const response = await api.get<MetaAdsCampaignPerformanceResponse>(
+      `/unified-metrics/meta-ads/campaign-performance`,
       { params }
     );
     return response.data;
@@ -185,8 +205,12 @@ export const buildSlidesFromWidgets = (
   }
 
   const slides = Array.from(slideMap.values());
-  console.log(`🏗️ [buildSlidesFromWidgets] Input: ${widgets?.length || 0} visible widgets, ${slidesMeta?.length || 0} meta pages.`);
-  console.log(`🏗️ [buildSlidesFromWidgets] Output: ${slides.length} slides constructed.`, slides);
+  console.log(`🏗️ [buildSlidesFromWidgets] Input: ${widgets?.length || 0} widgets, ${slidesMeta?.length || 0} slidesMeta items.`);
+  console.log(`🏗️ [buildSlidesFromWidgets] Output: ${slides.length} slides constructed.`);
+
+  if (slides.length > 0) {
+    console.log(`🏗️ [buildSlidesFromWidgets] Slide IDs:`, slides.map(s => s.id));
+  }
 
   if (pageOrder && pageOrder.length > 0) {
     return slides.sort((a, b) => {

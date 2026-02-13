@@ -2,7 +2,7 @@ import { FiLoader, FiCheckCircle } from "react-icons/fi";
 
 
 interface SyncStatusBadgeProps {
-    isSyncing: boolean;
+    isSyncing?: boolean;
     statusText?: string;
     syncDetails?: {
         total: number;
@@ -10,7 +10,7 @@ interface SyncStatusBadgeProps {
     } | null;
 }
 
-export const SyncStatusBadge = ({ isSyncing, statusText = "Connected", syncDetails }: SyncStatusBadgeProps) => {
+export const SyncStatusBadge = ({ isSyncing = false, statusText = "Connected", syncDetails }: SyncStatusBadgeProps) => {
     if (isSyncing) {
         const text = syncDetails
             ? `Syncing... (${syncDetails.synced}/${syncDetails.total})`

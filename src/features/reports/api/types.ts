@@ -1,4 +1,10 @@
 import type { AxiosError } from "axios";
+import type { Layout } from "react-grid-layout";
+import type { ReportWidgetType } from "../../../components/reportTypes";
+
+
+
+
 
 export type ApiSuccessResponse<T> = {
   success: true;
@@ -105,6 +111,14 @@ export interface ReportSlideMeta {
    * For integration slides, the index in the integrations array.
    */
   integrationIndex?: number;
+  /**
+   * Optional sort order used by the sidebar.
+   */
+  sortOrder?: number;
+  /**
+    * For multi-slide templates, which slide index (0-based) this page represents.
+    */
+  subSlideIndex?: number;
 }
 
 // Full template shape used by the Report Builder UI
@@ -461,3 +475,39 @@ export interface InstagramMediaResponse {
   count: number;
   media: InstagramMedia[];
 }
+
+// Meta Ads Campaign Performance
+export interface MetaAdsCampaignRow {
+  campaignName: string;
+  adName: string;
+  adsetName: string;
+  clicks: number;
+  impressions: number;
+  cpc: number;
+  ctr: number;
+}
+
+export interface MetaAdsCampaignPerformanceResponse {
+  success: boolean;
+  rows: MetaAdsCampaignRow[];
+}
+
+// Moved from ReportBuilder.tsx - Shared types for Store
+export interface DashboardLayout extends Layout {
+  widgetType: ReportWidgetType; // ReportWidgetType (string union)
+
+  data?: any; // WidgetData
+  metricConfig?: ReportWidgetDefinition;
+  snapshotData?: Record<string, any>;
+}
+
+
+export interface CustomPage {
+  id: number;
+  name: string;
+  subtitle?: string;
+}
+
+export type DashboardMap = Map<number, DashboardLayout[]>;
+
+

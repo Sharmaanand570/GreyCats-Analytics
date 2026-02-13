@@ -149,8 +149,10 @@ export const getSyncProgress = async (
   integrationType: IntegrationType
 ): Promise<import('../types/integration.types').SyncProgressResponse> => {
   try {
+    // Normalize key: replace spaces/underscores with hyphens to match API format
+    const normalizedType = integrationType.toLowerCase().replace(/[ _]/g, '-');
     const response = await api.get<import('../types/integration.types').SyncProgressResponse>(
-      `/sync-status/${clientId}/${integrationType}`
+      `/sync-status/${clientId}/${normalizedType}`
     );
     return response.data;
   } catch (error) {

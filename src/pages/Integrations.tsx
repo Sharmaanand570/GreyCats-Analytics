@@ -1,4 +1,4 @@
-import { FiBell, FiSearch, FiLoader } from "react-icons/fi";
+import { FiBell, FiSearch, FiLoader, FiAlertCircle } from "react-icons/fi";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import DropDownFilter, { type FilterGroup } from "../components/DropDownFilter";
@@ -130,7 +130,7 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
     );
   }
 
-  const { isAccountSyncing, getIntegrationCounts, overallProgress } = useSyncStatus(clientId);
+  const { isAccountSyncing, getIntegrationCounts, overallProgress, hasError, errorMessage, retrySync } = useSyncStatus(clientId);
 
   const [sortOrder, setSortOrder] = useState<string>("date_desc");
   const [platformFilter, setPlatformFilter] = useState<string>("all");
@@ -236,10 +236,11 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
           <SyncProgressBar
             clientId={clientId!}
             integrationType={integration.integrationType}
+            accountId={integration.accountId}
             compact={true}
           />
         ) : (
-          <SyncStatusBadge isSyncing={isSyncing} statusText={capitalizeStatus("connected")} syncDetails={syncDetails} />
+          <SyncStatusBadge statusText={capitalizeStatus("connected")} syncDetails={syncDetails} />
         ),
         renderActions: () => (
           <div className="flex items-center gap-2">
@@ -318,7 +319,26 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
         </div>
       </div>
       <div className="w-full px-5">
-        {overallProgress.isSyncing && (
+        {hasError && (
+          <div className="mb-6 bg-red-50 border border-red-100 rounded-lg p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-100 rounded-full text-red-600">
+                <FiAlertCircle className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="font-medium text-red-900 text-sm">Sync Status Unavailable</h4>
+                <p className="text-red-700 text-xs mt-0.5">
+                  {errorMessage || "Failed to fetch sync status"}
+                </p>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={retrySync} className="text-red-700 border-red-200 hover:bg-red-100">
+              Retry
+            </Button>
+          </div>
+        )}
+
+        {overallProgress.isSyncing && !hasError && (
           <div className="mb-6 bg-blue-50 border border-blue-100 rounded-lg p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-100 rounded-full text-blue-600">
@@ -328,6 +348,7 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
                 <h4 className="font-medium text-blue-900 text-sm">Syncing Data Sources</h4>
                 <p className="text-blue-700 text-xs mt-0.5">
                   Synced {overallProgress.synced} of {overallProgress.total} integrations
+                  {overallProgress.pending > 0 && ` (${overallProgress.pending} pending)`}
                 </p>
               </div>
             </div>

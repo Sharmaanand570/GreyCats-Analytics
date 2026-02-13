@@ -5,7 +5,7 @@ import type { SyncError } from "@/utils/errorHandling";
 
 export const useSyncStatus = (clientId: number | null) => {
     const [shouldPoll, setShouldPoll] = useState(true);
-    const [pollInterval, setPollInterval] = useState(5000); // Start with 5 seconds
+    const [pollInterval, setPollInterval] = useState(10000); // 10 seconds (SyncProgressBar polls detail at 2.5s)
     const queryClient = useQueryClient();
 
     const query = useQuery<SyncStatusResponse, SyncError>({
@@ -30,7 +30,7 @@ export const useSyncStatus = (clientId: number | null) => {
             setPollInterval(current => current === 30000 ? current : 30000);
         } else if (query.isSuccess) {
             // Reset to normal interval on success
-            setPollInterval(current => current === 5000 ? current : 5000);
+            setPollInterval(current => current === 10000 ? current : 10000);
         }
     }, [query.isError, query.isSuccess]);
 
@@ -81,7 +81,7 @@ export const useSyncStatus = (clientId: number | null) => {
 
     // Calculate overall progress
     const overallProgress = (() => {
-        if (!query.data?.data) return { total: 0, synced: 0, percent: 0, isSyncing: false };
+        if (!query.data?.data) return { total: 0, synced: 0, pending: 0, percent: 0, isSyncing: false, hasError: query.isError };
 
         const integrations = Object.values(query.data.data);
         const activeIntegrations = integrations.filter(i => i.hasAccounts);
@@ -94,10 +94,11 @@ export const useSyncStatus = (clientId: number | null) => {
             syncedAccounts += integration.accounts.filter(a => a.initialSyncComplete).length;
         });
 
+        const pending = totalAccounts - syncedAccounts;
         const isSyncing = totalAccounts > syncedAccounts;
         const percent = totalAccounts === 0 ? 100 : Math.round((syncedAccounts / totalAccounts) * 100);
 
-        return { total: totalAccounts, synced: syncedAccounts, percent, isSyncing };
+        return { total: totalAccounts, synced: syncedAccounts, pending, percent, isSyncing, hasError: false };
     })();
 
     const getIntegrationCounts = (integrationType: string) => {

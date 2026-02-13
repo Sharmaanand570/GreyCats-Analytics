@@ -64,5 +64,10 @@ export const prettifyMetricLabel = (label: string): string => {
     if (lower === 'engagement') return "Engagement";
     if (lower === 'post count') return "Post Count";
 
+    // Gender code overrides
+    if (final === 'U' || lower === 'gender u') return "Unknown";
+    if (final === 'F' || lower === 'gender f') return "Female";
+    if (final === 'M' || lower === 'gender m') return "Male";
+
     return final;
 };

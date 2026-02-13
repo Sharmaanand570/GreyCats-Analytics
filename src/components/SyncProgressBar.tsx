@@ -9,6 +9,7 @@ import type { IntegrationType } from '@/types/integration.types';
 interface SyncProgressBarProps {
     clientId: number;
     integrationType: IntegrationType;
+    accountId?: string | number;
     onRetry?: () => void;
     compact?: boolean;
 }

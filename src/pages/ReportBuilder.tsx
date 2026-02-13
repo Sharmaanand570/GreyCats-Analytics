@@ -15,18 +15,28 @@ import TasksWidgetForm from "../components/TasksWidgetForm";
 import ChartWidgetForm from "../components/ChartWidgetForm";
 import TableWidgetForm, {
   DEFAULT_RECENT_POSTS_COLUMNS,
-  DEFAULT_INSTAGRAM_MEDIA_COLUMNS,
+  DEFAULT_META_ADS_CAMPAIGN_COLUMNS,
 } from "../components/TableWidgetForm";
+
+export const DEFAULT_INSTAGRAM_MEDIA_COLUMNS = [
+  { name: 'Date', width: '15%', dataKey: 'date' },
+  { name: 'Post', width: '15%', dataKey: 'fullPicture' },
+  { name: 'Caption', width: '25%', dataKey: 'post' },
+  { name: 'Likes', width: '11.25%', dataKey: 'likes' },
+  { name: 'Clicks', width: '11.25%', dataKey: 'clicks' },
+  { name: 'Comments', width: '11.25%', dataKey: 'comments' },
+  { name: 'Shares', width: '11.25%', dataKey: 'shares' }
+];
 import ImageWidgetForm from "../components/ImageWidgetForm";
 import EmbedWidgetForm from "../components/EmbedWidgetForm";
-import { DataSyncBanner } from "../components/DataSyncBanner";
+
 import { DateRangePicker } from "../components/DateRangePicker";
 import { type DateRange } from "react-day-picker";
-import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfYear } from "date-fns";
+import { format, subDays } from "date-fns";
 import { useNavigate, useParams } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { toast } from "sonner";
-import api from "@/apiConfig";
+
 
 // Layout lib
 import GridLayout, { type Layout, WidthProvider } from "react-grid-layout";
@@ -34,27 +44,14 @@ import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
 // UI Components
-import { ChartLineMultiple } from "../components/ChartLineMultiple";
-import {
-  Card,
-  CardContent,
-} from "../components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../components/ui/table";
+
+
 // App constants
 import {
-  reportTableRows,
   WIDGET_SIZE_MAP,
   generateWidgetId,
 } from "../components/reportConstants";
-import { getReportStatusBadgeClass } from "../utils/statusColors";
+
 import { type ReportWidgetType } from "../components/reportTypes";
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import {
@@ -77,7 +74,6 @@ import type {
   TitleWidgetData,
   TableWidgetData,
   ChartWidgetData,
-  MapWidgetData,
   MetricWidgetData,
   ImageWidgetData,
   EmbedWidgetData,
@@ -87,14 +83,11 @@ import type {
 import {
   createReportTemplate,
   getReportTemplate,
-  fetchUnifiedMetric,
-  fetchMetaStoredPosts,
-  fetchInstagramStoredMedia,
   updateReportTemplate,
   listReportSchedules,
   type UnifiedMetricRow,
 } from "@/features/reports/api/reportingApi";
-import { getShopifyTrends } from "@/features/shopify/API/shopifyApi";
+
 import { prettifyMetricLabel } from "@/utils/labelUtils";
 import { CreateScheduleModal } from "../components/CreateScheduleModal";
 import { getGoogleConsoleUnifiedMetrics } from "@/features/YouTube/API/googleConsoleapi";
@@ -103,30 +96,46 @@ import type {
   CreateTemplatePayload,
   ReportWidgetDefinition,
   ResolvedWidgetData,
-  WidgetSeriesPoint,
-  ReportSlideMeta,
+
 
 } from "@/features/reports/api/types";
 import { useIntegrations } from "@/features/DataSources/hooks/useIntegrations";
 import { getPlatformConfig } from "@/utils/platformMapping";
 import { useAvailableMetrics } from "@/features/reports/hooks/useAvailableMetrics";
-import { getMetricAggregation } from '@/utils/facebookMetrics';
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+
+
+
 import { exportAllSlidesToPDF } from "../components/functions/reportfunctions";
+import {
+  GRID_CONFIG,
+  TABLET_GRID_CONFIG,
+  DEFAULT_WIDGET_SIZE,
+  getDefaultWidgetData,
+  DEFAULT_TEMPLATE_WIDGETS,
+  ENABLE_AUTO_DEFAULT_WIDGETS,
+  widgetItems,
+  customMetricItems,
+  imageWidgetItems,
+  embedWidgetItems,
+} from "@/features/reports/utils/reportBuilderConstants";
+import {
+  CURATED_DEFAULTS,
+  INTEGRATION_TEMPLATES,
+} from "@/features/reports/utils/integrationTemplates";
+import {
+  buildDashboardMapFromTemplate,
+  getInitialDateRange,
+  formatApiDate,
+  getRangeFromPreset,
+} from "@/features/reports/utils/templateHydration";
+import {
+  pickDefaultMetricsForIntegration,
+  buildDefaultWidgetsForIntegration,
+} from "@/features/reports/utils/widgetBuilders";
+import { type WidgetFormState, type ReportBuilderProps } from "@/features/reports/types";
+import { useDemographicData } from "@/features/reports/hooks/useDemographicData";
+import { WidgetDataWrapper } from "@/features/reports/components/WidgetDataWrapper";
+import { renderWidgetContent } from "@/features/reports/components/WidgetContentRenderer";
 import { useSyncStatus } from "@/features/reports/hooks/useSyncStatus";
 import { Loader2 } from "lucide-react";
 
@@ -143,1960 +152,49 @@ export type {
   WidgetData,
 } from "../components/widgetTypes";
 
-// Types
-export interface DashboardLayout extends Layout {
-  widgetType: ReportWidgetType;
-  data?: WidgetData;
-  metricConfig?: ReportWidgetDefinition;
-  snapshotData?: Record<string, any>;
-}
+// Types & Store
+import {
+  type DashboardLayout,
+  type DashboardMap,
+  type CustomPage,
+  type ReportSlideMeta
+} from "@/features/reports/api/types";
+import { useReportStore } from "@/features/reports/store/useReportStore";
+import { useSlideVisibility } from "@/features/reports/hooks/useSlideVisibility";
+import { getWidgetQueryKey, fetchAndProcessWidget } from "@/features/reports/hooks/useWidgetData";
+import { useResolvedWidgetsMap } from "@/features/reports/hooks/useResolvedWidgetsMap";
 
-export type DashboardMap = Map<number, DashboardLayout[]>;
+// DashboardLayout and DashboardMap types removed (imported from @/features/reports/api/types)
 
-// Grid constants
-const GRID_CONFIG = {
-  cols: 12,
-  rowHeight: 80,
-  width: 1200,
-  margin: [16, 16] as [number, number],
-} as const;
 
-// Tablet grid config
-const TABLET_GRID_CONFIG = {
-  cols: 8,
-  rowHeight: 80,
-  margin: [12, 12] as [number, number],
-} as const;
-
-const DEFAULT_WIDGET_SIZE = {
-  w: 4,
-  h: 4,
-} as const;
 
 // Auto width provider for react-grid-layout
 const AutoWidthGrid = WidthProvider(GridLayout);
 
-// Default widget data generators
-const getDefaultWidgetData = (
-  widgetType: ReportWidgetType
-): WidgetData | undefined => {
-  switch (widgetType) {
-    case "title":
-      return { text: "performance title", fontSize: "2xl", align: "center" };
-    case "table":
-      return {
-        title: "New Table",
-        caption: "Enter a caption",
-        rows: [
-          { name: "Row 1", value: "Value 1" },
-          { name: "Row 2", value: "Value 2" },
-        ],
-        columns: [
-          { name: "Name", width: "50%" },
-          { name: "Value" },
-        ],
-      };
-    case "chart":
-      return { chartType: "column" };
-    case "map":
-      return { location: "Default Location", zoom: 10 };
-    case "metric":
-      return { label: "Metric", value: 0, hideDataPoints: true };
-    case "image":
-      return { src: "", alt: "Image" };
-    case "embed":
-      return { url: "", type: "iframe" };
-    case "custom":
-      return {
-        content: "Enter your text here...",
-        type: "text",
-        title: "",
-        align: "left",
-        backgroundColor: "",
-        textColor: "",
-      };
-    default:
-      return undefined;
-  }
-};
 
-// Empty default template - users start with a blank canvas
-const DEFAULT_TEMPLATE_WIDGETS: ReportWidgetDefinition[] = [];
 
-// Feature flag: Set to false to disable auto-population of default widgets
-const ENABLE_AUTO_DEFAULT_WIDGETS = true;
 
-// Curated default metrics per integration platform
-const CURATED_DEFAULTS: Record<string, string[]> = {
-  "google-analytics": [
-    "google.sessions",        // Match backend format
-    "google.activeUsers",
-    "google.pageViews",
-    "google.bounceRate",
-  ],
-  "google": [                 // Alias for Google Analytics
-    "google.sessions",
-    "google.activeUsers",
-    "google.pageViews",
-    "google.bounceRate",
-  ],
-  "google-search-console": [
-    "google_seo.clicks",      // Match actual DB format
-    "google_seo.impressions",
-    "google_seo.ctr",
-    "google_seo.position",
-  ],
-  "google-console": [
-    "google-console.billing.cost",
-  ],
-  "meta": [
-    "meta.facebook.page.page_follows",
-    "meta.facebook.post.count",
-    "meta.facebook.page.page_post_engagements",
-    "meta.instagram.followers.total",
-  ],
-  "meta-facebook": [
-    // Page Metrics
-    "meta.facebook.page.page_follows",
-    "meta.facebook.page.page_post_engagements",
 
-    // Media Views
-    "meta.facebook.page.page_media_view",
-    "meta.facebook.page.page_impressions_unique",
 
-    // Post Metrics
-    "meta.facebook.post.likes",
-    "meta.facebook.post.comments",
-    "meta.facebook.post.shares",
-    "meta.facebook.post.reactions",
-    "meta.facebook.post.engaged_users",
 
-    // Special: Top Performing Posts Table
-    "meta.facebook.recent_posts",
-  ],
-  "meta-instagram": [
-    // Instagram Account-level Metrics
-    "meta.instagram.followers.total",
-    "meta.instagram.media.count",
-
-    // Instagram Aggregated Metrics (Historical)
-    "meta.instagram.media.aggregated.likes",
-    "meta.instagram.media.aggregated.comments",
-    "meta.instagram.media.aggregated.saves",
-    "meta.instagram.media.aggregated.shares",
-    "meta.instagram.media.aggregated.reach",
-
-    // Daily
-    "meta.instagram.reach",
-    "meta.instagram.follows",
-  ],
-  "meta-business": [
-    // Meta Business - Mixed Facebook & Instagram
-    "meta.facebook.page.page_follows",
-    "meta.facebook.post.count",
-
-    // Facebook Page
-    "meta.facebook.page.page_post_engagements",
-    "meta.facebook.page.page_impressions_unique",
-    "meta.facebook.page.page_media_view",
-    "meta.facebook.page.page_total_actions",
-
-    // Facebook Posts
-    "meta.facebook.post.likes",
-    "meta.facebook.post.comments",
-    "meta.facebook.post.shares",
-    "meta.facebook.post.reactions",
-    "meta.facebook.post.engaged_users",
-    "meta.facebook.post.clicks",
-    "meta.facebook.post.impressions",
-    "meta.facebook.post.reach",
-
-    // Instagram
-    "meta.instagram.followers.total",
-    "meta.instagram.media.count",
-
-    // Instagram Aggregated
-    "meta.instagram.media.aggregated.likes",
-    "meta.instagram.media.aggregated.comments",
-    "meta.instagram.media.aggregated.saves",
-    "meta.instagram.media.aggregated.shares",
-    "meta.instagram.media.aggregated.reach",
-
-    // Instagram Daily
-    "meta.instagram.reach",
-    "meta.instagram.follows",
-    "meta.instagram.profile_views",
-  ],
-  "meta-ads": [
-    // Meta Ads Campaign Metrics (Paid)
-    "meta.ads.impressions",
-    "meta.ads.clicks",
-    "meta.ads.spend",
-    "meta.ads.cpc",
-  ],
-  "youtube": [
-    "youtube.views",
-    "youtube.likes",
-    "youtube.comments",
-    "youtube.subscribersGained",
-  ],
-  "shopify": [
-    "shopify.revenue",
-    "shopify.orders",
-    "shopify.avgOrderValue",
-  ],
-  "woo": [                    // Match actual DB integration key
-    "woo.revenue",
-    "woo.orders",
-    "woo.itemsSold",
-  ],
-  "woocommerce": [            // Alias for compatibility
-    "woo.revenue",
-    "woo.orders",
-    "woo.itemsSold",
-  ],
-};
-
-const MAX_DEFAULT_WIDGETS = 8;
-
-const ensureSlide = (map: DashboardMap, slideId: number) => {
-  if (!map.has(slideId)) {
-    map.set(slideId, []);
-  }
-};
-
-type MetricOption = {
-  metricKey: string;
-  integration: string;
-  accountId: string;
-  displayName?: string;
-  filters?: Record<string, unknown>;
-};
-
-/**
- * Pick default metrics for an integration, trying curated keys first,
- * then falling back to available metrics from groupedMetrics.
- */
-function pickDefaultMetricsForIntegration(
-  integrationKey: string,
-  accountId: string,
-  groupedMetrics: Record<string, Record<string, MetricOption[]>>,
-  notifyFallback: (msg: string) => void
-): MetricOption[] {
-  // Normalize integration key: lower case, replace underscores OR spaces with hyphens
-  // This handles "Meta Ads" -> "meta-ads"
-  const normalized = integrationKey.toLowerCase().replace(/[ _]/g, "-");
-
-  // console.log(`🔍 [pickMetrics] Input: '${integrationKey}', Normalized: '${normalized}', Account: '${accountId}'`);
-
-  // Special case: meta-business... (keep existing)
-
-  // ... existing meta-business logic ...
-
-  // Try to find metrics for this integration/account in groupedMetrics
-  const perAccount =
-    groupedMetrics[integrationKey] ??
-    groupedMetrics[normalized] ??
-    groupedMetrics[normalized.replace(/-/g, '_')] ?? // Fallback to underscore (meta_ads)
-    groupedMetrics[normalized === "google-console" ? "google-search-console" : ""] ??
-    {};
-
-  // console.log(`🔍 [pickMetrics] perAccount keys for '${normalized}':`, Object.keys(perAccount));
-
-  // For Shopify, WooCommerce, and Meta Ads/Business, if no metrics are found (cold start), force the curated list immediately
-  const coldStartPlatforms = [
-    'shopify', 'woo', 'woocommerce',
-    'meta-ads', 'meta-business', 'meta-social', 'meta-facebook', 'meta-instagram', 'meta',
-    'google-search-console', 'google-console', 'google-analytics', 'google',
-    'youtube'
-  ];
-
-  // LOGIC CHECK: Is cold start triggered?
-  const isColdStart = coldStartPlatforms.includes(normalized) && (!perAccount || Object.keys(perAccount).length === 0);
-  // console.log(`❄️ [pickMetrics] Cold Start Check: Platform supported? ${coldStartPlatforms.includes(normalized)}, Empty? ${(!perAccount || Object.keys(perAccount).length === 0)}, Triggered? ${isColdStart}`);
-
-  if (isColdStart) {
-    // console.log(`❄️ ${integrationKey} cold start detected - using forced defaults`);
-    const defaults = CURATED_DEFAULTS[normalized] ?? CURATED_DEFAULTS['meta-ads'] ?? [];
-    return defaults.map(key => ({
-      metricKey: key,
-      integration: integrationKey,
-      accountId: accountId, // Will be sanitized at the end of function
-      displayName: key.split('.').pop()?.replace(/([A-Z])/g, ' $1').trim(),
-    }));
-  }
-
-  // If we can't find metrics for the specific accountId, try to find ANY metrics for this integration
-  // This handles cases where client uses accountId '5' but metrics are stored under '1'
-  // ALSO: specialized fix for Meta Ads where ID often has 'act_' prefix in data but not in integration
-  let candidates = perAccount[accountId] ?? perAccount[`act_${accountId}`] ?? [];
-
-  // Special handling for Meta Business: aggregate from sub-integrations if essentially empty
-  if (normalized === 'meta-business' && candidates.length === 0) {
-    // console.log('✨ aggregating Meta Business metrics from sub-platforms');
-    const ads = groupedMetrics['meta-ads'] || groupedMetrics['meta_ads'] || {};
-    const fb = groupedMetrics['meta-facebook'] || groupedMetrics['meta_facebook'] || {};
-    const ig = groupedMetrics['meta-instagram'] || groupedMetrics['meta_instagram'] || {};
-
-    // Collect all available metrics from sub-integrations
-    const allMetrics: MetricOption[] = [];
-
-    // Add Ads metrics
-    Object.values(ads).forEach((accountMetrics: any) => {
-      if (Array.isArray(accountMetrics)) {
-        allMetrics.push(...accountMetrics.map((m: any) => ({ ...m, integration: 'meta-ads' })));
-      }
-    });
-
-    // Add Facebook metrics
-    Object.values(fb).forEach((accountMetrics: any) => {
-      if (Array.isArray(accountMetrics)) {
-        allMetrics.push(...accountMetrics.map((m: any) => ({ ...m, integration: 'meta-facebook' })));
-      }
-    });
-
-    // Add Instagram metrics
-    Object.values(ig).forEach((accountMetrics: any) => {
-      if (Array.isArray(accountMetrics)) {
-        allMetrics.push(...accountMetrics.map((m: any) => ({ ...m, integration: 'meta-instagram' })));
-      }
-    });
-
-    candidates = allMetrics;
-  }
-
-  if (candidates.length === 0) {
-    const availableAccounts = Object.keys(perAccount);
-    if (availableAccounts.length > 0) {
-      // Use the first available account's metrics
-      console.log(`⚠️ Metrics mismatch for ${integrationKey}: requested ${accountId}, falling back to ${availableAccounts[0]}`);
-      candidates = perAccount[availableAccounts[0]];
-    }
-  }
-
-  // DEBUG: Log what metrics we found
-  console.log('📊 Available metrics for', integrationKey, ':', {
-    candidateCount: candidates.length,
-    sampleKeys: candidates.slice(0, 5).map(m => m.metricKey),
-  });
-
-  if (!candidates.length) {
-    console.warn('⚠️ No metrics found in debug list for', integrationKey, accountId);
-
-    // Try to find the ACTUAL accountId from available metrics if the provided one has no hits
-    const availableAccounts = Object.keys(perAccount);
-    const bestAccountId = availableAccounts.length > 0 ? availableAccounts[0] : accountId;
-    if (bestAccountId !== accountId) {
-      console.log(`✨ Using accountId fallback for synthetic metrics: ${accountId} -> ${bestAccountId}`);
-    }
-
-    // Fallback: use curated defaults if available
-    const curated = CURATED_DEFAULTS[normalized] ?? CURATED_DEFAULTS[integrationKey] ?? [];
-    if (curated.length > 0) {
-      console.log('✨ Using curated defaults as fallback:', curated);
-      // Create synthetic metric options from curated defaults
-      const syntheticMetrics: MetricOption[] = curated.map(metricKey => ({
-        metricKey,
-        integration: integrationKey,
-        accountId: bestAccountId, // Use best available accountId
-        label: metricKey.split('.').pop() || metricKey,
-      }));
-      return syntheticMetrics;
-    }
-
-    console.error('❌ No curated defaults available for', integrationKey);
-    return [];
-  }
-
-  const curated = CURATED_DEFAULTS[normalized] ?? [];
-  const curatedFound: MetricOption[] = [];
-
-  // Try to match curated metric keys (flexible matching by suffix)
-  curated.forEach((key) => {
-    const hit = candidates.find(
-      (m) =>
-        m.metricKey === key ||
-        m.metricKey.endsWith(`.${key}`) ||
-        m.metricKey.toLowerCase().includes(key.toLowerCase())
-    );
-    if (hit) {
-      console.log('✅ Matched curated metric:', key, '→', hit.metricKey);
-      curatedFound.push(hit);
-    } else {
-      console.log('❌ Curated metric not found:', key);
-    }
-  });
-
-  // If no curated metrics found, use fallback
-  if (!curatedFound.length && candidates.length) {
-    console.warn('⚠️ Using fallback metrics for', integrationKey);
-    notifyFallback(
-      `Using available metrics for ${integrationKey} (curated metrics not found).`
-    );
-    return candidates.slice(0, MAX_DEFAULT_WIDGETS);
-  }
-
-  // Fill remaining slots with other available metrics
-  const remaining =
-    candidates.filter(
-      (m) => !curatedFound.some((c) => c.metricKey === m.metricKey)
-    ) ?? [];
-
-  const result = [...curatedFound, ...remaining].slice(0, MAX_DEFAULT_WIDGETS);
-  // Sanitize accountId in result to strip 'act_' prefix for Meta Ads
-  // and generally ensure they match the integration's accountId if we did a fallback
-  const sanitizedResult = result.map(m => ({
-    ...m,
-    accountId: (m.accountId || accountId).replace(/^act_/, '')
-  }));
-
-  console.log('✨ Final metrics selected:', sanitizedResult.map(m => m.metricKey));
-
-  return sanitizedResult;
-}
-
-/**
- * Build default widget layouts for an integration slide.
- * Creates metric cards and a line chart from the provided metrics.
- */
-function buildDefaultWidgetsForIntegration(
-  slideId: number,
-  metrics: MetricOption[]
-): DashboardLayout[] {
-  if (!metrics.length) return [];
-
-  const widgets: DashboardLayout[] = [];
-
-  const addWidget = (
-    type: ReportWidgetType,
-    metric: MetricOption,
-    indexInType: number,
-    baseY: number = 0
-  ) => {
-    const id = generateWidgetId("auto");
-    const isMetricCard = type === "metric";
-
-    // Get proper label from metric displayName or metricKey
-    const label = metric.displayName || prettifyMetricLabel(metric.metricKey);
-
-    // Layout Logic for 12-col grid
-    let x = 0;
-    let y = baseY;
-    let w = 4;
-    let h = 4;
-
-    if (isMetricCard) {
-      // Metrics: 4 per row (w=3)
-      w = 3;
-      h = 3;
-      x = (indexInType % 4) * 3;
-      y = baseY + Math.floor(indexInType / 4) * 3;
-    } else {
-      // Charts: 2 per row (w=6) or full width (w=12)
-      w = 6; // Default to half width for charts
-      h = 5;
-      x = (indexInType % 2) * 6;
-      y = baseY + Math.floor(indexInType / 2) * 5;
-    }
-
-    const widget: DashboardLayout = {
-      i: id,
-      x,
-      y,
-      w,
-      h,
-      widgetType: type,
-      data: isMetricCard
-        ? { label, value: 0, hideDataPoints: true }  // Use proper label for metric cards
-        : { chartType: "column", title: label },  // Use proper title for charts
-      metricConfig: {
-        id,
-        metricKey: metric.metricKey,
-        integration: metric.integration,
-        accountId: metric.accountId,
-        groupBy: isMetricCard ? "none" : "day",
-        aggregation: "sum",
-        type: isMetricCard ? "metric_card" : "bar_chart",
-        displayName: label,
-        layout: {
-          slideId,
-          x,
-          y,
-          w,
-          h,
-        },
-        ...(metric.filters ? { filters: metric.filters } : {}),
-      },
-    };
-    widgets.push(widget);
-    return widget; // Return for sizing ref
-  };
-
-  // 1. Add top 4 metrics as cards in the first row
-  let currentY = 0;
-  const metricCards = metrics.slice(0, 4);
-  metricCards.forEach((m, idx) => addWidget("metric", m, idx, currentY));
-
-  // Advance Y for next section (if metrics were added)
-  if (metricCards.length > 0) {
-    currentY += 3; // Metrics are h=3
-  }
-
-  // 2. Add first metric as a main chart
-  if (metrics[0]) {
-    const chartWidget = addWidget("chart", metrics[0], 0, currentY);
-    // Make first chart full width
-    chartWidget.w = 12;
-    chartWidget.h = 8;
-    // Don't need to update x/y as it's the first in this row/section
-    currentY += 8;
-  }
-
-
-
-  return widgets.slice(0, MAX_DEFAULT_WIDGETS);
-}
-
-// Removed createPlaceholderWidget - new reports start with empty slides
-
-const normalizeWidgetType = (type?: string): ReportWidgetType => {
-  if (!type) return "metric";
-  if (type.includes("chart")) return "chart";
-  if (type.includes("metric") || type.includes("stat")) return "metric";
-  if (type.includes("table")) return "table";
-  return (type as ReportWidgetType) ?? "metric";
-};
-
-const buildDashboardMapFromTemplate = (
-  widgets: ReportWidgetDefinition[]
-): DashboardMap => {
-  console.log(`[Hydrate] Building map from ${widgets.length} widgets`, widgets[0]); // Log first widget for inspection
-  if (!widgets.length) {
-    return new Map([[0, []]]);
-  }
-
-  const map: DashboardMap = new Map();
-
-  widgets.forEach((widget, index) => {
-
-    const layoutInfo = widget.layout;
-    const slideId = Number(layoutInfo?.slideId ?? 0);
-    ensureSlide(map, slideId);
-
-    const widgetType = normalizeWidgetType(widget.type);
-    // Backend stores data in 'config', but we use 'widgetData' internally. Handle both.
-    const rawConfig = (widget as any).config;
-    const rawWidgetData = (widget as any).widgetData;
-    // START FIX: Merge logic
-    // We prioritize rawWidgetData for the *data* (rows, values), but we MUST restore 
-    // the configuration (chartType) from rawConfig if it exists.
-    let widgetData = (rawWidgetData || rawConfig) as WidgetData | undefined;
-
-    if (rawConfig && widgetData) {
-      widgetData = {
-        ...widgetData,
-        chartType: rawConfig.chartType || (widgetData as any).chartType,
-        chartColor: rawConfig.chartColor || (widgetData as any).chartColor,
-        backgroundColor: rawConfig.backgroundColor || (widgetData as any).backgroundColor,
-        textColor: rawConfig.textColor || (widgetData as any).textColor,
-      };
-    }
-    // END FIX
-    const layoutItem: DashboardLayout = {
-      i: widget.id ?? generateWidgetId("widget"),
-      x: layoutInfo?.x ?? 0,
-      y: layoutInfo?.y ?? index * DEFAULT_WIDGET_SIZE.h,
-      w: layoutInfo?.w ?? DEFAULT_WIDGET_SIZE.w,
-      h: layoutInfo?.h ?? DEFAULT_WIDGET_SIZE.h,
-      widgetType,
-      data: widgetData ?? getDefaultWidgetData(widgetType),
-      metricConfig: {
-        ...widget,
-        displayName: widget.displayName || prettifyMetricLabel((widget as any).label || (widget as any).title || widget.metricKey || widget.type || "Metric")
-      },
-      // Essential for Shared Reports: Hoist snapshotData from the API response
-      // so it sits at the root of the layout item, where the builder (and data resolution logic) expects it.
-      snapshotData: (widget as any).snapshotData,
-    } as DashboardLayout;
-
-    if (widget.integration?.includes('meta') || (widget as any).config?.integration?.includes('meta')) {
-      console.log(`[Hydrate] Found Meta-like widget: ID=${layoutItem.i}, slideId=${slideId}`);
-      console.log(`   Integration: '${widget.integration}'`);
-      console.log(`   Config Integration: '${(widget as any).config?.integration}'`);
-      console.log(`   MetricKey: '${widget.metricKey}'`);
-    }
-
-    map.set(slideId, [...(map.get(slideId) ?? []), layoutItem]);
-  });
-
-  console.log(`[Hydrate] Final map keys:`, Array.from(map.keys()));
-  // Always ensure at least one slide exists, even if empty
-  if (!map.size) {
-    return new Map([[0, []]]);
-  }
-
-  return map;
-};
-
-// Removed DEFAULT_DASHBOARD_MAP and cloneDashboardMap as we now create slides dynamically based on integrations
-
-const getInitialDateRange = (): DateRange => ({
-  from: subDays(new Date(), 6),
-  to: new Date(),
-});
-
-const formatApiDate = (value: Date) => format(value, "yyyy-MM-dd");
 
 // Table Data moved to reportConstants.ts
 
-const widgetItems: {
-  title: string;
-  description: string;
-  type: ReportWidgetType;
-  customKind?: string;
-}[] = [
-    {
-      title: "Textbox",
-      description: "textbox you can design",
-      type: "custom",
-      customKind: "text"
-    },
-    { title: "Title", description: "Organize using title", type: "title" },
-    {
-      title: "Table of Contents",
-      description: "Table of contents for your report",
-      type: "custom",
-      customKind: "toc",
-    },
-    {
-      title: "Tasks",
-      description: "Highlight completed tasks",
-      type: "custom",
-      customKind: "tasks",
-    },
-    {
-      title: "Table",
-      description: "Create a data table",
-      type: "table",
-    },
-  ];
+// Re-export for backward compatibility (used by ReportElements.tsx)
+export type { WidgetFormState } from "@/features/reports/types";
 
-const customMetricItems: {
-  title: string;
-  description: string;
-  type: ReportWidgetType;
-}[] = [
-    { title: "Stat", description: "Manual metric with trends", type: "metric" },
-  ];
 
-const imageWidgetItems: {
-  title: string;
-  description: string;
-  type: ReportWidgetType;
-}[] = [
-    { title: "Image", description: "Add any image you like", type: "image" },
-  ];
 
-const embedWidgetItems: {
-  title: string;
-  description: string;
-  type: ReportWidgetType;
-}[] = [
-    {
-      title: "Embed",
-      description: "Embed YouTube, Google Sheets etc",
-      type: "embed",
-    },
-  ];
 
-// Table helpers
-const getStatusBadgeClass = (
-  status: (typeof reportTableRows)[number]["status"]
-) => {
-  return getReportStatusBadgeClass(status);
-};
-
-const renderWidgetEmptyState = (
-  onConnectIntegration?: () => void,
-  message = "No data yet"
-) => {
-  return (
-    <div className="flex flex-col items-center justify-center w-full text-center text-xs md:text-sm text-gray-500 gap-2 py-4">
-      <DataSyncBanner compact className="bg-transparent border-0 p-0 justify-center mb-2" />
-      <span>{message}</span>
-      {onConnectIntegration && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onConnectIntegration}
-          className="text-xs md:text-sm"
-        >
-          Connect Integration
-        </Button>
-      )}
-    </div>
-  );
-};
-
-// Helper: Render widget content with dynamic data
-const renderWidgetContent = (
-  widget: DashboardLayout,
-  resolvedData?: ResolvedWidgetData,
-  options?: {
-    isLoading?: boolean;
-    onConnectIntegration?: () => void;
-    readOnly?: boolean;
-  }
-) => {
-  if (options?.isLoading) {
-    // Show specific skeleton based on widget type
-    if (widget.widgetType === "metric") {
-      return (
-        <div className="h-full flex flex-col items-center justify-center space-y-2">
-          <Skeleton className="h-8 w-20" />
-          <Skeleton className="h-3 w-16" />
-        </div>
-      );
-    }
-    if (widget.widgetType === "table") {
-      return (
-        <div className="h-full flex flex-col p-2 space-y-3">
-          <Skeleton className="h-5 w-1/3" />
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-full" />
-          </div>
-        </div>
-      );
-    }
-    if (widget.widgetType === "chart" || widget.widgetType === "line_chart" || widget.widgetType === "bar_chart" || widget.widgetType === "area_chart" || widget.widgetType === "pie_chart") {
-      return (
-        <div className="h-full flex flex-col p-2 space-y-2">
-          <Skeleton className="h-4 w-1/4" />
-          <Skeleton className="flex-1 w-full rounded-md" />
-        </div>
-      );
-    }
-    if (widget.widgetType === "title") {
-      return (
-        <div className="h-full flex items-center justify-center p-4">
-          <Skeleton className="h-8 w-3/4" />
-        </div>
-      );
-    }
-    if (widget.widgetType === "image") {
-      return (
-        <div className="h-full flex items-center justify-center p-4">
-          <Skeleton className="h-full w-full rounded-lg" />
-        </div>
-      );
-    }
-    if (widget.widgetType === "embed") {
-      return (
-        <div className="h-full flex flex-col p-2 space-y-2">
-          <Skeleton className="h-4 w-1/3" />
-          <Skeleton className="flex-1 w-full rounded-md" />
-        </div>
-      );
-    }
-    if (widget.widgetType === "custom") {
-      const customData = widget.data as CustomWidgetData | undefined;
-      if (customData?.type === "tasks") {
-        return (
-          <div className="h-full flex flex-col p-3 space-y-2">
-            <Skeleton className="h-4 w-1/3" />
-            <Skeleton className="h-3 w-full" />
-            <Skeleton className="h-3 w-5/6" />
-            <Skeleton className="h-3 w-4/5" />
-          </div>
-        );
-      }
-      if (customData?.type === "toc") {
-        return (
-          <div className="h-full flex flex-col p-3 space-y-2">
-            <Skeleton className="h-4 w-1/3" />
-            <div className="space-y-1">
-              <Skeleton className="h-3 w-full" />
-              <Skeleton className="h-3 w-full" />
-              <Skeleton className="h-3 w-full" />
-            </div>
-          </div>
-        );
-      }
-      // Default custom text block
-      return (
-        <div className="h-full flex flex-col p-3 space-y-2">
-          <Skeleton className="h-3 w-full" />
-          <Skeleton className="h-3 w-5/6" />
-          <Skeleton className="h-3 w-4/5" />
-        </div>
-      );
-    }
-    if (widget.widgetType === "map") {
-      return (
-        <div className="h-full flex items-center justify-center p-4">
-          <Skeleton className="h-full w-full rounded-lg" />
-        </div>
-      );
-    }
-
-    // Default skeleton
-    return (
-      <div className="h-full flex items-center justify-center p-4">
-        <Skeleton className="h-full w-full rounded-lg" />
-      </div>
-    );
-  }
-
-  const onConnectIntegration = options?.onConnectIntegration;
-
-  const widgetData = widget.data;
-  const metricConfig = widget.metricConfig;
-  const isIntegrationMetric =
-    widget.widgetType === "metric" &&
-    !!metricConfig?.metricKey &&
-    !!metricConfig?.integration;
-
-
-
-  switch (widget.widgetType) {
-    case "chart":
-    case "pie_chart": {
-      const series = Array.isArray((resolvedData as ResolvedWidgetData)?.series)
-        ? ((resolvedData as ResolvedWidgetData).series as WidgetSeriesPoint[])
-        : [];
-      const hasData =
-        series.length > 0 ||
-        typeof (resolvedData as ResolvedWidgetData)?.total === "number" ||
-        typeof (resolvedData as ResolvedWidgetData)?.value === "number";
-
-      const chartColor = (widgetData as ChartWidgetData)?.chartColor || "#2563EB";
-      const backgroundColor = (widgetData as ChartWidgetData)?.backgroundColor;
-
-      // Generate chart data from series, or create a single point from total/value
-      const chartData = series.length > 0
-        ? series.map((point) => ({
-          label: point.x,
-          value: point.y,
-        }))
-        : (() => {
-          const value = (resolvedData as ResolvedWidgetData)?.total ?? (resolvedData as ResolvedWidgetData)?.value;
-          if (typeof value === "number") {
-            const metricName = widget.metricConfig?.displayName ||
-              widget.metricConfig?.metricKey?.split('.').pop() ||
-              "Total";
-            return [{ label: metricName, value }];
-          }
-          return [];
-        })();
-
-      if (widget.metricConfig?.metricKey?.startsWith('youtube.')) {
-        console.log(`[YouTubeData] Widget ${widget.i}: hasData=${hasData}, seriesCount=${series.length}, firstPoints=`, series.slice(0, 3));
-      }
-
-      return (
-        <div
-          className="flex-1 flex flex-col min-h-0 relative"
-          style={{ backgroundColor: backgroundColor || undefined }}
-        >
-          <div className="flex-1 min-h-[200px] relative">
-            {hasData ? (
-              <ResponsiveContainer width="100%" height="100%" minHeight={150}>
-                {(() => {
-                  const cType = (widget.data as ChartWidgetData)?.chartType?.toLowerCase() || (widget.widgetType === "pie_chart" ? "pie" : "area");
-                  if (cType === "column" || cType === "bar") {
-                    return (
-                      <BarChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                        <YAxis tick={{ fontSize: 10 }} />
-                        {!options?.readOnly && (
-                          <Tooltip
-                            formatter={(value: number) => value.toLocaleString()}
-                            labelFormatter={(label: string) => label}
-                            cursor={{ fill: "transparent" }}
-                          />
-                        )}
-                        <Bar dataKey="value" fill={chartColor} />
-                      </BarChart>
-                    );
-                  }
-                  if (cType === "line") {
-                    return (
-                      <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                        <YAxis tick={{ fontSize: 10 }} />
-                        {!options?.readOnly && (
-                          <Tooltip
-                            formatter={(value: number) => value.toLocaleString()}
-                            labelFormatter={(label: string) => label}
-                          />
-                        )}
-                        <Line
-                          type="monotone"
-                          dataKey="value"
-                          stroke={chartColor}
-                          strokeWidth={2}
-                          dot={false}
-                          activeDot={options?.readOnly ? false : { r: 3, fill: chartColor }}
-                        />
-                      </LineChart>
-                    );
-                  }
-                  if (cType === "pie") {
-                    // Use the existing interactive pie or Recharts pie? 
-                    // The existing code fell back to ChartPieInteractive if no data.
-                    // Here we have data. Let's use Recharts Pie for consistency with others if possible, or just default to Area/Pie placeholder logic if not fully implemented.
-                    // But for now, let's just stick to the requested types that work well.
-                    // Actually, if it's pie, let's return Area for now as a fallback if Pie isn't fully set up with Recharts here, 
-                    // OR better, render a simple Pie chart.
-                    return (
-                      <PieChart>
-                        <Pie
-                          data={chartData}
-                          dataKey="value"
-                          nameKey="label"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          fill={chartColor}
-                          label
-                        />
-                        {!options?.readOnly && <Tooltip />}
-                      </PieChart>
-                    );
-                  }
-                  // Default to Area
-                  return (
-                    <AreaChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                      <YAxis tick={{ fontSize: 10 }} />
-                      {!options?.readOnly && (
-                        <Tooltip
-                          formatter={(value: number) => value.toLocaleString()}
-                          labelFormatter={(label: string) => label}
-                        />
-                      )}
-                      <Area
-                        type="monotone"
-                        dataKey="value"
-                        stroke={chartColor}
-                        strokeWidth={2}
-                        fillOpacity={0.15}
-                        fill={chartColor}
-                        dot={false}
-                        activeDot={{ r: 3, fill: chartColor }}
-                      />
-                    </AreaChart>
-                  );
-                })()}
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex-1 flex items-center justify-center">
-                {renderWidgetEmptyState(onConnectIntegration, "No chart data for this date range")}
-              </div>
-            )}
-          </div>
-
-        </div>
-      );
-    }
-
-    case "line_chart":
-    case "area_chart":
-    case "bar_chart": {
-      const series = Array.isArray((resolvedData as ResolvedWidgetData)?.series)
-        ? ((resolvedData as ResolvedWidgetData).series as WidgetSeriesPoint[])
-        : [];
-      const hasData =
-        series.length > 0 ||
-        typeof (resolvedData as ResolvedWidgetData)?.total === "number";
-
-
-
-      const chartData = series.map((point) => ({
-        label: point.x,
-        value: point.y,
-      }));
-
-      return (
-        <div className="h-full flex flex-col p-1 min-h-0 relative">
-          <div className="flex-1 min-h-[200px] relative">
-            {hasData ? (
-              <ResponsiveContainer width="100%" height="100%">
-                {widget.widgetType === "bar_chart" ? (
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 10 }} />
-                    <Tooltip
-                      formatter={(value: number) => value.toLocaleString()}
-                      labelFormatter={(label: string) => label}
-                    />
-                    <Bar dataKey="value" fill="#2563EB" />
-                  </BarChart>
-                ) : (
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 10 }} />
-                    <Tooltip
-                      formatter={(value: number) => value.toLocaleString()}
-                      labelFormatter={(label: string) => label}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="value"
-                      stroke="#2563EB"
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 3 }}
-                    />
-                  </LineChart>
-                )}
-              </ResponsiveContainer>
-            ) : (
-              <ChartLineMultiple data={[]} />
-            )}
-          </div>
-          {!hasData && (
-            <div className="border-t px-3 py-2 mt-2">
-              {renderWidgetEmptyState(onConnectIntegration)}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    case "map": {
-      const mapData = widgetData as MapWidgetData | undefined;
-      return (
-        <div className="h-full flex items-center justify-center text-xs md:text-sm text-gray-500 px-2">
-          <span className="text-center">
-            {mapData?.location ? `Map: ${mapData.location}` : "Map Placeholder"}
-          </span>
-        </div>
-      );
-    }
-
-    case "table": {
-      const tableData = widgetData as TableWidgetData | undefined;
-
-      const isGaTopPagesTable =
-        metricConfig?.metricKey === "ga.top_pages_views" &&
-        !!metricConfig?.integration;
-
-      console.log('🔍 [TableRender] Config:', {
-        key: metricConfig?.metricKey,
-        integration: metricConfig?.integration,
-        resolvedDataColumns: (resolvedData as any)?.columns,
-        tableDataColumns: tableData?.columns
-      });
-
-      // Check if it's a recent posts/media table (requires special list rendering)
-      const isRecentPostsTable = metricConfig?.metricKey === 'meta.facebook.recent_posts' || metricConfig?.metricKey === 'meta.instagram.recent_media';
-
-      const generateColumnsFromRows = (rows: any[]) => {
-        if (!rows.length) return [];
-        const sample = rows[0] as Record<string, unknown>;
-        return Object.keys(sample).slice(0, 8).map((key) => ({
-          name: key
-            .replace(/[_-]/g, " ")
-            .replace(/\s+/g, " ")
-            .replace(/^\w/, (c) => c.toUpperCase()),
-        }));
-      };
-
-      const resolvedRows =
-        resolvedData && Array.isArray((resolvedData as any).rows)
-          ? ((resolvedData as any).rows as unknown[])
-          : null;
-
-      // Check if this is dimensional data (from GET /unified-metrics with dimensionType)
-      const isDimensionalData =
-        resolvedRows &&
-        resolvedRows.length > 0 &&
-        resolvedRows[0] &&
-        typeof resolvedRows[0] === 'object' &&
-        resolvedRows[0] !== null &&
-        (resolvedRows[0] as any).dimensionValue && // Check values are truthy (not null)
-        'value' in (resolvedRows[0] as Record<string, unknown>);
-
-      // If dimensional data, convert to simple 2-column format
-      let dimensionalRows: Array<{ dimension: string; value: number }> | null = null;
-      if (isDimensionalData && resolvedRows) {
-        dimensionalRows = resolvedRows.map((row: any) => ({
-          dimension: row.dimensionValue || row.dimensionType || 'Unknown',
-          value: typeof row.value === 'number' ? row.value : 0,
-        }));
-      }
-
-      const gaRows =
-        isGaTopPagesTable &&
-          resolvedData &&
-          Array.isArray((resolvedData as any).rows)
-          ? ((resolvedData as any).rows as unknown[])
-          : null;
-
-      // Generic metrics: if we have a series but no GA rows, render a simple
-      // 2-column table from the series (label + value).
-      let seriesRows =
-        !isGaTopPagesTable &&
-          !isRecentPostsTable && // Recent posts is its own thing
-          !gaRows &&
-          !dimensionalRows &&  // Don't use series if we have dimensional data
-          (!metricConfig?.groupBy || metricConfig.groupBy === 'none' || metricConfig.groupBy === 'date') && // Only show series (time-series) if grouping is date-based or none. Don't show dates for 'device' tables.
-          Array.isArray((resolvedData as ResolvedWidgetData)?.series)
-          ? (((resolvedData as ResolvedWidgetData)
-            .series as WidgetSeriesPoint[]) as unknown[])
-          : null;
-
-      // Fallback: if metric returns only a single value/total, build a 1-row series
-      if (
-        !isGaTopPagesTable &&
-        !isRecentPostsTable &&
-        !gaRows &&
-        (!seriesRows || seriesRows.length === 0) &&
-        metricConfig?.metricKey &&
-        resolvedData
-      ) {
-        const value =
-          typeof (resolvedData as ResolvedWidgetData)?.value === "number"
-            ? (resolvedData as ResolvedWidgetData).value
-            : typeof (resolvedData as ResolvedWidgetData)?.total === "number"
-              ? (resolvedData as ResolvedWidgetData).total
-              : null;
-
-        if (value !== null) {
-          const metricName =
-            metricConfig.metricKey.split(".").pop() || metricConfig.metricKey;
-          seriesRows = [{ x: metricName, y: value }] as unknown[];
-        }
-      }
-
-      // For GA tables, filter series to only the core GA metric keys to avoid noisy dimension rows
-      const isGaIntegration =
-        (metricConfig?.integration || "").toLowerCase().replace(/_/g, "-") ===
-        "google-analytics";
-      if (isGaIntegration && seriesRows) {
-        const allowedGaKeys = new Set([
-          "google.activeUsers",
-          "google.bounceRate",
-          "google.pageViews",
-          "google.sessions",
-        ]);
-        const filtered = (seriesRows as WidgetSeriesPoint[]).filter((p) =>
-          allowedGaKeys.has(p.x)
-        );
-        seriesRows = filtered.length ? filtered : [];
-      }
-
-      // Identify which data source is driving the table so we render correct columns
-      const usingGaRows = !!gaRows && gaRows.length > 0;
-      const usingDimensionalRows = !usingGaRows && !!dimensionalRows && dimensionalRows.length > 0;
-      const usingSeriesRows = !usingGaRows && !usingDimensionalRows && !!seriesRows && seriesRows.length > 0;
-      const usingResolvedRows =
-        !usingGaRows &&
-        !usingDimensionalRows &&
-        !usingSeriesRows &&
-        !!resolvedRows &&
-        resolvedRows.length > 0 &&
-        (isRecentPostsTable || !metricConfig?.groupBy || metricConfig.groupBy === 'none' || metricConfig.groupBy === 'date');
-      const usingTableData =
-        !usingGaRows &&
-        !usingDimensionalRows &&
-        !usingSeriesRows &&
-        !usingResolvedRows &&
-        (!metricConfig?.metricKey) && // Never use static table data if a metric is configured
-        !!tableData?.rows &&
-        tableData.rows.length > 0;
-
-      const rows =
-        (usingGaRows ? (gaRows as any[]) : null) ??
-        (usingDimensionalRows ? (dimensionalRows as any[]) : null) ??
-        (usingResolvedRows ? (resolvedRows as any[]) : null) ??
-        (usingSeriesRows ? (seriesRows as any[]) : null) ??
-        (usingTableData ? tableData?.rows : null) ??
-        (metricConfig?.metricKey ? [] : reportTableRows);
-
-      if (isRecentPostsTable) {
-        console.log("🔍 [Table Render] Recent Posts Data Sources:", {
-          usingGaRows,
-          usingDimensionalRows,
-          usingResolvedRows,
-          usingSeriesRows,
-          usingTableData,
-          resolvedRowsCount: resolvedRows?.length || 0,
-          finalRowsCount: rows?.length || 0,
-          metricKey: metricConfig?.metricKey
-        });
-      }
-
-      const autoColumns =
-        resolvedRows &&
-          resolvedRows.length &&
-          !gaRows &&
-          !dimensionalRows &&
-          !seriesRows &&
-          (!tableData?.columns || tableData.columns.length === 0)
-          ? generateColumnsFromRows(resolvedRows)
-          : null;
-
-      // Get dimension type from metricConfig for title
-      const dimensionType = metricConfig?.groupBy || '';
-      const metricName = metricConfig?.metricKey?.split('.').pop()?.replace(/_/g, ' ') || 'Metric';
-
-
-
-      const caption =
-        tableData?.caption ??
-        (isGaTopPagesTable
-          ? "Pages with the highest number of views."
-          : isRecentPostsTable
-            ? "Recent posts from your Facebook Page."
-            : "Queue of report deliveries.");
-
-      const columns =
-        isGaTopPagesTable
-          ? [
-            { name: "Page Path", width: "45%" },
-            { name: "Title", width: "35%" },
-            { name: "Views" },
-          ]
-          : isRecentPostsTable
-            ? (() => {
-              // Check if tableData has generic "Name/Value" columns (legacy default)
-              const hasGenericColumns = tableData?.columns?.length === 2 &&
-                tableData.columns[0]?.name === 'Name' &&
-                tableData.columns[1]?.name === 'Value';
-
-              // If we have generic columns, ignore them and use proper defaults
-              if (hasGenericColumns) {
-                return metricConfig?.metricKey === 'meta.instagram.recent_media'
-                  ? [
-                    { name: "Date", width: "15%", dataKey: "date" },
-                    { name: "Full Picture", dataKey: "fullPicture" },
-                    { name: "Post Message", width: "35%", dataKey: "post" },
-                    { name: "Impressions", dataKey: "impressions" },
-                    { name: "Clicks", dataKey: "clicks" },
-                    { name: "Likes", dataKey: "likes" },
-                    { name: "Shares", dataKey: "shares" }
-                  ]
-                  : [
-                    { name: "Date", width: "15%", dataKey: "date" },
-                    { name: "Post", width: "40%", dataKey: "post" },
-                    { name: "Impressions", dataKey: "impressions" },
-                    { name: "Clicks", dataKey: "clicks" },
-                    { name: "Likes", dataKey: "likes" },
-                    { name: "Comments", dataKey: "comments" },
-                    { name: "Shares", dataKey: "shares" }
-                  ];
-              }
-
-              // Otherwise use existing columns if present
-              return tableData?.columns && tableData.columns.length > 0
-                ? tableData.columns
-                : (resolvedData as any)?.columns && (resolvedData as any).columns.length > 0
-                  ? (resolvedData as any).columns
-                  : metricConfig?.metricKey === 'meta.instagram.recent_media'
-                    ? [
-                      { name: "Date", width: "15%", dataKey: "date" },
-                      { name: "Full Picture", dataKey: "fullPicture" },
-                      { name: "Post Message", width: "35%", dataKey: "post" },
-                      { name: "Impressions", dataKey: "impressions" },
-                      { name: "Clicks", dataKey: "clicks" },
-                      { name: "Likes", dataKey: "likes" },
-                      { name: "Shares", dataKey: "shares" }
-                    ]
-                    : [
-                      { name: "Date", width: "15%", dataKey: "date" },
-                      { name: "Post", width: "40%", dataKey: "post" },
-                      { name: "Impressions", dataKey: "impressions" },
-                      { name: "Clicks", dataKey: "clicks" },
-                      { name: "Likes", dataKey: "likes" },
-                      { name: "Comments", dataKey: "comments" },
-                      { name: "Shares", dataKey: "shares" }
-                    ];
-            })()
-            : usingDimensionalRows
-              ? [
-                { name: dimensionType.charAt(0).toUpperCase() + dimensionType.slice(1), width: "60%" },
-                { name: metricName.charAt(0).toUpperCase() + metricName.slice(1) },
-              ]
-              : usingSeriesRows
-                ? [
-                  { name: "Metric", width: "60%" },
-                  { name: "Value" },
-                ]
-                : usingResolvedRows && autoColumns
-                  ? autoColumns
-                  : tableData?.columns && tableData.columns.length
-                    ? tableData.columns
-                    : [
-                      { name: "Report", width: "35%" },
-                      { name: "Audience" },
-                      { name: "Status" },
-                      { name: "Last Run" },
-                      { name: "Next Send" },
-                    ];
-
-      const rawCount =
-        typeof resolvedData?.rawCount === "number" ? resolvedData.rawCount : 0;
-      const rowCount = Array.isArray(rows) ? rows.length : 0;
-      const hasTableData = rawCount > 0 || rowCount > 0;
-
-      return (
-        <Card
-          className="h-full flex flex-col rounded-lg border-0 shadow-none"
-          style={{
-            backgroundColor: tableData?.backgroundColor || undefined,
-            color: tableData?.textColor || undefined
-          }}
-        >
-
-          <CardContent className="flex-1 p-0 overflow-visible">
-            <div className="w-full h-full overflow-x-auto">
-              <Table className="w-full table-fixed text-xs md:text-sm" style={{ color: "inherit" }}>
-                <TableCaption className="text-[10px] md:text-xs">
-                  {caption}
-                </TableCaption>
-                <TableHeader>
-                  <TableRow>
-                    {columns.map((col: { name: string; width?: string }) => (
-                      <TableHead
-                        key={col.name}
-                        className="truncate px-2 md:px-4"
-                        style={col.width ? { width: col.width } : undefined}
-                      >
-                        {col.name}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row, index) => (
-                    <TableRow key={row.name || index}>
-                      {columns.map((col: { name: string; width?: string; dataKey?: string }, colIndex: number) => {
-                        // For dynamic columns, we need to map column names to row properties
-                        let cellValue: unknown;
-
-                        if (isGaTopPagesTable && gaRows) {
-                          const gaRow = row as any;
-                          cellValue =
-                            col.name === "Page Path"
-                              ? gaRow.pagePath
-                              : col.name === "Title"
-                                ? gaRow.pageTitle || "Untitled"
-                                : col.name === "Views"
-                                  ? gaRow.views
-                                  : "";
-                        } else if (isRecentPostsTable) {
-                          const pRow = row as any;
-                          // Use dataKey if available, otherwise fallback to name mapping or direct property access
-                          let key = (col as any).dataKey;
-
-                          if (!key) {
-                            // Fallback for legacy columns without dataKey
-                            const nameLower = col.name.toLowerCase();
-                            if (col.name === "Date") key = "date";
-                            else if (col.name === "Post" || col.name === "Post Message") key = "post";
-                            else if (col.name === "Full Picture") key = "fullPicture";
-                            else if (col.name === "Permalink URL") key = "permalinkUrl";
-                            else key = nameLower;
-                          }
-
-                          cellValue = pRow[key];
-
-                          // Handle numeric defaults if needed (though API processing usually sets defaults)
-                          if (key === 'impressions' || key === 'clicks') {
-                            cellValue = cellValue ?? 0;
-                          }
-                        } else if (usingDimensionalRows) {
-                          const dimRow = row as { dimension: string; value: number };
-                          cellValue =
-                            colIndex === 0
-                              ? dimRow.dimension
-                              : dimRow.value;
-                        } else if (usingSeriesRows) {
-                          const sRow = row as any as WidgetSeriesPoint;
-                          cellValue =
-                            col.name === "Metric"
-                              ? sRow.x
-                              : col.name === "Value"
-                                ? sRow.y
-                                : "";
-                        } else if (resolvedRows) {
-                          const genericRow = row as Record<string, unknown>;
-                          cellValue =
-                            genericRow[col.name] ??
-                            genericRow[col.name.replace(/\s+/g, "")] ??
-                            genericRow[col.name.toLowerCase()] ??
-                            genericRow[col.name
-                              .toLowerCase()
-                              .replace(/\s+/g, "_")] ??
-                            "";
-                        } else {
-                          cellValue =
-                            col.name === "Report"
-                              ? (row as any).name
-                              : col.name === "Audience"
-                                ? (row as any).audience
-                                : col.name === "Status"
-                                  ? (row as any).status
-                                  : col.name === "Last Run"
-                                    ? (row as any).lastRun
-                                    : col.name === "Next Send"
-                                      ? (row as any).nextSend
-                                      : (row as Record<string, unknown>)[col.name] ??
-                                      (row as Record<string, unknown>)[
-                                      col.name.toLowerCase().replace(/\s+/g, "")
-                                      ] ?? "";
-                        }
-
-                        if (
-                          !isGaTopPagesTable &&
-                          !usingSeriesRows &&
-                          col.name === "Status"
-                        ) {
-                          return (
-                            <TableCell
-                              key={colIndex}
-                              className="truncate px-2 md:px-4"
-                            >
-                              <span
-                                className={`inline-flex items-center rounded-full border px-1.5 md:px-2 py-0.5 text-[10px] md:text-xs font-medium ${getStatusBadgeClass(
-                                  row.status
-                                )}`}
-                              >
-                                {String(cellValue)}
-                              </span>
-                            </TableCell>
-                          );
-                        }
-
-                        // Special rendering for "Post" column with image
-                        if (col.name === "Post" && (row as any).fullPicture) {
-                          return (
-                            <TableCell key={colIndex} className="px-2 md:px-4 py-2">
-                              <div className="flex items-center gap-2 md:gap-3">
-                                <div className="w-8 h-8 md:w-10 md:h-10 flex-shrink-0 bg-gray-100 rounded overflow-hidden border">
-                                  <img
-                                    src={(row as any).fullPicture}
-                                    alt="Post"
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => (e.currentTarget.style.display = 'none')}
-                                  />
-                                </div>
-                                <span className="line-clamp-2 whitespace-normal text-[10px] md:text-sm min-w-0 flex-1 leading-tight">
-                                  {String(cellValue ?? "")}
-                                </span>
-                              </div>
-                            </TableCell>
-                          );
-                        }
-
-                        // Special rendering for "Full Picture" column - show image thumbnail
-                        if (col.name === "Full Picture" && cellValue) {
-                          return (
-                            <TableCell key={colIndex} className="px-2 md:px-4 py-2">
-                              <div className="w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded overflow-hidden border">
-                                <img
-                                  src={String(cellValue)}
-                                  alt="Media"
-                                  className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = 'none';
-                                    e.currentTarget.parentElement!.innerHTML = '<span class="text-xs text-gray-400">No image</span>';
-                                  }}
-                                  onClick={() => window.open(String(cellValue), '_blank')}
-                                />
-                              </div>
-                            </TableCell>
-                          );
-                        }
-
-                        return (
-                          <TableCell
-                            key={colIndex}
-                            className={`px-2 md:px-4 ${colIndex === 0
-                              ? "font-medium truncate"
-                              : "truncate"
-                              }`}
-                          >
-                            {col.name === "Views" && isGaTopPagesTable
-                              ? Number(cellValue ?? 0).toLocaleString()
-                              : String(cellValue ?? "")}
-                          </TableCell>
-                        );
-                      })}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-          {!hasTableData && (
-            <div className="border-t px-3 py-2">
-              {renderWidgetEmptyState(
-                onConnectIntegration,
-                "No table data yet"
-              )}
-            </div>
-          )}
-        </Card>
-      );
-    }
-
-    case "title": {
-      const titleData = widgetData as TitleWidgetData | undefined;
-      const text = titleData?.text ?? "Demo title";
-      const fontSize = titleData?.fontSize ?? "2xl";
-      const align = titleData?.align ?? "center";
-
-      // Map fontSize to Tailwind classes
-      const fontSizeClass =
-        fontSize === "xs"
-          ? "text-xs"
-          : fontSize === "sm"
-            ? "text-sm"
-            : fontSize === "base"
-              ? "text-base"
-              : fontSize === "lg"
-                ? "text-lg"
-                : fontSize === "xl"
-                  ? "text-xl"
-                  : fontSize === "2xl"
-                    ? "text-2xl"
-                    : fontSize === "3xl"
-                      ? "text-3xl"
-                      : fontSize === "4xl"
-                        ? "text-4xl"
-                        : "text-2xl";
-
-      const alignClass =
-        align === "left"
-          ? "justify-start"
-          : align === "right"
-            ? "justify-end"
-            : "justify-center";
-
-      return (
-        <div
-          className={`h-full w-full flex items-center ${alignClass} hover:border text-xs md:text-sm text-gray-900`}
-          style={{
-            ...(titleData?.backgroundColor
-              ? { backgroundColor: titleData.backgroundColor }
-              : {}),
-            ...(titleData?.padding
-              ? { padding: titleData.padding }
-              : {}),
-          }}
-        >
-          <span
-            className={`${fontSizeClass} font-semibold break-words text-center`}
-            style={titleData?.color ? { color: titleData.color } : undefined}
-          >
-            {text}
-          </span>
-        </div>
-      );
-    }
-
-    case "metric": {
-      const metricData = widgetData as MetricWidgetData | undefined;
-
-      // For integration-based metrics, prefer resolved values from the API.
-      // For Content Blocks "Stat" widgets (manual), we ignore resolvedData and
-      // never show the "Connect Integration" empty state.
-      // Check resolved value with loose type checking to support strings
-      const val = resolvedData?.value;
-      const tot = resolvedData?.total;
-
-      const resolvedValue =
-        isIntegrationMetric && val != null && !isNaN(Number(val))
-          ? Number(val)
-          : isIntegrationMetric && tot != null && !isNaN(Number(tot))
-            ? Number(tot)
-            : undefined;
-
-
-
-      const dataRawCount =
-        isIntegrationMetric && typeof resolvedData?.rawCount === "number"
-          ? resolvedData.rawCount
-          : 0;
-      const hasData = isIntegrationMetric
-        ? resolvedValue !== undefined || dataRawCount > 0
-        : true;
-
-      const finalValue = resolvedValue ?? metricData?.value ?? 0;
-      const formattedValue = typeof finalValue === "number" ? Math.floor(finalValue * 10) / 10 : finalValue;
-
-      // NEW: Auto-populate sparklineData from resolved series
-      const sparklineData = resolvedData?.series && Array.isArray(resolvedData.series)
-        ? resolvedData.series.map((point: any) => ({ x: point.x, y: point.y }))
-        : metricData?.sparklineData || [];
-
-      return (
-        <div
-          className="flex-1 w-full flex flex-col items-center justify-center text-xs md:text-sm px-2 text-center min-h-[100px]"
-          style={{
-            backgroundColor: metricData?.backgroundColor || undefined,
-            color: metricData?.textColor || undefined
-          }}
-        >
-          <span
-            className="text-2xl md:text-3xl font-bold"
-            style={{ color: metricData?.textColor || "inherit" }}
-          >
-            {formattedValue}
-            {metricData?.unit && (
-              <span
-                className="text-base md:text-lg ml-1"
-                style={{ color: metricData?.textColor ? "inherit" : "#4b5563" }} // Default to gray-600 if no custom color
-              >
-                {metricData.unit}
-              </span>
-            )}
-          </span>
-
-          {/* NEW: Sparkline Chart (Agency Analytics style graph+number) */}
-          {(metricData?.showSparkline !== false) && sparklineData.length > 0 && (
-            <div className="w-full mt-3 px-2" style={{ height: '60px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={sparklineData}>
-                  <Line
-                    type="monotone"
-                    dataKey="y"
-                    stroke={metricData?.textColor || "#2563eb"}
-                    strokeWidth={2}
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
-
-          {/* Trend & Comparison (Manual / Custom Metrics) */}
-          {(metricData?.trendValue || metricData?.comparisonValue) && (
-            <div className="flex flex-col items-center mt-2 gap-0.5">
-              {metricData.trendValue && (
-                <div
-                  className={`flex items-center text-xs font-medium ${metricData.trendDirection === "up"
-                    ? "text-green-600"
-                    : metricData.trendDirection === "down"
-                      ? "text-red-600"
-                      : "text-gray-500"
-                    }`}
-                >
-                  {metricData.trendDirection === "up" && "▲ "}
-                  {metricData.trendDirection === "down" && "▼ "}
-                  {metricData.trendValue}
-                </div>
-              )}
-              {metricData.comparisonValue && (
-                <div className="text-[10px] text-gray-400">
-                  vs {metricData.comparisonValue}
-                </div>
-              )}
-            </div>
-          )}
-
-
-          {isIntegrationMetric && !hasData && (
-            <div className="w-full mt-3">
-              {renderWidgetEmptyState(onConnectIntegration)}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    case "image": {
-      const imageData = widgetData as ImageWidgetData | undefined;
-      const imageFit = imageData?.imageFit || "contain";
-      return (
-        <div
-          className="h-full flex items-center justify-center text-xs md:text-sm text-gray-500 p-0"
-          style={
-            imageData?.backgroundColor
-              ? { backgroundColor: imageData.backgroundColor }
-              : undefined
-          }
-        >
-          {imageData?.src ? (
-            <img
-              src={imageData.src}
-              alt={imageData.alt ?? "Image"}
-              className="max-w-full max-h-full rounded"
-              style={{ objectFit: imageFit }}
-            />
-          ) : (
-            <span className="text-center">Image Placeholder</span>
-          )}
-        </div>
-      );
-    }
-
-    case "embed": {
-      const embedData = widgetData as EmbedWidgetData | undefined;
-      const title = embedData?.title || "Embedded content";
-      const url = embedData?.url || "";
-
-      return (
-        <div
-          className="h-full flex items-center justify-center text-xs md:text-sm text-gray-500 p-1 md:p-2 embed-widget"
-          data-embed-title={title}
-          data-embed-url={url}
-          style={
-            embedData?.backgroundColor
-              ? { backgroundColor: embedData.backgroundColor }
-              : undefined
-          }
-        >
-          {url ? (
-            <iframe
-              src={url}
-              className="w-full h-full border-0 rounded"
-              title={title}
-            />
-          ) : (
-            <span className="text-center">Embed Placeholder</span>
-          )}
-        </div>
-      );
-    }
-
-    case "custom": {
-      const customData = widgetData as CustomWidgetData | undefined;
-      const customStyle = {
-        backgroundColor: customData?.backgroundColor || undefined,
-        color: customData?.textColor || undefined,
-        textAlign: customData?.align ?? "left",
-      } as React.CSSProperties;
-      const heading =
-        customData?.title && customData.title.trim().length > 0
-          ? customData.title.trim()
-          : null;
-      // Tasks-style custom block
-      if (customData?.type === "tasks") {
-        const tasks =
-          (customData.content ?? "")
-            .split("\n")
-            .map((t) => t.trim())
-            .filter(Boolean) || [];
-
-        return (
-          <div
-            className="h-full flex flex-col items-stretch justify-start text-xs md:text-sm text-gray-800 px-3 py-2 rounded-md"
-            style={customStyle}
-          >
-            {heading && (
-              <div className="font-semibold mb-2 text-gray-900">{heading}</div>
-            )}
-            {tasks.length === 0 ? (
-              <span className="text-[11px] text-gray-400">
-                No tasks yet. Use the editor to add tasks.
-              </span>
-            ) : (
-              <ul className={`list-disc list-inside space-y-1 ${customData.fontSize || ''} ${customData.fontWeight || ''}`}>
-                {tasks.map((task, idx) => (
-                  <li key={idx} className="break-words">
-                    {task}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        );
-      }
-
-      // Table-of-contents style custom block
-      if (customData?.type === "toc") {
-        const lines =
-          (customData.content ?? "")
-            .split("\n")
-            .map((t) => t.trim())
-            .filter(Boolean) || [];
-
-        // Parse lines to extract section name and page number
-        // Format: "Section Name | 3" or just "Section Name" (auto-number)
-        const parsedLines = lines.map((line, idx) => {
-          const parts = line.split("|").map(p => p.trim());
-          if (parts.length >= 2) {
-            return {
-              section: parts[0],
-              page: parts[1]
-            };
-          }
-          return {
-            section: line,
-            page: String(idx + 3) // Auto-number starting from page 3
-          };
-        });
-
-        return (
-          <div
-            className="h-full flex flex-col items-stretch justify-start px-6 py-4 rounded-md"
-            style={customStyle}
-          >
-            <div className="text-center font-bold text-lg mb-6 text-gray-700 dark:text-gray-300">
-              {heading ?? "Table of Contents"}
-            </div>
-            {parsedLines.length === 0 ? (
-              <span className="text-xs text-gray-400 text-center">
-                Add entries like "Section Name | 3" (one per line)
-              </span>
-            ) : (
-              <div className="w-full space-y-2.5">
-                {parsedLines.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className={`flex items-baseline gap-2 text-gray-700 dark:text-gray-300 ${customData.fontSize || 'text-sm'} ${customData.fontWeight || 'font-normal'}`}
-                  >
-                    <span className="flex-shrink-0">{item.section}</span>
-                    <span className="flex-1 border-b border-dotted border-gray-400 dark:border-gray-600 mb-1"></span>
-                    <span className="flex-shrink-0 font-medium text-gray-600 dark:text-gray-400 tabular-nums">
-                      {item.page}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      }
-
-      // Generic custom text block with Mini-Markdown support
-      const renderMarkdownLine = (line: string, idx: number) => {
-        // Helper to process inline styles (bold, italic)
-        const processInline = (text: string) => {
-          const parts = text.split(/(\*\*.*?\*\*|_.*?_)/g);
-          return parts.map((part, i) => {
-            if (part.startsWith("**") && part.endsWith("**")) {
-              return <strong key={i}>{part.slice(2, -2)}</strong>;
-            }
-            if (part.startsWith("_") && part.endsWith("_")) {
-              return <em key={i}>{part.slice(1, -1)}</em>;
-            }
-            return part;
-          });
-        };
-
-        if (line.startsWith("# ")) {
-          return (
-            <h1 key={idx} className="text-xl font-bold my-2 text-gray-900">
-              {processInline(line.slice(2))}
-            </h1>
-          );
-        }
-        if (line.startsWith("## ")) {
-          return (
-            <h2 key={idx} className="text-lg font-semibold my-2 text-gray-800">
-              {processInline(line.slice(3))}
-            </h2>
-          );
-        }
-        if (line.startsWith("- ")) {
-          return (
-            <div key={idx} className="flex gap-2 ml-1 my-0.5">
-              <span className="text-gray-400">•</span>
-              <span>{processInline(line.slice(2))}</span>
-            </div>
-          );
-        }
-        // Regular paragraph (preserve empty lines as spacing)
-        return (
-          <p key={idx} className={`my-0.5 ${!line.trim() ? "h-2" : ""}`}>
-            {processInline(line)}
-          </p>
-        );
-      };
-
-      const lines = (customData?.content ?? "Custom Placeholder").split("\n");
-
-      return (
-        <div
-          className={`h-full flex flex-col items-start justify-start text-gray-800 px-3 py-2 rounded-md w-full overflow-y-auto whitespace-pre-wrap break-words ${customData?.fontSize || 'text-xs md:text-sm'} ${customData?.fontWeight || 'font-normal'}`}
-          style={customStyle}
-        >
-          {heading && (
-            <div className="font-semibold mb-2 text-gray-900 border-b pb-1 w-full">
-              {heading}
-            </div>
-          )}
-          <div className="w-full">
-            {lines.map((line, idx) => renderMarkdownLine(line, idx))}
-          </div>
-        </div>
-      );
-    }
-
-    default:
-      return (
-        <div className="h-full flex items-center justify-center text-xs md:text-sm text-gray-500 px-2">
-          <span className="text-center">
-            {String(widget.widgetType).charAt(0).toUpperCase() +
-              String(widget.widgetType).slice(1)}{" "}
-            Placeholder
-          </span>
-        </div>
-      );
-  }
-};
-
-export interface WidgetFormState {
-  slideId: number;
-  widgetId: string;
-  widgetType: ReportWidgetType | "";
-  data?: WidgetData;
-  i?: string;
-  x?: number;
-  y?: number;
-  w?: number;
-  h?: number;
-}
-
-interface ReportBuilderProps {
-  readOnly?: boolean;
-  providedReportId?: number;
-  shareToken?: string;
-  initialData?: any;
-}
-
-const getRangeFromPreset = (preset: string): DateRange | undefined => {
-  switch (preset) {
-    case "Today":
-      return { from: new Date(), to: new Date() };
-    case "Yesterday":
-      return { from: subDays(new Date(), 1), to: subDays(new Date(), 1) };
-    case "Last 7 Days":
-      return { from: subDays(new Date(), 6), to: new Date() };
-    case "Last 30 Days":
-      return { from: subDays(new Date(), 29), to: new Date() };
-    case "Last 90 Days":
-      return { from: subDays(new Date(), 89), to: new Date() };
-    case "This Month":
-      return { from: startOfMonth(new Date()), to: endOfMonth(new Date()) };
-    case "Last Month":
-      return { from: startOfMonth(subMonths(new Date(), 1)), to: endOfMonth(subMonths(new Date(), 1)) };
-    case "This Year":
-      return { from: startOfYear(new Date()), to: new Date() };
-    default:
-      return undefined;
-  }
-};
-
+// Main ReportBuilder Component
 function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, initialData }: ReportBuilderProps = {}) {
   const params = useParams<{ clientId: string; id?: string }>();
   const parsedClientId = params.clientId ? parseInt(params.clientId) : null;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  // removed duplicate dateRange declaration here, using existing one or defining it once
+
+
   // Detect if we're on tablet (using window width)
   const [isTablet, setIsTablet] = useState(false);
 
@@ -2155,22 +253,70 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   const [templateId, setTemplateId] = useState<number | null>(
     providedReportId ?? (params.id && params.id !== "new" ? parseInt(params.id) : null)
   );
-  // Initialize dashboards based on integrations
+  // Initialize dashboards with persistence check
   const [dashboards, setDashboards] = useState<DashboardMap>(() => {
-    // Start with empty map, will be populated based on integrations
+    // Check if we have persisted state for this ID
+    // Note: params.id is available here
+    const reportId = params.id && params.id !== "new" ? parseInt(params.id) : null;
+    if (reportId) {
+      const saved = useReportStore.getState().getReportState(reportId);
+      if (saved?.dashboards) {
+        console.log('📦 [Persistence] Restoring dashboards from store', saved.dashboards);
+        return saved.dashboards;
+      }
+    }
+    // Default fallback
     return new Map([[0, []]]);
   });
-  const [isDashboardsInitialized, setIsDashboardsInitialized] = useState(false);
-  const [deletedSlideIds, setDeletedSlideIds] = useState<Set<number>>(new Set());
+  const [isDashboardsInitialized, setIsDashboardsInitialized] = useState(() => {
+    const reportId = params.id && params.id !== "new" ? parseInt(params.id) : null;
+    // CRITICAL FIX: Even if we have saved state in store, we MUST set initialized=false 
+    // for existing reports on a fresh mount. This forces the hydration effect to run 
+    // at least once to verify data from the backend/database. 
+    // If we return 'true' here, the hydration effect exits early and we risk showing "stale/empty" poison state.
+    if (reportId) return false;
+
+    return false;
+  });
+  const [deletedSlideIds, setDeletedSlideIds] = useState<Set<number>>(() => {
+    const reportId = params.id && params.id !== "new" ? parseInt(params.id) : null;
+    console.log(`🔄 [Store Init] Initializing deletedSlideIds for reportId:`, reportId);
+    if (reportId) {
+      const saved = useReportStore.getState().getReportState(reportId);
+      console.log(`🔄 [Store Init] Saved state from store:`, saved);
+      if (saved?.deletedSlideIds) {
+        console.log(`🔄 [Store Init] Restoring deletedSlideIds:`, Array.from(saved.deletedSlideIds));
+        // Expose to window for debugging
+        if (typeof window !== 'undefined') {
+          (window as any).__DELETED_SLIDES_DEBUG__ = saved.deletedSlideIds;
+        }
+        return saved.deletedSlideIds;
+      }
+    }
+    console.log(`🔄 [Store Init] No saved deletedSlideIds, returning empty Set`);
+    return new Set();
+  });
 
   // Custom pages state (pages added by user, not from integrations)
-  const [customPages, setCustomPages] = useState<
-    Array<{ id: number; name: string; subtitle?: string }>
-  >([]);
+  const [customPages, setCustomPages] = useState<CustomPage[]>(() => {
+    const reportId = params.id && params.id !== "new" ? parseInt(params.id) : null;
+    if (reportId) {
+      const saved = useReportStore.getState().getReportState(reportId);
+      if (saved?.customPages) return saved.customPages;
+    }
+    return [];
+  });
 
   // State to hold the "live" version of slidesMeta, which may differ from the backend data
   // if we perform rescues or cleanups. This is what the Sidebar should render.
-  const [processedSlidesMeta, setProcessedSlidesMeta] = useState<ReportSlideMeta[]>([]);
+  const [processedSlidesMeta, setProcessedSlidesMeta] = useState<ReportSlideMeta[]>(() => {
+    const reportId = params.id && params.id !== "new" ? parseInt(params.id) : null;
+    if (reportId) {
+      const saved = useReportStore.getState().getReportState(reportId);
+      if (saved?.processedSlidesMeta) return saved.processedSlidesMeta;
+    }
+    return [];
+  });
 
   // Template Query - Must be before integrations to derive clientId
   // Template Query - Must be before integrations to derive clientId
@@ -2204,29 +350,75 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     null;
 
   // Page order state - tracks the order of all pages (integration indices + custom page IDs)
-  const [pageOrder, setPageOrder] = useState<number[]>([]);
+  const [pageOrder, setPageOrder] = useState<number[]>(() => {
+    const reportId = params.id && params.id !== "new" ? parseInt(params.id) : null;
+    if (reportId) {
+      const saved = useReportStore.getState().getReportState(reportId);
+      if (saved?.pageOrder && saved.pageOrder.length > 0) return saved.pageOrder;
+    }
+    return [];
+  });
 
   const dashboardIds = useMemo(
-    () => Array.from(dashboards.keys()).sort((a, b) => a - b),
+    () => Array.from(dashboards.keys()),
     [dashboards]
   );
 
   const effectivePageOrder = useMemo(() => {
+    // Use pageOrder if available, otherwise use dashboardIds in their natural order (not sorted)
     const order = pageOrder.length > 0 ? pageOrder : dashboardIds;
-    // Filter out IDs that are not in dashboards to prevent rendering ghost pages
-    // or pages that have been deleted but linger in pageOrder state
-    return order.filter(id => dashboards.has(id));
+    const filtered = order.filter(id => dashboards.has(id));
+
+    // Debug logging to trace page order issues
+    if (pageOrder.length === 0 && dashboardIds.length > 0) {
+      console.warn('⚠️ [PageOrder] Using dashboardIds fallback. pageOrder is empty:', { dashboardIds, filtered });
+    } else if (pageOrder.length > 0) {
+      console.log('✅ [PageOrder] Using saved pageOrder:', { pageOrder, filtered });
+    }
+
+    return filtered;
   }, [pageOrder, dashboardIds, dashboards]);
   const slidesRef = useRef<(HTMLDivElement | null)[]>([]);
   const widgetRefs = useRef<Map<number, Map<string, HTMLDivElement>>>(
     new Map()
   );
+  // Track slides that have been manually edited in this session (widgets added/deleted/moved)
+  // This blocks the "Self-Healing" logic from undoing manual deletions.
+  const modifiedSlideIds = useRef<Set<number>>(new Set());
+
+  // Slide visibility for lazy loading: only fetch widget data for visible/near-visible slides
+  const { registerSlide, isSlideVisible } = useSlideVisibility({
+    rootMargin: "0px 0px 300px 0px",
+    sticky: true,
+  });
+
+
+
   const [rightPanelTitle, setRightPanelTitle] = useState<string>("");
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(
-    getInitialDateRange()
-  );
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
+    const reportId = params.id && params.id !== "new" ? parseInt(params.id) : null;
+    if (reportId) {
+      const saved = useReportStore.getState().getReportState(reportId);
+      if (saved?.dateRange) return saved.dateRange;
+    }
+    return getInitialDateRange();
+  });
   // Date Preset State (e.g. "Last 30 Days") to allow dynamic recalculation in Shared Reports
   const [_datePreset, setDatePreset] = useState<string | undefined>();
+
+  // Collect all widgets for demographic data fetching
+  const allWidgets = useMemo(() => Array.from(dashboards.values()).flat(), [dashboards]);
+  const currentStartDate = dateRange?.from ? formatApiDate(new Date(dateRange.from)) : formatApiDate(subDays(new Date(), 89));
+  const currentEndDate = dateRange?.to ? formatApiDate(new Date(dateRange.to)) : formatApiDate(new Date());
+
+  const { data: demographicDataMap } = useDemographicData(
+    allWidgets,
+    parsedClientId || 0,
+    {
+      startDate: currentStartDate,
+      endDate: currentEndDate
+    }
+  );
 
   const [isNameDialogOpen, setIsNameDialogOpen] = useState(false);
   const [newReportName, setNewReportName] = useState("");
@@ -2286,13 +478,31 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   }, [schedulesData, templateId]);
 
   // Auto-save state
-  const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<Date | null>(() => {
+    const reportId = params.id && params.id !== "new" ? parseInt(params.id) : null;
+    if (reportId) {
+      const saved = useReportStore.getState().getReportState(reportId);
+      if (saved?.lastSavedTime) return saved.lastSavedTime;
+    }
+    return null;
+  });
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(() => {
+    const reportId = params.id && params.id !== "new" ? parseInt(params.id) : null;
+    if (reportId) {
+      const saved = useReportStore.getState().getReportState(reportId);
+      if (saved?.hasUnsavedChanges !== undefined) return saved.hasUnsavedChanges;
+    }
+    return false;
+  });
 
   const {
     data: integrationsData,
     isLoading: isLoadingIntegrations,
-  } = useIntegrations(effectiveClientId, { enabled: !readOnly });
+  } = useIntegrations(effectiveClientId, {
+    enabled: !readOnly,
+    staleTime: 60 * 1000, // Cache for 60 seconds to avoid ghost slides
+    placeholderData: keepPreviousData // 🔧 FIX: Keep previous data during refetch to prevent slideIntegrationMap from becoming empty
+  });
 
   // Debug log with safe handling of undefined
   if (integrationsData) {
@@ -2302,11 +512,20 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   // NOTE: We only enable 'available metrics' fetch if we have a clientId
   // If we are in 'shared' mode, we might not have clientId initially,
   // but once template loads, effectiveClientId will be set.
+  // Force refresh of metrics when integrations change (e.g. newly connected)
+  const integrationVersion = integrationsData?.integrations
+    ?.map((i) => `${i.id}-${i.platform}`)
+    .sort()
+    .join(",") || "";
+
   const {
     groupedMetrics,
     isLoading: isLoadingAvailableMetrics,
     error: availableMetricsError,
-  } = useAvailableMetrics(effectiveClientId, { enabled: !readOnly });
+  } = useAvailableMetrics(effectiveClientId, {
+    enabled: !readOnly,
+    integrationVersion
+  });
 
   // UI state for the AgencyAnalytics-style "Choose your Metrics" panel
   const [selectedIntegrationForMetrics, setSelectedIntegrationForMetrics] =
@@ -2415,185 +634,113 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
 
 
-  // Apply saved default date range from template (if present)
-  useEffect(() => {
-    const data = templateQuery.data;
-    if (!data?.defaultDateFrom || !data?.defaultDateTo) return;
 
-    const from = new Date(data.defaultDateFrom);
-    const to = new Date(data.defaultDateTo);
 
-    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
-      return;
-    }
-
-    setDateRange({ from, to });
-  }, [templateQuery.data?.defaultDateFrom, templateQuery.data?.defaultDateTo]);
-
-  // Handle template query errors
-  useEffect(() => {
-    if (templateQuery.error) {
-      const error = templateQuery.error as ApiError;
-      if (error.status === 404) {
-        // For existing report IDs, do NOT auto-create a new template.
-        // Just inform the user and go back to the reports list.
-        templateBootstrapRef.current = false;
-        toast.error("Report not found");
-        if (!readOnly) {
-          navigate(`/clients/${parsedClientId}/reports`);
-        }
-        return;
-      }
-
-      if (error.status === 401 || error.status === 403) {
-        toast.error("You do not have permission to view this report. The link may be invalid or expired.");
-        return;
-      }
-
-      toast.error(error.message || "Failed to load report template");
-    }
-  }, [templateQuery.error, navigate, parsedClientId]);
-
-  // Initialize slides based on connected integrations (only for new reports without template data)
-  useEffect(() => {
-    // Only initialize if we don't have template data and integrations are loaded
-    if (
-      isTemplateLoading || // CRITICAL FIX: Wait for template to load before deciding to initialize empty!
-      templateQuery.data?.widgets ||
-      (templateQuery.data?.slides && templateQuery.data.slides.length > 0) ||
-      (templateQuery.data?.slidesMeta && templateQuery.data.slidesMeta.length > 0) ||
-      !integrationsData?.integrations ||
-      isDashboardsInitialized
-    ) {
-      return;
-    }
-
-    // REGRESSION FIX: strictly prevent "New Report" default initialization for Existing Reports.
-    // If templateId exists, we MUST wait for the data to load (handled by other effects).
-    // We should NEVER fall back to creating empty integration slides for an existing report,
-    // as this creates a race condition where empty slides overwrite the actual report data.
-    if (templateId != null) {
-      console.log('🛡️ [ReportBuilder] Preventing default init for existing report:', templateId);
-      return;
-    }
-
-    console.log('⚠️ [ReportBuilder] Proceeding with default init for NEW report (templateId is null)');
-
-    const integrations = integrationsData.integrations;
-
-    if (integrations.length === 0) {
-      // No integrations, start empty and let AutoPopulate fill in if data arrives later
-      setDashboards(new Map());
-      setPageOrder([]);
-    } else {
-      // Create one slide per integration
-      const newDashboards = new Map<number, DashboardLayout[]>();
-      const initialOrder: number[] = [];
-      const seenIds = new Set<number>();
-
-      integrations.forEach((_, index) => {
-        if (!seenIds.has(index)) {
-          newDashboards.set(index, []);
-          initialOrder.push(index);
-          seenIds.add(index);
-        }
-      });
-      setDashboards(newDashboards);
-      // Force empty order to let Sidebar fallback execute (shows all integrations)
-      // AutoPopulate will eventually sort this out if needed, but safe default is empty.
-      setPageOrder([]);
-    }
-
-    setIsDashboardsInitialized(true);
-  }, [integrationsData, templateQuery.data, isDashboardsInitialized, isTemplateLoading]);
-
-  // Ensure pageOrder always matches current slide IDs (integrations + custom pages)
-  // Skip this if we have template data with a saved pageOrder (to preserve template order)
-  // Ensure pageOrder always matches current slide IDs (integrations + custom pages)
-  useEffect(() => {
-    // If we have template data with a saved pageOrder, don't auto-sync initially.
-    // However, if the user adds a new integration or page, dashboards will change,
-    // and we MUST update pageOrder to include the new ID.
-
-    // We rely on the fact that `dashboards` ref only changes when we actually add/remove slides.
-    const ids = Array.from(dashboards.keys());
-
-    setPageOrder((prevOrder) => {
-      if (ids.length === 0) return prevOrder;
-
-      // If no existing order, just use current ids
-      if (prevOrder.length === 0) return ids;
-
-      const idSet = new Set(ids);
-
-      // 1) Keep existing order but drop any ids that no longer exist
-      // EXCEPTION: Always keep custom page IDs (>=1000) to prevent them from disappearing
-      // if dashboards map is temporarily out of sync or empty.
-      const filtered = prevOrder.filter((id) => idSet.has(id) || id >= 1000);
-
-      // 2) Deduplicate just in case
-      const uniqueFiltered = Array.from(new Set(filtered));
-
-      // 3) Append any new ids that weren't in previous order
-      const existingSet = new Set(uniqueFiltered);
-      ids.forEach((id) => {
-        if (!existingSet.has(id)) {
-          uniqueFiltered.push(id);
-        }
-      });
-
-      // Only update if the order actually changed (optimization)
-      if (
-        uniqueFiltered.length === prevOrder.length &&
-        uniqueFiltered.every((val, index) => val === prevOrder[index])
-      ) {
-        return prevOrder;
-      }
-
-      return uniqueFiltered;
-    });
-  }, [dashboards]);
-
-  // Map each slideId to its integration (if any) so we can restrict drops to the
-  // matching integration page.
   const slideIntegrationMap = useMemo(() => {
-    const map = new Map<
-      number,
-      { platform: string; accountId: string; accountName?: string }
-    >();
+    // Build a map of slide IDs to integration details
+    // Current assumption: slide ID 0 = Integration 0, slide ID 1 = Integration 1, etc.
+    const map = new Map<number, {
+      platform: string;
+      accountId: string;
+      accountName: string;
+      originalIndex: number; // Important for mapping back to integrations array
+      subSlideIndex: number; // 0 for main slide, 1 for second slide (e.g. IG), etc.
+    }>();
+
+    let currentSlideId = 0;
 
     // Iterate through integrations array by index
-    // The slideId corresponds to the array index
     integrationsData?.integrations?.forEach((integ, index) => {
       if (integ) {
-        map.set(index, {
-          platform: integ.platform,
-          accountId: integ.accountId,
-          accountName: integ.accountName,
-        });
+        // Normalize platform key for template lookup
+        let normalizedPlatform = integ.platform?.toLowerCase().trim().replace(/[ _-]/g, '');
+        // Special mapping for meta business
+        if (normalizedPlatform === 'metabusiness') normalizedPlatform = 'meta-business';
+
+        const template = normalizedPlatform ? (
+          INTEGRATION_TEMPLATES[integ.platform || ''] ??
+          INTEGRATION_TEMPLATES[normalizedPlatform] ??
+          INTEGRATION_TEMPLATES[normalizedPlatform.replace(/(meta)(.+)/, '$1-$2')]
+        ) : undefined;
+
+        const slideCount = template?.slides?.length || 1;
+
+        // 🔍 DIAGNOSTIC LOG: Track Instagram slide creation
+        if (integ.platform?.toLowerCase().includes('instagram')) {
+          console.log(`📊 [SlideMap] Creating Instagram slide(s):`, {
+            platform: integ.platform,
+            normalizedPlatform,
+            accountId: integ.accountId,
+            accountName: integ.accountName,
+            templateFound: !!template,
+            slideCount,
+            startingSlideId: currentSlideId,
+            integrationIndex: index
+          });
+        }
+
+        for (let i = 0; i < slideCount; i++) {
+          map.set(currentSlideId, {
+            platform: integ.platform,
+            accountId: integ.accountId,
+            accountName: integ.accountName,
+            originalIndex: index,
+            subSlideIndex: i
+          });
+          currentSlideId++;
+        }
       }
     });
+
+    // 🔍 DIAGNOSTIC LOG: Final slideIntegrationMap summary
+    console.log(`📊 [SlideMap] Final map created with ${map.size} slides:`,
+      Array.from(map.entries()).map(([id, info]) => ({
+        slideId: id,
+        platform: info.platform,
+        accountName: info.accountName
+      }))
+    );
+
+    // Expose to window for console debugging
+    if (typeof window !== 'undefined') {
+      (window as any).__SLIDE_MAP_DEBUG__ = map;
+      (window as any).__INTEGRATIONS_DEBUG__ = integrationsData;
+    }
 
     return map;
   }, [integrationsData?.integrations]);
 
-  // Update template data when loaded successfully
+
+  // 🔍 DIAGNOSTIC: Track when slideIntegrationMap becomes empty
+  useEffect(() => {
+    if (slideIntegrationMap.size === 0 && integrationsData?.integrations?.length) {
+      console.error(`⚠️ [SlideMap] Map is EMPTY but integrations exist!`, {
+        integrationsCount: integrationsData.integrations.length,
+        integrations: integrationsData.integrations.map(i => i.platform)
+      });
+    }
+  }, [slideIntegrationMap, integrationsData?.integrations]);
+
+  // Ref to track if we've hydrated this specific template to prevent re-hydration
+  const hydratedTemplateIdRef = useRef<number | null>(null);
+
+  // ✅ FIX 1: Clean Hydration Logic
   useEffect(() => {
     if (!templateQuery.data) return;
 
-    // CRITICAL FIX: Wait for integrations to load so we can properly rescue/map IDs (Backend ID 500 -> Index 0)
-    // If we run too early, rescue fails and we get duplicates.
-    // SHARED REPORT FIX: In readOnly mode, integrations never load, so we skip this check.
+    // CRITICAL FIX: Wait for integrations to load so we can properly rescue/map IDs
     if (!readOnly && (isLoadingIntegrations || !integrationsData?.integrations)) return;
 
-    // CRITICAL FIX: Only run hydration once to avoid resetting local state/drag position on background refetches
-    if (isDashboardsInitialized) return;
+    // CRITICAL FIX: Only run hydration once per template to avoid resetting local state
+    // Check EITHER isDashboardsInitialized OR the ref to handle remounts in Strict Mode
+    // Use OR logic so that even if isDashboardsInitialized is reset, the ref prevents re-hydration
+    if (isDashboardsInitialized || hydratedTemplateIdRef.current === templateId) {
+      console.log(`⏭️ [Hydration] Skipping - already hydrated templateId ${templateId}`);
+      return;
+    }
 
     // Restore saved date range if available
     if ((templateQuery.data as any).defaultDateFrom && (templateQuery.data as any).defaultDateTo) {
-      // Feature: Dynamic Date Presets
-      // If we have a saved preset (e.g. "Last 30 Days") AND we are in read-only mode (Shared),
-      // we should ignore the static dates and calculate fresh ones based on the preset.
       const savedPreset = (templateQuery.data as any).datePreset;
       if (savedPreset) {
         setDatePreset(savedPreset);
@@ -2605,7 +752,6 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           console.log(`📅 [Dynamic Dates] Applied preset '${savedPreset}':`, dynamicRange);
           setDateRange(dynamicRange);
         } else {
-          // Fallback to static dates if preset invalid or unknown
           const from = new Date((templateQuery.data as any).defaultDateFrom);
           const to = new Date((templateQuery.data as any).defaultDateTo);
           if (!isNaN(from.getTime()) && !isNaN(to.getTime())) {
@@ -2613,10 +759,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           }
         }
       } else {
-        // Standard static date restore (Builder or no preset)
         const from = new Date((templateQuery.data as any).defaultDateFrom);
         const to = new Date((templateQuery.data as any).defaultDateTo);
-        // Only set if valid dates
         if (!isNaN(from.getTime()) && !isNaN(to.getTime())) {
           setDateRange(prev => {
             if (prev?.from?.getTime() === from.getTime() && prev?.to?.getTime() === to.getTime()) {
@@ -2628,71 +772,72 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       }
     }
 
+    const numIntegrations = integrationsData?.integrations?.length ?? 0;
+    console.log('🧹 [Hydration] Starting cleanup. Integrations:', numIntegrations);
 
-    // Sync customPages (used by the left "Pages" sidebar) with backend slide
-    // titles/subtitles so names stay stable across saves/refreshes. Merge
-    // backend-provided custom pages with any local-only custom pages so that
-    // newly added pages don't disappear immediately after a save.
+    let cleanedSlidesMeta: ReportSlideMeta[] = [];
+
     if (Array.isArray(templateQuery.data.slidesMeta)) {
-      const slidesMeta = templateQuery.data.slidesMeta;
-      console.log('🔍 [LoadDebug] Raw Template Data:', {
-        slidesMeta,
-        pageOrder: templateQuery.data.pageOrder,
-        widgets: templateQuery.data.widgets?.length
+      const rawSlidesMeta = templateQuery.data.slidesMeta;
+
+      // ✅ STEP 1: Build valid slide IDs set using slideIntegrationMap
+      const validSlideIds = new Set<number>();
+      // Add all slide IDs from slideIntegrationMap (handles multi-slide integrations)
+      slideIntegrationMap.forEach((_, slideId) => {
+        validSlideIds.add(slideId);
       });
 
+      rawSlidesMeta.forEach((slide: any) => {
+        const sId = Number(slide.id);
+
+        // Add ALL pages with ID >= 1000 as custom pages, regardless of their source field
+        // This handles cases where backend incorrectly marks custom pages as 'integration'
+        if (sId >= 1000) {
+          console.log('🔍 [Validation] Adding high-ID page to validSlideIds:', sId, 'source:', slide.source, 'title:', slide.title);
+          validSlideIds.add(sId);
+        }
+      });
+
+      console.log(`🔍 [Hydration] Current deletedSlideIds:`, Array.from(deletedSlideIds));
+
+      // 🔍 DIAGNOSTIC: Check for Instagram slides in deleted list
+      const deletedInstagramSlides = Array.from(deletedSlideIds).filter(id => {
+        const slideInfo = slideIntegrationMap.get(id);
+        return slideInfo?.platform?.toLowerCase().includes('instagram');
+      });
+      if (deletedInstagramSlides.length > 0) {
+        console.warn(`⚠️ [Hydration] Instagram slides in deleted list:`, deletedInstagramSlides);
+      }
+
+      // ✅ STEP 2: Filter out ghost slides and explicitly deleted slides
+      cleanedSlidesMeta = rawSlidesMeta.filter((slide: any) => {
+        const sId = Number(slide.id);
+
+        // Reject if explicitly deleted by user
+        if (deletedSlideIds.has(sId)) {
+          console.log(`🗑️ [Hydration] Removing deleted slide: ID=${sId}, Title="${slide.title}"`);
+          return false;
+        }
+
+        // Reject if not in valid set
+        if (!validSlideIds.has(sId)) {
+          console.log(`👻 [Hydration] Removing ghost slide: ID=${sId}, Title="${slide.title}", Source=${slide.source}`);
+          return false;
+        }
+
+        // Reject high-ID integration duplicates (ID >= 1000 but source is integration)
+        if (sId >= 1000 && slide.source === 'integration') {
+          console.log(`👻 [Hydration] Removing high-ID integration duplicate: ID=${sId}`);
+          return false;
+        }
+
+        return true;
+      });
+
+      // ✅ STEP 3: Update customPages with cleaned data
       setCustomPages((prev) => {
-        // Custom pages coming from backend slidesMeta
-        const fromBackend = slidesMeta
-          // Only treat slides explicitly marked as "custom" (or legacy slides
-          // that don't clearly map to an integration) as custom pages.
-          .filter((slide: any) => {
-            // Robustness: IDs >= 1000 are ALWAYS custom pages, regardless of source setting
-            // REMOVED: Backend IDs can be > 1000, so this check is invalid.
-            // if (Number(slide.id) >= 1000) return true;
-
-            if (slide.source === "custom") {
-              // FIX: Ghost Check. If ID < 1000, it might be a disconnected integration saved as custom.
-              // Verify integration exists.
-              const sId = Number(slide.id);
-              if (sId < 1000) {
-                // Only filter if we have integration data loaded (not readOnly)
-                if (!readOnly && integrationsData?.integrations && !integrationsData.integrations[sId]) {
-                  console.log(`👻 [Hydration] Skipping ghost Custom Page ID ${sId}`);
-                  return false;
-                }
-              }
-              return true;
-            }
-
-            // If source is 'integration', verify it effectively maps to one.
-            // If the backend wipes integrationIndex and source, we must check if
-            // the slide title/subtitle matches a known integration to avoid duplicate "Custom" pages
-            // for real integrations.
-            if (slide.source === "integration") {
-              // If we have an index, trust it (it's an integration page)
-              if (typeof slide.integrationIndex === 'number') return false;
-
-              // If no index, check if we can rescue it by title matching
-              // This prevents "Meta Business" (ID 1750) from showing as a Custom Page
-              const matchesIntegration = integrationsData?.integrations?.some(i =>
-                i.platform === slide.title ||
-                (getPlatformConfig(i.platform)?.name === slide.title)
-              );
-              if (matchesIntegration) return false;
-            }
-
-            // Legacy: if there's an integration at this index or slideId,
-            // assume it's an integration slide, not custom.
-            // (Only if ID is small enough to be an index)
-            if (Number(slide.id) < 1000) {
-              // ALWAYS return false for low IDs. They are reserved for integrations.
-              // Even if we don't have the integration data yet, we shouldn't claim it as a custom page.
-              return false;
-            }
-
-            return true;
-          })
+        const fromBackend = cleanedSlidesMeta
+          .filter((slide: any) => slide.source === 'custom' && Number(slide.id) >= 1000)
           .map((slide: any) => ({
             id: Number(slide.id),
             name: slide.title,
@@ -2700,653 +845,326 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           }));
 
         const backendIds = new Set(fromBackend.map((p: any) => p.id));
-
-        // Keep any local custom pages that the backend doesn't know about yet
         const preservedLocal = prev.filter((p: any) => !backendIds.has(p.id));
-
-        const result = [...preservedLocal, ...fromBackend];
-        return result;
+        return [...preservedLocal, ...fromBackend];
       });
     }
 
-    // Prevent race condition: If integrations are still loading, numIntegrations will be 0.
-    // This causes legitimate slides (e.g. index 0) to be seen as ghosts and deleted.
-    // We must wait for integrationsData to be fully loaded before running this logic.
-    // ALSO: In Read-Only mode (Shared Reports), integrationsData is NEVER loaded. We must skip
-    // ghost cleanup entirely and trust the template data.
-    if ((!readOnly && isLoadingIntegrations) || (!readOnly && !integrationsData?.integrations)) {
-      console.log('[Hydrate] Waiting for integrations...', { isLoading: isLoadingIntegrations, hasData: !!integrationsData });
-      return;
-    }
-
-    if (!readOnly && integrationsData?.integrations?.length === 0) {
-      console.warn('[Hydrate] Integrations loaded but EMPTY array. This might cause rescue failure.');
-    }
-
-
-    // SHARED REPORT FIX: If readOnly, we don't have integrations to validate against.
-    // SHARED REPORT FIX: If readOnly, we don't have integrations to validate against.
-    // We should skip the rescue/cleanup logic below entirely to avoid deleting valid slides.
-    if (readOnly) {
-      // Just populate the map from the template directly
-      const map = buildDashboardMapFromTemplate(
-        (templateQuery.data.widgets ?? []) as ReportWidgetDefinition[]
-      );
-
-      // Need to ensure dashboards state is set
-      setDashboards(map);
-
-      // Also ensure pageOrder matches template, ensuring strictly Number() types
-      // to match the DashboardMap keys (which are numbers).
-      if (templateQuery.data.pageOrder && templateQuery.data.pageOrder.length > 0) {
-        let order = templateQuery.data.pageOrder.map((id: any) => Number(id));
-
-        // FIX: SLIDE ORDER MISMATCH (Shared Report)
-        // If the saved order has ID 0 (legacy first integration) but our map uses a new ID
-        // (e.g. 6402) for those widgets, we must map 0 -> 6402 to preserve position.
-        // We detect this if order has 0, map DOES NOT have 0, but map has keys effectively.
-        if (order.includes(0) && !map.has(0) && map.size > 0) {
-          const mapKeys = Array.from(map.keys());
-          // Heuristic: If we have one ID in map that IS NOT in order, assume it replaces 0.
-          // This covers the case where 0 was the integration slide, and 6402 is its new ID.
-          const orphanedKeys = mapKeys.filter(k => !order.includes(k));
-
-          if (orphanedKeys.length === 1) {
-            console.log(`✨ [ReadOnly Fix] Remapping legacy ID 0 to available ID ${orphanedKeys[0]} in pageOrder`);
-            order = order.map((id: number) => (id === 0 ? orphanedKeys[0] : id));
-          } else {
-            // If multiple orphans, append them to ensure they are at least visible
-            // (better to show at end than hide completely)
-            console.log(`⚠️ [ReadOnly Fix] Orphaned slides detected: ${orphanedKeys}. Appending to order.`);
-            order = [...order.filter((id: number) => id !== 0), ...orphanedKeys];
-          }
-        }
-
-        setPageOrder(order);
-      } else {
-        setPageOrder(Array.from(map.keys()).sort((a, b) => a - b));
-      }
-
-      setIsDashboardsInitialized(true);
-      return;
-    }
-
+    // Populate widgets map
+    console.log(`🔄 [Hydration] Loading ${templateQuery.data.widgets?.length || 0} widgets from database`);
+    console.log(`🔄 [Hydration] Widget slideIds:`,
+      (templateQuery.data.widgets ?? []).map((w: any) => w.layout?.slideId).filter((id: number, i: number, arr: number[]) => arr.indexOf(id) === i)
+    );
     const map = buildDashboardMapFromTemplate(
       (templateQuery.data.widgets ?? []) as ReportWidgetDefinition[]
     );
 
-    // Initial population: Ensure every integration has at least an empty dashboard entry
-    // so it shows up in the UI and in the saved payload.
-    // BUT ONLY if we are starting fresh (no saved pageOrder/slidesMeta).
-    // If we have saved state, assume missing pages were intentionally deleted.
-    const hasSavedState = (Array.isArray(templateQuery.data.pageOrder) && templateQuery.data.pageOrder.length > 0) ||
-      (Array.isArray(templateQuery.data.slidesMeta) && templateQuery.data.slidesMeta.length > 0);
-
-    if (!hasSavedState && integrationsData?.integrations) {
-      integrationsData.integrations.forEach((_, index) => {
-        if (!map.has(index)) {
-          map.set(index, []);
+    // Ensure all integration slides have dashboards (even if empty), unless explicitly deleted
+    // This fixes reports that were created with missing slides
+    if (!readOnly && integrationsData?.integrations) {
+      // Use slideIntegrationMap to create dashboards for all slides (handles multi-slide integrations)
+      slideIntegrationMap.forEach((_, slideId) => {
+        if (!map.has(slideId) && !deletedSlideIds.has(slideId)) {
+          console.log(`📝 [Hydration] Creating missing dashboard for slide ${slideId}`);
+          map.set(slideId, []);
         }
       });
     }
 
-    // Remap backend IDs to integration indices if applicable
-    // This fixes the issue where backend assigns new IDs (e.g. 500) to integration slides (e.g. 0),
-    // causing duplicates in the sidebar.
-    // Remap backend IDs to integration indices if applicable
-    // This fixes the issue where backend assigns new IDs (e.g. 500) to integration slides (e.g. 0),
-    // causing duplicates in the sidebar.
-    const idMapping = new Map<number, number>(); // backendId -> frontendId
-    const numIntegrations = integrationsData?.integrations?.length ?? 0;
-
-    // CLEANUP: Remove ghost slides
-    // This cleans the UI immediately without waiting for a save.
-    if (!readOnly && integrationsData?.integrations && templateQuery.data?.slidesMeta) {
-      const validIndices = new Set(integrationsData.integrations.map((_, i) => i));
-      const ghostIds = new Set<number>();
-
-      // 1. Identify ghosts from Metadata
-      templateQuery.data.slidesMeta.forEach((s: any) => {
-        const sId = Number(s.id);
-
-        // UNIVERSAL GHOST CHECK:
-        // If a slide has an 'integrationIndex' property, it MUST point to a valid integration.
-        // This catches "Custom" pages (ID > 1000) that were originally integrations (e.g. index 1)
-        // but the integration was disconnected.
-        if (typeof s.integrationIndex === 'number') {
-          if (!validIndices.has(s.integrationIndex)) {
-            console.log(`👻 [Hydration] Identified Ghost (Invalid Index ref): ID=${sId}, Index=${s.integrationIndex}, Source=${s.source}`);
-            ghostIds.add(sId);
-            return; // Caught, next slide
-          }
-        }
-
-        // Scenario A: Explicit "integration" source but invalid index
-        if (s.source === 'integration') {
-          const idx = typeof s.integrationIndex === 'number' ? s.integrationIndex : sId;
-          // If index is invalid (missing from validIndices), it's a ghost
-          if (!validIndices.has(idx)) {
-            console.log(`👻 [Hydration] Inditified Ghost Integration Slide: ID=${sId}, Index=${idx}`);
-            ghostIds.add(sId);
-          }
-        }
-
-        // Scenario B: "Custom" source but actually an orphaned integration (ID < 1000)
-        // (Handled by map scan below, but reinforcing here)
-        if (s.source === 'custom' && sId < 1000) {
-          if (!integrationsData.integrations[sId]) {
-            console.log(`👻 [Hydration] Identified Ghost Custom-Masquerading Slide: ID=${sId}`);
-            ghostIds.add(sId);
-          }
-        }
-      });
-
-      // 1.5 Content-Based Detection (Scan widgets for disconnected integrations)
-      // This catches "Custom" pages that have lost their metadata link but contain stale content.
-      if (templateQuery.data.widgets) {
-        // get all known platform keys from connected integrations
-        const connectedPlatforms = new Set(integrationsData.integrations.map(i => i.platform));
-
-        // Group widgets by slideId
-        const slideWidgets = new Map<number, any[]>();
-        templateQuery.data.widgets.forEach((w: any) => {
-          const sId = Number(w.layout?.slideId ?? 0);
-          if (!slideWidgets.has(sId)) slideWidgets.set(sId, []);
-          slideWidgets.get(sId)?.push(w);
-        });
-
-        // Check every slide in slidesMeta (or identified in widgets)
-        const allSlideIds = new Set<number>([
-          ...templateQuery.data.slidesMeta.map((s: any) => Number(s.id)),
-          ...Array.from(slideWidgets.keys())
-        ]);
-
-        allSlideIds.forEach(sId => {
-          // Only scan "Custom" slides (ID >= 1000) or orphaned low-IDs not yet caught
-          if (sId >= 1000 || !validIndices.has(sId)) {
-            const widgets = slideWidgets.get(sId) || [];
-            if (widgets.length > 0) {
-              // Check if ALL widgets are from disconnected integrations
-              let hasDisconnectedContent = false;
-              let hasConnectedContent = false;
-              let hasGenericContent = false;
-
-              widgets.forEach(w => {
-                let integration = (w.metricConfig?.integration || w.integration || "").toLowerCase();
-                if (integration === 'woocommerce') integration = 'woo';
-
-                // Ignore generic/text/image widgets - if they exist, we keep the page
-                if (w.type === 'text' || w.type === 'image' || w.type === 'embed') {
-                  hasGenericContent = true;
-                  return;
-                }
-
-                // If no integration specified, it's generic or broken. Treat as generic.
-                if (!integration) {
-                  hasGenericContent = true;
-                  return;
-                }
-
-                // Check connection
-                // We need to match against platform keys (e.g. 'google-analytics', 'meta-business')
-                // The widget might have 'meta_business' or 'meta-ads'.
-                const normalizedInt = integration.replace(/[ _]/g, '-');
-
-                // Optimization: Check for 'meta' specifically if that's the issue
-                const isConnected = Array.from(connectedPlatforms).some(p => {
-                  const normP = p.replace(/[ _]/g, '-');
-                  return normalizedInt.includes(normP) || normP.includes(normalizedInt);
-                });
-
-                if (isConnected) {
-                  hasConnectedContent = true;
-                } else {
-                  hasDisconnectedContent = true;
-                }
-              });
-
-              // DECISION: If has disconnected content, BUT NO connected/generic content -> GHOST
-              if (hasDisconnectedContent && !hasConnectedContent && !hasGenericContent) {
-                console.log(`👻 [Hydration] Inditified Content-Based Ghost Slide: ID=${sId}. All widgets disconnected.`);
-                ghostIds.add(sId);
-              }
-            }
-          }
-        });
-      }
-
-      // 1.5.1 Identify ghosts from Dashboard Keys (orphaned IDs < 1000)
-      for (const [id] of map) {
-        if (typeof id === 'number' && id < 1000) {
-          if (!validIndices.has(id)) {
-            console.log(`👻 [Hydration] Detected ghost slide ${id} (No integration). Marking for removal.`);
-            ghostIds.add(id);
-          }
-        }
-      }
-
-      // Remove all identified ghosts from map
-      if (ghostIds.size > 0) {
-        ghostIds.forEach(id => map.delete(id));
-      }
-
-      // Remove ghosts from pageOrder
-      if (templateQuery.data.pageOrder) {
-        const newOrder = templateQuery.data.pageOrder
-          .map((id: any) => Number(id))
-          .filter((id: number) => {
-            // 1. Must not be a detected ghost
-            if (ghostIds.has(id)) return false;
-
-            // 2. CRITICAL: Strictly Only allow IDs that exist in the map OR are valid integrations.
-            const hasDashboard = map.has(id);
-            const isValidIntegration = validIndices.has(id);
-
-            if (!hasDashboard && !isValidIntegration) {
-              console.log(`👻 [Hydration] Removing orphaned PageOrder ID ${id} (No Dashboard, Not Valid Integration)`);
-              return false;
-            }
-            return true;
-          });
-
-        if (newOrder.length !== templateQuery.data.pageOrder.length) {
-          console.log(`👻 [Hydration] Cleaned pageOrder:`, newOrder);
-          setPageOrder(newOrder);
-          setHasUnsavedChanges(true); // Persist cleanup on next save
-        }
-      }
-    }
-
-    // Use a local copy of slidesMeta for processing rescues
-    // We will update this and set it to state at the end
-    let localSlidesMeta: ReportSlideMeta[] = [...(templateQuery.data.slidesMeta || [])];
-
-    // Helper to rescue widgets from a ghost/malformed slide
-    const attemptRescue = (backendId: number) => {
-      const ghostWidgets = map.get(backendId) || [];
-      if (ghostWidgets.length > 0 && integrationsData?.integrations) {
-        const firstWidget = ghostWidgets[0];
-        // Helper to normalize backend integration names (snake_case) to frontend (kebab-case)
-        const normalize = (s: string) => s.toLowerCase().replace(/_/g, '-');
-        const widgetIntegration = normalize(firstWidget.metricConfig?.integration || '');
-
-        const targetIndex = integrationsData.integrations.findIndex(i => {
-          const plat = normalize(i.platform);
-          const isMatch = plat === widgetIntegration ||
-            (plat === 'woocommerce' && widgetIntegration === 'woo') ||
-            (plat === 'google-search-console' && widgetIntegration === 'google-console') ||
-            (plat === 'meta-business' && ['meta-facebook', 'meta-instagram'].includes(widgetIntegration));
-
-          return isMatch;
-        });
-
-        if (targetIndex !== -1) {
-          const existing = map.get(targetIndex) || [];
-          // Avoid duplicates if we already rescued or populated
-          // For Meta Business, we might have multiple "ghost" slides (one for FB, one for IG) mapping to the same target
-          // So we should append, not just skip if existing is non-empty, OR be smart about it.
-          // Actually, if we simply append, we might duplicate if the target already has its *own* widgets?
-          // But usually the target (valid integration) starts empty if it was "lost".
-          // If we have mixed content, appending is safer than losing data.
-
-          // Update widgets to point to new slideId (layout consistency)
-          // CRITICAL: We must update BOTH 'slideId' property AND 'layout.slideId' if it exists.
-          const updatedWidgets = ghostWidgets.map(w => {
-            const layout = (w as any).layout || {};
-            return {
-              ...w,
-              slideId: targetIndex,
-              layout: {
-                ...layout,
-                slideId: targetIndex
-              },
-              // Also update metricConfig just in case
-              metricConfig: {
-                ...(w.metricConfig || {}),
-                id: w.metricConfig?.id ?? w.i,
-              } as ReportWidgetDefinition['metricConfig']
-            };
-          });
-
-          if (existing.length === 0) {
-            map.set(targetIndex, updatedWidgets as DashboardLayout[]);
-            console.log(`[ReportBuilder] Rescued ${ghostWidgets.length} widgets from ghost ${backendId} to ${targetIndex} (${integrationsData.integrations[targetIndex].platform})`);
+    // SHARED / READ-ONLY MODE
+    if (readOnly) {
+      setDashboards(map);
+      if (templateQuery.data.pageOrder && templateQuery.data.pageOrder.length > 0) {
+        let order = templateQuery.data.pageOrder.map((id: any) => Number(id));
+        if (order.includes(0) && !map.has(0) && map.size > 0) {
+          const mapKeys = Array.from(map.keys());
+          const orphanedKeys = mapKeys.filter(k => !order.includes(k));
+          if (orphanedKeys.length === 1) {
+            order = order.map((id: number) => (id === 0 ? orphanedKeys[0] : id));
           } else {
-            // If data already exists, merge it
-            map.set(targetIndex, [...existing, ...updatedWidgets] as DashboardLayout[]);
-            console.log(`[ReportBuilder] Merged ${ghostWidgets.length} widgets from ghost ${backendId} into existing slide ${targetIndex}`);
+            order = [...order.filter((id: number) => id !== 0), ...orphanedKeys];
           }
-
-          // CRITICAL FIX: Update idMapping so pageOrder correctly points to the rescued index
-          // instead of keeping the old ghost ID.
-          idMapping.set(backendId, targetIndex);
-
-          // Update localSlidesMeta to reflect this rescue!
-          // Remove the ghost entry
-          localSlidesMeta = localSlidesMeta.filter(m => Number(m.id) !== backendId);
-          // Ensure the target integration entry exists
-          const existingMeta = localSlidesMeta.find(m => Number(m.id) === targetIndex);
-          if (!existingMeta) {
-            localSlidesMeta.push({
-              id: targetIndex,
-              source: 'integration',
-              integrationIndex: targetIndex,
-              title: integrationsData.integrations[targetIndex].platform // temporary title
-            });
-          }
-
-          // Only delete from map if successfully moved
-          map.delete(backendId);
-        } else {
-          // User Request: "i dont want disconnected page"
-          // DELETE ghost slides that can't be rescued instead of preserving them
-          console.log(`[ReportBuilder] 🗑️ DELETING ghost ${backendId}. No matching integration found for widgetIntegration: '${widgetIntegration}'.`);
-          map.delete(backendId);
-          localSlidesMeta = localSlidesMeta.filter(m => Number(m.id) !== backendId);
         }
+        setPageOrder(order);
       } else {
-        // console.log(`[RescueDebug] Ghost ${backendId} has no widgets to rescue.`);
-        // Only delete if truly empty
-        map.delete(backendId);
+        setPageOrder(Array.from(map.keys()).sort((a, b) => a - b));
       }
-    };
+      setIsDashboardsInitialized(true);
+      return;
+    }
 
-    if (Array.isArray(templateQuery.data.slidesMeta)) {
-      templateQuery.data.slidesMeta.forEach((slide: any) => {
-        const backendId = Number(slide.id);
-        const integrationIndex = slide.integrationIndex;
+    // RESCUE & MIGRATION LOGIC (Simplified but robust)
+    const idMapping = new Map<number, number>();
+    const pendingMoves: Array<{ from: number; to: number }> = [];
 
-        // Robustness: explicitly identify custom pages first.
-        // If a page has ID >= 1000 OR source "custom", treat it as custom regardless of any stale integrationIndex.
-        const isCustom = Number(slide.id) >= 1000 || slide.source === 'custom';
+    console.log('🔍 [ID Mapping] cleanedSlidesMeta:', cleanedSlidesMeta.map(s => ({ id: s.id, source: s.source, integrationIndex: s.integrationIndex })));
 
-        // If this slide corresponds to an integration index AND is not a custom page
-        if (!isCustom && typeof integrationIndex === 'number' && !isNaN(integrationIndex)) {
+    // Remap backend IDs to integration indices
+    cleanedSlidesMeta.forEach(slide => {
+      const bId = Number(slide.id);
+      const iIdx = slide.integrationIndex;
 
-          // Robustness Check: If the saved integration index is out of bounds (e.g. a ghost slide with index=884),
-          // we ignore it to prevent it from cluttering the UI as a duplicate "Integration" page.
-          if (slide.source === 'integration' && integrationIndex >= numIntegrations) {
-            console.warn(`[ReportBuilder] Ignoring ghost slide id=${backendId} index=${integrationIndex}`);
-            attemptRescue(backendId);
-            return;
+      // CRITICAL: Never remap custom pages (ID >= 1000 with source === 'custom')
+      if (bId >= 1000 && slide.source === 'custom') {
+        console.log('🔍 [ID Mapping] Skipping custom page:', bId);
+        return; // Skip custom pages entirely
+      }
+
+      if (slide.source === 'integration' && typeof iIdx === 'number') {
+        // Find newest frontend ID for this integration (subSlide 0)
+        let fId = iIdx;
+        for (const [sId, info] of slideIntegrationMap.entries()) {
+          if (info.originalIndex === iIdx && info.subSlideIndex === 0) {
+            fId = sId;
+            break;
           }
+        }
+        if (bId !== fId) {
+          console.log('🔍 [ID Mapping] Mapping integration page:', bId, '->', fId);
+          pendingMoves.push({ from: bId, to: fId });
+          idMapping.set(bId, fId);
+        }
+      } else if (bId < 1000 && !slide.source) {
+        // Legacy: ID < 1000 is integration index 0
+        console.log('🔍 [ID Mapping] Legacy mapping:', bId);
+        idMapping.set(bId, bId);
+      }
+    });
 
-          const frontendId = integrationIndex;
-          idMapping.set(backendId, frontendId);
+    // Execute Moves
+    pendingMoves.forEach(move => {
+      const widgets = map.get(move.from);
+      if (widgets && widgets.length > 0 && integrationsData?.integrations) {
+        // ✅ NEW: Validate that widgets actually belong to the target platform
+        const targetIntegration = integrationsData.integrations[move.to];
+        if (targetIntegration) {
+          const normalize = (s: string) => s.toLowerCase().replace(/[ _-]/g, '');
+          const targetPlatform = normalize(targetIntegration.platform);
 
-          // If the IDs differ, move the widgets
-          if (backendId !== frontendId) {
-            if (map.has(backendId)) {
-              const widgets = map.get(backendId) || [];
-              // Merge with any existing widgets at frontendId (though usually empty)
-              const existing = map.get(frontendId) || [];
-              map.set(frontendId, [...existing, ...widgets]);
-              map.delete(backendId);
-            }
+          const allMatch = widgets.every(w => {
+            const wInt = normalize(w.metricConfig?.integration || '');
+            if (wInt === targetPlatform) return true;
+            if (targetPlatform === 'metabusiness' && (wInt === 'metafacebook' || wInt === 'metainstagram')) return true;
+            if (targetPlatform === 'googleanalytics' && (wInt === 'google' || wInt === 'googleanalytics')) return true;
+            if (targetPlatform === 'googlesearchconsole' && (wInt === 'googleconsole' || wInt === 'googlelandingpages')) return true;
+            return false;
+          });
+
+          if (!allMatch) {
+            console.log(`❌ [Migration] Rejecting move from ${move.from} to ${move.to}: Widget integration mismatch`);
+            return; // Leave widgets in ghost slide for content-based rescue to find later
           }
+        }
 
-          // CRITICAL FIX: Ensure the integration slide exists in the map even if it has no widgets.
-          // Otherwise, effectivePageOrder will filter it out of the UI.
-          if (!map.has(frontendId)) {
-            map.set(frontendId, []);
+        const updated = widgets.map(w => {
+          const updatedW = { ...w, slideId: move.to } as any;
+          if (updatedW.layout) updatedW.layout = { ...updatedW.layout, slideId: move.to };
+          if (updatedW.metricConfig?.layout) {
+            updatedW.metricConfig.layout = { ...updatedW.metricConfig.layout, slideId: move.to };
           }
-        } else {
-          // Custom page handling
+          return updatedW;
+        });
+        const existing = map.get(move.to) || [];
+        map.set(move.to, [...existing, ...updated]);
+        map.delete(move.from);
+      }
+    });
 
-          // SELF-HEALING: Check if this "Custom" page is actually a disguised Integration page.
-          // This happens if a previous save incorrectly marked it as custom.
-          // We detect this by checking if the Title matches a known integration.
+    // Content-Based Reclamation (Keep for safety)
+    map.forEach((widgets, sId) => {
+      if ((sId >= 1000 || !cleanedSlidesMeta.find(m => Number(m.id) === sId)) && widgets.length > 0) {
+        const firstInt = widgets[0].metricConfig?.integration;
+        if (firstInt && integrationsData?.integrations) {
+          const normalize = (s: string) => s.toLowerCase().replace(/[ _-]/g, '');
+          const widgetIntNormalized = normalize(firstInt);
 
+          const matchIdx = integrationsData.integrations.findIndex(i => {
+            const plat = normalize(i.platform);
+            return plat === widgetIntNormalized ||
+              (plat === 'woocommerce' && widgetIntNormalized === 'woo') ||
+              (plat === 'googlesearchconsole' && widgetIntNormalized === 'googleconsole') ||
+              (plat === 'metabusiness' && ['metafacebook', 'metainstagram'].includes(widgetIntNormalized));
+          });
 
-          // PRIORITY 1: Check widgets! Content is the source of truth.
-          if (map.has(backendId)) {
-            const widgets = map.get(backendId) || [];
-            if (widgets.length > 0) {
-              const firstConfig = widgets[0].metricConfig;
-              if (firstConfig?.integration) {
-                const widgetInt = firstConfig.integration.toLowerCase().replace(/_/g, '-');
+          if (matchIdx !== -1) {
+            const targetPlatform = normalize(integrationsData.integrations[matchIdx].platform);
 
-                // Find matching integration
-                const widgetMatchIndex = integrationsData?.integrations?.findIndex(i => {
-                  const plat = i.platform.toLowerCase().replace(/_/g, '-');
-                  // Special handling for google-console mismatch or specific groupings
-                  return plat === widgetInt ||
-                    (plat === 'woocommerce' && widgetInt === 'woo') ||
-                    (plat === 'google-search-console' && widgetInt === 'google-console') ||
-                    (plat === 'meta-business' && (widgetInt === 'meta-facebook' || widgetInt === 'meta-instagram')) ||
-                    (plat === 'meta-ads' && widgetInt === 'meta-ads');
-                });
+            // ✅ NEW: Strict validation for ALL widgets in this ghost slide
+            const allMatch = widgets.every(w => {
+              const wInt = normalize(w.metricConfig?.integration || '');
+              if (wInt === targetPlatform) return true;
+              if (targetPlatform === 'metabusiness' && (wInt === 'metafacebook' || wInt === 'metainstagram')) return true;
+              if (targetPlatform === 'googleanalytics' && (wInt === 'google' || wInt === 'googleanalytics')) return true;
+              return false;
+            });
 
-                if (widgetMatchIndex !== undefined && widgetMatchIndex !== -1) {
-                  console.log(`[ReportBuilder] Identified page (id=${backendId}) as Integration ${widgetMatchIndex} via widgets. Rescuing...`);
-
-                  idMapping.set(backendId, widgetMatchIndex);
-
-                  // Update pageOrder logic to point here done by idMapping
-                  // Move widgets and update their slideId
-                  const target = map.get(widgetMatchIndex) || [];
-                  const ghosts = widgets;
-                  const targetIntegrationDetails = integrationsData?.integrations?.[widgetMatchIndex];
-
-                  const moved = ghosts.map(w => {
-                    const layout = (w as any).layout || {};
-                    const finalAccountId = (w as any).accountId || targetIntegrationDetails?.accountId;
-                    const metricConfigAccountId = (w.metricConfig as any)?.accountId || finalAccountId;
-
-                    if (widgetMatchIndex === 0) { // Meta Business debugging
-                      console.log(`[RescueDebug] Widget ${w.i} (Int 0):`);
-                      console.log(`  - widget.accountId: ${(w as any).accountId}`);
-                      console.log(`  - metricConfig.accountId: ${(w.metricConfig as any)?.accountId}`);
-                      console.log(`  - integration.accountId: ${targetIntegrationDetails?.accountId}`);
-                      console.log(`  - Final widget.accountId: ${finalAccountId}`);
-                      console.log(`  - Final metricConfig.accountId: ${metricConfigAccountId}`);
-                      console.log(`  - metricKey: ${(w.metricConfig as any)?.metricKey}`);
-                    }
-
-                    return {
-                      ...w,
-                      slideId: widgetMatchIndex,
-                      // Prioritize existing widget accountId (crucial for Meta Business Page IDs), fallback to integration main ID
-                      accountId: finalAccountId,
-                      layout: { ...layout, slideId: widgetMatchIndex },
-                      metricConfig: {
-                        ...(w.metricConfig || {}),
-                        id: w.metricConfig?.id ?? w.i,
-                        // CRITICAL FIX: Also inject accountId into metricConfig (this is what the data fetcher uses!)
-                        accountId: metricConfigAccountId,
-                      } as ReportWidgetDefinition['metricConfig']
-                    };
-                  });
-
-                  map.set(widgetMatchIndex, [...target, ...moved] as DashboardLayout[]);
-                  map.delete(backendId);
-                  return;
+            if (allMatch) {
+              console.log(`🩹 [Rescue] Reclaiming content from ${sId} to ${matchIdx}`);
+              const existing = map.get(matchIdx) || [];
+              const updatedWidgets = widgets.map(w => {
+                const updatedW = { ...w, slideId: matchIdx } as any;
+                if (updatedW.layout) updatedW.layout = { ...updatedW.layout, slideId: matchIdx };
+                if (updatedW.metricConfig?.layout) {
+                  updatedW.metricConfig.layout = { ...updatedW.metricConfig.layout, slideId: matchIdx };
                 }
-              }
+                return updatedW;
+              });
+              map.set(matchIdx, [...existing, ...updatedWidgets]);
+              map.delete(sId);
+              idMapping.set(sId, matchIdx);
+            } else {
+              console.log(`❌ [Rescue] Aborting rescue of ${sId}: mixed content detected`);
+              // If it's mixed, we're better off deleting it than corrupting a dashboard
+              map.delete(sId);
             }
-          }
-
-          // PRIORITY 2: Check if this "Custom" page is a disguised Integration page via Title.
-          // This happens if a previous save incorrectly marked it as custom or if widgets are missing.
-          const matchingIntegrationIndex = integrationsData?.integrations?.findIndex(i => {
-            // const plat = i.platform.toLowerCase().replace(/_/g, '-');
-            // Check exact title match or platform name match
-            const configName = getPlatformConfig(i.platform)?.name;
-            return slide.title === i.platform || slide.title === configName || slide.title === i.accountName;
-          });
-
-          if (matchingIntegrationIndex !== undefined && matchingIntegrationIndex !== -1) {
-            console.log(`[ReportBuilder] Identified 'Custom' page '${slide.title}' (id=${backendId}) as disguised Integration ${matchingIntegrationIndex} via Title. Rescuing...`);
-
-            // Manually update ID mapping for this case since attemptRescue relies on widgets
-            idMapping.set(backendId, matchingIntegrationIndex);
-
-            // Move widgets
-            const ghosts = map.get(backendId) || [];
-            const target = map.get(matchingIntegrationIndex) || [];
-
-            console.log(`[RescueDebug] Moving ${ghosts.length} widgets from ${backendId} to ${matchingIntegrationIndex}`); // DEBUG LOG
-
-            const moved = ghosts.map(w => {
-              const layout = (w as any).layout || {};
-              return {
-                ...w,
-                slideId: matchingIntegrationIndex,
-                layout: { ...layout, slideId: matchingIntegrationIndex }
-              };
-            });
-
-            map.set(matchingIntegrationIndex, [...target, ...moved]);
-            map.delete(backendId);
-
-            // Continue to next slide
-            return;
-          }
-
-          // GHOST DETECTION: Check if this "Custom" page has a title matching a known platform
-          // but NO corresponding connected integration. This indicates it's a ghost from a disconnected integration.
-          // User Request: "i dont want disconnected page"
-          const knownPlatformNames = [
-            'Google Search Console', 'Google Analytics', 'Google Ads',
-            'Meta Business', 'Facebook', 'Instagram', 'Meta Ads',
-            'YouTube', 'TikTok', 'LinkedIn', 'Twitter', 'Shopify', 'WooCommerce'
-          ];
-
-          const looksLikeIntegration = knownPlatformNames.some(platform =>
-            slide.title?.includes(platform)
-          );
-
-          if (looksLikeIntegration) {
-            // Check if there's a connected integration matching this title
-            const hasMatchingIntegration = integrationsData?.integrations?.some(i => {
-              const configName = getPlatformConfig(i.platform)?.name;
-              return slide.title === i.platform || slide.title === configName || slide.title === i.accountName;
-            });
-
-            if (!hasMatchingIntegration) {
-              console.log(`[ReportBuilder] 🗑️ DELETING ghost custom page: "${slide.title}" (id=${backendId}) - looks like disconnected integration`);
-              map.delete(backendId);
-              localSlidesMeta = localSlidesMeta.filter(m => Number(m.id) !== backendId);
-              return;
-            }
-          }
-
-          if (!map.has(backendId)) {
-            map.set(backendId, []);
+          } else {
+            // No matching integration: Delete orphaned content
+            console.log(`🗑️ [Rescue] Deleting orphaned widgets from ${sId} (No match for ${firstInt})`);
+            map.delete(sId);
           }
         }
-      });
-    }
+      }
+    });
 
-    // FINAL SAFETY NET: Ensure EVERY connected integration has a slide in the map and metadata.
-    // This catches cases where an integration page was valid (e.g. Meta Ads) but got dropped
-    // from the backend (e.g. because it was empty/0-value widgets) and is now missing.
-    if (integrationsData?.integrations) {
-      integrationsData.integrations.forEach((integ, index) => {
-        // 1. Ensure it exists in Dashboards Map
-        if (!map.has(index)) {
-          console.log(`[ReportBuilder] 🩹 Safety Net: Restoring missing integration slide ${index} (${integ.platform})`);
-          map.set(index, []);
-        }
-
-        // 2. Ensure it exists in Metadata (so Sidebar renders it)
-        const existingMeta = localSlidesMeta.find(m => Number(m.id) === index);
-        if (!existingMeta) {
-          const platformConfig = getPlatformConfig(integ.platform);
-          localSlidesMeta.push({
-            id: index,
-            source: 'integration',
-            integrationIndex: index,
-            title: platformConfig?.name || integ.platform || "Integration",
-            subtitle: integ.accountName
-          });
-        }
-      });
-    }
-
-    console.log('[LoadDebug] Dashboards Map Keys:', Array.from(map.keys()));
+    // Final Setup
     setDashboards(map);
     setIsDashboardsInitialized(true);
-    setProcessedSlidesMeta(localSlidesMeta);
-    setProcessedSlidesMeta(localSlidesMeta);
+    // Mark this template as hydrated to prevent re-hydration on remounts
+    hydratedTemplateIdRef.current = templateId;
+    console.log(`✅ [Hydration] Completed for templateId ${templateId}`);
 
-    // If backend returns a saved page order, apply it so pages/sidebar and slides
-    // appear in the same order after reload.
-    // If backend returns a saved page order, OR if we performed rescues (idMapping > 0),
-    // we must establish a valid pageOrder that reflects the rescues.
-    const hasSavedOrder = Array.isArray(templateQuery.data.pageOrder) && templateQuery.data.pageOrder.length > 0;
+    // Rebuild processedSlidesMeta
+    const finalMeta = cleanedSlidesMeta.map(m => {
+      const targetId = idMapping.get(Number(m.id)) ?? Number(m.id);
+      return { ...m, id: targetId };
+    });
 
-    if (hasSavedOrder || idMapping.size > 0) {
-      // CRITICAL FIX: Backend assigns NEW slide IDs on save, creating stale IDs in pageOrder.
-      // Clean up by only keeping slides that actually exist in slidesMeta.
-      // Use "localSlidesMeta" (which includes rescues) rather than raw template data.
-      const slideMetaList = localSlidesMeta;
-      const backendPageOrder = hasSavedOrder ? (templateQuery.data.pageOrder as any[]).map((x: any) => Number(x)) : [];
+    // Deduplicate Meta and fix integration metadata
+    const dedupedMeta: ReportSlideMeta[] = [];
+    const seenIds = new Set<number>();
 
-      // Remap PageOrder IDs using the rescue map (e.g., map ID 500 -> 0)
-      const remappedOrder = backendPageOrder.map(id => idMapping.get(id) ?? id);
+    console.log('🔍 [Hydration] finalMeta before deduplication:', finalMeta.map(m => ({ id: m.id, title: m.title, source: m.source })));
 
-      // Get actual slide IDs that exist
-      const actualSlideIds = slideMetaList.map((s: any) => Number(s.id));
-      const actualSlideIdsSet = new Set(actualSlideIds);
+    finalMeta.forEach(m => {
+      if (!seenIds.has(m.id)) {
+        // If slide ID exists in slideIntegrationMap, it's ALWAYS an integration slide
+        // Force correct metadata even if corrupted backend data says it's 'custom'
+        const slideInfo = slideIntegrationMap.get(m.id);
+        if (slideInfo) {
+          dedupedMeta.push({
+            id: m.id,
+            source: 'integration',
+            integrationIndex: slideInfo.originalIndex,
+            title: slideInfo.platform,
+            subtitle: slideInfo.accountName
+          });
+        } else {
+          // Not in slideIntegrationMap, preserve as-is (custom page)
+          console.log('🔍 [Hydration] Adding custom page to dedupedMeta:', m.id, m.title);
+          dedupedMeta.push(m);
+        }
+        seenIds.add(m.id);
+      }
+    });
 
-      // Filter pageOrder to only include IDs that exist in slidesMeta
-      const cleanedPageOrder = remappedOrder.filter(id => actualSlideIdsSet.has(id));
+    // Safety: Ensure all current integrations exist (unless explicitly deleted)
+    slideIntegrationMap.forEach((info, sId) => {
+      if (!seenIds.has(sId) && !deletedSlideIds.has(sId)) {
+        dedupedMeta.push({
+          id: sId,
+          source: 'integration',
+          integrationIndex: info.originalIndex,
+          title: info.platform,
+          subtitle: info.accountName
+        });
+        seenIds.add(sId);
+      }
+    });
 
-      // Sort slidesMeta by the cleaned pageOrder
-      const sortedSlidesMeta = [...slideMetaList].sort((a, b) => {
-        const indexA = cleanedPageOrder.indexOf(Number(a.id));
-        const indexB = cleanedPageOrder.indexOf(Number(b.id));
-        if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-        if (indexA !== -1) return -1;
-        if (indexB !== -1) return 1;
-        return 0;
+    setProcessedSlidesMeta(dedupedMeta);
+
+    // Clean pageOrder
+    if (templateQuery.data.pageOrder) {
+      console.log('🔍 [PageOrder Hydration] Raw pageOrder from backend:', templateQuery.data.pageOrder);
+      console.log('🔍 [PageOrder Hydration] seenIds:', Array.from(seenIds));
+      console.log('🔍 [PageOrder Hydration] idMapping:', Array.from(idMapping.entries()));
+
+      const newOrder = templateQuery.data.pageOrder
+        .map((id: any) => {
+          const numId = Number(id);
+          // Don't remap custom pages (ID >= 1000)
+          if (numId >= 1000) {
+            console.log('🔍 [PageOrder Mapping] Preserving custom page ID:', numId);
+            return numId;
+          }
+          // Only remap integration pages
+          const mapped = idMapping.get(numId) ?? numId;
+          if (mapped !== numId) {
+            console.log('🔍 [PageOrder Mapping] Remapping integration page:', numId, '->', mapped);
+          }
+          return mapped;
+        });
+
+      console.log('🔍 [PageOrder Hydration] Cleaned pageOrder:', newOrder);
+
+      const uniqueOrder = Array.from(new Set(newOrder)) as number[];
+
+      // 2. Ghost Rescue & Validation
+      // We trust the backend order, but we must ensure we don't have IDs that point to nothing.
+      // However, for Custom Pages (ID >= 1000), if they are in the order but missing from metadata,
+      // we "rescue" them by treating them as valid (they will be rendered as untitled custom pages if not in customPages state).
+      const finalValidatedOrder = uniqueOrder.filter(id => {
+        // Integration Pages: MUST exist in slideIntegrationMap
+        if (id < 1000) {
+          const exists = slideIntegrationMap.has(id);
+          if (!exists) {
+            console.warn(`👻 [PageOrder] Removing ghost INTEGRATION page ID ${id} (Integrations: ${integrationsData?.integrations?.length})`);
+          }
+          return exists;
+        }
+
+        // Custom Pages: Always keep them if they are in the order.
+        // The user explicitly ordered them. If metadata is missing, they will just be blank.
+        return true;
       });
 
-      const orderedSlideIds = sortedSlidesMeta.map((s: any) => Number(s.id));
-      const validOrder = orderedSlideIds.filter(id => map.has(id) || actualSlideIdsSet.has(id));
-
-      setPageOrder(Array.from(new Set(validOrder)));
+      setPageOrder(finalValidatedOrder);
+    } else {
+      // Fallback: Use the order of slides as they appear in metadata
+      console.log('⚠️ [PageOrder Hydration] No pageOrder in template data, using dedupedMeta order');
+      setPageOrder(dedupedMeta.map(m => m.id));
     }
 
-    // Sync saved date range from template
-    if (templateQuery.data.defaultDateFrom && templateQuery.data.defaultDateTo) {
-      const savedFrom = new Date(templateQuery.data.defaultDateFrom);
-      const savedTo = new Date(templateQuery.data.defaultDateTo);
-      // Only update if valid dates
-      if (!isNaN(savedFrom.getTime()) && !isNaN(savedTo.getTime())) {
-        setDateRange({ from: savedFrom, to: savedTo });
-      }
+  }, [templateQuery.data, integrationsData?.integrations, isLoadingIntegrations, isDashboardsInitialized, deletedSlideIds]);
+
+  // Persistence: Sync state changes to store
+  const updateReportState = useReportStore((state) => state.updateReportState);
+
+  useEffect(() => {
+    // CRITICAL: Prevent syncing empty/initial state back to the store until hydration is complete.
+    // If we sync too early, we "poison" the persistence store with empty data before the backend returns.
+    if (templateId && isDashboardsInitialized) {
+      // console.log(`💾 [Store Persist] Saving state for templateId ${templateId}.`);
+      updateReportState(templateId, {
+        dashboards,
+        pageOrder,
+        customPages,
+        dateRange,
+        lastSavedTime,
+        hasUnsavedChanges,
+        deletedSlideIds,
+        // We persist processedSlidesMeta to keep sidebar consistent
+        processedSlidesMeta
+      });
     }
-  }, [templateQuery.data, integrationsData?.integrations, isLoadingIntegrations, isDashboardsInitialized]);
+  }, [templateId, dashboards, pageOrder, customPages, dateRange, lastSavedTime, hasUnsavedChanges, deletedSlideIds, processedSlidesMeta, updateReportState, isDashboardsInitialized]);
+
 
   const templateName = isTemplateError
     ? "Report Not Found"
     : prettifyMetricLabel((templateQuery.data?.name ?? newReportName) || "Untitled Report");
 
-  // Signature of all metric widgets in the current dashboards/layout state.
-  // This ensures we refetch report data whenever the user adds/removes widgets
-  // or changes their metric configuration, even before saving.
-  const widgetSignature = useMemo(() => {
-    const ids: string[] = [];
-    dashboards.forEach((layout) => {
-      layout.forEach((widget) => {
-        const metric = widget.metricConfig;
-        if (!metric?.metricKey) return;
-        ids.push(
-          [
-            metric.id ?? widget.i,
-            metric.metricKey,
-            metric.integration ?? "",
-            metric.accountId ?? "",
-            metric.groupBy ?? "",
-            metric.aggregation ?? "",
-          ].join(":")
-        );
-      });
-    });
-    return ids.join("|");
-  }, [dashboards]);
+  // widgetSignature removed — per-widget useQuery handles refetch automatically
 
   // Auto-save: Debounced save when dashboards, customPages, or templateName changes
 
@@ -3357,46 +1175,70 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   // so they show up in the Pages sidebar and canvas.
   // If ENABLE_AUTO_DEFAULT_WIDGETS is true, pre-populate with default widgets.
   useEffect(() => {
-    // If we are loading an existing template (params.id exists), do NOT run this
-    // auto-population logic if we have populated template data.
-    // However, if the template is effectively empty (newly created), allow auto-population.
-    const isTemplateEmpty = templateQuery.data &&
-      (!templateQuery.data.widgets || templateQuery.data.widgets.length === 0);
-
-    if (params.id && templateQuery.data && !isTemplateEmpty) {
-      return;
-    }
-
     // If we are still loading an existing template, wait
     if (params.id && (isTemplateLoading || !templateQuery.data)) {
       return;
     }
 
-    const integrationIds = integrationsData?.integrations?.map((_, idx) => idx) ?? [];
+    const slideIds = Array.from(slideIntegrationMap.keys());
 
-    if (!integrationIds.length || !isDashboardsInitialized) return;
+    if (!slideIds.length || !isDashboardsInitialized) return;
 
     setDashboards((prev) => {
       let changed = false;
       const updated = new Map(prev);
 
-      integrationIds.forEach((id) => {
+      slideIds.forEach((id) => {
         // Skip if explicitly deleted in this session
         if (deletedSlideIds.has(id)) return;
 
+        const integrationInfo = slideIntegrationMap.get(id);
+
+        // CRITICAL FIX: Check if THIS SPECIFIC SLIDE (not just the integration) is already represented
+        // For multi-slide integrations, each slide (0, 1) must be checked individually
+        if (integrationInfo && !updated.has(id)) {
+          // Check if THIS EXACT slide (by ID) is already represented by another ID
+          const isThisSlideRepresented = Array.from(updated.keys()).some(existingId => {
+            if (existingId === id) return true; // Same ID
+
+            // Check if metadata points to this exact slide (same integration AND subSlideIndex)
+            const meta = processedSlidesMeta.find(m => Number(m.id) === existingId);
+            if (meta?.source === 'integration' &&
+              meta?.integrationIndex === integrationInfo.originalIndex) {
+              // Same integration - but is it the same SUB-SLIDE?
+              const existingInfo = slideIntegrationMap.get(existingId);
+              if (existingInfo && existingInfo.subSlideIndex === integrationInfo.subSlideIndex) {
+                return true; // Same integration AND same sub-slide (e.g., both are Instagram)
+              }
+            }
+
+            return false;
+          });
+
+          if (isThisSlideRepresented) {
+            // This specific slide is represented elsewhere - skip it
+            return;
+          }
+        }
+
         if (!updated.has(id)) {
-          // Slide doesn't exist yet - create it
+          // Slide doesn't exist yet - create it ONLY if not represented!
           if (ENABLE_AUTO_DEFAULT_WIDGETS && groupedMetrics && !isLoadingAvailableMetrics) {
             // Auto-populate with default widgets
-            const integration = integrationsData?.integrations?.[id];
-            if (integration) {
+            if (integrationInfo) {
               const picked = pickDefaultMetricsForIntegration(
-                integration.platform,
-                integration.accountId,
+                integrationInfo.platform,
+                integrationInfo.accountId,
                 groupedMetrics as any,
                 (msg) => toast.warning(msg)
               );
-              const defaults = buildDefaultWidgetsForIntegration(id, picked);
+              const defaults = buildDefaultWidgetsForIntegration(
+                id,
+                picked,
+                integrationInfo.platform,
+                integrationInfo.accountId,
+                integrationInfo.subSlideIndex
+              );
               updated.set(id, defaults);
               changed = true;
             } else {
@@ -3409,18 +1251,36 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             changed = true;
           }
         } else if (ENABLE_AUTO_DEFAULT_WIDGETS && groupedMetrics && !isLoadingAvailableMetrics) {
-          // Slide exists - check if it's empty and should be populated
+          // Slide exists - check if it's empty OR has a broken auto-state and should be populated/replaced
           const existing = updated.get(id);
-          if (existing && existing.length === 0) {
-            const integration = integrationsData?.integrations?.[id];
-            if (integration) {
+
+          // A slide is "broken" if it's empty OR if it has 4 or fewer widgets for a Meta integration (our old partial default)
+          const isMeta = !!integrationInfo?.platform?.toLowerCase().match(/meta|fb|ig|ads/);
+          const isBrokenState = existing && (
+            (existing.length === 4 && existing.every(w => w.i.includes('auto'))) ||
+            (existing.length < 5 && isMeta)
+          );
+
+
+          // 🛡️ CRITICAL FIX: Do NOT auto-populate if the user has manually touched this slide
+          // this ensures widget deletions persist!
+          if (existing && (existing.length === 0 || isBrokenState) && !modifiedSlideIds.current.has(id)) {
+            if (integrationInfo) {
+              // ... rest of logic
+              console.log(`♻️ Auto-populating/Replacing slide ${id} for ${integrationInfo.platform} (Metrics: ${existing.length})`);
               const picked = pickDefaultMetricsForIntegration(
-                integration.platform,
-                integration.accountId,
+                integrationInfo.platform,
+                integrationInfo.accountId,
                 groupedMetrics as any,
                 (msg) => toast.warning(msg)
               );
-              const defaults = buildDefaultWidgetsForIntegration(id, picked);
+              const defaults = buildDefaultWidgetsForIntegration(
+                id,
+                picked,
+                integrationInfo.platform,
+                integrationInfo.accountId,
+                integrationInfo.subSlideIndex
+              );
               if (defaults.length > 0) {
                 updated.set(id, defaults);
                 changed = true;
@@ -3439,7 +1299,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
       const existing = new Set(base);
       let changed = false;
-      integrationIds.forEach((id) => {
+      slideIds.forEach((id) => {
         // Skip if explicitly deleted
         if (deletedSlideIds.has(id)) return;
 
@@ -3463,816 +1323,50 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     // We intentionally omit full objects/arrays that might be referentially unstable
     // integrationsData?.integrations, groupedMetrics, templateQuery.data
   ]);
-  const dateRangeKey = useMemo(() => {
-    if (!dateRange?.from || !dateRange?.to) return "none";
-    return `${dateRange.from.toISOString()}_${dateRange.to.toISOString()}`;
-  }, [dateRange]);
+  // Compute formatted date strings for per-widget hooks
+  const dateFrom = useMemo(() => dateRange?.from ? formatApiDate(dateRange.from) : "", [dateRange?.from]);
+  const dateTo = useMemo(() => dateRange?.to ? formatApiDate(dateRange.to) : "", [dateRange?.to]);
 
-  // Allow widget resolution even for new unsaved reports (no templateId yet)
-  // This ensures auto-created default widgets get data immediately
-  const shouldResolveWidgets =
-    Boolean(dateRange?.from && dateRange?.to) &&
-    Boolean(widgetSignature) &&
-    Boolean(effectiveClientId || shareToken);
+  // --- Per-widget lazy loading replaces the old monolithic reportDataQuery ---
+  // Each widget now fetches its own data via useWidgetData (called inside WidgetDataWrapper).
+  // useResolvedWidgetsMap aggregates all per-widget cache entries for consumers like buildTemplatePayloadFromDashboards.
+  const resolvedWidgets = useResolvedWidgetsMap(dashboards, dateFrom, dateTo, shareToken);
 
-  const reportDataQuery = useQuery<Record<string, ResolvedWidgetData>>({
-    queryKey: ["report-data", templateId, dateRangeKey, widgetSignature, shareToken],
-    enabled: shouldResolveWidgets,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    queryFn: async () => {
-      if (!dateRange?.from || !dateRange?.to) {
-        return {};
-      }
-
-      // Build the widgets to resolve from the current dashboards state
-      const templatePayload = buildTemplatePayloadFromDashboards();
-      const widgets = (templatePayload.widgets ?? []).filter(
-        (widget: ReportWidgetDefinition) => widget.metricKey
-      );
-
-      if (!widgets.length) {
-        return {};
-      }
-
-
-
-      const dateFrom = formatApiDate(dateRange.from);
-      const dateTo = formatApiDate(dateRange.to);
-
-      // Group widgets by unique query parameters to deduplicate requests
-      const uniqueQueries = new Map<string, ReportWidgetDefinition[]>();
-
-      widgets.forEach((widget) => {
-        // Create a unique hash for the data requirements
-        // normalizedIntegration is calculated later, but strict inputs are enough for grouping
-        const queryHash = JSON.stringify({
-          i: widget.integration,
-          m: widget.metricKey,
-          a: widget.accountId,
-          f: widget.filters
-        });
-
-        if (!uniqueQueries.has(queryHash)) {
-          uniqueQueries.set(queryHash, []);
-        }
-        uniqueQueries.get(queryHash)!.push(widget);
-      });
-
-
-
-      // Fetch data for each UNIQUE query signature
-      // OR use pre-loaded snapshot data if available (Shared Reports)
-      const queryPromises = Array.from(uniqueQueries.entries()).map(async ([hash, localWidgets]) => {
-        // Use the first widget in the group as the prototype
-        const widget = localWidgets[0];
-
-        // 1. Check for Pre-loaded Snapshot Data (Shared Report Mode)
-        // In shared mode, the data is often already in the template response (snapshot object).
-        // The API layer (reportingApi.ts) attaches this data to the widget definition as `snapshotData`.
-
-        // For shared reports, ALWAYS use snapshot data if available
-        // This ensures guests see the data for the backend's calculated date range
-        if (!!shareToken) {
-          console.log(`🐛 [QueryFn] Checking snapshot for widget ${widget.metricKey} / ${widget.id}:`, (widget as any).snapshotData);
-        }
-
-        if ((widget as any).snapshotData && !!shareToken) {
-          return { hash, widgets: localWidgets, data: (widget as any).snapshotData };
-        }
-
-        try {
-          // 2. Normal Fetch Mode (Editor Mode or Missing Data)
-
-          // Normalize integration key to match backend schema
-          let normalizedIntegration = widget.integration.toLowerCase();
-
-          // Only replace underscores with hyphens for non-Meta integrations
-          if (!normalizedIntegration.startsWith("meta_")) {
-            normalizedIntegration = normalizedIntegration.replace(/_/g, '-');
-          }
-
-          if (normalizedIntegration === "google") {
-            normalizedIntegration = "google-analytics";
-          } else if (normalizedIntegration === "woocommerce") {
-            normalizedIntegration = "woo";
-          } else if (normalizedIntegration === "meta-business" || normalizedIntegration === "meta_business") {
-            // "meta-business" is a frontend container; route to underlying API integration
-            if (widget.metricKey.includes("facebook") || widget.metricKey.startsWith("meta.page") || widget.metricKey.startsWith("meta.facebook")) {
-              normalizedIntegration = "meta-facebook";
-            } else if (widget.metricKey.includes("instagram") || widget.metricKey.startsWith("meta.instagram")) {
-              normalizedIntegration = "meta-instagram";
-            }
-          }
-
-          // Validate integration key
-          const validIntegrations = [
-            'google-analytics',
-            'google-search-console',
-            'google-console',
-            'meta',
-            'meta-facebook',
-            'meta-instagram',
-            'meta-ads',
-            'meta_facebook',
-            'meta_instagram',
-            'meta_ads',
-            'youtube', 'shopify', 'woo'
-          ];
-
-          if (!validIntegrations.includes(normalizedIntegration)) {
-            // Return null for this whole group
-            return { hash, widgets: localWidgets, data: null };
-          }
-
-          // Validate metric key format
-          const hasValidPrefix =
-            widget.metricKey.startsWith('google.') ||
-            widget.metricKey.startsWith('google_seo.') ||
-            widget.metricKey.startsWith('google-console.') ||
-            widget.metricKey.startsWith('meta.') ||
-            widget.metricKey.startsWith('youtube.') ||
-            widget.metricKey.startsWith('shopify.') ||
-            widget.metricKey.startsWith('woo.');
-
-          if (!hasValidPrefix) {
-            console.warn(`⚠️ Invalid metric key format: ${widget.metricKey}`);
-            return { hash, widgets: localWidgets, data: null };
-          }
-
-          // Override for Shopify: Fetch directly from Shopify-specific API
-          const hasChart = localWidgets.some(w => w.type === 'chart' || (w as any).widgetType === 'chart' || (w.metricConfig as any)?.type === 'chart');
-
-          // For Meta Business (meta-facebook, meta-instagram), do NOT send accountId
-          // The backend determines the account from the metricKey itself
-          const shouldIncludeAccountId = !['meta-facebook', 'meta-instagram'].includes(normalizedIntegration);
-
-          const params = {
-            integration: normalizedIntegration,
-            metricKey: widget.metricKey,
-            startDate: dateFrom,
-            endDate: dateTo,
-            token: shareToken,
-            groupBy: hasChart ? 'day' : (widget.groupBy && widget.groupBy !== 'none' ? widget.groupBy : undefined),
-            ...(shouldIncludeAccountId && widget.accountId ? { accountId: widget.accountId } : {}),
-            filters: widget.filters,
-          };
-
-          // Debug Meta Business API calls
-          if (normalizedIntegration === 'meta-facebook' || normalizedIntegration === 'meta-instagram') {
-            // console.log(`🔍 [Meta Business API] Integration: ${normalizedIntegration}, MetricKey: ${widget.metricKey}, Params:`, params);
-          }
-
-          if (normalizedIntegration === 'shopify') {
-            try {
-              let rows: UnifiedMetricRow[] = [];
-              const startD = dateFrom;
-              const endD = dateTo;
-
-              // Only attempt direct fetch if we have a clientId (authenticated session)
-              // Shared reports (without clientId) will fall back to unified-metric API below
-              if (effectiveClientId) {
-                const trendsData = await getShopifyTrends(effectiveClientId, { startDate: startD, endDate: endD });
-
-                if (trendsData.success && trendsData.trends) {
-                  // Strictly filter by date range
-                  rows = trendsData.trends
-                    .filter(t => t.date >= startD && t.date <= endD)
-                    .map((t) => {
-                      let val = 0;
-                      if (widget.metricKey === 'shopify.revenue') val = t.revenue;
-                      else if (widget.metricKey === 'shopify.orders') val = t.orders;
-                      else if (widget.metricKey === 'shopify.avgOrderValue') val = t.orders > 0 ? (t.revenue / t.orders) : 0;
-
-                      return {
-                        id: Math.floor(Math.random() * 1000000), // dummy ID
-                        metricKey: widget.metricKey,
-                        value: val,
-                        date: t.date,
-                        integration: 'shopify',
-                        // Force undefined to trigger "Global Metric" self-healing
-                        accountId: "",
-                        userId: 0,
-                        clientId: effectiveClientId,
-                        recordedAt: new Date().toISOString(),
-                        dimensionType: '',
-                        dimensionValue: '',
-                        extra: null
-                      } as UnifiedMetricRow;
-                    });
-                  return { hash, widgets: localWidgets, data: { success: true, rows, pagination: { page: 1, limit: rows.length, total: rows.length, totalPages: 1 } } };
-                }
-              }
-            } catch (err) {
-              console.error("Shopify Direct Fetch Error", err);
-            }
-          }
-
-          // Special: Recent Posts Table (Meta Facebook)
-          if (widget.metricKey === 'meta.facebook.recent_posts') {
-            try {
-              // Use widget.accountId if set, otherwise fall back to effectiveClientId
-              // This ensures data loads on first drag (like it does after refresh)
-              const targetAccountId = widget.accountId || effectiveClientId;
-              console.log("🔍 [Recent Posts] Fetching with Account ID:", targetAccountId, "(from widget:", widget.accountId, ", effective:", effectiveClientId, ")");
-
-              if (targetAccountId) {
-                // Use the date range from the report builder
-                const startDate = dateFrom;
-                const endDate = dateTo;
-
-                console.log("📅 [Recent Posts] Date Range used:", { startDate, endDate, widgetDateFrom: widget.dateFrom, widgetDateTo: widget.dateTo });
-
-                const postsData = await fetchMetaStoredPosts(
-                  targetAccountId,
-                  25, // limit
-                  'createdTime', // sortBy
-                  'desc', // order
-                  startDate,
-                  endDate
-                );
-                console.log("✅ [Recent Posts] API Response:", postsData);
-                if (postsData && postsData.success && Array.isArray(postsData.posts)) {
-                  console.log("📊 [Recent Posts] Processing", postsData.posts.length, "posts");
-                  const rows = postsData.posts.map((p) => ({
-                    id: p.id,
-                    metricKey: widget.metricKey,
-                    integration: normalizedIntegration, // 'meta-facebook'
-                    accountId: targetAccountId,
-                    date: p.createdTime ? new Date(p.createdTime).toLocaleDateString() : "",
-                    value: p.likes || 0, // Default value for charts/metrics if used wrongly
-                    // Custom props for the table renderer (matches Guide columns)
-                    post: p.message || "(No caption)",
-                    impressions: p.impressions || 0,
-                    clicks: p.clicks || 0,
-                    likes: p.likes,
-                    comments: p.comments,
-                    shares: p.shares,
-                    reactions: p.reactions,
-                    fullPicture: p.fullPicture,
-                    permalinkUrl: p.permalinkUrl
-                  }));
-
-                  return {
-                    hash,
-                    widgets: localWidgets,
-                    data: {
-                      success: true,
-                      rows: rows as any[],
-                      pagination: { page: 1, limit: rows.length, total: rows.length, totalPages: 1 },
-                      // Hint for table component to render specific columns
-                      columns: [
-                        { name: "Date", width: "15%" },
-                        { name: "Post", width: "40%" },
-                        { name: "Impressions" },
-                        { name: "Clicks" },
-                        { name: "Likes" },
-                        { name: "Comments" },
-                        { name: "Shares" },
-                        { name: "Reactions" }
-                      ]
-                    }
-                  };
-                }
-              }
-            } catch (err) {
-              console.error("Failed to fetch recent posts", err);
-              // Fallthrough to unified metric (which will likely return empty) or return null
-            }
-          }
-
-          // Special: Recent Media Table (Instagram)
-          if (widget.metricKey === 'meta.instagram.recent_media') {
-            try {
-              console.log("🔍 [Instagram Media] Widget details:", {
-                widgetAccountId: widget.accountId,
-                widgetIntegration: widget.integration,
+  // Prefetch all widget data (e.g. before PDF export) to ensure off-screen slides have data
+  const prefetchAllWidgets = useCallback(async () => {
+    const promises: Promise<void>[] = [];
+    dashboards.forEach((layout) => {
+      layout.forEach((widget) => {
+        const metricConfig = widget.metricConfig;
+        if (!metricConfig?.metricKey) return;
+        promises.push(
+          queryClient.prefetchQuery({
+            queryKey: getWidgetQueryKey(metricConfig, dateFrom, dateTo, shareToken),
+            queryFn: () =>
+              fetchAndProcessWidget(
+                metricConfig,
                 effectiveClientId,
-                widget
-              });
-
-              // Get the Instagram page ID
-              let targetAccountId = widget.accountId;
-
-              // If widget.accountId is empty, try to get Instagram page ID from client integrations
-              if (!targetAccountId) {
-                try {
-                  let integrations = integrationsData?.integrations;
-
-                  if (!integrations) {
-                    console.log("🔍 [Instagram Media] integrationsData not ready, fetching...");
-                    const integrationsResponse = await api.get(`/integrations/client/${effectiveClientId}`);
-                    // Handle both array and object response formats
-                    integrations = Array.isArray(integrationsResponse.data)
-                      ? integrationsResponse.data
-                      : (integrationsResponse.data?.integrations || integrationsResponse.data);
-                  }
-
-                  console.log("🔍 [Instagram Media] Integrations source:", integrations ? "Cache/API" : "None");
-
-                  // Search for any integration that contains an Instagram account
-                  if (Array.isArray(integrations)) {
-                    // Log for debugging
-                    console.log("🔍 [Instagram Media] Checking", integrations.length, "integrations");
-
-                    // 1. Try to find explicit instagram platform
-                    let found = integrations.find((int: any) =>
-                      int.platform && int.platform.toLowerCase().includes('instagram')
-                    );
-
-                    // 2. If not found, try to find Meta Business integration that IS NOT the client ID
-                    // The client ID (e.g. 28) is often used as a placeholder, but we want the real Page ID
-                    if (!found) {
-                      found = integrations.find((int: any) =>
-                        (int.platform === 'meta-business' || int.platform === 'meta_business') &&
-                        int.accountId && String(int.accountId) !== String(effectiveClientId)
-                      );
-                    }
-
-                    if (found) {
-                      targetAccountId = found.accountId;
-                      console.log("✅ [Instagram Media] Found account:", found.accountName, "(ID:", targetAccountId, ")");
-                    } else {
-                      console.log("⚠️ [Instagram Media] No suitable account found in integrations");
-                    }
-                  } else {
-                    console.warn("⚠️ [Instagram Media] Integrations data is not an array:", integrations);
-                  }
-
-                } catch (err) {
-                  console.error("Failed to fetch Instagram page ID from integrations", err);
-                }
-              }
-
-              // Fallback to effectiveClientId if still not found
-              if (!targetAccountId) {
-                targetAccountId = effectiveClientId;
-                console.warn("⚠️ [Instagram Media] Using client ID as fallback - this may not work correctly");
-              }
-
-              console.log("🔍 [Instagram Media] Fetching with Account ID:", targetAccountId, "(from widget:", widget.accountId, ", effective:", effectiveClientId, ")");
-
-              if (targetAccountId) {
-                const startDate = dateFrom;
-                const endDate = dateTo;
-
-                console.log("📅 [Instagram Media] Date Range:", { startDate, endDate, dateFrom, dateTo });
-                console.log("📤 [Instagram Media] API Call Params:", {
-                  accountId: targetAccountId,
-                  limit: 25,
-                  startDate,
-                  endDate
-                });
-
-                const mediaData = await fetchInstagramStoredMedia(
-                  targetAccountId,
-                  25,
-                  startDate,
-                  endDate
-                );
-                console.log("✅ [Instagram Media] API Response:", mediaData);
-
-                if (mediaData && mediaData.success && Array.isArray(mediaData.media)) {
-                  console.log("📊 [Instagram Media] Processing", mediaData.media.length, "items");
-                  const rows = mediaData.media.map((m) => ({
-                    id: m.id,
-                    metricKey: widget.metricKey,
-                    integration: normalizedIntegration, // 'meta-instagram'
-                    accountId: targetAccountId,
-                    date: m.timestamp ? new Date(m.timestamp).toLocaleDateString() : "",
-                    value: m.views || 0,
-                    // Custom props
-                    post: m.caption || "(No caption)",
-                    impressions: m.views || 0, // Using views as a proxy for impressions since it's requested
-                    clicks: 0, // Not available in current API response
-                    likes: m.likeCount,
-                    shares: m.shares,
-                    fullPicture: m.mediaUrl,
-                    permalinkUrl: m.permalinkUrl
-                  }));
-
-
-                  console.log("🎯 [Instagram Media] Returning data with", rows.length, "rows");
-                  return {
-                    hash,
-                    widgets: localWidgets,
-                    data: {
-                      success: true,
-                      rows: rows as any[],
-                      pagination: { page: 1, limit: rows.length, total: rows.length, totalPages: 1 },
-                      columns: [
-                        { name: "Date", width: "15%", dataKey: "date" },
-                        { name: "Full Picture", dataKey: "fullPicture" },
-                        { name: "Post Message", width: "35%", dataKey: "post" },
-                        { name: "Impressions", dataKey: "impressions" },
-                        { name: "Clicks", dataKey: "clicks" },
-                        { name: "Likes", dataKey: "likes" },
-                        { name: "Shares", dataKey: "shares" }
-                      ]
-                    }
-                  };
-                }
-              }
-            } catch (err) {
-              console.error("Failed to fetch Instagram media", err);
-            }
-          }
-
-          console.log('🚀 [UnifiedMetric] Request:', params);
-          const data = await fetchUnifiedMetric(effectiveClientId, params);
-          console.log('✅ [UnifiedMetric] Response:', data);
-
-          return { hash, widgets: localWidgets, data };
-        } catch (error) {
-          console.error(`❌ Failed to fetch data for group [${widget.metricKey}]:`, error);
-          return { hash, widgets: localWidgets, data: null };
-        }
-      });
-
-      const responses = await Promise.all(queryPromises);
-
-      // Flatten results back to individual widget IDs
-      const results = responses.flatMap(({ widgets: groupWidgets, data }) => {
-        return groupWidgets.map(w => ({
-          id: w.id,
-          widget: w,
-          data
-        }));
-      });
-
-      // Process and format data for each widget type
-      const merged: Record<string, ResolvedWidgetData> = {};
-
-      results.forEach(({ id, widget, data }) => {
-        // Shared Reports: Snapshot data is ALREADY resolved (has value/total/series directly)
-        // We can identify this because it might lack 'rows' but have the other fields.
-        const isSnapshotData = data && (
-          (data as any).series ||
-          typeof (data as any).value === 'number' ||
-          typeof (data as any).total === 'number'
-        ) && (!data.rows || (Array.isArray(data.rows) && data.rows.length === 0));
-
-        if (isSnapshotData) {
-          // It's already in the format we need, just use it directly!
-          // But ensure we have at least empty arrays for safety
-          merged[id] = {
-            value: (data as any).value ?? 0,
-            total: (data as any).total ?? 0,
-            rawCount: (data as any).rawCount ?? 0,
-            rows: [], // Snapshot data usually doesn't store raw rows
-            series: (data as any).series ?? []
-          };
-          return;
-        }
-
-        // Standard API Response: Must have rows to process
-        if (!data || !data.rows || !Array.isArray(data.rows)) {
-          // console.warn(`⚠️ Widget ${id} has no valid data, using empty state`);
-          merged[id] = { value: 0, total: 0, rawCount: 0, rows: [], series: [] };
-          return;
-        }
-
-        if (widget.integration === 'shopify') {
-          console.log('[ShopifyDebug] Raw Data for Widget:', { id, rows: data.rows });
-        }
-
-        // Filter rows by accountId and metricKey
-
-        // Helper to normalize integration names
-        const normalizeIntegration = (name: string) => {
-          const lower = (name || '').toLowerCase();
-          if (lower === 'woo' || lower === 'woocommerce') return 'woocommerce';
-          if (lower === 'google' || lower === 'google-analytics' || lower === 'google_analytics') return 'google-analytics';
-          if (lower === 'youtube') return 'youtube';
-
-          if (lower.startsWith('meta_') || lower.startsWith('meta-')) {
-            return lower.replace(/-/g, '_'); // Meta likes underscores
-          }
-          return lower.replace(/_/g, '-'); // Others like hyphens
-        };
-
-        const widgetIntegration = normalizeIntegration(widget.integration);
-
-        // Smart Account ID Comparator (handles act_ prefix)
-
-
-        // Loose Matching Logic for accountId mismatch fallback
-        // First try strict match
-        let matchingRows = data.rows.filter((row: any) => {
-          // Normalize Integration: 'meta_ads' == 'meta-ads'
-          const rowInteg = (row.integration || '').replace(/_/g, '-').toLowerCase();
-          const widgetInteg = (widget.integration || '').replace(/_/g, '-').toLowerCase();
-
-          if (rowInteg !== widgetInteg && widgetInteg !== 'meta-business') return false;
-
-          let accountMatch = true;
-          // Only check account ID if it's a Meta integration or widget has an accountId
-          // And ignore 'act_' prefix
-          if (rowInteg.startsWith('meta') || widget.accountId) {
-            const rowAcc = String(row.accountId || '').replace(/^act_/, '');
-            const widAcc = String(widget.accountId || '').replace(/^act_/, '');
-
-            // Fix: If row.accountId is empty (API fallback), check if dimensionValue matches widget accountId
-            // This handles cases where API returns dimension-keyed data without explicit accountId col
-            if (!rowAcc && (row.dimensionType === 'page' || row.dimensionType === 'account') && row.dimensionValue) {
-              const dimVal = String(row.dimensionValue).replace(/^act_/, '');
-              accountMatch = (dimVal === widAcc);
-            } else {
-              accountMatch = (rowAcc === widAcc);
-            }
-
-            // Special case: If widget is 'meta-business', allow all accounts AND all meta sub-integrations
-            if (widgetInteg === 'meta-business') {
-              accountMatch = true;
-            }
-
-            // Special bypass for Meta Business aggregation (it might aggregate multiple accounts)
-            // If the widget is 'meta-business', we don't strictly filter by accountId at this stage,
-            // as the backend might return data for multiple accounts under the business.
-            if (widgetIntegration === 'meta-business') accountMatch = true;
-          }
-
-          // Double Safety: Check Client ID if available to avoid cross-client data leakage
-          let clientMatch = true;
-          if (effectiveClientId && row.clientId) {
-            clientMatch = String(row.clientId) === String(effectiveClientId);
-          }
-
-          // Final Check with corrected integration/account logic
-          return row.metricKey === widget.metricKey &&
-            (rowInteg === widgetInteg || (widgetInteg === 'meta-business' && rowInteg.startsWith('meta'))) &&
-            accountMatch &&
-            clientMatch;
-        });
-
-        // If strict match fails, try loose match (ignore account ID) for ANY integration
-        // This fixes the issue where cloned templates have stale account IDs but the API returns valid data for the client
-        if (matchingRows.length === 0) {
-          matchingRows = data.rows.filter((row: any) => {
-            const rowIntegration = (row.integration || '').replace(/_/g, '-').toLowerCase();
-            const widgetInteg = (widgetIntegration || '').replace(/_/g, '-').toLowerCase();
-
-            // Special handling: Meta Business widgets can consume data from any Meta sub-integration
-            const isMetaBusinessWidget = widgetInteg === 'meta-business';
-            const isMetaRow = rowIntegration.startsWith('meta');
-
-            const looseMatch = (
-              row.metricKey === widget.metricKey &&
-              (
-                rowIntegration === widgetInteg ||
-                (isMetaBusinessWidget && isMetaRow)
-              )
-            );
-            return looseMatch;
-          });
-          if (matchingRows.length > 0) {
-            // console.log(`⚠️ Widget ${id} caused accountId mismatch. Falling back to simple metric key match. (Expected: ${widget.accountId})`);
-          }
-        }
-
-        const filteredRows = matchingRows.filter((row: any) => {
-          // Additional Dimension Filters (re-apply on the matched set)
-          // For tables, we want dimensional data
-          if (widget.type === 'table') {
-            return true;
-          }
-
-          // For metric cards and charts, exclude dimensional data
-          // EXCEPT for time-series dimensions (day, date, week, month)
-          // EXCEPT for YouTube which has dimensionType="video" but we want to aggregate by date
-          const dimType = (row.dimensionType || '').replace('ga:', '').toLowerCase();
-          const isDimensional = dimType !== "";
-          const isTimeDimension = dimType === 'day' || dimType === 'date' || dimType === 'week' || dimType === 'month' || dimType === 'year';
-          const isYouTubeDimension = widget.metricKey.startsWith('youtube.') && (dimType === 'video' || row.dimensionType === 'video');
-
-          // Include if: not dimensional OR is a time dimension OR is YouTube video dimension
-          // OR is Meta Ads campaign/adset dimension (since API might return only these)
-          // OR is Meta Page/Account dimension (Fix for missing accountId in rows)
-          const isMetaAdsDimension = widget.metricKey.startsWith('meta.') &&
-            (dimType === 'campaign' || dimType === 'adset' || dimType === 'ad' || dimType === 'page' || dimType === 'account');
-
-          return (!isDimensional || isTimeDimension || isYouTubeDimension || isMetaAdsDimension);
-        });
-
-        // Check for rate metrics vs countable metrics
-        const isRateMetric =
-          widget.metricKey?.toLowerCase().includes("cpc") ||
-          widget.metricKey?.toLowerCase().includes("ctr") ||
-          widget.metricKey?.toLowerCase().includes("cpm") ||
-          widget.metricKey?.toLowerCase().includes("bouncerate") ||
-          widget.metricKey?.toLowerCase().includes("average") ||
-          widget.metricKey?.toLowerCase().includes("avg") || // Covers avgOrderValue
-          widget.metricKey?.toLowerCase().includes("rate") || // Covers conversionRate, engagementRate
-          widget.metricKey?.toLowerCase().includes("duration") || // Covers averageSessionDuration
-          widget.metricKey?.toLowerCase().includes("perview"); // Covers likesPerView, commentsPerView
-
-        if (isRateMetric && widget.metricKey) {
-          // console.log(`🔍 [Dashboard] Metric ${widget.metricKey} identified as RATE (Average aggregation)`);
-        } else if (widget.metricKey) {
-          // console.log(`➕ [Dashboard] Metric ${widget.metricKey} identified as COUNTABLE (Sum aggregation)`);
-        }
-
-
-        // Calculate total value
-        let total = 0;
-
-        // Try to use API-provided summary (Blended Calculation) first
-        // This is critical for rate metrics (CPC, CTR) to be accurate (Weighted vs Simple Average)
-        const summary = (data as any).summary;
-        const metricSuffix = widget.metricKey.split('.').pop()?.toLowerCase(); // e.g. 'cpc' from 'meta.ads.cpc'
-
-        if (summary) {
-          // Normalize metric key for summary lookup
-          let summaryKey = widget.metricKey.split('.').pop()?.toLowerCase() || '';
-
-          // Map common variations to summary keys
-          if (summaryKey === 'cost_per_click') summaryKey = 'cpc';
-          if (summaryKey === 'click_through_rate') summaryKey = 'ctr';
-          if (summaryKey === 'cost_per_mille') summaryKey = 'cpm';
-          if (summaryKey === 'amount_spent') summaryKey = 'spend';
-
-          if (summaryKey && typeof summary[summaryKey] === 'number') {
-            total = summary[summaryKey];
-          }
-        }
-
-        // Fallback to row aggregation if summary is missing (and total wasn't set from summary)
-        // Note: We check if total is still 0/default, but technically summary could be 0.
-        // Better to use a flag or check if summary was used.
-        const summaryUsed = summary && typeof summary[widget.metricKey.split('.').pop()?.toLowerCase() || ''] === 'number';
-
-        if (!summaryUsed && filteredRows.length > 0) {
-
-          // Check for Cumulative Metrics (Facebook Page Likes, etc.)
-          // These should take the LATEST value, not the SUM/AVG
-          const aggregationType = getMetricAggregation(widget.metricKey);
-
-          if (aggregationType === 'latest') {
-            // Group by date to handle multiple accounts correctly (sum across accounts for the same day)
-            const dateMap = new Map<string, number>();
-
-            filteredRows.forEach((row: any) => {
-              // Ensure we have a valid date
-              const dateKey = row.date ? row.date.split('T')[0] : '';
-              if (dateKey) {
-                dateMap.set(dateKey, (dateMap.get(dateKey) || 0) + (Number(row.value) || 0));
-              }
-            });
-
-            // Sort dates descending
-            const sortedDates = Array.from(dateMap.keys()).sort((a, b) =>
-              new Date(b).getTime() - new Date(a).getTime()
-            );
-
-            if (sortedDates.length > 0) {
-              // Take the value of the latest date
-              total = dateMap.get(sortedDates[0]) || 0;
-              // console.log(`✅ [Dashboard] Cumulative Metric ${widget.metricKey}: Using latest value from ${sortedDates[0]} = ${total}`);
-            }
-
-          } else {
-            // Standard Logic for Daily Metrics
-
-            // Fallback: If summary is missing, try to calculate BLENDED metrics from raw rows if available
-            // (e.g. CPC = Sum(Spend) / Sum(Clicks)) rather than Average(CPC Rows)
-            let blendedCalculated = false;
-            const contextRows = data.rows; // Use valid raw rows
-
-            // Helpers to find sum of related metrics
-            const getSum = (keySuffix: string) => {
-              return contextRows
-                .filter((r: any) =>
-                  r.metricKey.endsWith(keySuffix) &&
-                  // Loose match for integration (meta_ads vs meta-ads)
-                  (r.integration || '').replace('_', '-').toLowerCase() === (widgetIntegration || '').replace('_', '-').toLowerCase() &&
-                  // Loose match for account ID
-                  (widgetIntegration === 'meta-business' || String(r.accountId) === String(widget.accountId))
-                )
-                .reduce((sum: number, r: any) => sum + (Number(r.value) || 0), 0);
-            };
-
-            if (metricSuffix === 'cpc') {
-              const sumSpend = getSum('spend') || getSum('amount_spent');
-              const sumClicks = getSum('clicks');
-              if (sumClicks > 0) {
-                total = sumSpend / sumClicks;
-                blendedCalculated = true;
-              }
-            } else if (metricSuffix === 'ctr') {
-              const sumClicks = getSum('clicks');
-              const sumImpressions = getSum('impressions');
-              if (sumImpressions > 0) {
-                total = (sumClicks / sumImpressions) * 100;
-                blendedCalculated = true;
-              }
-            } else if (metricSuffix === 'cpm') {
-              const sumSpend = getSum('spend');
-              const sumImpressions = getSum('impressions');
-              if (sumImpressions > 0) {
-                total = (sumSpend / sumImpressions) * 1000;
-                blendedCalculated = true;
-              }
-            }
-
-            if (!blendedCalculated) {
-              if (isRateMetric) {
-                // For other rate metrics (or if blended data missing), fallback to simple average
-                const sum = filteredRows.reduce((a: number, b: any) => a + (b.value || 0), 0);
-                total = sum / filteredRows.length;
-              } else {
-                // For countable metrics (Spend, Impressions), SUM is correct
-                total = filteredRows.reduce((sum: number, row: any) => sum + (row.value || 0), 0);
-              }
-            }
-          }
-
-        }
-
-        // Create time-series data for charts
-        // For YouTube and other integrations with dimensional data, aggregate by date
-        const seriesMap = new Map<string, { sum: number; count: number }>();
-        filteredRows.forEach((row: any) => {
-          const dateKey = row.date || row.dimensionValue || '';
-          if (dateKey) {
-            const current = seriesMap.get(dateKey) || { sum: 0, count: 0 };
-            seriesMap.set(dateKey, {
-              sum: current.sum + (row.value || 0),
-              count: current.count + 1
-            });
-          }
-        });
-
-        const series = Array.from(seriesMap.entries())
-          .map(([x, { sum, count }]) => {
-            const value = isRateMetric ? (sum / count) : sum;
-            return { x, y: value };
+                dateFrom,
+                dateTo,
+                shareToken,
+                integrationsData
+              ),
+            staleTime: 5 * 60 * 1000,
           })
-          .sort((a, b) => {
-            // Sort by date if x is a date string, otherwise keep original order
-            const dateA = new Date(a.x).getTime();
-            const dateB = new Date(b.x).getTime();
-            if (!isNaN(dateA) && !isNaN(dateB)) {
-              return dateA - dateB;
-            }
-            return 0;
-          });
-
-        // Format based on widget type
-        if (widget.type === 'table') {
-          // For tables, keep dimensional data
-          merged[id] = {
-            rows: filteredRows,
-            rawCount: filteredRows.length,
-          };
-        } else if (
-          widget.type === 'line_chart' ||
-          widget.type === 'bar_chart' ||
-          widget.type === 'area_chart' ||
-          widget.type === 'pie_chart' ||
-          widget.type === 'chart'
-        ) {
-          // For charts, include series
-          merged[id] = {
-            value: total,
-            total: total,
-            series: series,
-            rawCount: filteredRows.length,
-            rows: filteredRows,
-          };
-        } else {
-          // For metric cards, include value, total, and series (for sparkline support)
-          merged[id] = {
-            value: total,
-            total: total,
-            series: series, // NEW: Include series for sparkline charts
-            rawCount: filteredRows.length,
-            rows: filteredRows,
-          };
-        }
-
+        );
       });
+    });
+    await Promise.all(promises);
+  }, [dashboards, dateFrom, dateTo, shareToken, effectiveClientId, integrationsData, queryClient]);
 
-      return merged;
-    },
-  });
-
-
-
-
-
-  // Handle report data query errors
-  useEffect(() => {
-    if (reportDataQuery.error) {
-      const error = reportDataQuery.error as ApiError;
-      toast.error(error.message || "Failed to resolve widget data");
-    }
-  }, [reportDataQuery.error]);
-
-  // Merge resolved widgets with table widget data and WooCommerce data
-  const resolvedWidgets = useMemo(() => {
-    // All data is now fetched via reportDataQuery using GET /unified-metrics
-    return reportDataQuery.data ?? {};
-  }, [reportDataQuery.data]);
-
+  // LEGACY COMPAT: stub reportDataQuery shape for any remaining references
+  const reportDataQuery = {
+    data: resolvedWidgets,
+    isFetching: false,
+    isError: false,
+    error: null,
+    status: Object.keys(resolvedWidgets).length > 0 ? "success" as const : "pending" as const,
+  };
 
 
 
@@ -4280,101 +1374,225 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
   const buildTemplatePayloadFromDashboards =
     useCallback((): CreateTemplatePayload => {
+      console.log(`🔨 [BuildPayload] Building save payload...`, {
+        isLoadingIntegrations,
+        hasIntegrationsData: !!integrationsData,
+        slideMapSize: slideIntegrationMap.size
+      });
+
       const widgets: ReportWidgetDefinition[] = [];
       // Build slidesMeta earlier so we can use it to bake titles into widgets
       // KEY FIX: Use pageOrder as source of truth for which slides exist.
       // Previously used dashboards.keys(), which might miss empty pages or include deleted ones.
       const slideIdList = pageOrder && pageOrder.length > 0 ? pageOrder : Array.from(dashboards.keys());
-      const existingMeta = templateQuery.data?.slidesMeta ?? [];
 
+      // 🔍 DIAGNOSTIC: Warn if slideIntegrationMap is empty during save
+      if (slideIntegrationMap.size === 0 && !readOnly && slideIdList.some(id => Number(id) < 1000)) {
+        console.warn(`⚠️ [SavePayload] slideIntegrationMap is EMPTY during save!`, {
+          integrationsDataExists: !!integrationsData,
+          integrationsCount: integrationsData?.integrations?.length,
+          slideIdList: slideIdList.filter(id => Number(id) < 1000)
+        });
+      }
 
+      // CRITICAL FIX: Use processedSlidesMeta (the clean, deduplicated list from state)
+      // instead of raw templateQuery data. This ensures rescues/reclamations are persisted.
+      const existingMeta = processedSlidesMeta.length > 0 ? processedSlidesMeta : (templateQuery.data?.slidesMeta ?? []);
 
-      const slidesMeta = slideIdList.map((slideId) => {
-        const fromExisting = existingMeta.find((m: any) => m.id === slideId);
-        const fromCustom = customPages.find((p) => p.id === slideId);
+      const slidesMeta = slideIdList
+        .map((slideId) => {
+          const slideIdNum = Number(slideId);
 
-        if (fromExisting && fromCustom) {
-          // SANITIZATION: Explicitly remove integrationIndex from custom pages to prevent backend confusion
-          const { integrationIndex, ...rest } = fromExisting;
-          return { ...rest, title: fromCustom.name, subtitle: fromCustom.subtitle ?? fromExisting.subtitle, source: "custom" as const };
-        }
-        if (fromExisting) {
-          const slideIdNum = Number(fromExisting.id);
+          // ✅ STEP 1: Validate slideId is legitimate
+          // For integration slides, check if the slide exists in slideIntegrationMap
+          // 🔧 FIX: If slideIntegrationMap is empty (timing issue), allow integration IDs 0-999 to pass through
+          const isValidIntegrationId = slideIdNum >= 0 && slideIdNum < 1000 &&
+            (slideIntegrationMap.has(slideIdNum) || slideIntegrationMap.size === 0);
+          const isValidCustomId = slideIdNum >= 1000;
 
-          // FIX: If ID < 1000, force it to be an integration slide, even if backend mistakenly said "custom".
-          // This self-heals corrupted templates where integration slides got saved as "Untitled... Custom...".
-          if (slideIdNum < 1000) {
-            // NEW: Ghost check from existing metadata.
-            // If the integration is fully loaded and disconnected, drop this slide.
-            if (!readOnly && !isLoadingIntegrations && integrationsData?.integrations && !integrationsData.integrations[slideIdNum]) {
-              console.log(`👻 [SavePayload] removing existing ghost slide ${slideId} (Integration Disconnected)`);
+          if (!isValidIntegrationId && !isValidCustomId) {
+            console.log(`👻 [SavePayload] Rejecting invalid slideId: ${slideId}`, {
+              slideIdNum,
+              isIntegrationRange: slideIdNum >= 0 && slideIdNum < 1000,
+              inSlideMap: slideIntegrationMap.has(slideIdNum),
+              slideMapKeys: Array.from(slideIntegrationMap.keys()),
+              slideMapSize: slideIntegrationMap.size,
+              reason: slideIdNum < 1000 ? 'Not in slideIntegrationMap' : 'Invalid custom ID'
+            });
+            return null;
+          }
+
+          const fromExisting = existingMeta.find((m: any) => Number(m.id) === slideId);
+          const fromCustom = customPages.find((p) => p.id === slideId);
+
+          if (fromExisting) {
+            // ✅ CRITICAL: Detect and remove "Untitled page" ghosts
+            const isGhostUntitled =
+              fromExisting.source === 'custom' &&
+              slideIdNum < 1000 && // Custom pages MUST have ID >= 1000
+              (!fromExisting.title ||
+                fromExisting.title === 'Untitled page' ||
+                fromExisting.title === 'Untitled' ||
+                fromExisting.title.startsWith('Slide '));
+
+            if (isGhostUntitled) {
+              console.log(`👻 [SavePayload] Removing "Untitled page" ghost: ${slideId}`);
               return null;
             }
+
+            // ✅ CRITICAL: Detect and remove high-ID integration duplicates
+            if (slideIdNum >= 1000 && fromExisting.source === 'integration') {
+              const integrationIdx = typeof fromExisting.integrationIndex === 'number'
+                ? fromExisting.integrationIndex
+                : slideIdNum;
+
+              // Check if we already have the low-ID version in slideIdList
+              const hasDuplicateLowId = slideIdList.includes(integrationIdx) && integrationIdx !== slideIdNum;
+
+              if (hasDuplicateLowId) {
+                console.log(`👻 [SavePayload] Removing high-ID duplicate: ${slideId} (integration ${integrationIdx})`);
+                return null;
+              }
+            }
+
+            // Ghost check for disconnected integrations
+            if (!readOnly && !isLoadingIntegrations && integrationsData?.integrations) {
+              if (fromExisting.source === 'integration') {
+                // Use slideIntegrationMap to find the correct integration index
+                const slideInfo = slideIntegrationMap.get(slideIdNum);
+                const idx = typeof fromExisting.integrationIndex === 'number'
+                  ? fromExisting.integrationIndex
+                  : (slideInfo?.originalIndex ?? slideIdNum);
+
+                if (!integrationsData.integrations[idx]) {
+                  const slideInfo = slideIntegrationMap.get(slideIdNum);
+                  console.log(`👻 [SavePayload] removing ghost slide ${slideId} (Integration Disconnected). Index=${idx}`, {
+                    platform: slideInfo?.platform,
+                    accountName: slideInfo?.accountName,
+                    reason: 'Integration no longer exists in integrationsData.integrations array'
+                  });
+                  return null;
+                }
+              }
+            }
+
+            // Force low IDs (< 1000) to be integration slides
+            if (slideIdNum < 1000) {
+              // Use slideIntegrationMap to find the correct integration index if not set
+              const slideInfo = slideIntegrationMap.get(slideIdNum);
+              const integrationIdx = fromExisting.integrationIndex ?? slideInfo?.originalIndex ?? slideIdNum;
+
+              return {
+                ...fromExisting,
+                source: "integration" as const,
+                integrationIndex: integrationIdx,
+                title: fromExisting.title?.includes("Untitled") ? "" : fromExisting.title
+              };
+            }
+
+            // High IDs (>= 1000) that claim to be custom - validate they're real
+            if (slideIdNum >= 1000 && fromExisting.source === 'custom') {
+              const layout = dashboards.get(slideIdNum);
+              const hasWidgets = layout && layout.length > 0;
+              const hasRealTitle = fromExisting.title &&
+                fromExisting.title !== 'Untitled page' &&
+                fromExisting.title !== 'Untitled' &&
+                !fromExisting.title.startsWith('Slide ') &&
+                fromExisting.title.trim() !== '';
+
+              const isReal = hasRealTitle || hasWidgets;
+
+              if (!isReal) {
+                console.log(`👻 [SavePayload] Removing fake custom page: ${slideId}`);
+                return null;
+              }
+
+              const { integrationIndex, ...rest } = fromExisting;
+              return { ...rest, source: "custom" as const };
+            }
+
+            return { ...fromExisting };
+          }
+
+          // fromCustom logic
+          if (fromCustom) {
+            // ✅ FIX: Always save custom pages if they exist in our state.
+            // Do NOT filter them out even if they are empty or untitled.
             return {
-              ...fromExisting,
-              source: "integration" as const,
-              integrationIndex: fromExisting.integrationIndex ?? slideIdNum,
-              // If title matches generic "Untitled", allow it to be regenerated by Sidebar later
-              title: fromExisting.title?.includes("Untitled") ? "" : fromExisting.title
+              id: slideIdNum,
+              title: fromCustom.name, // Persist the user-defined name
+              subtitle: fromCustom.subtitle,
+              source: "custom" as const
             };
           }
 
-          // FIX: Check for High-ID Integration Ghosts (ID >= 1000)
-          // If it claims to be an integration slide but the integration is gone, DROP IT.
-          if (!readOnly && !isLoadingIntegrations && integrationsData?.integrations && fromExisting.source === 'integration') {
-            const idx = typeof fromExisting.integrationIndex === 'number' ? fromExisting.integrationIndex : slideIdNum;
-            if (!integrationsData.integrations[idx]) {
-              console.log(`👻 [SavePayload] removing existing High-ID ghost slide ${slideId} (Integration Disconnected). Index=${idx}`);
-              return null;
+          // Integration fallback - use slideIntegrationMap to find the correct integration
+          const slideInfo = slideIntegrationMap.get(Number(slideId));
+          if (slideInfo) {
+            const integration = integrationsData?.integrations?.[slideInfo.originalIndex];
+            if (integration) {
+              const platformConfig = getPlatformConfig(integration.platform);
+              return {
+                id: slideId,
+                title: platformConfig?.name || integration.platform,
+                subtitle: integration.accountName,
+                source: "integration" as const,
+                integrationIndex: slideInfo.originalIndex
+              };
             }
           }
 
-          // If existing has ID >= 1000, force it to be custom and strip integrationIndex
-          if (slideIdNum >= 1000 || fromExisting.source === 'custom') {
-            const { integrationIndex, ...rest } = fromExisting;
-            return { ...rest, source: "custom" as const };
+          // Final safety: low IDs are integrations
+          if (Number(slideId) < 1000) {
+            // Use slideIntegrationMap to find the correct integration index
+            const slideInfo = slideIntegrationMap.get(Number(slideId));
+            const integrationIdx = slideInfo?.originalIndex ?? Number(slideId);
+
+            if (!readOnly && !isLoadingIntegrations && integrationsData?.integrations && !integrationsData.integrations[integrationIdx]) {
+              console.log(`👻 [SavePayload] removing ghost slide ${slideId} (Integration Disconnected). Index=${integrationIdx}`);
+              return null;
+            }
+
+            return {
+              id: slideId,
+              title: "",
+              source: "integration" as const,
+              integrationIndex: integrationIdx
+            };
           }
-          return { ...fromExisting };
-        }
-        if (fromCustom) return { id: slideId, title: fromCustom.name, subtitle: fromCustom.subtitle, source: "custom" as const };
 
-        const integration = integrationsData?.integrations?.[slideId];
-        if (integration) {
-          const platformConfig = getPlatformConfig(integration.platform);
-          return {
-            id: slideId,
-            title: platformConfig?.name || integration.platform,
-            subtitle: integration.accountName,
-            source: "integration" as const,
-            integrationIndex: slideId
-          };
-        }
+          const layout = dashboards.get(slideIdNum);
+          const hasWidgets = layout && layout.length > 0;
 
-        // Fallback: If ID < 1000, it's safer to assume it's an integration slide 
-        // (even if integration data is missing/loading) rather than defaulting to "custom".
-        // Custom pages always get assigned IDs >= 1000.
-        if (Number(slideId) < 1000) {
-          // CRITICAL FIX: If integrations are fully loaded and this index is not found,
-          // then this is a "ghost" slide (integration disconnected). We MUST NOT save it.
-          // However, we must be extremely careful not to delete slides while data is just loading.
-          if (!readOnly && !isLoadingIntegrations && integrationsData?.integrations && !integrationsData.integrations[slideId]) {
-            console.log(`👻 [SavePayload] removing ghost slide ${slideId} (Integration Disconnected)`);
+          // ✅ FIX: Allow saving empty custom pages. 
+          // If we have a dashboard entry (which we create when adding a page), it's real.
+          // Fallback for "ghost" custom pages that might be continuously resaved:
+          // If it's not in customPages AND has no widgets, then maybe it's a true ghost.
+          if (!hasWidgets && !fromCustom) {
+            console.log(`👻 [SavePayload] Removing true ghost custom page: ${slideId}`);
             return null;
           }
 
           return {
-            id: slideId,
-            title: "", // Empty title triggers sidebar to re-resolve name from integration data later
-            source: "integration" as const,
-            integrationIndex: Number(slideId)
+            id: slideIdNum,
+            title: "Untitled page",
+            source: "custom" as const
           };
-        }
+        })
+        .filter((s): s is ReportSlideMeta => s !== null);
 
-        return { id: slideId, title: "Untitled page", source: "custom" as const };
-      }).filter((s): s is ReportSlideMeta => s !== null); // Filter out nulls (ghost slides)
+      // ✅ STEP 2: Clean pageOrder to match cleaned slidesMeta
+      const validSlideIds = new Set(slidesMeta.map(s => s.id));
+      const cleanedPageOrder = pageOrder.map(id => Number(id)).filter(id => validSlideIds.has(id));
+
+      console.log('💾 [Save] PageOrder being saved:', cleanedPageOrder);
+      console.log('💾 [Save] SlidesMeta:', slidesMeta.map(s => ({ id: s.id, title: s.title, source: s.source })));
 
       // Build widgets array from current dashboards/layouts
       dashboards.forEach((layout, slideId) => {
+        // Only include widgets from slides that are still valid after filtering
+        if (!validSlideIds.has(slideId)) return;
+
         const slideMeta = slidesMeta.find(m => m.id === slideId);
 
         layout.forEach((widget, indexInSlide) => {
@@ -4397,8 +1615,6 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             metricConfig.metricKey ||
             "Metric"
           );
-
-
 
           // Self-Healing: If we have resolved live data, ensure the saved widget
           // uses the correctly matched accountId. This fixes "ghost" attributes
@@ -4474,36 +1690,59 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
         // console.log(`📦 [PayloadBuilder] Slide ${slideId} has ${layout.length} widgets.`);
       });
+      console.log(`🏗️ [BuildPayload] Construction complete. Widgets: ${widgets.length}, Slides: ${slidesMeta.length}`);
 
       const payload = {
         name: templateName,
         widgets,
-        pageOrder: pageOrder,
-        slidesMeta,
+        pageOrder: cleanedPageOrder,
+        slidesMeta, // Send all slidesMeta
         defaultDateFrom: dateRange?.from?.toISOString(),
         defaultDateTo: dateRange?.to?.toISOString(),
       };
 
-      console.log('💾 [Save] PageOrder being saved:', pageOrder);
-      console.log('💾 [Save] SlidesMeta:', slidesMeta.map(s => ({ id: s.id, title: s.title, source: s.source })));
+      console.log(`💾 [BuildPayload] Final payload details:`, {
+        totalWidgets: widgets.length,
+        widgetsBySlide: slidesMeta.map(s => ({
+          slideId: s.id,
+          slideTitle: s.title,
+          widgetCount: widgets.filter(w => w.layout?.slideId === s.id).length
+        }))
+      });
 
       return payload;
     }, [
       dashboards,
       templateName,
-      templateQuery.data?.slidesMeta,
+      // Removed: templateQuery.data?.slidesMeta (redundant with processedSlidesMeta)
       customPages,
       integrationsData,
       pageOrder,
       resolvedWidgets,
-      dateRange
+      dateRange,
+      slideIntegrationMap,
+      processedSlidesMeta,
+      readOnly,
+      isLoadingIntegrations
     ]);
+
+  // Ref to always have the latest payload builder for the auto-save effect
+  const payloadBuilderRef = useRef(buildTemplatePayloadFromDashboards);
+  useEffect(() => {
+    payloadBuilderRef.current = buildTemplatePayloadFromDashboards;
+  });
 
   // MOVED: handleConfirmNewReport now lives here to access buildTemplatePayloadFromDashboards
   const handleConfirmNewReport = useCallback(() => {
     const trimmedName = newReportName.trim();
     if (!trimmedName) {
       toast.error("Please enter a report name");
+      return;
+    }
+
+    // Prevent creating a report if integrations are still loading
+    if (isLoadingIntegrations) {
+      toast.warning("Please wait for integrations to load.");
       return;
     }
 
@@ -4636,9 +1875,21 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       if (!templateId || !parsedClientId) {
         throw new Error("Template not ready or missing client id");
       }
+      console.log(`💾 [SaveMutation] Sending to API:`, {
+        templateId,
+        clientId: parsedClientId,
+        widgetCount: payload.widgets?.length,
+        slideCount: payload.slidesMeta?.length
+      });
       return updateReportTemplate(parsedClientId, templateId, payload);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log(`✅ [SaveMutation] Success! Response:`, data);
+
+      // 🔧 CRITICAL FIX: Invalidate template query so refresh loads fresh data
+      queryClient.invalidateQueries({ queryKey: ["report-template", templateId] });
+      console.log(`🔄 [SaveMutation] Invalidated template query cache`);
+
       // We already keep the in-memory dashboards (with full widget data)
       // as the source of truth. Avoid immediately re-hydrating from the
       // backend, since the backend may not yet persist manual widgetData
@@ -4648,6 +1899,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       toast.success("Report template saved");
     },
     onError: (error: ApiError) => {
+      console.error(`❌ [SaveMutation] Failed:`, error);
       toast.error(error.message || "Failed to save template");
     },
   });
@@ -4661,21 +1913,53 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     // - Read-only mode
     // - Data is currently fetching (to avoid saving empty snapshots)
     // - Dashboards not yet initialized (prevents saving empty state during hydration race conditions)
-    if (!templateId || isTemplateLoading || templateBootstrapRef.current || readOnly || reportDataQuery.isFetching || !isDashboardsInitialized) {
+    // - Integrations are loading (prevents saving with empty slideIntegrationMap)
+    if (
+      !templateId ||
+      isTemplateLoading ||
+      templateBootstrapRef.current ||
+      readOnly ||
+      reportDataQuery.isFetching ||
+      !isDashboardsInitialized ||
+      isLoadingIntegrations ||
+      isSavingTemplate || // Don't auto-save if a save is already in progress
+      !hasUnsavedChanges   // CRITICAL: Only save if there are actual unsaved changes
+    ) {
       return;
     }
 
-    // Mark that there are unsaved changes
-    setHasUnsavedChanges(true);
-
     // Debounce: wait 1 second after last change before saving
     const timer = setTimeout(() => {
-      const payload = buildTemplatePayloadFromDashboards();
+      const payload = payloadBuilderRef.current();
+
+      // 🔧 CRITICAL FIX: Allow saving "Structure Only" reports
+      // We only block if BOTH widgets AND slides are empty.
+      const hasWidgets = payload.widgets && payload.widgets.length > 0;
+      const hasSlides = payload.slidesMeta && payload.slidesMeta.length > 0;
+
+      if (!hasWidgets && !hasSlides) {
+        console.warn(`⏸️ [Auto-save] BLOCKED - Payload is completely empty (No widgets, No slides)!`);
+        return;
+      }
+
+      console.log(`💾 [Auto-save] Calling saveTemplate...`, { widgets: payload.widgets?.length, slides: payload.slidesMeta?.length });
       saveTemplate(payload);
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [dashboards, customPages, pageOrder, templateName, templateId, isTemplateLoading, readOnly, buildTemplatePayloadFromDashboards, reportDataQuery.isFetching, isDashboardsInitialized]);
+  }, [
+    dashboards,
+    customPages,
+    pageOrder,
+    templateName,
+    templateId,
+    isTemplateLoading,
+    readOnly,
+    isDashboardsInitialized,
+    isLoadingIntegrations,
+    isSavingTemplate,
+    hasUnsavedChanges // Added hasUnsavedChanges to break the loop on success
+  ]);
 
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
@@ -4693,16 +1977,31 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       return;
     }
 
+    // Prevent saving if integrations are still loading
+    if (isLoadingIntegrations) {
+      toast.warning("Please wait for integrations to load before saving.");
+      return;
+    }
+
     console.log("💾 [handleSaveTemplate] Clicked. Checking inputs...");
     console.log(`💾 [handleSaveTemplate] Dashboards Size: ${dashboards.size}`);
     console.log(`💾 [handleSaveTemplate] Dashboards Keys:`, Array.from(dashboards.keys()));
 
     const basePayload = buildTemplatePayloadFromDashboards();
 
+    // 🔧 SAFETY: Prevent saving with 0 widgets UNLESS it's intentional (user deleted everything)
+    // If dashboards exist but have 0 widgets, we allow it (user might be clearing a report).
+    // If dashboards also 0, it might be a hydration failure.
+    if ((!basePayload.widgets || basePayload.widgets.length === 0) && dashboards.size === 0) {
+      toast.error("Cannot save - No data loaded. Please wait for widgets to load.");
+      return;
+    }
+
     // DEBUG: Show user what is being saved
+    const widgetCount = basePayload.widgets?.length || 0;
     const customPageCount = (basePayload.slidesMeta || []).filter(s => s.source === 'custom').length;
     const integrationPageCount = (basePayload.slidesMeta || []).filter(s => s.source === 'integration').length;
-    toast.info(`Saving: ${customPageCount} Custom, ${integrationPageCount} Int. Pages`);
+    toast.info(`Saving ${widgetCount} widgets across ${customPageCount + integrationPageCount} pages...`);
 
     // DATA SYNC FIX: Inject live data from reportDataQuery into the payload
     // This forces the backend snapshot to match the "WYSIWYG" Builder view (e.g. 1888 value)
@@ -4755,7 +2054,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         ? formatApiDate(dateRange.from)
         : undefined,
       defaultDateTo: dateRange?.to ? formatApiDate(dateRange.to) : undefined,
-      pageOrder: pageOrder.length > 0 ? pageOrder : Array.from(dashboardIds),
+      // Use pageOrder from basePayload (already cleaned by buildTemplatePayloadFromDashboards)
+      // Don't override with sorted dashboardIds fallback as it breaks custom page ordering
     };
 
     saveTemplate(payload);
@@ -4776,6 +2076,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     if (isGeneratingPdf) return;
     try {
       setIsGeneratingPdf(true);
+      // Ensure all widget data is fetched (including off-screen slides) before exporting
+      await prefetchAllWidgets();
       await exportAllSlidesToPDF(slidesRef.current, pageOrder);
     } catch (error) {
       console.error("Failed to generate PDF from frontend", error);
@@ -4879,9 +2181,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         return [...base, nextId];
       });
 
-      // Mark as unsaved to trigger auto-save
       setHasUnsavedChanges(true);
-
       toast.success(`Added custom page: ${pageName}`);
 
       return nextId;
@@ -4890,10 +2190,13 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   );
 
   const handleDeletePage = useCallback((slideId: number) => {
+    console.log(`🗑️ [Delete] Deleting slide ${slideId}`);
+
     // Remove the slide from dashboards
     setDashboards((prev) => {
       const updated = new Map(prev);
       updated.delete(slideId);
+      console.log(`🗑️ [Delete] Updated dashboards, keys:`, Array.from(updated.keys()));
       return updated;
     });
 
@@ -4901,7 +2204,11 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     setCustomPages((prev) => prev.filter((p) => p.id !== slideId));
 
     // Remove from page order
-    setPageOrder((prev) => prev.filter((id) => id !== slideId));
+    setPageOrder((prev) => {
+      const updated = prev.filter((id) => id !== slideId);
+      console.log(`🗑️ [Delete] Updated pageOrder:`, updated);
+      return updated;
+    });
 
     // Remove from processedSlidesMeta to prevent ghost pages in sidebar
     setProcessedSlidesMeta((prev) => prev.filter((s) => Number(s.id) !== slideId));
@@ -4910,6 +2217,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     setDeletedSlideIds((prev) => {
       const updated = new Set(prev);
       updated.add(slideId);
+      console.log(`🗑️ [Delete] Updated deletedSlideIds:`, Array.from(updated));
       return updated;
     });
 
@@ -4935,6 +2243,9 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         }
         : prev
     );
+
+    setHasUnsavedChanges(true);
+    toast.success("Page removed");
   }, []);
 
   const handleRenamePage = useCallback((slideId: number, newName: string) => {
@@ -4949,6 +2260,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       // add a new entry so the name override is included in slidesMeta on save.
       return [...prev, { id: slideId, name: newName }];
     });
+    setHasUnsavedChanges(true); // Triggers auto-save
   }, []);
 
   const handleReorderPages = useCallback(
@@ -4958,9 +2270,6 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         // If prevOrder has ghost items, index-based splice will fail.
         // We will cleanup first.
         let baseOrder = prevOrder.length > 0 ? Array.from(new Set(prevOrder)) : Array.from(dashboards.keys());
-
-        // Align with UI: Remove ghosts (ids not in dashboards) so indices match
-        baseOrder = baseOrder.filter(id => dashboards.has(id));
 
         // Validate indices - allow toIndex to be equal to length (appending)
         if (
@@ -4975,6 +2284,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         const [movedItem] = baseOrder.splice(fromIndex, 1);
         baseOrder.splice(toIndex, 0, movedItem);
 
+        setHasUnsavedChanges(true); // Triggers auto-save
         return baseOrder;
       });
     },
@@ -4982,13 +2292,36 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   );
 
   const handleAddIntegrationPage = useCallback((integrationIndex: number) => {
-    // 1. Check if we already have this slide (shouldn't happen if UI filters correctly, but safety first)
-    if (dashboards.has(integrationIndex)) {
+    // 1. Find all slide IDs that belong to this integration
+    const integrationSlideIds = Array.from(slideIntegrationMap.entries())
+      .filter(([_, info]) => info.originalIndex === integrationIndex)
+      .map(([slideId, _]) => slideId);
+
+    if (integrationSlideIds.length === 0) {
+      toast.error("Integration not found");
+      return;
+    }
+
+    // 2. Find the first slide ID that doesn't have a dashboard yet
+    const availableSlideId = integrationSlideIds.find(slideId => !dashboards.has(slideId));
+
+    if (availableSlideId === undefined) {
       toast.error("This integration page already exists");
       return;
     }
 
-    // 2. Create the slide with default widgets if enabled
+    // 2.5. Remove from deletedSlideIds if it was previously deleted
+    setDeletedSlideIds((prev) => {
+      if (prev.has(availableSlideId)) {
+        const updated = new Set(prev);
+        updated.delete(availableSlideId);
+        console.log(`✅ [Add Integration] Removed slide ${availableSlideId} from deletedSlideIds`);
+        return updated;
+      }
+      return prev;
+    });
+
+    // 3. Create the slide with default widgets if enabled
     let defaultWidgets: DashboardLayout[] = [];
     if (ENABLE_AUTO_DEFAULT_WIDGETS) {
       const integration = integrationsData?.integrations?.[integrationIndex];
@@ -4999,41 +2332,38 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           (groupedMetrics ?? {}) as any,
           (msg) => toast.warning(msg)
         );
-        defaultWidgets = buildDefaultWidgetsForIntegration(integrationIndex, picked);
+        defaultWidgets = buildDefaultWidgetsForIntegration(availableSlideId, picked, integration.platform);
       }
     }
 
-    // 3. Add to dashboards
+    // 4. Add to dashboards using the correct slide ID
     setDashboards((prev) => {
       const updated = new Map(prev);
-      updated.set(integrationIndex, defaultWidgets);
+      updated.set(availableSlideId, defaultWidgets);
       return updated;
     });
 
-    // 4. Add to page order (append to end)
+    // 5. Add to page order (append to end) using the correct slide ID
     setPageOrder((prev) => {
-      const newOrder = [...prev, integrationIndex];
-      // Force immediate save to persist the new slide and its widgets
-      // We construct the payload manually here because state updates (setDashboards) are async
-      // and wouldn't be reflected in buildTemplatePayloadFromDashboards() immediately.
-      setTimeout(() => {
-        setHasUnsavedChanges(true); // Trigger the effect or let the effect handle it?
-        // Actually, the effect depends on [dashboards], so setDashboards will trigger it.
-        // But we want to ensure it happens.
-      }, 0);
+      // Don't add if already in pageOrder (e.g., orphaned from corrupted template data)
+      if (prev.includes(availableSlideId)) {
+        return prev;
+      }
+      const newOrder = [...prev, availableSlideId];
+      setHasUnsavedChanges(true);
       return newOrder;
     });
 
     toast.success("Integration page added");
 
-    // 5. Scroll to new page
+    // 6. Scroll to new page using the correct slide ID
     setTimeout(() => {
-      if (slidesRef.current[integrationIndex]) {
-        slidesRef.current[integrationIndex]?.scrollIntoView({ behavior: 'smooth' });
+      if (slidesRef.current[availableSlideId]) {
+        slidesRef.current[availableSlideId]?.scrollIntoView({ behavior: 'smooth' });
       }
     }, 100);
 
-  }, [dashboards, groupedMetrics, isLoadingAvailableMetrics, integrationsData]);
+  }, [dashboards, groupedMetrics, isLoadingAvailableMetrics, integrationsData, slideIntegrationMap]);
 
   // Update widget data in dashboards state
   const updateWidgetData = useCallback(
@@ -5049,6 +2379,9 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         updated.set(slideId, updatedLayout);
         return updated;
       });
+
+      setHasUnsavedChanges(true);
+      modifiedSlideIds.current.add(slideId);
 
       // Also update widgetFormState to keep it in sync
       setWidgetFormState((prev) => ({
@@ -5102,6 +2435,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         return updated;
       });
 
+      setHasUnsavedChanges(true);
+
       // Update widgetFormState immediately to reflect the change in the editor
       setWidgetFormState((prev) => ({
         ...prev,
@@ -5143,6 +2478,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           }
           : prev
       );
+      setHasUnsavedChanges(true);
+      modifiedSlideIds.current.add(slideId);
     },
     []
   );
@@ -5239,9 +2576,14 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           metricAccountId: metricData.accountId,
         });
 
+        const isMetaBusinessChild = expected && (expected.platform === 'meta-business' || expected.platform === 'meta_business') &&
+          (normalize(metricData.integration) === 'meta-facebook' ||
+            normalize(metricData.integration) === 'meta-instagram');
+
         if (
           expected &&
-          normalize(metricData.integration) !== normalize(expected.platform)
+          normalize(metricData.integration) !== normalize(expected.platform) &&
+          !isMetaBusinessChild
         ) {
           // Soften strict block to a warning to prevent invisible failures for slightly mismatched keys
           toast.warning(
@@ -5311,6 +2653,9 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       } else if (metricData?.metricKey === 'meta.instagram.recent_media' && widgetData && 'columns' in widgetData) {
         (widgetData as any).columns = DEFAULT_INSTAGRAM_MEDIA_COLUMNS;
         (widgetData as any).rows = [];
+      } else if (metricData?.metricKey === 'meta.ads.campaign_performance' && widgetData && 'columns' in widgetData) {
+        (widgetData as any).columns = DEFAULT_META_ADS_CAMPAIGN_COLUMNS;
+        (widgetData as any).rows = [];
       }
 
       // If this is a custom Content Block with a specific kind, annotate it in data
@@ -5376,24 +2721,53 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     [slideIntegrationMap]
   );
 
+  // Layout change helper: used when widgets are moved or resized
+  // Layout change helper: used when widgets are moved or resized
   const createLayoutChangeHandler = useCallback(
-    (id: number, currentLayout: DashboardLayout[]) => (newLayout: Layout[]) => {
-      // 🛡️ CRITICAL: Ignore layout changes when in mobile view
-      // This prevents the responsive 2-col/1-col reflow from overwriting the saved 12-col desktop layout.
-      if (isMobile) {
-        console.log('[ReportBuilder] Ignoring layout change in mobile view');
-        return;
-      }
+    (slideId: number, currentLayout: DashboardLayout[]) =>
+      (newLayout: Layout[]) => {
+        // 🛡️ CRITICAL: Ignore layout changes when in mobile view
+        if (isMobile) {
+          console.log('[ReportBuilder] Ignoring layout change in mobile view');
+          return;
+        }
 
-      const mergedLayout = currentLayout.map((item) => {
-        const updated = newLayout.find((n) => n.i === item.i);
-        return updated ? { ...item, ...updated } : item;
-      });
+        // Only update if there's an actual change in x, y, w, or h
+        const isActuallyChanged = newLayout.some((newWidget) => {
+          const oldWidget = currentLayout.find((w) => w.i === newWidget.i);
+          if (!oldWidget) return true;
+          return (
+            newWidget.x !== oldWidget.x ||
+            newWidget.y !== oldWidget.y ||
+            newWidget.w !== oldWidget.w ||
+            newWidget.h !== oldWidget.h
+          );
+        });
 
-      updateDashboard(id, mergedLayout);
-    },
-    [updateDashboard, isMobile]
+        if (isActuallyChanged) {
+          // ✅ FIX: Use functional state update to ensure we always have the latest dashboards map
+          setDashboards(prev => {
+            const updated = new Map(prev);
+            const currentSlideLayout = updated.get(slideId) || [];
+
+            // Merge the new layout positions (x,y,w,h) into the existing widgets (preserving data, config etc)
+            const mergedLayout = currentSlideLayout.map(item => {
+              const updatedItem = newLayout.find(n => n.i === item.i);
+              return updatedItem ? { ...item, ...updatedItem } : item;
+            });
+
+            updated.set(slideId, mergedLayout);
+            return updated;
+          });
+
+          setHasUnsavedChanges(true); // Triggers auto-save
+          modifiedSlideIds.current.add(slideId);
+        }
+      },
+    [isMobile] // Removed updateDashboard dependency
   );
+
+
 
   const handleDragStart = useCallback(
     (
@@ -5771,25 +3145,60 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
               ? aliasMetrics
               : {};
 
-      // Special handling for Meta Business: merge Facebook and Instagram metrics if not found under "meta-business"
-      if ((platform === "meta-business" || normalizedPlatform === "meta-business") && Object.keys(metricsByAccount).length === 0) {
+      // Special handling for Meta Business: merge Facebook and Instagram metrics
+      // We do this even if metrics were found directly, to ensure we have BOTH platforms
+      if (platform === "meta-business" || normalizedPlatform === "meta-business") {
         const fbMetrics = groupedMetrics["meta-facebook"] || groupedMetrics["meta_facebook"] || {};
         const igMetrics = groupedMetrics["meta-instagram"] || groupedMetrics["meta_instagram"] || {};
 
-        // Merge accounts from both
-        const allAccounts = new Set([...Object.keys(fbMetrics), ...Object.keys(igMetrics)]);
+        // Merge accounts from all sources
+        const allAccounts = new Set([
+          ...Object.keys(metricsByAccount),
+          ...Object.keys(fbMetrics),
+          ...Object.keys(igMetrics)
+        ]);
+
+        // Flatten ALL FB and IG metrics to ensure cross-account visibility
+        // This solves the issue where FB Page ID != IG Account ID, causing them to be separated
+        const allFbMetrics: any[] = [];
+        Object.values(fbMetrics).forEach((list: any) => allFbMetrics.push(...list));
+
+        const allIgMetrics: any[] = [];
+        Object.values(igMetrics).forEach((list: any) => allIgMetrics.push(...list));
 
         allAccounts.forEach(accId => {
-          const fb = fbMetrics[accId] || [];
-          const ig = igMetrics[accId] || [];
+          const existing = (metricsByAccount[accId] || []) as any[];
 
-          const combined = [
-            ...fb.map(m => ({ ...m, displayName: `Facebook - ${m.displayName || m.metricKey}`, integration: "meta-business" })),
-            ...ig.map(m => ({ ...m, displayName: `Instagram - ${m.displayName || m.metricKey}`, integration: "meta-business" }))
-          ];
+          // Create a map to deduplicate by metricKey
+          const uniqueMetrics = new Map<string, any>();
 
-          if (combined.length > 0) {
-            metricsByAccount[accId] = combined as any;
+          // Helper to add metrics
+          const addMetrics = (list: any[], prefix: string) => {
+            list.forEach(m => {
+              // Check if we need to add a prefix prefix
+              const displayName = m.displayName || m.metricKey;
+              const hasPrefix = displayName.startsWith('Facebook - ') || displayName.startsWith('Instagram - ');
+              const finalName = hasPrefix ? displayName : `${prefix} - ${displayName}`;
+
+              uniqueMetrics.set(m.metricKey, {
+                ...m,
+                displayName: finalName,
+                integration: "meta-business"
+              });
+            });
+          };
+
+          // Add existing first (giving priority)
+          addMetrics(existing, "General");
+
+          // Add ALL Facebook metrics (from any account)
+          addMetrics(allFbMetrics, "Facebook");
+
+          // Add ALL Instagram metrics (from any account)
+          addMetrics(allIgMetrics, "Instagram");
+
+          if (uniqueMetrics.size > 0) {
+            metricsByAccount[accId] = Array.from(uniqueMetrics.values());
           }
         });
       }
@@ -5988,7 +3397,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
       // Filter based on supported visualization types
       const viewableMetrics = filteredMetrics.filter(metric => {
-        const isListMetric = metric.metricKey === 'meta.facebook.recent_posts' || metric.metricKey === 'meta.instagram.recent_media';
+        const isListMetric = metric.metricKey === 'meta.facebook.recent_posts' || metric.metricKey === 'meta.instagram.recent_media' || metric.metricKey === 'meta.ads.campaign_performance';
 
         if (selectedMetricWidgetType === 'table') {
           // Table mode: ONLY show list metrics (Recent Posts/Media)
@@ -6343,7 +3752,28 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     }
   };
 
-  const showFullPageSkeleton = isTemplateLoading || !isDashboardsInitialized;
+  // Keep skeleton visible until widgets are fully populated with data.
+  // Covers the full waterfall: template → integrations → available metrics → auto-defaults → data fetch
+  const hasPopulatedLayouts = useMemo(() => {
+    let total = 0;
+    dashboards.forEach(layout => { total += layout.length; });
+    return total > 0;
+  }, [dashboards]);
+
+  // Waiting for auto-default widgets to populate empty slides
+  // (needs available metrics to finish loading first)
+  const isWaitingForAutoDefaults =
+    isDashboardsInitialized &&
+    templateId != null &&
+    !readOnly &&
+    !hasPopulatedLayouts &&
+    isLoadingAvailableMetrics;
+
+  // With per-widget lazy loading, individual widgets manage their own loading state.
+  // We only show a full-page skeleton during template/integration loading, not data loading.
+  const isInitialDataLoading = false;
+
+  const showFullPageSkeleton = isTemplateLoading || !isDashboardsInitialized || isWaitingForAutoDefaults || isInitialDataLoading;
 
 
   return (
@@ -6567,7 +3997,16 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                       index: idx,
                       platform: integ.platform,
                       accountName: integ.accountName
-                    })).filter(integ => !dashboards.has(integ.index)) ?? []}
+                    })).filter(integ => {
+                      // Find all slide IDs that belong to this integration
+                      const integrationSlideIds = Array.from(slideIntegrationMap.entries())
+                        .filter(([_, info]) => info.originalIndex === integ.index)
+                        .map(([slideId, _]) => slideId);
+
+                      // Show integration if ANY of its slides is MISSING (available to add)
+                      // This allows re-adding removed slides, especially for multi-slide integrations
+                      return integrationSlideIds.some(slideId => !dashboards.has(slideId));
+                    }) ?? []}
                     // Pass through slide metadata from the template, augmented with any
                     // in-memory custom pages so newly added pages appear immediately in
                     // the sidebar even before a full save/refresh round-trip.
@@ -6693,22 +4132,43 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             {/* Grid Area */}
             <div className="flex-1 overflow-y-auto bg-gray-100 flex flex-col items-center h-[calc(100vh-(var(--rb-header)+var(--rb-subheader)))] px-2 md:px-0">
               {showFullPageSkeleton ? (
-                <div className="w-full max-w-5xl my-4 space-y-8">
+                <div className="w-full md:w-[95%] lg:w-[90%] my-4 space-y-8">
                   {/* Skeleton Slide 1 */}
-                  <div className="rounded-xl border bg-white p-6 shadow-sm">
-                    <div className="flex items-center justify-between mb-8 border-b pb-4">
+                  <div className="rounded-xl md:rounded-2xl border border-black/[0.03] bg-white/40 backdrop-blur-sm p-4 md:p-6 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)]">
+                    <div className="flex items-center justify-between mb-6 border-b border-black/[0.03] pb-4">
                       <div className="space-y-2">
-                        <Skeleton className="h-8 w-64" />
-                        <Skeleton className="h-4 w-48" />
+                        <Skeleton className="h-7 w-48" />
+                        <Skeleton className="h-4 w-36" />
                       </div>
-                      <Skeleton className="h-6 w-32" />
                     </div>
-                    <div className="space-y-6">
-                      <div className="grid grid-cols-2 gap-4">
-                        <Skeleton className="h-32 w-full rounded-lg" />
-                        <Skeleton className="h-32 w-full rounded-lg" />
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <Skeleton className="h-28 w-full rounded-xl" />
+                        <Skeleton className="h-28 w-full rounded-xl" />
+                        <Skeleton className="h-28 w-full rounded-xl" />
+                        <Skeleton className="h-28 w-full rounded-xl" />
                       </div>
-                      <Skeleton className="h-64 w-full rounded-lg" />
+                      <div className="grid grid-cols-2 gap-4">
+                        <Skeleton className="h-52 w-full rounded-xl" />
+                        <Skeleton className="h-52 w-full rounded-xl" />
+                      </div>
+                    </div>
+                  </div>
+                  {/* Skeleton Slide 2 */}
+                  <div className="rounded-xl md:rounded-2xl border border-black/[0.03] bg-white/40 backdrop-blur-sm p-4 md:p-6 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)]">
+                    <div className="flex items-center justify-between mb-6 border-b border-black/[0.03] pb-4">
+                      <div className="space-y-2">
+                        <Skeleton className="h-7 w-40" />
+                        <Skeleton className="h-4 w-36" />
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <Skeleton className="h-28 w-full rounded-xl" />
+                        <Skeleton className="h-28 w-full rounded-xl" />
+                        <Skeleton className="h-28 w-full rounded-xl" />
+                      </div>
+                      <Skeleton className="h-56 w-full rounded-xl" />
                     </div>
                   </div>
                 </div>
@@ -6789,6 +4249,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                     <SlideContainer
                       key={id}
                       id={`slide-${id}`}
+                      slideId={id}
+                      registerSlide={registerSlide}
                       title={displayTitle}
                       dateRange={formatDateRange()}
                       containerRef={(el) => {
@@ -6892,31 +4354,17 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                           onLayoutChange={createLayoutChangeHandler(id, layout)}
                         >
                           {layout.map((widget) => {
-                            const dataKey = widget.metricConfig?.id ?? widget.i;
-
-                            if (widget.widgetType === "metric" && (widget as any).snapshotData) {
-                              // console.log(`🐛 [ReportBuilderLoop] Widget ${widget.i}, dataKey=${dataKey}`);
-                              // console.log(`   Keys in resolvedWidgets:`, Object.keys(resolvedWidgets).slice(0, 10));
-                              // console.log(`   Resolved entry:`, resolvedWidgets[dataKey]);
-                            }
-
-                            const widgetResolvedData: ResolvedWidgetData | undefined =
-                              resolvedWidgets[dataKey];
-
-                            // Check if GSC table with no data
-                            const isGscTable =
-                              widget.widgetType === "table" &&
-                              widget.metricConfig?.integration
-                                ?.toLowerCase()
-                                .includes("google-search-console");
-                            const hasData =
-                              widgetResolvedData &&
-                              Array.isArray(widgetResolvedData.rows) &&
-                              widgetResolvedData.rows.length > 0;
-
-                            // If condition met, return null directly (no div wrapper)
-                            if (isGscTable && !hasData) {
-                              return null;
+                            // Patch widget type for demographics if needed
+                            let finalWidget = widget;
+                            const demoConfig = (widget.data as any)?.customConfig?.demographics;
+                            if (demoConfig) {
+                              if (demoConfig.type === 'age') {
+                                finalWidget = { ...widget, widgetType: 'chart', data: { ...widget.data, chartType: 'bar' } as any };
+                              } else if (demoConfig.type === 'gender') {
+                                finalWidget = { ...widget, widgetType: 'pie_chart', data: { ...widget.data, chartType: 'pie' } as any };
+                              } else if (demoConfig.type === 'country' || demoConfig.type === 'city') {
+                                finalWidget = { ...widget, widgetType: 'table' };
+                              }
                             }
 
                             return (
@@ -6924,25 +4372,52 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                                 key={widget.i}
                                 ref={createWidgetRefCallback(id, widget.i)}
                               >
-                                <WidgetCard
-                                  widget={widget}
-                                  resolvedData={widgetResolvedData}
-                                  onContentClick={createWidgetClickHandler(id)}
-                                  onDelete={() => handleDeleteWidget(id, widget.i)}
-                                  readOnly={readOnly}
+                                <WidgetDataWrapper
+                                  widget={finalWidget}
+                                  slideId={id}
+                                  effectiveClientId={effectiveClientId}
+                                  dateFrom={dateFrom}
+                                  dateTo={dateTo}
+                                  shareToken={shareToken}
+                                  integrationsData={integrationsData}
+                                  isLoadingIntegrations={isLoadingIntegrations}
+                                  isSlideVisible={isSlideVisible(id)}
+                                  demographicDataMap={demographicDataMap}
                                 >
-                                  {renderWidgetContent(widget, widgetResolvedData, {
-                                    isLoading:
-                                      // Show loading if data is being fetched
-                                      reportDataQuery.isFetching ||
-                                      // OR if query is pending (initial load)
-                                      reportDataQuery.status === "pending" ||
-                                      // OR if this specific widget doesn't have data yet (but query isn't in error state)
-                                      (!widgetResolvedData && !reportDataQuery.isError && widget.metricConfig?.metricKey),
-                                    onConnectIntegration: handleConnectIntegration,
-                                    readOnly: readOnly,
-                                  })}
-                                </WidgetCard>
+                                  {({ resolvedData: finalResolvedData, isLoading, isFetching }) => {
+                                    // Check if GSC table with no data
+                                    const isGscTable =
+                                      finalWidget.widgetType === "table" &&
+                                      finalWidget.metricConfig?.integration
+                                        ?.toLowerCase()
+                                        .includes("google-search-console");
+                                    const hasData =
+                                      finalResolvedData &&
+                                      Array.isArray((finalResolvedData as any).rows) &&
+                                      (finalResolvedData as any).rows.length > 0;
+
+                                    if (isGscTable && !hasData && !isLoading) {
+                                      return null;
+                                    }
+
+                                    return (
+                                      <WidgetCard
+                                        widget={finalWidget}
+                                        resolvedData={finalResolvedData}
+                                        onContentClick={createWidgetClickHandler(id)}
+                                        onDelete={() => handleDeleteWidget(id, widget.i)}
+                                        readOnly={readOnly}
+                                        isRefetching={isFetching && !isLoading && !!widget.metricConfig?.metricKey}
+                                      >
+                                        {renderWidgetContent(finalWidget, finalResolvedData, {
+                                          isLoading,
+                                          onConnectIntegration: handleConnectIntegration,
+                                          readOnly: !!readOnly,
+                                        })}
+                                      </WidgetCard>
+                                    );
+                                  }}
+                                </WidgetDataWrapper>
                               </div>
                             );
                           })}
@@ -7013,30 +4488,66 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                           index: idx,
                           platform: integ.platform,
                           accountName: integ.accountName
-                        })).filter(integ => !dashboards.has(integ.index)) ?? []}
+                        })).filter(integ => {
+                          // Find all slide IDs that belong to this integration
+                          const integrationSlideIds = Array.from(slideIntegrationMap.entries())
+                            .filter(([_, info]) => info.originalIndex === integ.index)
+                            .map(([slideId, _]) => slideId);
+
+                          // Show integration if ANY of its slides is MISSING (available to add)
+                          // This allows re-adding removed slides, especially for multi-slide integrations
+                          return integrationSlideIds.some(slideId => !dashboards.has(slideId));
+                        }) ?? []}
                         slidesMeta={(() => {
                           const rawBase = (processedSlidesMeta as ReportSlideMeta[] | undefined) ?? [];
-                          const numIntegrations = integrationsData?.integrations?.length ?? 0;
+
+                          // Correctly filter base slides that are out of bounds
+                          // (Legacy logic used index, now checks valid IDs)
                           const base = rawBase.filter(s => {
                             if (s.source === "integration") {
-                              const idx = typeof s.integrationIndex === 'number' ? s.integrationIndex : Number(s.id);
-                              if (!isNaN(idx) && idx >= numIntegrations) return false;
+                              // If it has a mapped integration, check if that integration still exists
+                              // (We can assume if slideId maps to something in slideIntegrationMap, it's valid)
+                              // But rawBase might have stale data.
+                              return true;
                             }
                             return true;
                           });
+
                           const existingIds = new Set(base.map((s) => Number(s.id)));
                           const extras = customPages.filter((p) => !existingIds.has(Number(p.id))).map((p) => ({
                             id: p.id, title: p.name, subtitle: p.subtitle, source: "custom" as const,
                           }));
+
                           const integrationExtras: ReportSlideMeta[] = [];
+
                           if (integrationsData?.integrations) {
                             Array.from(dashboards.keys()).forEach(slideId => {
                               const numId = Number(slideId);
                               if (!existingIds.has(numId) && !customPages.find(p => Number(p.id) === numId)) {
-                                const integration = integrationsData.integrations[numId];
-                                if (integration) {
+                                const integrationInfo = slideIntegrationMap.get(numId);
+                                if (integrationInfo) {
+                                  // Use the multi-slide template to get specific slide name (e.g. "Facebook", "Instagram")
+                                  // Or just empty, and let the UI resolve it using the same map later
+                                  // For sidebar, we want specific titles.
+
+                                  const normalizedPlatform = integrationInfo.platform?.toLowerCase().trim().replace(/[ _-]/g, '');
+                                  const template = normalizedPlatform ? (
+                                    INTEGRATION_TEMPLATES[integrationInfo.platform || ''] ??
+                                    INTEGRATION_TEMPLATES[normalizedPlatform] ??
+                                    INTEGRATION_TEMPLATES[normalizedPlatform.replace(/(meta)(.+)/, '$1-$2')]
+                                  ) : undefined;
+
+                                  let title = "";
+                                  if (template?.slides && template.slides[integrationInfo.subSlideIndex]) {
+                                    title = template.slides[integrationInfo.subSlideIndex].name;
+                                  }
+
                                   integrationExtras.push({
-                                    id: numId, title: "", subtitle: "", source: "integration", integrationIndex: numId
+                                    id: numId,
+                                    title: title,
+                                    subtitle: "",
+                                    source: "integration",
+                                    integrationIndex: integrationInfo.originalIndex
                                   });
                                 }
                               }
@@ -7051,13 +4562,28 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                             }
                             if (Number(updated.id) < 1000) updated.source = "integration";
                             if (updated.source === "integration" && updated.integrationIndex === undefined) updated.integrationIndex = Number(updated.id);
+
                             if (updated.source === "integration") {
-                              const idx = typeof updated.integrationIndex === 'number' ? updated.integrationIndex : Number(updated.id);
-                              const integration = integrationsData?.integrations?.[idx];
-                              if (integration && (!updated.title || updated.title === "" || updated.title.startsWith("Untitled"))) {
-                                const platformConfig = getPlatformConfig(integration.platform);
-                                updated.title = platformConfig?.name || integration.platform || "Integration";
-                                if (!updated.subtitle) updated.subtitle = integration.accountName;
+                              // Use slideID to lookup integration (Multi-Slide Support)
+                              const integrationInfo = slideIntegrationMap.get(Number(updated.id));
+
+                              if (integrationInfo && (!updated.title || updated.title === "" || updated.title.startsWith("Untitled"))) {
+                                // Specific logic for sub-slides
+                                const normalizedPlatform = integrationInfo.platform?.toLowerCase().trim().replace(/[ _-]/g, '');
+                                const template = normalizedPlatform ? (
+                                  INTEGRATION_TEMPLATES[integrationInfo.platform || ''] ??
+                                  INTEGRATION_TEMPLATES[normalizedPlatform] ??
+                                  INTEGRATION_TEMPLATES[normalizedPlatform.replace(/(meta)(.+)/, '$1-$2')]
+                                ) : undefined;
+
+                                if (template?.slides && template.slides[integrationInfo.subSlideIndex]) {
+                                  updated.title = template.slides[integrationInfo.subSlideIndex].name;
+                                } else {
+                                  const platformConfig = getPlatformConfig(integrationInfo.platform);
+                                  updated.title = platformConfig?.name || integrationInfo.platform || "Integration";
+                                }
+
+                                if (!updated.subtitle) updated.subtitle = integrationInfo.accountName;
                               }
                             }
                             return updated;

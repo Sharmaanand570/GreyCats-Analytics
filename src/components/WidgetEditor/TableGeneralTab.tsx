@@ -33,23 +33,42 @@ const INSTAGRAM_RECENT_MEDIA_COLUMNS = [
 ];
 
 export const DEFAULT_RECENT_POSTS_COLUMNS = [
-    { name: "Date", width: "15%", dataKey: "date" },
-    { name: "Post", width: "40%", dataKey: "post" },
-    { name: "Impressions", dataKey: "impressions" },
-    { name: "Clicks", dataKey: "clicks" },
-    { name: "Likes", dataKey: "likes" },
-    { name: "Comments", dataKey: "comments" },
-    { name: "Shares", dataKey: "shares" },
+    { name: "Post Image", width: "15%", dataKey: "fullPicture" },
+    { name: "Post", width: "30%", dataKey: "post" },
+    { name: "Impressions", width: "13.75%", dataKey: "impressions" },
+    { name: "Likes", width: "13.75%", dataKey: "likes" },
+    { name: "Clicks", width: "13.75%", dataKey: "clicks" },
+    { name: "Shares", width: "13.75%", dataKey: "shares" },
 ];
 
 export const DEFAULT_INSTAGRAM_MEDIA_COLUMNS = [
-    { name: "Date", width: "15%", dataKey: "date" },
-    { name: "Full Picture", dataKey: "fullPicture" },
-    { name: "Post Message", width: "35%", dataKey: "post" },
-    { name: "Impressions", dataKey: "impressions" },
-    { name: "Clicks", dataKey: "clicks" },
-    { name: "Likes", dataKey: "likes" },
-    { name: "Shares", dataKey: "shares" },
+    { name: 'Date', width: '15%', dataKey: 'date' },
+    { name: 'Post', width: '15%', dataKey: 'fullPicture' },
+    { name: 'Caption', width: '25%', dataKey: 'post' },
+    { name: 'Likes', width: '11.25%', dataKey: 'likes' },
+    { name: 'Clicks', width: '11.25%', dataKey: 'clicks' },
+    { name: 'Comments', width: '11.25%', dataKey: 'comments' },
+    { name: 'Shares', width: '11.25%', dataKey: 'shares' }
+];
+
+const META_ADS_CAMPAIGN_COLUMNS = [
+    { value: "campaignName", label: "Campaign" },
+    { value: "adName", label: "Ad" },
+    { value: "adsetName", label: "Ad Set" },
+    { value: "clicks", label: "Clicks" },
+    { value: "impressions", label: "Impressions" },
+    { value: "cpc", label: "Average CPC" },
+    { value: "ctr", label: "CTR" },
+];
+
+export const DEFAULT_META_ADS_CAMPAIGN_COLUMNS = [
+    { name: 'Campaign', width: '20%', dataKey: 'campaignName' },
+    { name: 'Ad', width: '20%', dataKey: 'adName' },
+    { name: 'Ad Set', width: '15%', dataKey: 'adsetName' },
+    { name: 'Clicks', width: '10%', dataKey: 'clicks' },
+    { name: 'Impressions', width: '12%', dataKey: 'impressions' },
+    { name: 'Average CPC', width: '12%', dataKey: 'cpc' },
+    { name: 'CTR', width: '11%', dataKey: 'ctr' }
 ];
 
 interface TableGeneralTabProps {
@@ -65,7 +84,8 @@ export function TableGeneralTab({
 }: TableGeneralTabProps) {
     const isRecentPosts = metricKey === 'meta.facebook.recent_posts';
     const isInstagramMedia = metricKey === 'meta.instagram.recent_media';
-    const isDynamicTable = isRecentPosts || isInstagramMedia;
+    const isMetaAdsCampaign = metricKey === 'meta.ads.campaign_performance';
+    const isDynamicTable = isRecentPosts || isInstagramMedia || isMetaAdsCampaign;
 
     const columns = data?.columns ?? [];
 
@@ -194,7 +214,7 @@ export function TableGeneralTab({
                                     const val = e.target.value;
                                     if (!val) return;
 
-                                    const options = isRecentPosts ? META_RECENT_POSTS_COLUMNS : INSTAGRAM_RECENT_MEDIA_COLUMNS;
+                                    const options = isMetaAdsCampaign ? META_ADS_CAMPAIGN_COLUMNS : isRecentPosts ? META_RECENT_POSTS_COLUMNS : INSTAGRAM_RECENT_MEDIA_COLUMNS;
                                     const opt = options.find(c => c.value === val);
 
                                     if (opt) addRecentPostColumn(opt.value, opt.label);
@@ -202,7 +222,7 @@ export function TableGeneralTab({
                                 }}
                             >
                                 <option value="">+ Add Column</option>
-                                {(isRecentPosts ? META_RECENT_POSTS_COLUMNS : INSTAGRAM_RECENT_MEDIA_COLUMNS).map(opt => (
+                                {(isMetaAdsCampaign ? META_ADS_CAMPAIGN_COLUMNS : isRecentPosts ? META_RECENT_POSTS_COLUMNS : INSTAGRAM_RECENT_MEDIA_COLUMNS).map(opt => (
                                     <option key={opt.value} value={opt.value} disabled={columns.some(c => c.dataKey ? c.dataKey === opt.value : c.name === opt.label)}>
                                         {opt.label}
                                     </option>

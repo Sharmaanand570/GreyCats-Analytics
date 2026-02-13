@@ -24,7 +24,48 @@
 .react-grid-placeholder {
   background: rgba(0, 0, 0, 0.05) !important;
   border-radius: 0.5rem !important;
-} */
+}
+
+/* 📐 Prominent Resize Handles */
+.react-resizable-handle {
+  opacity: 0.4;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 20;
+}
+
+/* Show handle when hovering over the widget item */
+.group\/widget:hover .react-resizable-handle {
+  opacity: 1;
+}
+
+/* Specific styling for the southeast (bottom-right) handle */
+.react-resizable-handle-se {
+  width: 24px !important;
+  height: 24px !important;
+  bottom: 6px !important;
+  right: 6px !important;
+  background-image: none !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  cursor: nwse-resize !important;
+}
+
+/* Modern triangular handle indicator */
+.react-resizable-handle-se::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-right: 2.5px solid #9ca3af; /* gray-400 */
+  border-bottom: 2.5px solid #9ca3af;
+  border-bottom-right-radius: 2px;
+  transition: border-color 0.2s, transform 0.2s;
+}
+
+.react-resizable-handle-se:hover::after {
+  border-color: #4b5563; /* gray-600 */
+  transform: scale(1.1);
+}
 
 /* Force RGB colors when exporting to avoid html2canvas oklch() errors */
 /* .pdf-safe, */

@@ -58,9 +58,10 @@ const getMetricCategory = (metricKey: string): string => {
   return 'General';
 };
 
-export const useAvailableMetrics = (clientId: number | null, options?: { enabled?: boolean }) => {
+export const useAvailableMetrics = (clientId: number | null, options?: { enabled?: boolean; integrationVersion?: string }) => {
   const { data, isLoading, error } = useQuery({
-    queryKey: ["available-metrics", clientId],
+    queryKey: ["available-metrics", clientId, options?.integrationVersion],
+
     staleTime: 5 * 60 * 1000,
     enabled: !!clientId && (options?.enabled ?? true),
     queryFn: async () => {

@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useUserStore } from "@/utils/useUserStore";
 import { getProfileImageUrl } from "@/utils/imageUtils";
 
@@ -7,18 +8,28 @@ type SlideContainerProps = {
   children: React.ReactNode;
   id?: string;
   dateRange?: string;
+  slideId?: number;
+  registerSlide?: (id: number, el: HTMLElement | null) => void;
 };
 
-export default function SlideContainer({ title, containerRef, children, id, dateRange }: SlideContainerProps) {
+export default function SlideContainer({ title, containerRef, children, id, dateRange, slideId, registerSlide }: SlideContainerProps) {
   const { user } = useUserStore();
 
-  // Don't render anything if neither name nor logo is present
-
+  const combinedRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      containerRef(el);
+      if (slideId != null && registerSlide) {
+        registerSlide(slideId, el);
+      }
+    },
+    [containerRef, slideId, registerSlide]
+  );
 
   return (
     <div
       id={id}
-      ref={containerRef}
+      data-slide-id={slideId}
+      ref={combinedRef}
       className="w-full md:w-[95%] lg:w-[90%] h-auto my-4 md:my-6 lg:my-10 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] pb-8 md:pb-10 lg:pb-12 rounded-xl md:rounded-2xl bg-white/40 backdrop-blur-sm border border-black/[0.03] relative"
     >
       <div className="p-4 md:p-6 mb-2 md:mb-4 border-b border-black/[0.03]">

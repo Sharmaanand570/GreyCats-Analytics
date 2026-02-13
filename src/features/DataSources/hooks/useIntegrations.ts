@@ -4,7 +4,7 @@ import {
   type IntegrationsResponse,
 } from "../integrationsAPI";
 
-export const useIntegrations = (clientId: number | null, options?: { enabled?: boolean }) => {
+export const useIntegrations = (clientId: number | null, options?: { enabled?: boolean; staleTime?: number; placeholderData?: any }) => {
   return useQuery<IntegrationsResponse, Error>({
     queryKey: ["integrations", clientId],
     queryFn: () => {
@@ -13,7 +13,8 @@ export const useIntegrations = (clientId: number | null, options?: { enabled?: b
     },
     enabled: !!clientId && (options?.enabled ?? true),
     retry: 1,
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: options?.staleTime ?? 30 * 1000, // Default 30s, can be overridden
+    placeholderData: options?.placeholderData
   });
 };
 

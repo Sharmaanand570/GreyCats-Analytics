@@ -106,7 +106,7 @@ const platformMap: Record<string, PlatformConfig> = {
 export const getPlatformConfig = (
   platform: string
 ): PlatformConfig | null => {
-  const normalizedPlatform = platform.toLowerCase().replace(/_/g, "-");
+  const normalizedPlatform = platform.toLowerCase().replace(/[ _]/g, "-");
   return platformMap[normalizedPlatform] || null;
 };
 
