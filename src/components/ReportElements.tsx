@@ -52,9 +52,10 @@ type ReportElementsType = {
   setRightPanelTitle: React.Dispatch<React.SetStateAction<string>>;
   setWidgetFormState: React.Dispatch<React.SetStateAction<WidgetFormState>>;
   orientation?: "vertical" | "horizontal";
+  disabled?: boolean;
 };
 
-function ReportElements({ setRightPanelTitle, setWidgetFormState, orientation = "vertical" }: ReportElementsType) {
+function ReportElements({ setRightPanelTitle, setWidgetFormState, orientation = "vertical", disabled = false }: ReportElementsType) {
 
 
   return (
@@ -65,6 +66,7 @@ function ReportElements({ setRightPanelTitle, setWidgetFormState, orientation = 
       {reportElements.map(({ id, label, icon: Icon }) => (
         <div
           onKeyDown={(e) => {
+            if (disabled) return;
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
 
@@ -78,6 +80,7 @@ function ReportElements({ setRightPanelTitle, setWidgetFormState, orientation = 
             }
           }}
           onClick={() => {
+            if (disabled) return;
             setWidgetFormState({
               slideId: 0,
               widgetId: "",
@@ -93,7 +96,10 @@ function ReportElements({ setRightPanelTitle, setWidgetFormState, orientation = 
           tabIndex={0}
           aria-label={`Drag ${label} widget to dashboard`}
 
-          className={`flex flex-col text-xs items-center justify-center text-center p-1.5 md:p-2 gap-0.5 md:gap-1 cursor-pointer active:cursor-grabbing text-gray-600 hover:bg-gray-50 transition-colors ${orientation === "vertical"
+          className={`flex flex-col text-xs items-center justify-center text-center p-1.5 md:p-2 gap-0.5 md:gap-1 transition-colors ${disabled
+            ? "opacity-50 cursor-not-allowed pointer-events-none"
+            : "cursor-pointer active:cursor-grabbing text-gray-600 hover:bg-gray-50"
+            } ${orientation === "vertical"
             ? "my-2 md:my-4 text-wrap"
             : "mx-1"
             }`}

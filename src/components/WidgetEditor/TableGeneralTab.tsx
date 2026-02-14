@@ -33,9 +33,9 @@ const INSTAGRAM_RECENT_MEDIA_COLUMNS = [
 ];
 
 export const DEFAULT_RECENT_POSTS_COLUMNS = [
-    { name: "Post Image", width: "15%", dataKey: "fullPicture" },
+    { name: "Date", width: "15%", dataKey: "date" },
     { name: "Post", width: "30%", dataKey: "post" },
-    { name: "Impressions", width: "13.75%", dataKey: "impressions" },
+    { name: "Post impressions", width: "13.75%", dataKey: "impressions" },
     { name: "Likes", width: "13.75%", dataKey: "likes" },
     { name: "Clicks", width: "13.75%", dataKey: "clicks" },
     { name: "Shares", width: "13.75%", dataKey: "shares" },

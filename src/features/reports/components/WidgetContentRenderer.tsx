@@ -957,6 +957,27 @@ export const renderWidgetContent = (
                           );
                         }
 
+                        // Special rendering for image thumbnail column (dataKey is fullPicture)
+                        if (col.dataKey === "fullPicture" && (cellValue || (row as any).fullPicture)) {
+                          const imgSrc = String(cellValue || (row as any).fullPicture);
+                          return (
+                            <TableCell key={colIndex} className="px-2 md:px-4 py-2">
+                              <div className="w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded overflow-hidden border">
+                                <img
+                                  src={imgSrc}
+                                  alt="Media"
+                                  className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    e.currentTarget.parentElement!.innerHTML = '<span class="text-xs text-gray-400">No image</span>';
+                                  }}
+                                  onClick={() => window.open(imgSrc, '_blank')}
+                                />
+                              </div>
+                            </TableCell>
+                          );
+                        }
+
                         // Special rendering for "Post" column with image
                         if (col.name === "Post" && (row as any).fullPicture) {
                           return (
@@ -970,7 +991,7 @@ export const renderWidgetContent = (
                                     onError={(e) => (e.currentTarget.style.display = 'none')}
                                   />
                                 </div>
-                                <span className="whitespace-normal text-[10px] md:text-sm min-w-0 flex-1 leading-tight">
+                                <span className="text-[11px] md:text-xs text-gray-700 line-clamp-3 break-words">
                                   {String(cellValue ?? "")}
                                 </span>
                               </div>
@@ -998,6 +1019,8 @@ export const renderWidgetContent = (
                           );
                         }
 
+                        // Truncate long text in Caption/Post columns
+                        const isTextColumn = col.dataKey === 'post' || col.name === 'Caption' || col.name === 'Post Message';
                         return (
                           <TableCell
                             key={colIndex}
@@ -1008,7 +1031,9 @@ export const renderWidgetContent = (
                           >
                             {col.name === "Views" && isGaTopPagesTable
                               ? Number(cellValue ?? 0).toLocaleString()
-                              : String(cellValue ?? "")}
+                              : isTextColumn
+                                ? <span className="line-clamp-3 text-[11px] md:text-xs">{String(cellValue ?? "")}</span>
+                                : String(cellValue ?? "")}
                           </TableCell>
                         );
                       })}

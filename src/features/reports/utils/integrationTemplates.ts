@@ -49,6 +49,11 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
     "meta.instagram.media.aggregated.shares",
     "meta.instagram.media.aggregated.saves",
     "meta.instagram.recent_media",
+    // Instagram Demographics
+    "meta.instagram.followers.age",
+    "meta.instagram.followers.gender",
+    "meta.instagram.followers.country",
+    "meta.instagram.followers.city",
   ],
   "metabusinessinstagram": [
     "meta.instagram.reach",
@@ -59,6 +64,11 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
     "meta.instagram.media.aggregated.shares",
     "meta.instagram.media.aggregated.saves",
     "meta.instagram.recent_media",
+    // Instagram Demographics
+    "meta.instagram.followers.age",
+    "meta.instagram.followers.gender",
+    "meta.instagram.followers.country",
+    "meta.instagram.followers.city",
   ],
   "meta-business": [
     // Facebook metrics
@@ -80,6 +90,11 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
     "meta.instagram.media.aggregated.shares",
     "meta.instagram.media.aggregated.saves",
     "meta.instagram.recent_media",
+    // Instagram Demographics
+    "meta.instagram.followers.age",
+    "meta.instagram.followers.gender",
+    "meta.instagram.followers.country",
+    "meta.instagram.followers.city",
   ],
   "metabusiness": [
     "meta.facebook.page.page_follows",
@@ -100,6 +115,11 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
     "meta.instagram.media.aggregated.shares",
     "meta.instagram.media.aggregated.saves",
     "meta.instagram.recent_media",
+    // Instagram Demographics
+    "meta.instagram.followers.age",
+    "meta.instagram.followers.gender",
+    "meta.instagram.followers.country",
+    "meta.instagram.followers.city",
   ],
   "meta-ads": [
     "meta.ads.impressions",
@@ -236,11 +256,13 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
             displayName: 'Instagram – Posts Table',
             customConfig: {
               columns: [
-                { name: 'Date', width: '20%', dataKey: 'date' },
-                { name: 'Post', width: '35%', dataKey: 'post' },
-                { name: 'Like', width: '15%', dataKey: 'likes' },
-                { name: 'Comments', width: '15%', dataKey: 'comments' },
-                { name: 'Clicks', width: '15%', dataKey: 'clicks' },
+                { name: 'Date', width: '15%', dataKey: 'date' },
+                { name: 'Post', width: '15%', dataKey: 'fullPicture' },
+                { name: 'Caption', width: '25%', dataKey: 'post' },
+                { name: 'Likes', width: '11.25%', dataKey: 'likes' },
+                { name: 'Comments', width: '11.25%', dataKey: 'comments' },
+                { name: 'Clicks', width: '11.25%', dataKey: 'clicks' },
+                { name: 'Shares', width: '11.25%', dataKey: 'shares' },
               ]
             }
           },
@@ -367,11 +389,13 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
         displayName: 'Instagram – Posts Table',
         customConfig: {
           columns: [
-            { name: 'Date', width: '20%', dataKey: 'date' },
-            { name: 'Post', width: '35%', dataKey: 'post' },
-            { name: 'Like', width: '15%', dataKey: 'likes' },
-            { name: 'Comments', width: '15%', dataKey: 'comments' },
-            { name: 'Clicks', width: '15%', dataKey: 'clicks' },
+            { name: 'Date', width: '15%', dataKey: 'date' },
+            { name: 'Post', width: '15%', dataKey: 'fullPicture' },
+            { name: 'Caption', width: '25%', dataKey: 'post' },
+            { name: 'Likes', width: '11.25%', dataKey: 'likes' },
+            { name: 'Comments', width: '11.25%', dataKey: 'comments' },
+            { name: 'Clicks', width: '11.25%', dataKey: 'clicks' },
+            { name: 'Shares', width: '11.25%', dataKey: 'shares' },
           ]
         }
       },
@@ -497,11 +521,13 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
         displayName: 'Campaign Name',
         customConfig: {
           columns: [
-            { name: 'Campaign', width: '25%', dataKey: 'campaignName' },
-            { name: 'Clicks', width: '15%', dataKey: 'clicks' },
-            { name: 'Impressions', width: '15%', dataKey: 'impressions' },
-            { name: 'CPC', width: '15%', dataKey: 'cpc' },
-            { name: 'Spend', width: '30%', dataKey: 'spend' }
+            { name: 'Campaign', width: '20%', dataKey: 'campaignName' },
+            { name: 'Ad', width: '20%', dataKey: 'adName' },
+            { name: 'Ad Set', width: '15%', dataKey: 'adsetName' },
+            { name: 'Clicks', width: '10%', dataKey: 'clicks' },
+            { name: 'Impressions', width: '12%', dataKey: 'impressions' },
+            { name: 'Average CPC', width: '12%', dataKey: 'cpc' },
+            { name: 'CTR', width: '11%', dataKey: 'ctr' }
           ]
         }
       },

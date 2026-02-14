@@ -223,6 +223,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+
   // Detect if we should use overlay layout (Mobile + Tablet + Small Desktop < 1280px)
   const [isOverlayLayout, setIsOverlayLayout] = useState(false);
 
@@ -2654,7 +2655,9 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         // If we had no custom order (empty), strictly use current dashboardIds as base
         // otherwise simply append to the existing custom order
         const base = prev.length > 0 ? prev : Array.from(dashboards.keys());
-        return [...base, nextId];
+        const newOrder = [...base, nextId];
+        console.log(`✅ [Add Custom Page] Updated pageOrder: ${prev} → ${newOrder}`);
+        return newOrder;
       });
 
       setHasUnsavedChanges(true);
@@ -2665,6 +2668,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     [dashboards]
   );
 
+  
   const handleDeletePage = useCallback((slideId: number) => {
     console.log(`🗑️ [Delete] Deleting slide ${slideId}`);
 
@@ -2817,14 +2821,28 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     let defaultWidgets: DashboardLayout[] = [];
     if (ENABLE_AUTO_DEFAULT_WIDGETS) {
       const integration = integrationsData?.integrations?.[integrationIndex];
-      if (integration) {
+      const slideInfo = slideIntegrationMap.get(availableSlideId);
+
+      if (integration && slideInfo) {
         const picked = pickDefaultMetricsForIntegration(
           integration.platform,
           integration.accountId,
           (groupedMetrics ?? {}) as any,
           (msg) => toast.warning(msg)
         );
-        defaultWidgets = buildDefaultWidgetsForIntegration(availableSlideId, picked, integration.platform);
+
+        // 🔧 CRITICAL FIX: Pass subSlideIndex to ensure correct widgets for multi-slide integrations
+        // For Meta Business: slideInfo.slideTitle tells us if it's Facebook (0) or Instagram (1)
+        const subSlideIndex = slideInfo.slideTitle.toLowerCase().includes('instagram') ? 1 : 0;
+        console.log(`🔧 [Add Integration] Building widgets for ${slideInfo.slideTitle} with subSlideIndex=${subSlideIndex}`);
+
+        defaultWidgets = buildDefaultWidgetsForIntegration(
+          availableSlideId,
+          picked,
+          integration.platform,
+          integration.accountId,
+          subSlideIndex
+        );
       }
     }
 
@@ -2845,6 +2863,37 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       setHasUnsavedChanges(true);
       return newOrder;
     });
+
+    // 6. Update processedSlidesMeta with correct title from slideIntegrationMap
+    const slideInfo = slideIntegrationMap.get(availableSlideId);
+    if (slideInfo) {
+      setProcessedSlidesMeta((prev) => {
+        // Check if this slide already has metadata
+        const existingIndex = prev.findIndex(m => m.id === availableSlideId);
+        const integration = integrationsData?.integrations?.[integrationIndex];
+
+        const newMeta = {
+          id: availableSlideId,
+          title: slideInfo.slideTitle,
+          subtitle: integration?.accountName || slideInfo.accountName,
+          source: 'integration' as const,
+          integrationIndex: slideInfo.originalIndex,
+          sortOrder: prev.length // Append to end
+        };
+
+        if (existingIndex >= 0) {
+          // Update existing metadata
+          const updated = [...prev];
+          updated[existingIndex] = newMeta;
+          console.log(`✅ [Add Integration] Updated processedSlidesMeta for slide ${availableSlideId}: "${newMeta.title}"`);
+          return updated;
+        } else {
+          // Add new metadata
+          console.log(`✅ [Add Integration] Added processedSlidesMeta for slide ${availableSlideId}: "${newMeta.title}"`);
+          return [...prev, newMeta];
+        }
+      });
+    }
 
     toast.success("Integration page added");
 
@@ -3105,6 +3154,16 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
       // ✅ Use defaults or fallbacks
       let { w, h } = WIDGET_SIZE_MAP[widgetType] ?? { w: 4, h: 3 };
+
+      // Force full width and appropriate height for data tables (posts, media, campaigns, demographics)
+      if (metricData && widgetType === 'table') {
+        const key = metricData.metricKey || "";
+        const isDataTable = key === 'meta.facebook.recent_posts' || key === 'meta.instagram.recent_media' || key === 'meta.ads.campaign_performance' || key === 'meta.instagram.followers.country' || key === 'meta.instagram.followers.city';
+        if (isDataTable) {
+          w = 12; // Full width
+          h = 8;  // Enough height for rows
+        }
+      }
 
       // Strict Safety Check: Only affect "metric" type widgets (Metric Cards)
       if (metricData && widgetType === 'metric') {
@@ -3823,6 +3882,41 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             value: 0
           });
         }
+
+        // Inject Instagram Demographic metrics (Age, Gender, Top Countries, Top Cities)
+        const demographicMetrics = [
+          { metricKey: 'meta.instagram.followers.age', displayName: 'Instagram - Age Distribution', category: 'Demographics' },
+          { metricKey: 'meta.instagram.followers.gender', displayName: 'Instagram - Gender Distribution', category: 'Demographics' },
+          { metricKey: 'meta.instagram.followers.country', displayName: 'Instagram - Top Countries', category: 'Demographics' },
+          { metricKey: 'meta.instagram.followers.city', displayName: 'Instagram - Top Cities', category: 'Demographics' },
+        ];
+        demographicMetrics.forEach(dm => {
+          if (!metricsForAccount.some(m => m.metricKey === dm.metricKey)) {
+            metricsForAccount.push({
+              metricKey: dm.metricKey,
+              integration: platform,
+              accountId: accountId,
+              displayName: dm.displayName,
+              category: dm.category,
+              value: 0
+            });
+          }
+        });
+      }
+
+      // Inject Campaign Performance table for Meta Ads
+      if (normalizedPlatform === 'meta-ads' || normalizedPlatform === 'metaads') {
+        const campaignKey = 'meta.ads.campaign_performance';
+        if (!metricsForAccount.some(m => m.metricKey === campaignKey)) {
+          metricsForAccount.push({
+            metricKey: campaignKey,
+            integration: platform,
+            accountId: accountId,
+            displayName: 'Campaign Name',
+            category: 'Campaigns',
+            value: 0
+          });
+        }
       }
 
       // Enforce distinct naming for Meta Business metrics (Facebook vs Instagram)
@@ -3889,7 +3983,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
       // Filter based on supported visualization types
       const viewableMetrics = filteredMetrics.filter(metric => {
-        const isListMetric = metric.metricKey === 'meta.facebook.recent_posts' || metric.metricKey === 'meta.instagram.recent_media' || metric.metricKey === 'meta.ads.campaign_performance';
+        const isListMetric = metric.metricKey === 'meta.facebook.recent_posts' || metric.metricKey === 'meta.instagram.recent_media' || metric.metricKey === 'meta.ads.campaign_performance' || metric.metricKey === 'meta.instagram.followers.country' || metric.metricKey === 'meta.instagram.followers.city';
 
         if (selectedMetricWidgetType === 'table') {
           // Table mode: ONLY show list metrics (Recent Posts/Media)
@@ -4364,6 +4458,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                 size="sm"
                 className="xl:hidden ml-1 h-8 w-8 p-0"
                 onClick={() => setIsRightSidebarOpen(true)}
+                disabled={isGeneratingPdf || isMobile}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
               </Button>
@@ -4480,11 +4575,11 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                     onSlideClick={handleScrollToSlide}
                     customPages={customPages}
                     pageOrder={effectivePageOrder}
-                    onAddPage={addCustomPage}
-                    onDeletePage={handleDeletePage}
-                    onRenamePage={handleRenamePage}
-                    onReorderPages={handleReorderPages}
-                    onAddIntegrationPage={handleAddIntegrationPage}
+                    onAddPage={isGeneratingPdf ? undefined : addCustomPage}
+                    onDeletePage={isGeneratingPdf ? undefined : handleDeletePage}
+                    onRenamePage={isGeneratingPdf ? undefined : handleRenamePage}
+                    onReorderPages={isGeneratingPdf ? undefined : handleReorderPages}
+                    onAddIntegrationPage={isGeneratingPdf ? undefined : handleAddIntegrationPage}
                     availableIntegrations={integrationsData?.integrations?.map((integ, idx) => ({
                       index: idx,
                       platform: integ.platform,
@@ -4782,6 +4877,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                           /* Empty State - Still accepts drops */
                           <div className="relative w-full min-h-[500px]">
                             <AutoWidthGrid
+                              key={`grid-empty-${id}-${isMobile ? 'm' : 'd'}`}
                               className="layout w-full h-full"
                               layout={[]}
                               cols={currentGridConfig.cols}
@@ -4789,7 +4885,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                               autoSize={false}
                               margin={currentGridConfig.margin}
                               containerPadding={isTablet ? [8, 8] : [14, 14]}
-                              isDroppable={!readOnly}
+                              isDroppable={!readOnly && !isGeneratingPdf}
                               isDraggable={false}
                               compactType={null}
                               onDrop={(layoutArr, layoutItem, e) =>
@@ -4847,6 +4943,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                         )
                       ) : (
                         <AutoWidthGrid
+                          key={`grid-${id}-${isMobile ? 'm' : 'd'}`}
                           className="layout w-full"
                           layout={layout}
                           cols={currentGridConfig.cols}
@@ -4854,9 +4951,9 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                           autoSize={true}
                           margin={currentGridConfig.margin}
                           containerPadding={isTablet ? [8, 8] : [14, 14]}
-                          isDroppable={!readOnly && !isMobile}
-                          isDraggable={!readOnly && !isMobile}
-                          isResizable={!readOnly && !isMobile}
+                          isDroppable={!readOnly && !isMobile && !isGeneratingPdf}
+                          isDraggable={!readOnly && !isMobile && !isGeneratingPdf}
+                          isResizable={!readOnly && !isMobile && !isGeneratingPdf}
                           compactType={null}
                           draggableHandle=".drag-handle"
                           draggableCancel=".non-draggable"
@@ -4918,7 +5015,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                                         resolvedData={finalResolvedData}
                                         onContentClick={createWidgetClickHandler(id)}
                                         onDelete={() => handleDeleteWidget(id, widget.i)}
-                                        readOnly={readOnly}
+                                        readOnly={readOnly || isGeneratingPdf || isMobile}
                                         isRefetching={isFetching && !isLoading && !!widget.metricConfig?.metricKey}
                                       >
                                         {renderWidgetContent(finalWidget, finalResolvedData, {
@@ -4972,6 +5069,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                 <ReportElements
                   setRightPanelTitle={setRightPanelTitle}
                   setWidgetFormState={setWidgetFormState}
+                  disabled={isGeneratingPdf || isMobile}
                 />
               </div>
             )}
@@ -4991,11 +5089,11 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                         }}
                         customPages={customPages}
                         pageOrder={effectivePageOrder}
-                        onAddPage={addCustomPage}
-                        onDeletePage={handleDeletePage}
-                        onRenamePage={handleRenamePage}
-                        onReorderPages={handleReorderPages}
-                        onAddIntegrationPage={handleAddIntegrationPage}
+                        onAddPage={(isGeneratingPdf || isMobile) ? undefined : addCustomPage}
+                        onDeletePage={(isGeneratingPdf || isMobile) ? undefined : handleDeletePage}
+                        onRenamePage={(isGeneratingPdf || isMobile) ? undefined : handleRenamePage}
+                        onReorderPages={(isGeneratingPdf || isMobile) ? undefined : handleReorderPages}
+                        onAddIntegrationPage={(isGeneratingPdf || isMobile) ? undefined : handleAddIntegrationPage}
                         availableIntegrations={integrationsData?.integrations?.map((integ, idx) => ({
                           index: idx,
                           platform: integ.platform,
@@ -5127,6 +5225,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                           setRightPanelTitle={setRightPanelTitle}
                           setWidgetFormState={setWidgetFormState}
                           orientation="horizontal"
+                          disabled={isGeneratingPdf || isMobile}
                         />
                       </div>
                     </div>
