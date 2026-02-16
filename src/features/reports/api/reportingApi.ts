@@ -156,6 +156,11 @@ export const buildSlidesFromWidgets = (
         subtitle: meta.subtitle,
         source: meta.source, // 🔧 CRITICAL: Include source field for backend
         sortOrder: meta.sortOrder,
+        metadata: {
+          integrationIndex: meta.integrationIndex,
+          originalSource: meta.source,
+          frontendId: meta.id
+        },
         widgets: [],
       });
     });
@@ -281,14 +286,22 @@ const mapApiTemplateToReportTemplate = (
 
 
     // Determine if this is a custom page or integration page
-    // Custom pages typically have IDs >= 1000 (backend-generated) or have no widgets
-    const isCustomPage = slideId >= 1000 || slide.widgets.length === 0;
+    // Prioritize metadata markers over ID heuristics
+    const hasIntegrationMarker =
+      typeof slide.metadata?.integrationIndex === 'number' ||
+      slide.metadata?.originalSource === 'integration' ||
+      slide.source === 'integration';
+
+    // Custom pages typically have IDs >= 1000 (backend-generated) AND lack integration markers
+    const isCustomPage = !hasIntegrationMarker && (slideId >= 1000 || slide.widgets.length === 0);
 
     slidesMeta.push({
       id: slideId,
       title: slide.title,
       subtitle: slide.subtitle,
+      metadata: slide.metadata,
       source: isCustomPage ? "custom" : "integration",
+      integrationIndex: slide.metadata?.integrationIndex,
     });
 
     slide.widgets.forEach((w, widgetIndex) => {

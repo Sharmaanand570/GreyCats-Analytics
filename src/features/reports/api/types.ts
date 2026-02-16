@@ -119,6 +119,10 @@ export interface ReportSlideMeta {
     * For multi-slide templates, which slide index (0-based) this page represents.
     */
   subSlideIndex?: number;
+  metadata?: {
+    integrationIndex?: number;
+    originalSource?: string;
+  };
 }
 
 // Full template shape used by the Report Builder UI
@@ -200,6 +204,11 @@ export interface ApiReportTemplateSlide {
    */
   sortOrder?: number;
   widgets: ApiReportTemplateWidget[];
+  metadata?: {
+    integrationIndex?: number;
+    originalSource?: string;
+    frontendId?: number;
+  };
 }
 
 export interface ApiReportTemplate {

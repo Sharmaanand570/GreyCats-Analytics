@@ -1,3 +1,4 @@
+
 import { FiBell, FiSearch, FiCalendar } from "react-icons/fi";
 import { FaFacebook, FaInstagram } from "react-icons/fa";
 import { Button } from "../components/ui/button";
@@ -8,6 +9,9 @@ import {
 } from "../components/ui/sheet";
 import WidgetsPageSideComponent from "../components/WidgetsPageSideComponent";
 import ReportElements from "../components/ReportElements";
+
+
+
 import TitleWidgetForm from "../components/TitleWidgetForm";
 import MetricWidgetForm from "../components/MetricWidgetForm";
 import CustomWidgetForm from "../components/CustomWidgetForm";
@@ -27,10 +31,11 @@ export const DEFAULT_INSTAGRAM_MEDIA_COLUMNS = [
   { name: 'Comments', width: '11.25%', dataKey: 'comments' },
   { name: 'Shares', width: '11.25%', dataKey: 'shares' }
 ];
+
 import ImageWidgetForm from "../components/ImageWidgetForm";
 import EmbedWidgetForm from "../components/EmbedWidgetForm";
-
 import { DateRangePicker } from "../components/DateRangePicker";
+
 import { type DateRange } from "react-day-picker";
 import { format, subDays } from "date-fns";
 import { useNavigate, useParams } from "react-router-dom";
@@ -63,10 +68,13 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { Skeleton } from "../components/ui/skeleton";
+
 import { Input } from "../components/ui/input";
 
 import SlideContainer from "../components/SlideContainer";
 import WidgetCard from "../components/WidgetCard";
+
+
 import WidgetDragItem from "../components/WidgetDragItem";
 
 // Widget Data Types - imported from widgetTypes.ts to avoid circular dependencies
@@ -90,6 +98,7 @@ import {
 
 import { prettifyMetricLabel } from "@/utils/labelUtils";
 import { CreateScheduleModal } from "../components/CreateScheduleModal";
+
 import { getGoogleConsoleUnifiedMetrics } from "@/features/YouTube/API/googleConsoleapi";
 import type {
   ApiError,
@@ -943,10 +952,36 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     // This fixes reports that were created with missing slides
     if (!readOnly && integrationsData?.integrations) {
       // Use slideIntegrationMap to create dashboards for all slides (handles multi-slide integrations)
+      // Use slideIntegrationMap to create dashboards for all slides (handles multi-slide integrations)
       slideIntegrationMap.forEach((_, slideId) => {
-        if (!map.has(slideId) && !deletedSlideIds.has(slideId)) {
+        // 🔧 CRITICAL FIX: Check if this "Frontend Slide ID" (e.g. 0) is already mapped to a "Backend Slide ID" (e.g. 5946)
+        // If it is, we check if the DASHBOARD for that Backend ID exists.
+        // We only create a new dashboard if the slot is truly empty.
+
+        let shouldCreate = false;
+        if (backendIdMap.current.has(slideId)) {
+          const mappedBackendId = backendIdMap.current.get(slideId)!;
+          if (!map.has(mappedBackendId)) {
+            shouldCreate = true; // Mapped ID exists but no dashboard? Weird, but create it.
+          }
+        } else {
+          // No backend mapping found. 
+          // BUT wait! The deduplication loop above POPULATES backendIdMap.
+          // If we are here, it means this integration slot was NOT claimed by any backend slide.
+          // So we should create it.
+          if (!map.has(slideId)) {
+            shouldCreate = true;
+          }
+        }
+
+        if (shouldCreate && !deletedSlideIds.has(slideId)) {
           console.log(`📝 [Hydration] Creating missing dashboard for slide ${slideId}`);
           map.set(slideId, []);
+
+          // Also map it to itself since it's a new "frontend-only" slide for now
+          if (!backendIdMap.current.has(slideId)) {
+            backendIdMap.current.set(slideId, slideId);
+          }
         }
       });
     }
@@ -980,6 +1015,10 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     // Clear backend ID map on fresh hydration
     backendIdMap.current.clear();
 
+    // Initialize ref to max existing ID + 1 to ensure uniqueness
+    const maxExistingId = Math.max(...Array.from(map.keys()), 999);
+    nextCustomIdRef.current = maxExistingId + 1;
+
     // ✅ Backend now returns accurate source field - no correction needed!
     console.log('🔍 [Hydration] slidesMeta from backend:', cleanedSlidesMeta.map(s => ({
       id: s.id,
@@ -1003,6 +1042,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         // For custom pages, the ID is already the DB ID (if hydrated from DB)
         // or a temp ID (if created locally). We map it 1:1.
         backendIdMap.current.set(bId, bId);
+        idMapping.set(bId, bId); // ✅ Explicitly mark as mapped to avoid any fallback logic
         return;
       }
 
@@ -1125,9 +1165,9 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         return;
       }
 
-      // Only reclaim from slides that are NOT in cleanedSlidesMeta (true ghost slides)
-      // AND not backend slide IDs (which are real slides that just need ID mapping)
-      if (!cleanedSlideIdSet.has(sId) && !backendSlideIds.has(sId) && widgets.length > 0) {
+      // 🔧 CRITICAL FIX: Allow rescue logic for ANY slide ID > 1000 that looks like an integration slide
+      // Whether it's in cleanedSlideIdSet (Active) or not (Ghost), we want to map it correctly.
+      if (sId >= 1000 && widgets.length > 0) {
         const firstInt = widgets[0].metricConfig?.integration;
         if (firstInt && integrationsData?.integrations) {
           const normalize = (s: string) => s.toLowerCase().replace(/[ _-]/g, '');
@@ -1175,8 +1215,6 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                 console.log(`🔗 [Rescue] Mapped Frontend ${matchIdx} -> Backend ${sId}`);
               } else {
                 // If we already have a mapping (from previous non-ghost slide?), be careful.
-                // But usually Rescue implies the "real" slide was missing/empty.
-                // So updating is safer.
                 const existing = backendIdMap.current.get(matchIdx);
                 if (existing !== sId) {
                   console.log(`🔗 [Rescue] Updating Frontend ${matchIdx} -> Backend ${sId} (was ${existing})`);
@@ -1186,13 +1224,17 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
             } else {
               console.log(`❌ [Rescue] Aborting rescue of ${sId}: mixed content detected`);
-              // If it's mixed, we're better off deleting it than corrupting a dashboard
-              map.delete(sId);
+              // Only delete if it's NOT in the active set (truly ghost)
+              if (!cleanedSlideIdSet.has(sId) && !backendSlideIds.has(sId)) {
+                map.delete(sId);
+              }
             }
           } else {
-            // No matching integration: Delete orphaned content
-            console.log(`🗑️ [Rescue] Deleting orphaned widgets from ${sId} (No match for ${firstInt})`);
-            map.delete(sId);
+            // No matching integration: Delete orphaned content only if ghost
+            if (!cleanedSlideIdSet.has(sId) && !backendSlideIds.has(sId)) {
+              console.log(`🗑️ [Rescue] Deleting orphaned widgets from ${sId} (No match for ${firstInt})`);
+              map.delete(sId);
+            }
           }
         }
       }
@@ -1217,162 +1259,217 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
     console.log('🔍 [Hydration] finalMeta before deduplication:', finalMeta.map(m => ({ id: m.id, title: m.title, source: m.source })));
 
+    // 🔧 CRITICAL FIX: Deduplicate based on Integration Index ONLY. Title is mutable.
+    // This prevents "Ghost" duplicates when a user renames an integration slide (e.g. "Facebook" -> "FB")
+    const claimedSlots = new Set<string>();
+    const getSlotKey = (idx: number) => `${idx}`;
+
     finalMeta.forEach(m => {
+      // ... existing duplicate ID check ...
       if (seenIds.has(m.id)) {
-        console.warn(`⚠️ [Hydration] Skipping duplicate slide ID ${m.id} (${m.title}, source: ${m.source})`);
+        console.warn(`⚠️ [Hydration] Skipping duplicate slide ID ${m.id}`);
         return;
       }
 
-      if (!seenIds.has(m.id)) {
-        // ✅ CRITICAL FIX: Explicitly preserve Custom Pages (ID >= 1000)
-        // Do not let them fall into integration matching logic
-        if (m.id >= 1000 || m.source === 'custom') {
-          console.log('🔍 [Hydration] Preserving custom page:', m.id, m.title);
-          dedupedMeta.push(m);
+      // --- 1. Custom Page Handling ---
+      if (m.metadata?.originalSource === 'custom') {
+        // ... custom page logic ...
+        console.log('🔍 [Hydration] Preserving custom page (via metadata):', m.id, m.title);
+        dedupedMeta.push(m);
+        seenIds.add(m.id);
+        return;
+      }
+
+      const hasExplicitIndex = typeof m.metadata?.integrationIndex === 'number' || (typeof m.integrationIndex === 'number' && m.integrationIndex >= 0);
+
+      // --- 2. Rescue Logic (Legacy Custom -> Integration) ---
+      // Only rescue if no explicit index is set. If explicit index exists, trust it!
+      if (!hasExplicitIndex && (m.id >= 1000 || m.source === 'custom')) {
+        // ... existing rescue logic ...
+        let rescued = false;
+
+        // 🔧 NEW RESCUE LOGIC: Iterate ALL possible integration slots
+        for (const [frontendId, info] of slideIntegrationMap.entries()) {
+          const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const slideTitleNorm = normalize(m.title || '');
+          const integrationTitleNorm = normalize(info.slideTitle || '');
+
+          let isMatch = false;
+
+          // 1. Exact Title Match
+          if (slideTitleNorm === integrationTitleNorm) {
+            isMatch = true;
+          }
+          // 2. Strong Substring Match (relaxed for "Meta Ads" etc)
+          else if (slideTitleNorm.length > 4 && integrationTitleNorm.length > 4 && (slideTitleNorm.includes(integrationTitleNorm) || integrationTitleNorm.includes(slideTitleNorm))) {
+            isMatch = true;
+          }
+
+          // 🛡️ REJECT Mismatches (e.g. Google title on Meta slide)
+          if (isMatch) {
+            const isMeta = info.platform?.toLowerCase().includes('meta') || info.platform?.toLowerCase().includes('facebook') || info.platform?.toLowerCase().includes('instagram');
+            const isGoogle = info.platform?.toLowerCase().includes('google');
+
+            if (isMeta && (slideTitleNorm.includes('google') || slideTitleNorm.includes('searchconsole'))) isMatch = false;
+            if (isGoogle && (slideTitleNorm.includes('meta') || slideTitleNorm.includes('facebook') || slideTitleNorm.includes('instagram'))) isMatch = false;
+          }
+
+          if (isMatch) {
+            const key = getSlotKey(info.originalIndex);
+
+            if (claimedSlots.has(key)) {
+              console.warn(`🗑️ [Hydration-Dedup] Skipping RESCUED duplicate for slot ${key} (Slide ID ${m.id})`);
+              seenIds.add(m.id); // Mark seen so we don't process again
+              return;
+            }
+
+            console.log(`⛑️ [Hydration] Rescued Custom Slide ID ${m.id} -> Integration Slot ${key} (${info.slideTitle})`);
+
+            dedupedMeta.push({
+              ...m,
+              source: 'integration' as const,
+              integrationIndex: info.originalIndex,
+              title: info.slideTitle,
+              subtitle: info.accountName
+            });
+
+            claimedSlots.add(key);
+            seenIds.add(m.id);
+            rescued = true;
+
+            // Map the frontend ID to this backend ID if not already mapped
+            if (!backendIdMap.current.has(frontendId)) {
+              backendIdMap.current.set(frontendId, m.id);
+            }
+            break; // Stop looking after first match
+          }
+        }
+        if (rescued) return;
+
+        // Fallback to custom
+        dedupedMeta.push(m);
+        seenIds.add(m.id);
+        return;
+      }
+
+      // --- 3. Integration Slide Handling (Explicit or Metadata) ---
+      const slideInfo = slideIntegrationMap.get(m.id);
+
+      let integrationIdxFromMeta: number | undefined;
+
+
+      // Determine Index
+      if (typeof m.metadata?.integrationIndex === 'number') {
+        integrationIdxFromMeta = m.metadata.integrationIndex;
+      } else if (typeof m.integrationIndex === 'number' && m.integrationIndex >= 0) {
+        integrationIdxFromMeta = m.integrationIndex;
+      }
+
+      if (slideInfo) {
+        integrationIdxFromMeta = slideInfo.originalIndex;
+      } else if (integrationIdxFromMeta !== undefined) {
+        // Find platform info from index
+        for (const [, info] of slideIntegrationMap.entries()) {
+          if (info.originalIndex === integrationIdxFromMeta) {
+            // 🛡️ MISMATCH CHECK: Does the slide Title match the Platform?
+            // If slide title is "Google..." but index maps to "Meta", REJECT IT.
+            const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const normSlideTitle = normalize(m.title || '');
+            const normPlatform = normalize(info.platform || '');
+            const normRealTitle = normalize(info.slideTitle || '');
+
+            // If title is totally different from platform, likely a corruption mismatch
+            // Exception: "Integration" generic title
+            if (normSlideTitle.length > 5 && !normSlideTitle.includes(normPlatform) && !normPlatform.includes(normSlideTitle) && !normRealTitle.includes(normSlideTitle)) {
+              // Check for cross-platform contamination (e.g. Google title on Meta index)
+              if (
+                (normPlatform.includes('meta') && normSlideTitle.includes('google')) ||
+                (normPlatform.includes('google') && normSlideTitle.includes('meta')) ||
+                (normPlatform.includes('facebook') && normSlideTitle.includes('google'))
+              ) {
+                console.warn(`🛑 [Hydration-Mismatch] Rejecting corrupted slide ID ${m.id}. Title="${m.title}" but Index ${integrationIdxFromMeta} is ${info.platform}`);
+                seenIds.add(m.id);
+                return;
+              }
+            }
+            break;
+          }
+        }
+      }
+
+      // Final Dedup Check for Integration Slides
+      if (integrationIdxFromMeta !== undefined) {
+        const key = getSlotKey(integrationIdxFromMeta);
+        if (claimedSlots.has(key)) {
+          console.warn(`🗑️ [Hydration-Dedup] Skipping duplicate integration slide ID ${m.id} for slot ${key}`);
           seenIds.add(m.id);
           return;
         }
 
-        // If slide ID exists in slideIntegrationMap, it's ALWAYS an integration slide
-        // Force correct metadata even if corrupted backend data says it's 'custom'
-        const slideInfo = slideIntegrationMap.get(m.id);
+        claimedSlots.add(key);
+      }
 
-        // CRITICAL FIX: Also check if the metadata claims a valid integration index!
-        // Backend-persisted slides will have High IDs (e.g. 5329) but integrationIndex (e.g. 0).
-        // We need to match this 5329 back to Integration 0.
-        let integrationIdxFromMeta: number | undefined;
-        if (typeof m.integrationIndex === 'number' && m.integrationIndex >= 0 && m.integrationIndex < 1000) {
-          integrationIdxFromMeta = m.integrationIndex;
-        }
-
-        if (slideInfo) {
-          dedupedMeta.push({
-            id: m.id,
-            source: 'integration',
-            integrationIndex: slideInfo.originalIndex,
-            title: slideInfo.slideTitle, // 🔧 FIX: Use slide-specific title
-            subtitle: slideInfo.accountName
-          });
-        } else if (integrationIdxFromMeta !== undefined) {
-          // It claims to be an integration. Verify the integration exists at that index.
-          // We need to find if ANY integration exists at this index.
-          // Since slideIntegrationMap is keyed by ID, we have to search it or integrationsData.
-          // Easier: iterate slideIntegrationMap to find a match for this index.
-          let foundIntegration = false;
-          let foundPlatform = '';
-          let foundAccount = '';
-
-          // Search for the integration details corresponding to this index
-          // (We can't easily look up by index in slideIntegrationMap effectively, but we can iterate)
-          for (const [, info] of slideIntegrationMap.entries()) {
-            if (info.originalIndex === integrationIdxFromMeta) {
-              foundIntegration = true;
-              foundPlatform = info.platform;
-              foundAccount = info.accountName;
-              break;
-            }
-          }
-
-          if (foundIntegration) {
-            console.log(`🔗 [Hydration] Matched High-ID Slide ${m.id} to Integration Index ${integrationIdxFromMeta} (${foundPlatform})`);
-
-            // FORCE MAPPING IMMEDIATELY
-            // logic: Frontend Index (0) -> Backend ID (5493)
-            const fId = integrationIdxFromMeta!;
-            if (!backendIdMap.current.has(fId)) {
-              backendIdMap.current.set(fId, m.id);
-              console.log(`🔗 [Hydration-Recovery] Mapped Frontend ${fId} -> Backend ${m.id}`);
-            }
-
-            // 🔧 FIX: Get slide-specific title from slideIntegrationMap
-            let slideTitle = foundPlatform;
-            for (const [, info] of slideIntegrationMap.entries()) {
-              if (info.originalIndex === integrationIdxFromMeta) {
-                slideTitle = info.slideTitle;
-                break;
-              }
-            }
-
+      // ... push logic ...
+      if (slideInfo) {
+        dedupedMeta.push({
+          ...m,
+          source: 'integration' as const,
+          integrationIndex: slideInfo.originalIndex,
+          title: slideInfo.slideTitle,
+          subtitle: slideInfo.accountName,
+        });
+        seenIds.add(m.id);
+      } else if (integrationIdxFromMeta !== undefined) {
+        let found = false;
+        for (const [, info] of slideIntegrationMap.entries()) {
+          if (info.originalIndex === integrationIdxFromMeta) {
             dedupedMeta.push({
-              id: m.id,
-              source: 'integration',
-              integrationIndex: integrationIdxFromMeta,
-              title: slideTitle, // Use slide-specific title
-              subtitle: foundAccount
+              ...m,
+              source: 'integration' as const,
+              integrationIndex: info.originalIndex,
+              title: info.slideTitle,
+              subtitle: info.accountName
             });
-          } else {
-            console.warn(`⚠️ [Hydration] High-ID Slide ${m.id} claims index ${integrationIdxFromMeta} but matches no active integration.`);
-            // Fallback to custom page to preserve data?
-            dedupedMeta.push(m);
-          }
-        } else {
-          // FINAL RESCUE: Try to match by Title (e.g. "Facebook", "Instagram")
-          // If the backend wiped our metadata (source/index) but kept the Title, we can use that!
-          let titleMatchFound = false;
-
-          for (const [, info] of slideIntegrationMap.entries()) {
-            // Normalize for fuzzy comparison
-            const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-            const normTitle = normalize(m.title || '');
-            const normPlatform = normalize(info.platform || '');
-            const normAccount = normalize(info.accountName || '');
-
-            console.log(`🕵️ [Hydration-Debug] Comparing Slide ${m.id}: "${m.title}" (norm: ${normTitle}) vs Integration: "${info.platform}" (norm: ${normPlatform})`);
-
-            const isMatch =
-              normTitle === normPlatform ||
-              normTitle.includes(normPlatform) ||
-              (normTitle.includes(normPlatform) && normTitle.includes(normAccount));
-
-            if (isMatch) {
-              console.log(`🔗 [Hydration] Matched High-ID Slide ${m.id} ("${m.title}") to Integration: ${info.platform} (Index ${info.originalIndex})`);
-
-              // FORCE MAPPING IMMEDIATELY
-              // This maps: Frontend Index (0) -> Backend ID (e.g., 5358)
-              // fId for integration slides IS the integrationIndex (originalIndex).
-              const fId = info.originalIndex;
-              if (!backendIdMap.current.has(fId)) {
-                backendIdMap.current.set(fId, m.id);
-                console.log(`🔗 [Hydration-Recovery] Mapped Frontend ${fId} -> Backend ${m.id}`);
-              }
-
-              dedupedMeta.push({
-                id: m.id,
-                source: 'integration',
-                integrationIndex: info.originalIndex,
-                title: info.slideTitle, // 🔧 FIX: Use slide-specific title
-                subtitle: info.accountName,
-                sortOrder: m.sortOrder // preserve sortOrder if available
-              });
-              titleMatchFound = true;
-              break;
-            }
-          }
-
-          if (!titleMatchFound) {
-            // Not in slideIntegrationMap, preserve as-is (custom page)
-            console.log('🔍 [Hydration] Adding custom page to dedupedMeta:', m.id, m.title);
-            dedupedMeta.push(m);
+            seenIds.add(m.id);
+            found = true;
+            break;
           }
         }
+        if (!found) {
+          // Fallback
+          dedupedMeta.push(m);
+          seenIds.add(m.id);
+        }
+      } else {
+        dedupedMeta.push(m);
         seenIds.add(m.id);
       }
+
     });
 
     // Safety: Ensure all current integrations exist (unless explicitly deleted)
     // 🔧 CRITICAL FIX: Also add to dashboards Map if missing
     slideIntegrationMap.forEach((info, sId) => {
-      if (!seenIds.has(sId) && !deletedSlideIds.has(sId)) {
-        console.log(`🔧 [Hydration] Auto-populating missing integration slide: ${sId} (${info.slideTitle})`);
+      const slotKey = getSlotKey(info.originalIndex);
+
+      // 🛡️ CRITICAL FIX: Only create if slot is NOT claimed by ANY slide (backend or custom-rescue)
+      if (!claimedSlots.has(slotKey) && !seenIds.has(sId) && !deletedSlideIds.has(sId)) {
+        console.log(`➕ [Hydration] Adding missing integration slide for slot ${slotKey} (Frontend ID ${sId})`);
 
         dedupedMeta.push({
           id: sId,
-          source: 'integration',
-          integrationIndex: info.originalIndex,
-          title: info.slideTitle, // 🔧 FIX: Use slide-specific title
-          subtitle: info.accountName
+          // templateId, columns, data removed to fix type error
+          title: info.slideTitle,
+          subtitle: info.accountName,
+          source: 'integration' as const,
+          integrationIndex: info.originalIndex
         });
-        seenIds.add(sId);
+
+        // Mark as claimed so we don't duplicate if map has multiple entries for same slot
+        claimedSlots.add(slotKey);
+
+        // Map the frontend ID to itself since it finds no backend ID
+        backendIdMap.current.set(sId, sId);
 
         // 🔧 CRITICAL: Also ensure this slide exists in dashboards Map
         if (!map.has(sId)) {
@@ -1396,6 +1493,22 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     // 🔧 CRITICAL: Set the hydrated dashboards map to state
     // This was missing! The comment at line 1168 said it would be called after auto-population,
     // but it was never added. Without this, all the hydration work above is discarded.
+    // 🔧 CRITICAL FIX: Ensure ALL slides (including empty Custom Pages) are in dashboards map
+    // The previous logic only populated map from 'widgets' or 'slideIntegrationMap',
+    // skipping empty Custom Pages which caused them to disappear from the sidebar (ghosted).
+    dedupedMeta.forEach(m => {
+      if (!map.has(m.id)) {
+        console.log(`🔧 [Hydration] Adding empty dashboard for slide ${m.id} (${m.title}) during final check`);
+        map.set(m.id, []);
+      }
+
+      // Also ensure backendIdMap knows about these IDs
+      if (!backendIdMap.current.has(m.id)) {
+        // If it's a backend ID (which it is, during hydration), map it to itself
+        backendIdMap.current.set(m.id, m.id);
+      }
+    });
+
     console.log(`✅ [Hydration] Setting dashboards map with ${map.size} slides:`, Array.from(map.keys()));
     setDashboards(map);
     setIsDashboardsInitialized(true);
@@ -2638,15 +2751,14 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     []
   );
 
+  // Ref for robust ID generation
+  const nextCustomIdRef = useRef(1000);
+
   const addCustomPage = useCallback(
     (pageName: string, subtitle?: string) => {
       // Robust ID generation
-      const existingIds = Array.from(dashboards.keys());
-      const maxId = existingIds.length > 0 ? Math.max(...existingIds) : -1;
-      // Ensure we jump high enough to avoid collision with low integration IDs
-      // If no high IDs exist, start at 1000. If we have 1000+, increment.
-      const startId = Math.max(999, maxId);
-      const nextId = startId + 1;
+      // Robust ID generation using ref (initialized during hydration)
+      const nextId = nextCustomIdRef.current++;
 
       console.log(`[addCustomPage] Creating custom page with ID=${nextId}, name="${pageName}"`);
 
@@ -2671,9 +2783,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       // Add empty slide to dashboards immediately so it's "real"
       setDashboards((prev) => {
         const updated = new Map(prev);
-        if (!updated.has(nextId)) {
-          updated.set(nextId, []);
-        }
+        // FIX: Force set empty array even if key exists (to clear any ghost widgets)
+        updated.set(nextId, []);
         return updated;
       });
 
@@ -2692,7 +2803,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
       return nextId;
     },
-    [dashboards]
+    [dashboards, deletedSlideIds] // Add deletedSlideIds dependency
   );
 
 
@@ -4680,19 +4791,34 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                       if (integrationsData?.integrations) {
                         Array.from(dashboards.keys()).forEach(slideId => {
                           const numId = Number(slideId);
-                          if (!existingIds.has(numId) && !customPages.find(p => Number(p.id) === numId)) {
-                            // Integration slides have IDs that match their index in integrations array
-                            // (unless they were remapped, but for new/re-added pages they match)
-                            const integration = integrationsData.integrations[numId];
-                            if (integration) {
-                              integrationExtras.push({
-                                id: numId,
-                                title: "", // Sidebar logic will fallback to integration name
-                                subtitle: "",
-                                source: "integration",
-                                integrationIndex: numId
-                              });
+
+                          // CRITICAL FIX: Ensure we skip slides that are:
+                          // 1. Already in the base list (hydrated slides)
+                          // 2. Custom pages
+                          // 3. Mapped via backend ID (Ghost duplicate protection)
+                          if (existingIds.has(numId) || customPages.find(p => Number(p.id) === numId)) {
+                            return;
+                          }
+
+                          // Check if this slide ID maps to an integration
+                          const integrationInfo = slideIntegrationMap.get(numId);
+                          if (integrationInfo) {
+
+                            // Check by TITLE (New logic): If I have a custom page named "Facebook", don't show the "Facebook" integration fallback
+                            // Use slideTitle as the name property might not exist on integrationInfo
+                            const customPageWithSameName = customPages.some(cp => cp.name.toLowerCase() === integrationInfo.slideTitle.toLowerCase());
+
+                            if (customPageWithSameName) {
+                              return;
                             }
+
+                            integrationExtras.push({
+                              id: numId,
+                              title: "", // Sidebar logic will fallback to integration name
+                              subtitle: "",
+                              source: "integration",
+                              integrationIndex: integrationInfo.originalIndex
+                            });
                           }
                         });
                       }
@@ -5063,6 +5189,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                   );
                 })
               )}
+
             </div>
 
             {/* Right Sidebar */}
