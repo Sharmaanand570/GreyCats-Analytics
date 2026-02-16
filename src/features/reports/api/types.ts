@@ -192,6 +192,10 @@ export interface ApiReportTemplateSlide {
   title: string;
   subtitle?: string;
   /**
+   * Source of the slide: 'integration' for auto-generated slides, 'custom' for user-created pages
+   */
+  source?: "integration" | "custom";
+  /**
    * Optional sort order from the backend. We primarily rely on pageOrder.
    */
   sortOrder?: number;

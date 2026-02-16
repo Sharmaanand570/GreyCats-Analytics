@@ -154,6 +154,7 @@ export const buildSlidesFromWidgets = (
         id: meta.id,
         title: meta.title,
         subtitle: meta.subtitle,
+        source: meta.source, // 🔧 CRITICAL: Include source field for backend
         sortOrder: meta.sortOrder,
         widgets: [],
       });
