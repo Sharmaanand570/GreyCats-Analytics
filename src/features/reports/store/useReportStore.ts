@@ -127,7 +127,25 @@ export const useReportStore = create<ReportStore>()(
                         }, {} as Record<string, any>)
                     };
 
-                    localStorage.setItem(name, JSON.stringify({ state: serializable }));
+                    try {
+                        localStorage.setItem(name, JSON.stringify({ state: serializable }));
+                    } catch (error) {
+                        // Handle QuotaExceededError by clearing storage and retrying once
+                        if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+                            console.warn('⚠️ [LocalStorage] Quota exceeded, clearing storage and retrying...');
+                            try {
+                                localStorage.removeItem(name);
+                                localStorage.setItem(name, JSON.stringify({ state: serializable }));
+                                console.log('✅ [LocalStorage] Successfully saved after clearing');
+                            } catch (retryError) {
+                                console.error('❌ [LocalStorage] Failed to save even after clearing:', retryError);
+                                // Silently fail - don't crash the app
+                            }
+                        } else {
+                            console.error('❌ [LocalStorage] Unexpected error:', error);
+                            // Silently fail - don't crash the app
+                        }
+                    }
                 },
                 removeItem: (name) => localStorage.removeItem(name)
             }

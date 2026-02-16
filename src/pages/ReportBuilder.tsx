@@ -381,6 +381,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     });
 
     const translatedOrder = rawOrder.map(id => {
+      // If this ID already exists in dashboards, use it directly (frontend ID)
+      if (dashboards.has(id)) return id;
       // If the ID is a backend ID that maps to a frontend ID, use the frontend ID
       if (backendToFrontend.has(id)) {
         return backendToFrontend.get(id)!;
@@ -978,12 +980,22 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     // Clear backend ID map on fresh hydration
     backendIdMap.current.clear();
 
-    console.log('🔍 [ID Mapping] cleanedSlidesMeta:', cleanedSlidesMeta.map(s => ({ id: s.id, source: s.source, integrationIndex: s.integrationIndex })));
+    // ✅ Backend now returns accurate source field - no correction needed!
+    console.log('🔍 [Hydration] slidesMeta from backend:', cleanedSlidesMeta.map(s => ({
+      id: s.id,
+      source: s.source,
+      integrationIndex: s.integrationIndex,
+      title: s.title
+    })));
+
+    console.log('🔍 [ID Mapping] cleanedSlidesMeta AFTER correction:', cleanedSlidesMeta.map(s => ({ id: s.id, source: s.source, integrationIndex: s.integrationIndex })));
 
     // Remap backend IDs to integration indices
     cleanedSlidesMeta.forEach(slide => {
       const bId = Number(slide.id); // This IS the backend database ID
       const iIdx = slide.integrationIndex;
+
+      console.log(`🔍 [ID Mapping] Slide ${bId}: source="${slide.source}", integrationIndex=${iIdx}, typeof iIdx=${typeof iIdx}`);
 
       // CRITICAL: Never remap custom pages (ID >= 1000 with source === 'custom')
       if (bId >= 1000 && slide.source === 'custom') {
@@ -995,6 +1007,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       }
 
       if (slide.source === 'integration' && typeof iIdx === 'number') {
+        console.log(`🔍 [ID Mapping] Processing integration slide: bId=${bId}, iIdx=${iIdx}`);
         // 🔧 CRITICAL FIX: For multi-slide integrations (e.g., Meta Business with Facebook + Instagram),
         // we need to map ALL sub-slides, not just subSlideIndex 0.
         // Find ALL frontend IDs for this integration index
@@ -1029,6 +1042,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           if (!backendIdMap.current.has(fId)) {
             backendIdMap.current.set(fId, bId);
             console.log(`🔗 [BackendIdMap] Mapped Frontend ${fId} (subSlide ${backendSubSlideIndex}) -> Backend ${bId}`);
+          } else {
+            console.warn(`⚠️ [BackendIdMap] Frontend ${fId} already mapped to ${backendIdMap.current.get(fId)}, skipping bId ${bId}`);
           }
 
           if (bId !== fId) {
@@ -1047,6 +1062,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         backendIdMap.current.set(bId, bId);
       }
     });
+
+    console.log(`🔍 [ID Mapping] backendIdMap AFTER forEach:`, Array.from(backendIdMap.current.entries()));
 
     // Execute Moves
     pendingMoves.forEach(move => {
@@ -1087,9 +1104,30 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       }
     });
 
-    // Content-Based Reclamation (Keep for safety)
+    // Content-Based Reclamation — rescue orphaned widgets from ghost slides
+    // CRITICAL: Skip slides that are legitimate custom pages in cleanedSlidesMeta
+    const cleanedSlideIdSet = new Set(cleanedSlidesMeta.map(m => Number(m.id)));
+
+    // 🔧 CRITICAL FIX: Also get all backend IDs to avoid treating them as ghost slides
+    const backendSlideIds = new Set(cleanedSlidesMeta.map(m => Number(m.id)));
+
+
+    console.log(`🔍 [Rescue] cleanedSlideIdSet:`, Array.from(cleanedSlideIdSet));
+    console.log(`🔍 [Rescue] map.keys():`, Array.from(map.keys()));
+
     map.forEach((widgets, sId) => {
-      if ((sId >= 1000 || !cleanedSlidesMeta.find(m => Number(m.id) === sId)) && widgets.length > 0) {
+      console.log(`🔍 [Rescue] Checking slide ${sId}: inCleanedSet=${cleanedSlideIdSet.has(sId)}, hasWidgets=${widgets.length > 0}`);
+
+      // 🔧 CRITICAL FIX: Skip rescue logic for frontend IDs (< 1000)
+      // These are legitimate integration slides that just need ID mapping, not content reclamation
+      if (sId < 1000) {
+        console.log(`🔍 [Rescue] Skipping frontend ID ${sId} - not a ghost slide`);
+        return;
+      }
+
+      // Only reclaim from slides that are NOT in cleanedSlidesMeta (true ghost slides)
+      // AND not backend slide IDs (which are real slides that just need ID mapping)
+      if (!cleanedSlideIdSet.has(sId) && !backendSlideIds.has(sId) && widgets.length > 0) {
         const firstInt = widgets[0].metricConfig?.integration;
         if (firstInt && integrationsData?.integrations) {
           const normalize = (s: string) => s.toLowerCase().replace(/[ _-]/g, '');
@@ -1160,13 +1198,12 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       }
     });
 
-    // NOTE: setDashboards(map) moved to AFTER auto-population logic
-    // so that missing integration slides are properly added to the map first
+    // NOTE: setDashboards(map) and setIsDashboardsInitialized(true) are now called
+    // AFTER auto-population logic (see lines after slideIntegrationMap.forEach),
+    // so that missing integration slides are properly added to the map first.
 
-    setIsDashboardsInitialized(true);
     // Mark this template as hydrated to prevent re-hydration on remounts
     hydratedTemplateIdRef.current = templateId;
-    console.log(`✅ [Hydration] Completed for templateId ${templateId}`);
 
     // Rebuild processedSlidesMeta
     const finalMeta = cleanedSlidesMeta.map(m => {
@@ -1181,6 +1218,11 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     console.log('🔍 [Hydration] finalMeta before deduplication:', finalMeta.map(m => ({ id: m.id, title: m.title, source: m.source })));
 
     finalMeta.forEach(m => {
+      if (seenIds.has(m.id)) {
+        console.warn(`⚠️ [Hydration] Skipping duplicate slide ID ${m.id} (${m.title}, source: ${m.source})`);
+        return;
+      }
+
       if (!seenIds.has(m.id)) {
         // ✅ CRITICAL FIX: Explicitly preserve Custom Pages (ID >= 1000)
         // Do not let them fall into integration matching logic
@@ -1343,9 +1385,21 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         if (!backendIdMap.current.has(sId)) {
           backendIdMap.current.set(sId, sId);
           console.log(`🔗 [Hydration] Auto-mapped Frontend ${sId} -> Backend ${sId}`);
+        } else {
+          console.log(`🔗 [Hydration] Skipping auto-map for Frontend ${sId}, already mapped to Backend ${backendIdMap.current.get(sId)}`);
         }
       }
     });
+
+    console.log(`🔍 [Hydration] backendIdMap AFTER auto-population:`, Array.from(backendIdMap.current.entries()));
+
+    // 🔧 CRITICAL: Set the hydrated dashboards map to state
+    // This was missing! The comment at line 1168 said it would be called after auto-population,
+    // but it was never added. Without this, all the hydration work above is discarded.
+    console.log(`✅ [Hydration] Setting dashboards map with ${map.size} slides:`, Array.from(map.keys()));
+    setDashboards(map);
+    setIsDashboardsInitialized(true);
+    console.log(`✅ [Hydration] Completed for templateId ${templateId}`);
 
     // 🔧 CRITICAL FIX: Correct corrupted slide titles from backend
     // Backend may have wrong titles (e.g., all "meta-ads"), so override with correct titles from slideIntegrationMap
@@ -1392,74 +1446,66 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
     setProcessedSlidesMeta(correctedMeta);
 
-    // Clean pageOrder
+    // Clean pageOrder — translate ALL backend IDs to frontend IDs.
+    // pageOrder must use the same IDs as dashboards keys (frontend IDs).
+    // Backend now returns clean backend DB IDs (e.g. [6395, 6396, 7000]),
+    // but dashboards use frontend IDs (0, 1, 1000). We must translate.
     if (templateQuery.data.pageOrder) {
       console.log('🔍 [PageOrder Hydration] Raw pageOrder from backend:', templateQuery.data.pageOrder);
-      console.log('🔍 [PageOrder Hydration] seenIds:', Array.from(seenIds));
       console.log('🔍 [PageOrder Hydration] idMapping:', Array.from(idMapping.entries()));
+      console.log('🔍 [PageOrder Hydration] backendIdMap (Frontend→Backend):', Array.from(backendIdMap.current.entries()));
+
+      // Build reverse map: Backend ID → Frontend ID
+      const backendToFrontendMap = new Map<number, number>();
+      backendIdMap.current.forEach((bId, fId) => {
+        backendToFrontendMap.set(bId, fId);
+      });
+      idMapping.forEach((frontendId, backendId) => {
+        backendToFrontendMap.set(backendId, frontendId);
+      });
+
+      console.log('🔍 [PageOrder Hydration] backendToFrontendMap:', Array.from(backendToFrontendMap.entries()));
+      console.log('🔍 [PageOrder Hydration] map.keys():', Array.from(map.keys()));
 
       const newOrder = templateQuery.data.pageOrder
         .map((id: any) => {
           const numId = Number(id);
-          // Don't remap custom pages (ID >= 1000)
+
+          // 🔧 CRITICAL FIX: Always try to translate backend ID → frontend ID first
+          // Don't check map.has(numId) because map contains BOTH backend and frontend IDs
+          const frontendId = backendToFrontendMap.get(numId);
+          if (frontendId !== undefined) {
+            console.log('🔍 [PageOrder Mapping] Backend -> Frontend:', numId, '->', frontendId);
+            return frontendId;
+          }
+
+          // If no mapping found and it's a custom page ID (>= 1000), keep it as-is
           if (numId >= 1000) {
             console.log('🔍 [PageOrder Mapping] Preserving custom page ID:', numId);
             return numId;
           }
-          // Only remap integration pages
-          // Only remap integration pages
-          let mapped = idMapping.get(numId) ?? numId;
 
-          // CRITICAL FIX: Normalize duplicates!
-          // If 'mapped' is a Frontend ID (e.g. 0) that we know has a Backend ID (e.g. 5493),
-          // convert it to the Backend ID.
-          // This fixes cases where pageOrder contains BOTH [5493, 0], ensuring they dedup to [5493].
-          if (backendIdMap.current.has(mapped)) {
-            const bId = backendIdMap.current.get(mapped);
-            if (bId !== mapped) {
-              console.log('🔍 [PageOrder Mapping] Normalizing Frontend ID -> Backend ID:', mapped, '->', bId);
-              mapped = bId!;
-            }
+          // Fallback: try idMapping directly
+          const mapped = idMapping.get(numId);
+          if (mapped !== undefined) {
+            console.log('🔍 [PageOrder Mapping] idMapping fallback:', numId, '->', mapped);
+            return mapped;
           }
 
-          if (mapped !== numId) {
-            console.log('🔍 [PageOrder Mapping] Remapping integration page:', numId, '->', mapped);
-          }
-          return mapped;
+          return numId;
         });
 
-      console.log('🔍 [PageOrder Hydration] Cleaned pageOrder:', newOrder);
+      console.log('🔍 [PageOrder Hydration] Translated to frontend IDs:', newOrder);
 
       const uniqueOrder = Array.from(new Set(newOrder)) as number[];
 
-      // 2. Ghost Rescue & Validation
-      // We trust the backend order, but we must ensure we don't have IDs that point to nothing.
-      // However, for Custom Pages (ID >= 1000), if they are in the order but missing from metadata,
-      // we "rescue" them by treating them as valid.
+      // Validate: only keep IDs that exist in dashboards or dedupedMeta
       const finalValidatedOrder = uniqueOrder.filter(id => {
-        // Custom Pages: Always keep
-        if (id >= 1000) return true;
+        if (map.has(id)) return true;
+        // Custom pages may exist in dedupedMeta even without dashboard entries
+        if (id >= 1000 && dedupedMeta.some(m => m.id === id)) return true;
 
-        // Integration Pages (ID < 1000 or big backend IDs)
-        // Check 1: Is it in the slide map directly? (e.g. ID 0)
-        if (slideIntegrationMap.has(id)) return true;
-
-        // Check 2: Is it a backend ID that maps to a valid frontend ID?
-        // backendIdMap: Frontend (0) -> Backend (5438)
-        // We need to check if ANY entry in backendIdMap values equals `id`
-        // AND if the corresponding key exists in slideIntegrationMap.
-        let isValidBackendId = false;
-        for (const [fId, bId] of backendIdMap.current.entries()) {
-          if (bId === id) {
-            if (slideIntegrationMap.has(fId)) {
-              isValidBackendId = true;
-            }
-            break;
-          }
-        }
-        if (isValidBackendId) return true;
-
-        console.warn(`👻 [PageOrder] Removing ghost INTEGRATION page ID ${id} (Integrations: ${integrationsData?.integrations?.length})`);
+        console.warn(`👻 [PageOrder] Removing ghost page ID ${id} - not in dashboards`);
         return false;
       });
 
@@ -1721,7 +1767,17 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       // Build slidesMeta earlier so we can use it to bake titles into widgets
       // KEY FIX: Use pageOrder as source of truth for which slides exist.
       // Previously used dashboards.keys(), which might miss empty pages or include deleted ones.
-      const slideIdList = pageOrder && pageOrder.length > 0 ? pageOrder : Array.from(dashboards.keys());
+      const rawSlideIdList = pageOrder && pageOrder.length > 0 ? pageOrder : Array.from(dashboards.keys());
+
+      // 🔧 CRITICAL FIX: Deduplicate slideIdList to prevent duplicate slides in save payload
+      const slideIdList = Array.from(new Set(rawSlideIdList.map(id => Number(id))));
+
+      if (rawSlideIdList.length !== slideIdList.length) {
+        console.warn(`⚠️ [SavePayload] Removed ${rawSlideIdList.length - slideIdList.length} duplicate slide IDs from pageOrder`, {
+          raw: rawSlideIdList,
+          deduplicated: slideIdList
+        });
+      }
 
       // 🔍 DIAGNOSTIC: Warn if slideIntegrationMap is empty during save
       if (slideIntegrationMap.size === 0 && !readOnly && slideIdList.some(id => Number(id) < 1000)) {
@@ -1968,13 +2024,22 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         .filter((s): s is ReportSlideMeta => s !== null);
 
       // ✅ STEP 2: Clean pageOrder to match cleaned slidesMeta
-      // 🔧 CRITICAL FIX: Use pageOrder as-is (frontend IDs in reordered sequence)
-      // pageOrder state already has the reordered frontend IDs like [2, 0, 1]
-      // These frontend IDs represent the slide identities (0=Facebook, 1=Instagram, 2=Meta Ads)
-      // Just send them directly - the backend will understand them as sortOrder values
-      const cleanedPageOrder = pageOrder.length > 0 ? pageOrder : slideIdList;
+      // 🔧 CRITICAL FIX: Translate frontend IDs → backend IDs for save
+      // pageOrder state has frontend IDs like [1, 0, 2, 3, 4] (reordered)
+      // Backend expects backend IDs like [5801, 5797, 5798, 5799, 5800]
+      const frontendPageOrder = pageOrder.length > 0 ? pageOrder : slideIdList;
+      const cleanedPageOrder = frontendPageOrder.map(fId => {
+        const backendId = backendIdMap.current.get(fId);
+        if (backendId !== undefined) {
+          console.log(`💾 [Save] Translating pageOrder: Frontend ${fId} -> Backend ${backendId}`);
+          return backendId;
+        }
+        // Custom pages (>= 1000) use their ID as-is
+        console.log(`💾 [Save] Keeping pageOrder ID as-is: ${fId}`);
+        return fId;
+      });
 
-      console.log('💾 [Save] PageOrder being saved:', cleanedPageOrder);
+      console.log('💾 [Save] PageOrder being saved (backend IDs):', cleanedPageOrder);
       console.log('💾 [Save] SlidesMeta:', slidesMeta.map(s => ({ id: s.id, title: s.title, source: s.source })));
 
       // Build widgets array from current dashboards/layouts
@@ -2281,95 +2346,57 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     onSuccess: (data) => {
       console.log(`✅ [SaveMutation] Success! Response:`, data);
 
-      // 🔧 CRITICAL FIX: Sync pageOrder with backend response
-      // Backend may reassign slide IDs, so we must update our local state to match
-      const backendPageOrder = data?.template?.pageOrder;
-      if (backendPageOrder && Array.isArray(backendPageOrder) && backendPageOrder.length > 0) {
-        console.log(`🔄 [SaveMutation] Syncing pageOrder from backend:`, backendPageOrder);
+      // DO NOT sync pageOrder from backend response.
+      // pageOrder must always stay in frontend IDs (matching dashboards keys, customPages IDs,
+      // and processedSlidesMeta IDs). The backend returns backend DB IDs (e.g. [6395, 6396, 7000])
+      // which don't match frontend state — syncing them causes pages to disappear.
+      // The backend's pageOrder is only consumed during initial hydration (page refresh),
+      // where it gets translated back to frontend IDs.
 
-        // 🔧 DISABLED: Migration logic was creating duplicates
-        // Backend returns mixed IDs (e.g., [6392, 0, 6394]), and migration incorrectly
-        // mapped frontend ID 0 to backend ID 6392 by sortOrder match, creating [6392, 6392, 6394]
-        // Use backend pageOrder as-is for now
-        const correctedPageOrder: number[] = backendPageOrder;
-        /*
-        let correctedPageOrder: number[] = backendPageOrder;
-        if (data?.template?.slides && Array.isArray(data.template.slides)) {
-          correctedPageOrder = backendPageOrder
-            .map((id: number): number | undefined => {
-              if (id < 1000) {
-                // Find slide with matching sortOrder
-                const slide = data.template.slides.find((s: any) => s.sortOrder === id);
-                if (slide && slide.id !== id) {
-                  console.log(`🔧 [Migration] Correcting pageOrder: Frontend ID ${id} -> Backend ID ${slide.id}`);
-                  return slide.id;
-                }
-              }
-              return id;
-            })
-            .filter((id): id is number => id !== undefined);
-        }
-        */
+      // Only update backendIdMap — maps frontend IDs → backend DB IDs for subsequent saves
+      if (data?.template?.slides && Array.isArray(data.template.slides)) {
+        console.log(`🔗 [SaveMutation] Updating backendIdMap from slides:`, data.template.slides.map((s: any) => ({ id: s.id, sortOrder: s.sortOrder, title: s.title, source: s.source })));
 
+        // Build reverse map from current backendIdMap: backendId → frontendId
+        const currentBackendToFrontend = new Map<number, number>();
+        backendIdMap.current.forEach((bId, fId) => {
+          currentBackendToFrontend.set(bId, fId);
+        });
 
-        // 🔧 CRITICAL: Only sync pageOrder if it has the same number of slides
-        // This prevents corruption where slides disappear due to filtering
-        console.log(`🔍 [SaveMutation] Comparing pageOrder lengths: backend=${correctedPageOrder.length}, current=${pageOrder.length}`);
-        if (correctedPageOrder.length === pageOrder.length) {
-          setPageOrder(correctedPageOrder);
-          console.log(`✅ [SaveMutation] Synced pageOrder from backend:`, correctedPageOrder);
-        } else {
-          console.warn(`⚠️ [SaveMutation] Skipping pageOrder sync - length mismatch! Backend has ${correctedPageOrder.length} slides, frontend has ${pageOrder.length}`);
-        }
+        data.template.slides.forEach((slide: any) => {
+          if (!slide.id) return;
 
-        // Also update backendIdMap if slides were returned
-        if (data?.template?.slides && Array.isArray(data.template.slides)) {
-          console.log(`🔗 [SaveMutation] Updating backendIdMap from slides:`, data.template.slides.map((s: any) => ({ id: s.id, sortOrder: s.sortOrder, title: s.title })));
-          data.template.slides.forEach((slide: any) => {
-            if (slide.id && typeof slide.sortOrder === 'number') {
-              // Map the sortOrder (frontend index) to the backend ID
-              backendIdMap.current.set(slide.sortOrder, slide.id);
-              console.log(`🔗 [SaveMutation] Mapped sortOrder ${slide.sortOrder} -> Backend ID ${slide.id} (${slide.title})`);
+          // 1. If we already have a mapping for this backend ID, preserve it
+          const existingFrontendId = currentBackendToFrontend.get(slide.id);
+          if (existingFrontendId !== undefined) {
+            backendIdMap.current.set(existingFrontendId, slide.id);
+            console.log(`🔗 [SaveMutation] Preserved: Frontend ${existingFrontendId} -> Backend ${slide.id} (${slide.title})`);
+            return;
+          }
+
+          // 2. 🔧 CRITICAL FIX: Use pageOrder to map sortOrder -> Frontend ID
+          // Do NOT use sortOrder directly as a key, because reordering changes the index!
+          // Example: If Custom Page (ID 1000) is moved to index 0:
+          // - sortOrder = 0
+          // - We MUST map Frontend ID 1000 -> Backend ID
+          // - We must NOT map Frontend ID 0 -> Backend ID (that would overwrite Facebook!)
+          const sentOrder = pageOrder.length > 0 ? pageOrder : Array.from(dashboards.keys());
+
+          if (typeof slide.sortOrder === 'number' && slide.sortOrder < sentOrder.length) {
+            const frontendId = sentOrder[slide.sortOrder];
+
+            // Validate the frontend ID exists in our state
+            if (typeof frontendId === 'number' && (dashboards.has(frontendId) || frontendId >= 1000)) {
+              backendIdMap.current.set(frontendId, slide.id);
+              console.log(`🔗 [SaveMutation] Mapped via Order: Frontend ${frontendId} -> Backend ${slide.id} (SortOrder ${slide.sortOrder})`);
+              return;
             }
-          });
-        }
+          }
 
-        // 🔧 DISABLED: Don't sync processedSlidesMeta from backend after save
-        // The frontend already has the correct metadata. Syncing from backend was causing
-        // slides to disappear because backend might return incomplete slidesMeta.
-        // Only sync pageOrder and backendIdMap, which are essential for ID mapping.
-        /*
-        if (data?.template?.slidesMeta && Array.isArray(data.template.slidesMeta)) {
-          console.log(`🔄 [SaveMutation] Syncing slidesMeta from backend:`, data.template.slidesMeta);
-
-          // Update processedSlidesMeta with backend data
-          // The backend returns slidesMeta with correct title/subtitle for each slide ID
-          const backendSlidesMeta = data.template.slidesMeta.map((slide: any) => ({
-            id: slide.id,
-            title: slide.title || '',
-            subtitle: slide.subtitle || '',
-            source: slide.source || 'integration',
-            integrationIndex: slide.integrationIndex,
-            sortOrder: slide.sortOrder
-          }));
-
-          setProcessedSlidesMeta(backendSlidesMeta);
-          console.log(`✅ [SaveMutation] Updated processedSlidesMeta with ${backendSlidesMeta.length} slides`);
-        }
-        */
+          console.warn(`⚠️ [SaveMutation] Could not map slide ${slide.id} to a frontend ID. SortOrder: ${slide.sortOrder}`);
+        });
       }
 
-      // 🔧 DISABLED: Don't invalidate query after save to prevent re-hydration
-      // We already synced pageOrder and processedSlidesMeta from the save response above.
-      // Invalidating would trigger a re-fetch and re-hydration, which can filter out slides.
-      // The data will be fresh on next page load/refresh.
-      // queryClient.invalidateQueries({ queryKey: ["report-template", templateId] });
-      // console.log(`🔄 [SaveMutation] Invalidated template query cache`);
-
-      // We already keep the in-memory dashboards (with full widget data)
-      // as the source of truth. Avoid immediately re-hydrating from the
-      // backend, since the backend may not yet persist manual widgetData
-      // (content blocks), which would make them appear to "reset" after save.
       setLastSavedTime(new Date());
       setHasUnsavedChanges(false);
       toast.success("Report template saved");
@@ -2555,7 +2582,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       setIsGeneratingPdf(true);
       // Ensure all widget data is fetched (including off-screen slides) before exporting
       await prefetchAllWidgets();
-      await exportAllSlidesToPDF(slidesRef.current, pageOrder);
+      await exportAllSlidesToPDF(slidesRef.current, effectivePageOrder);
     } catch (error) {
       console.error("Failed to generate PDF from frontend", error);
       toast.error("Failed to generate PDF");
@@ -2668,7 +2695,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     [dashboards]
   );
 
-  
+
   const handleDeletePage = useCallback((slideId: number) => {
     console.log(`🗑️ [Delete] Deleting slide ${slideId}`);
 
