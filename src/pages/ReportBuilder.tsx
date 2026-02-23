@@ -2137,20 +2137,39 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         .filter((s): s is ReportSlideMeta => s !== null);
 
       // ✅ STEP 2: Clean pageOrder to match cleaned slidesMeta
-      // 🔧 CRITICAL FIX: Translate frontend IDs → backend IDs for save
-      // pageOrder state has frontend IDs like [1, 0, 2, 3, 4] (reordered)
-      // Backend expects backend IDs like [5801, 5797, 5798, 5799, 5800]
+      // 🔧 CRITICAL FIX: Build pageOrder from user's order, but ONLY include validated slides
+      // 
+      // PROBLEM: If we use the raw pageOrder state directly, it might include:
+      // - Slides that were filtered out during validation (e.g., 6030 removed)
+      // - Temporary IDs (e.g., 3) that haven't been created yet
+      // This causes the backend to delete valid slides that aren't in the list!
+      // 
+      // SOLUTION: 
+      // 1. Start with user's pageOrder (to preserve their ordering)
+      // 2. Translate frontend IDs → backend IDs
+      // 3. Filter to only include IDs that made it into slidesMeta
+      const validSlideIds = new Set(slidesMeta.map(s => s.id));
       const frontendPageOrder = pageOrder.length > 0 ? pageOrder : slideIdList;
-      const cleanedPageOrder = frontendPageOrder.map(fId => {
-        const backendId = backendIdMap.current.get(fId);
-        if (backendId !== undefined) {
-          console.log(`💾 [Save] Translating pageOrder: Frontend ${fId} -> Backend ${backendId}`);
-          return backendId;
-        }
-        // Custom pages (>= 1000) use their ID as-is
-        console.log(`💾 [Save] Keeping pageOrder ID as-is: ${fId}`);
-        return fId;
-      });
+
+      const cleanedPageOrder = frontendPageOrder
+        .map(fId => {
+          // Translate frontend ID to backend ID
+          const backendId = backendIdMap.current.get(fId);
+          if (backendId !== undefined) {
+            console.log(`💾 [Save] Translating pageOrder: Frontend ${fId} -> Backend ${backendId}`);
+            return backendId;
+          }
+          // Custom pages (>= 1000) use their ID as-is
+          console.log(`💾 [Save] Keeping pageOrder ID as-is: ${fId}`);
+          return fId;
+        })
+        .filter(id => {
+          const isValid = validSlideIds.has(id);
+          if (!isValid) {
+            console.warn(`⚠️ [Save] Filtering out ID ${id} from pageOrder - not in validated slidesMeta`);
+          }
+          return isValid;
+        });
 
       console.log('💾 [Save] PageOrder being saved (backend IDs):', cleanedPageOrder);
       console.log('💾 [Save] SlidesMeta:', slidesMeta.map(s => ({ id: s.id, title: s.title, source: s.source })));
@@ -2756,11 +2775,31 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
   const addCustomPage = useCallback(
     (pageName: string, subtitle?: string) => {
-      // Robust ID generation
       // Robust ID generation using ref (initialized during hydration)
       const nextId = nextCustomIdRef.current++;
 
       console.log(`[addCustomPage] Creating custom page with ID=${nextId}, name="${pageName}"`);
+
+      // CRITICAL FIX: Update dashboards first, then nest pageOrder update inside
+      // This ensures the new empty dashboard exists before we update pageOrder
+      setDashboards((prevDashboards) => {
+        const updated = new Map(prevDashboards);
+        // Force set empty array to ensure new slide starts with no widgets
+        updated.set(nextId, []);
+        console.log(`✅ [Add Custom Page] Created empty dashboard for ID ${nextId}`);
+        console.log(`✅ [Add Custom Page] Dashboard has ${updated.get(nextId)?.length || 0} widgets`);
+
+        // Update pageOrder immediately after dashboards update
+        // This ensures pageOrder uses the most up-to-date dashboard keys
+        setPageOrder((prevOrder) => {
+          const base = prevOrder.length > 0 ? prevOrder : Array.from(prevDashboards.keys());
+          const newOrder = [...base, nextId];
+          console.log(`✅ [Add Custom Page] Updated pageOrder:`, newOrder);
+          return newOrder;
+        });
+
+        return updated;
+      });
 
       // Add to custom pages
       setCustomPages((prev) => [
@@ -2768,7 +2807,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         { id: nextId, name: pageName, subtitle },
       ]);
 
-      // CRITICAL FIX: Add to processedSlidesMeta with source: 'custom'
+      // Add to processedSlidesMeta with source: 'custom'
       // This ensures the page is saved with the correct metadata and persists after refresh
       setProcessedSlidesMeta((prev) => [
         ...prev,
@@ -2780,30 +2819,12 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         }
       ]);
 
-      // Add empty slide to dashboards immediately so it's "real"
-      setDashboards((prev) => {
-        const updated = new Map(prev);
-        // FIX: Force set empty array even if key exists (to clear any ghost widgets)
-        updated.set(nextId, []);
-        return updated;
-      });
-
-      // Add to page order
-      setPageOrder((prev) => {
-        // If we had no custom order (empty), strictly use current dashboardIds as base
-        // otherwise simply append to the existing custom order
-        const base = prev.length > 0 ? prev : Array.from(dashboards.keys());
-        const newOrder = [...base, nextId];
-        console.log(`✅ [Add Custom Page] Updated pageOrder: ${prev} → ${newOrder}`);
-        return newOrder;
-      });
-
       setHasUnsavedChanges(true);
       toast.success(`Added custom page: ${pageName}`);
 
       return nextId;
     },
-    [dashboards, deletedSlideIds] // Add deletedSlideIds dependency
+    [] // Removed dashboards dependency to prevent stale closures
   );
 
 
@@ -4917,15 +4938,23 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                   // 🔧 CRITICAL FIX: effectivePageOrder contains backend IDs (e.g., 5503, 5504)
                   // but dashboards Map uses frontend IDs (e.g., 0, 1, 2) as keys.
                   // We need to reverse-lookup the frontend ID from backendIdMap.
+                  // HOWEVER: Custom pages (ID >= 1000) should NEVER be mapped through backendIdMap
+                  // because they are frontend-only IDs that don't have backend equivalents yet.
 
                   let frontendId = id; // Default to the ID itself
 
-                  // Check if this ID is a backend ID by searching backendIdMap
-                  for (const [fId, bId] of backendIdMap.current.entries()) {
-                    if (bId === id) {
-                      frontendId = fId;
-                      console.log(`🔄 [SlideRender] Mapped Backend ID ${id} -> Frontend ID ${frontendId}`);
-                      break;
+                  // 🔧 FIX: Skip backendIdMap lookup for custom pages (ID >= 1000)
+                  // Custom pages use their own ID directly as the key in dashboards Map
+                  if (id >= 1000) {
+                    console.log(`✅ [SlideRender] Custom page ID ${id} - using direct ID (no mapping)`);
+                  } else {
+                    // Check if this ID is a backend ID by searching backendIdMap
+                    for (const [fId, bId] of backendIdMap.current.entries()) {
+                      if (bId === id) {
+                        frontendId = fId;
+                        console.log(`🔄 [SlideRender] Mapped Backend ID ${id} -> Frontend ID ${frontendId}`);
+                        break;
+                      }
                     }
                   }
 

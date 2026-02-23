@@ -23,7 +23,7 @@ export interface WidgetDataWrapperProps {
 
 export function WidgetDataWrapper({
   widget,
-  slideId,
+  slideId: _slideId,
   effectiveClientId,
   dateFrom,
   dateTo,

@@ -317,7 +317,7 @@ export const renderWidgetContent = (
                           />
                         )}
                         <Bar dataKey="value" fill={chartColor}>
-                          {chartData.map((entry, index) => (
+                          {chartData.map((_entry, index) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Bar>
@@ -358,10 +358,10 @@ export const renderWidgetContent = (
                           cy="50%"
                           outerRadius={65}
                           fill={chartColor}
-                          label={({ label, percent }) => `${label} (${(percent * 100).toFixed(0)}%)`}
+                          label={({ label, percent }: { label: string; percent: number }) => `${label} (${(percent * 100).toFixed(0)}%)`}
                           labelLine={true}
                         >
-                          {chartData.map((entry, index) => (
+                          {chartData.map((_entry, index) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
