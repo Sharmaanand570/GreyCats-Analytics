@@ -22,7 +22,7 @@ export const INTEGRATION_CONFIG: Record<IntegrationType, IntegrationConfig> = {
   },
   'meta-ads': {
     name: 'Meta Ads',
-    icon: '📱', 
+    icon: '📱',
     color: 'bg-purple-500',
     oauthUrl: '/meta-ads/connect',
     availableAccountsUrl: '/api/integrations/meta-ads/available-accounts',
@@ -82,6 +82,15 @@ export const INTEGRATION_CONFIG: Record<IntegrationType, IntegrationConfig> = {
     availableAccountsUrl: '/api/integrations/google-analytics/available-accounts',
     displayNameField: 'platform',
     identifierField: 'id',
+  },
+  'google-ads': {
+    name: 'Google Ads',
+    icon: '🎯',
+    color: 'bg-blue-600',
+    oauthUrl: '/google-ads/connect',
+    availableAccountsUrl: '/api/integrations/google-ads/available-accounts',
+    displayNameField: 'name',
+    identifierField: 'customerId',
   },
 };
 

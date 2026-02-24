@@ -353,14 +353,11 @@ const mapApiTemplateToReportTemplate = (
 
 
     // Determine if this is a custom page or integration page
-    // Prioritize metadata markers over ID heuristics
-    const hasIntegrationMarker =
-      typeof slide.metadata?.integrationIndex === 'number' ||
-      slide.metadata?.originalSource === 'integration' ||
-      slide.source === 'integration';
-
-    // Custom pages typically have IDs >= 1000 (backend-generated) AND lack integration markers
-    const isCustomPage = !hasIntegrationMarker && (slideId >= 1000 || slide.widgets.length === 0);
+    // ✅ FIX: Trust `slide.source` as the authoritative field.
+    // The old `slideId >= 1000` heuristic was only valid for FRONTEND IDs.
+    // After save+refresh, backend assigns real DB IDs (e.g. 423) which may be < 1000,
+    // causing custom pages to be misclassified as integration pages.
+    const isCustomPage = slide.source === 'custom';
 
     slidesMeta.push({
       id: slideId,

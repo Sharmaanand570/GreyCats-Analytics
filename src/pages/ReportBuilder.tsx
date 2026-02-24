@@ -916,6 +916,14 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           // We let the ID Mapping logic (Step 4) decide if they are valid.
           if (slide.source === 'integration') return true;
 
+          // 🔧 FIX: Allow custom pages through regardless of their backend ID.
+          // Custom pages with backend-assigned IDs < 1000 were being incorrectly dropped here.
+          // The id >= 1000 check only applies to FRONTEND IDs, not backend DB IDs.
+          if (slide.source === 'custom') {
+            console.log(`✅ [Hydration] Preserving custom page (source=custom): ID=${sId}, Title="${slide.title}"`);
+            return true;
+          }
+
           console.log(`👻 [Hydration] Removing ghost slide: ID=${sId}, Title="${slide.title}", Source=${slide.source}`);
           return false;
         }
@@ -925,8 +933,11 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
       // ✅ STEP 3: Update customPages with cleaned data
       setCustomPages((prev) => {
+        // 🔧 FIX: Remove the `id >= 1000` guard — this was designed for frontend IDs only.
+        // After a save+refresh, backend assigns its own DB IDs which may be < 1000.
+        // Trust the `source === 'custom'` field as the source of truth.
         const fromBackend = cleanedSlidesMeta
-          .filter((slide: any) => slide.source === 'custom' && Number(slide.id) >= 1000)
+          .filter((slide: any) => slide.source === 'custom')
           .map((slide: any) => ({
             id: Number(slide.id),
             name: slide.title,
@@ -1162,6 +1173,18 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       // These are legitimate integration slides that just need ID mapping, not content reclamation
       if (sId < 1000) {
         console.log(`🔍 [Rescue] Skipping frontend ID ${sId} - not a ghost slide`);
+        return;
+      }
+
+      // 🔧 CRITICAL FIX: Skip rescue for legitimate CUSTOM PAGES.
+      // The rescue logic moves widgets to integration slots based on their `integration` field.
+      // But custom pages can also contain metric widgets — those must NOT be moved.
+      // A custom page is confirmed if it appears in cleanedSlidesMeta with source='custom'.
+      const isConfirmedCustomPage = cleanedSlidesMeta.some(
+        (m: any) => Number(m.id) === sId && m.source === 'custom'
+      );
+      if (isConfirmedCustomPage) {
+        console.log(`✅ [Rescue] Skipping confirmed custom page ID ${sId} - preserving its widgets`);
         return;
       }
 
@@ -1615,8 +1638,9 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       // Validate: only keep IDs that exist in dashboards or dedupedMeta
       const finalValidatedOrder = uniqueOrder.filter(id => {
         if (map.has(id)) return true;
-        // Custom pages may exist in dedupedMeta even without dashboard entries
-        if (id >= 1000 && dedupedMeta.some(m => m.id === id)) return true;
+        // 🔧 FIX: Custom pages may exist in dedupedMeta even without dashboard entries.
+        // Use source === 'custom' instead of id >= 1000 — backend DB IDs can be any number.
+        if (dedupedMeta.some(m => m.id === id && m.source === 'custom')) return true;
 
         console.warn(`👻 [PageOrder] Removing ghost page ID ${id} - not in dashboards`);
         return false;
@@ -1951,8 +1975,12 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           const isFrontendIntegrationId = slideIdNum >= 0 && slideIdNum < 1000 && slideIntegrationMap.has(slideIdNum);
           const isValidIntegrationId = isFrontendIntegrationId || isMappedBackendId;
 
-          // Custom pages: ID >= 1000 AND not a backend ID for an integration
-          const isValidCustomId = slideIdNum >= 1000 && !isMappedBackendId;
+          // 🔧 FIX: Custom pages are identified by source='custom' in processedSlidesMeta,
+          // NOT by id >= 1000. After a save+refresh, backend assigns real DB IDs (e.g. 423).
+          // Check if this slide ID corresponds to a known custom page.
+          const metaEntry = existingMeta.find((m: any) => Number(m.id) === slideIdNum || Number(m.id) === originalId);
+          const isCustomPageBySource = metaEntry?.source === 'custom' || customPages.some(p => p.id === slideIdNum);
+          const isValidCustomId = isCustomPageBySource;
 
           if (!isValidIntegrationId && !isValidCustomId) {
             console.log(`👻 [SavePayload] Rejecting invalid slideId: ${slideId}`, {
@@ -1973,9 +2001,12 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
           if (fromExisting) {
             // ✅ CRITICAL: Detect and remove "Untitled page" ghosts
+            // 🔧 FIX: Only treat as a ghost if it IS a custom page (by source field).
+            // The old check `slideIdNum < 1000` was wrong — after refresh, custom pages
+            // can have backend DB IDs like 423. Use source field as the truth.
             const isGhostUntitled =
               fromExisting.source === 'custom' &&
-              slideIdNum < 1000 && // Custom pages MUST have ID >= 1000
+              !isValidCustomId && // Only ghost if we didn't validate it as custom above
               (!fromExisting.title ||
                 fromExisting.title === 'Untitled page' ||
                 fromExisting.title === 'Untitled' ||
@@ -2022,8 +2053,10 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
               }
             }
 
-            // Force low IDs (< 1000) to be integration slides
-            if (slideIdNum < 1000) {
+            // 🔧 FIX: Don't blindly force slides with id < 1000 to be integration slides.
+            // After a save+refresh, custom pages can have backend DB IDs smaller than 1000.
+            // Only force to integration if it's a known integration slide (in slideIntegrationMap or mapped backend ID).
+            if (slideIdNum < 1000 && !isCustomPageBySource) {
               // Use slideIntegrationMap to find the correct integration index if not set
               const slideInfo = slideIntegrationMap.get(slideIdNum);
               const integrationIdx = fromExisting.integrationIndex ?? slideInfo?.originalIndex ?? slideIdNum;
@@ -2042,8 +2075,9 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
               };
             }
 
-            // High IDs (>= 1000) that claim to be custom - validate they're real
-            if (slideIdNum >= 1000 && fromExisting.source === 'custom') {
+            // High IDs (>= 1000) that claim to be custom - validate they're real.
+            // Also handles custom pages with low backend DB IDs (isCustomPageBySource = true).
+            if (isCustomPageBySource && fromExisting.source === 'custom') {
               const layout = dashboards.get(slideIdNum);
               const hasWidgets = layout && layout.length > 0;
               const hasRealTitle = fromExisting.title &&
