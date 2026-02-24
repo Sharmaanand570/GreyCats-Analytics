@@ -42,6 +42,10 @@ const normalizeAccount = (account: any, type: IntegrationType): AvailableAccount
       name = account.name || account.accountId;
       identifier = account.accountId;
       break;
+    case 'google-ads':
+      name = account.descriptiveName || `Google Ads Account (${account.customerId})`;
+      identifier = account.customerId;
+      break;
     case 'meta-insights':
       // Handle platform-specific naming
       if (account.platform === 'facebook') {
@@ -61,7 +65,7 @@ const normalizeAccount = (account: any, type: IntegrationType): AvailableAccount
   }
 
   return {
-    id: account.id, // This determines what we send to the backend for assignment
+    id: account.id || account.customerId || identifier,
     name,
     identifier,
     platform: account.platform,
@@ -78,6 +82,13 @@ export const getAvailableAccounts = async (integration: IntegrationType): Promis
       const response = await getMetaInsightsAccounts();
       // Map insights array to accounts
       return response.insights.map((acc: any) => normalizeAccount(acc, integration));
+    }
+
+    // Special handling for Google Ads
+    if (integration === 'google-ads') {
+      const { getGoogleAdsAccounts } = await import('../features/googleAds/API/googleAdsApi');
+      const response = await getGoogleAdsAccounts();
+      return response.accounts.map((acc: any) => normalizeAccount(acc, integration));
     }
 
     // API endpoints use hyphens (e.g. meta-ads), but types use underscores (e.g. meta-ads)
@@ -102,6 +113,19 @@ export const assignAccountToClient = async (
 ): Promise<AccountAssignmentResponse> => {
   console.log("assignAccountToClient", clientId, integration, accountId);
   try {
+    // Special handling for Google Ads
+    if (integration === 'google-ads') {
+      const { connectGoogleAdsAccount } = await import('../features/googleAds/API/googleAdsApi');
+      // Note: In generic flow, we might not have the customerName handy. 
+      // We pass the accountId (customerId) and a generic name if needed.
+      const response = await connectGoogleAdsAccount({
+        customerId: String(accountId),
+        customerName: 'Google Ads Account', // Placeholder, backend can update from API if needed
+        clientId
+      });
+      return { success: response.success, message: response.message };
+    }
+
     const response = await api.post<AccountAssignmentResponse>(
       `/clients/${clientId}/accounts`,
       {
@@ -124,10 +148,35 @@ export const removeAccountFromClient = async (
   accountId: string | number
 ): Promise<any> => {
   try {
-    const response = await api.delete(
-      `/clients/${clientId}/accounts/${integration}/${accountId}`
-    );
-    return response.data;
+    // Specialized handling for integrations with their own disconnect endpoints
+    switch (integration) {
+      case 'google-ads': {
+        const { disconnectGoogleAds } = await import('../features/googleAds/API/googleAdsApi');
+        return await disconnectGoogleAds(clientId);
+      }
+      case 'meta-business': {
+        const { disconnectMetaBusinessAccount } = await import('../features/meta/API/metaBusinessApi');
+        return await disconnectMetaBusinessAccount(Number(accountId));
+      }
+      case 'shopify': {
+        const { disconnectShopify } = await import('../features/shopify/API/shopifyApi');
+        return await disconnectShopify(clientId);
+      }
+      case 'youtube': {
+        const { disconnectYouTube } = await import('../features/YouTube/API/youtubeApi');
+        return await disconnectYouTube(clientId);
+      }
+      case 'google-search-console': {
+        const { disconnectGoogleConsole } = await import('../features/YouTube/API/googleConsoleapi');
+        return await disconnectGoogleConsole(clientId);
+      }
+      default:
+        // Generic disconnection
+        const response = await api.delete(
+          `/clients/${clientId}/accounts/${integration}/${accountId}`
+        );
+        return response.data;
+    }
   } catch (error) {
     console.error(`Error removing account from client ${clientId}:`, error);
     throw error;

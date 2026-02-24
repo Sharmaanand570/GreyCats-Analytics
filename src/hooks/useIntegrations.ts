@@ -9,6 +9,7 @@ import type {
 } from '../types/client.types';
 import { toast } from 'sonner';
 import { clientKeys } from './useClients';
+import { removeAccountFromClient } from '../api/integrationApi';
 
 // Query Keys
 export const integrationKeys = {
@@ -99,12 +100,10 @@ export const useRemoveAccount = () => {
     }: {
       clientId: number;
       integrationType: IntegrationType;
-      accountId: number;
+      accountId: number | string;
     }): Promise<void> => {
       try {
-        await api.delete(
-          `/clients/${clientId}/accounts/${integrationType}/${accountId}`
-        );
+        await removeAccountFromClient(clientId, integrationType as any, accountId);
       } catch (error: any) {
         console.error('Error removing account:', error);
         toast.error(error.response?.data?.message || 'Failed to remove account');

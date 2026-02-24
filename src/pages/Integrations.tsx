@@ -5,9 +5,9 @@ import DropDownFilter, { type FilterGroup } from "../components/DropDownFilter";
 import TableComponent from "../components/TableComponent";
 import ConnectDataSource from "../components/ConnectDataSource";
 import { getPlatformConfig, capitalizeStatus } from "@/utils/platformMapping";
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Skeleton } from "../components/ui/skeleton";
-import { useRemoveAccount } from "@/hooks/useIntegrations";
+import { useRemoveAccount, useSyncProgress } from "@/hooks/useIntegrations";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +37,54 @@ interface IntegrationsProps {
   withLayout?: boolean;
   hideHeader?: boolean;
 }
+
+// -------------------------------------------------------------------
+// StatusCell: Decides between SyncProgressBar and SyncStatusBadge.
+// Defined at module level so React sees a stable component reference
+// (avoids remounts / polling resets on every parent render).
+// -------------------------------------------------------------------
+interface StatusCellProps {
+  clientId: number;
+  integrationType: import("@/types/client.types").IntegrationType;
+  accountId: number;
+  isSyncing: boolean;
+  syncDetails: { total: number; synced: number } | null;
+}
+
+const StatusCell: React.FC<StatusCellProps> = ({
+  clientId,
+  integrationType,
+  accountId,
+  isSyncing,
+  syncDetails,
+}) => {
+  const { data: syncData, isLoading: syncLoading } = useSyncProgress(
+    clientId,
+    integrationType,
+    true
+  );
+
+  // Show progress bar when a sync is happening or recently finished (not 'not_started')
+  if (syncLoading || (syncData?.success && syncData?.status !== 'not_started')) {
+    return (
+      <SyncProgressBar
+        clientId={clientId}
+        integrationType={integrationType}
+        accountId={accountId}
+        compact={true}
+      />
+    );
+  }
+
+  // Fallback: static connected badge
+  return (
+    <SyncStatusBadge
+      isSyncing={isSyncing}
+      statusText={capitalizeStatus("connected")}
+      syncDetails={syncDetails}
+    />
+  );
+};
 
 function Integrations({ clientId: propClientId, withLayout = true, hideHeader = false }: IntegrationsProps) {
   const params = useParams<{ clientId?: string }>();
@@ -218,13 +266,14 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
 
       // Append Client ID for dynamic routes
       // List of platforms that support /:clientId
-      const dynamicPlatforms = ['google-analytics', 'google-console', 'youtube', 'meta-ads', 'meta-business', 'meta-facebook', 'meta-instagram'];
+      const dynamicPlatforms = ['google-analytics', 'google-console', 'youtube', 'meta-ads', 'google-ads', 'meta-business', 'meta-facebook', 'meta-instagram'];
       if (clientId && dynamicPlatforms.includes(platformKey) && !link.endsWith(`/${clientId}`)) {
         link = `${link}/${clientId}`;
       }
 
-      const isSyncing = isAccountSyncing(integration.integrationType, integration.accountId);
       const syncDetails = getIntegrationCounts(integration.integrationType);
+      const isSyncing = isAccountSyncing(integration.integrationType, integration.accountId);
+
 
       return {
         name: platformConfig?.name || integration.integrationType,
@@ -232,15 +281,14 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
         iconColor: platformConfig?.color,
         link,
         label: integration.accountName,
-        status: isSyncing ? (
-          <SyncProgressBar
+        status: (
+          <StatusCell
             clientId={clientId!}
             integrationType={integration.integrationType}
             accountId={integration.accountId}
-            compact={true}
+            isSyncing={isSyncing}
+            syncDetails={syncDetails}
           />
-        ) : (
-          <SyncStatusBadge statusText={capitalizeStatus("connected")} syncDetails={syncDetails} />
         ),
         renderActions: () => (
           <div className="flex items-center gap-2">

@@ -62,8 +62,8 @@ export const SyncProgressBar: React.FC<SyncProgressBarProps> = ({
         );
     }
 
-    if (!data || !data.success) {
-        return null; // Or some placeholder
+    if (!data || !data.success || data.status === 'not_started') {
+        return null; // No active sync for this integration
     }
 
     const { status, progress } = data;

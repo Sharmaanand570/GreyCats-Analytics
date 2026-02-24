@@ -71,6 +71,30 @@ export const DEFAULT_META_ADS_CAMPAIGN_COLUMNS = [
     { name: 'CTR', width: '11%', dataKey: 'ctr' }
 ];
 
+const GOOGLE_ADS_CAMPAIGN_COLUMNS = [
+    { value: "name", label: "Campaign" },
+    { value: "viewThroughConversions", label: "View-through conversions" },
+    { value: "cpc", label: "Avg CPC" },
+    { value: "clicks", label: "Clicks" },
+    { value: "conversionRate", label: "Conversion rate" },
+    { value: "conversions", label: "Conversions" },
+    { value: "cost", label: "Cost" },
+    { value: "costPerConversion", label: "Cost / conv." },
+    { value: "impressions", label: "Impressions" },
+];
+
+export const DEFAULT_GOOGLE_ADS_CAMPAIGN_COLUMNS = [
+    { name: 'Campaign', width: '18%', dataKey: 'name' },
+    { name: 'View-through conversions', width: '10%', dataKey: 'viewThroughConversions' },
+    { name: 'Avg CPC', width: '10%', dataKey: 'cpc' },
+    { name: 'Clicks', width: '9%', dataKey: 'clicks' },
+    { name: 'Conversion rate', width: '10%', dataKey: 'conversionRate' },
+    { name: 'Conversions', width: '10%', dataKey: 'conversions' },
+    { name: 'Cost', width: '11%', dataKey: 'cost' },
+    { name: 'Cost / conv.', width: '11%', dataKey: 'costPerConversion' },
+    { name: 'Impressions', width: '11%', dataKey: 'impressions' },
+];
+
 interface TableGeneralTabProps {
     data?: TableWidgetData;
     onChange: (updates: Partial<TableWidgetData>) => void;
@@ -85,7 +109,8 @@ export function TableGeneralTab({
     const isRecentPosts = metricKey === 'meta.facebook.recent_posts';
     const isInstagramMedia = metricKey === 'meta.instagram.recent_media';
     const isMetaAdsCampaign = metricKey === 'meta.ads.campaign_performance';
-    const isDynamicTable = isRecentPosts || isInstagramMedia || isMetaAdsCampaign;
+    const isGoogleAdsCampaign = metricKey === 'google_ads.campaign_performance';
+    const isDynamicTable = isRecentPosts || isInstagramMedia || isMetaAdsCampaign || isGoogleAdsCampaign;
 
     const columns = data?.columns ?? [];
 
@@ -214,7 +239,7 @@ export function TableGeneralTab({
                                     const val = e.target.value;
                                     if (!val) return;
 
-                                    const options = isMetaAdsCampaign ? META_ADS_CAMPAIGN_COLUMNS : isRecentPosts ? META_RECENT_POSTS_COLUMNS : INSTAGRAM_RECENT_MEDIA_COLUMNS;
+                                    const options = isGoogleAdsCampaign ? GOOGLE_ADS_CAMPAIGN_COLUMNS : isMetaAdsCampaign ? META_ADS_CAMPAIGN_COLUMNS : isRecentPosts ? META_RECENT_POSTS_COLUMNS : INSTAGRAM_RECENT_MEDIA_COLUMNS;
                                     const opt = options.find(c => c.value === val);
 
                                     if (opt) addRecentPostColumn(opt.value, opt.label);
@@ -222,7 +247,7 @@ export function TableGeneralTab({
                                 }}
                             >
                                 <option value="">+ Add Column</option>
-                                {(isMetaAdsCampaign ? META_ADS_CAMPAIGN_COLUMNS : isRecentPosts ? META_RECENT_POSTS_COLUMNS : INSTAGRAM_RECENT_MEDIA_COLUMNS).map(opt => (
+                                {(isGoogleAdsCampaign ? GOOGLE_ADS_CAMPAIGN_COLUMNS : isMetaAdsCampaign ? META_ADS_CAMPAIGN_COLUMNS : isRecentPosts ? META_RECENT_POSTS_COLUMNS : INSTAGRAM_RECENT_MEDIA_COLUMNS).map(opt => (
                                     <option key={opt.value} value={opt.value} disabled={columns.some(c => c.dataKey ? c.dataKey === opt.value : c.name === opt.label)}>
                                         {opt.label}
                                     </option>

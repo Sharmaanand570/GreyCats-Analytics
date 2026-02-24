@@ -5,6 +5,7 @@ export type IntegrationType =
   | 'woocommerce'
   | 'google-search-console'
   | 'google-analytics'
+  | 'google-ads'
   | 'meta-ads'
   | 'meta-insights';
 

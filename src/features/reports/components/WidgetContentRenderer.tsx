@@ -35,6 +35,7 @@ import type {
   DashboardLayout,
   ResolvedWidgetData,
   WidgetSeriesPoint,
+  ReportWidgetDefinition,
 } from "@/features/reports/api/types";
 import type {
   TitleWidgetData,
@@ -193,9 +194,9 @@ export const renderWidgetContent = (
   // No, renderWidgetContent is called BY renderWidget (indirectly through JSX?).
   // Let's check renderWidget function again.
 
-  const metricConfig = widget.metricConfig;
+  const metricConfig = widget.metricConfig || ((widget as any).metricKey ? widget as any as ReportWidgetDefinition : undefined);
   const isIntegrationMetric =
-    widget.widgetType === "metric" &&
+    (widget.widgetType === "metric" || !!metricConfig?.metricKey) &&
     !!metricConfig?.metricKey &&
     !!metricConfig?.integration;
 
@@ -491,15 +492,14 @@ export const renderWidgetContent = (
         metricConfig?.metricKey === "ga.top_pages_views" &&
         !!metricConfig?.integration;
 
-      console.log('🔍 [TableRender] Config:', {
-        key: metricConfig?.metricKey,
-        integration: metricConfig?.integration,
-        resolvedDataColumns: (resolvedData as any)?.columns,
-        tableDataColumns: tableData?.columns
-      });
 
-      // Check if it's a recent posts/media table (requires special list rendering)
-      const isRecentPostsTable = metricConfig?.metricKey === 'meta.facebook.recent_posts' || metricConfig?.metricKey === 'meta.instagram.recent_media' || metricConfig?.metricKey === 'meta.ads.campaign_performance';
+
+      // Check if it's a list-style table (Recent Posts, Media, or Campaign Performance)
+      const isListTable =
+        metricConfig?.metricKey === 'meta.facebook.recent_posts' ||
+        metricConfig?.metricKey === 'meta.instagram.recent_media' ||
+        metricConfig?.metricKey === 'meta.ads.campaign_performance' ||
+        metricConfig?.metricKey === 'google_ads.campaign_performance';
 
       const generateColumnsFromRows = (rows: any[]) => {
         if (!rows.length) return [];
@@ -594,7 +594,7 @@ export const renderWidgetContent = (
       // 2-column table from the series (label + value).
       let seriesRows =
         !isGaTopPagesTable &&
-          !isRecentPostsTable && // Recent posts is its own thing
+          !isListTable && // List tables (posts, campaigns) are handled via resolvedRows
           !gaRows &&
           !dimensionalRows &&  // Don't use series if we have dimensional data
           (!metricConfig?.groupBy || metricConfig.groupBy === 'none' || metricConfig.groupBy === 'date') && // Only show series (time-series) if grouping is date-based or none. Don't show dates for 'device' tables.
@@ -606,7 +606,7 @@ export const renderWidgetContent = (
       // Fallback: if metric returns only a single value/total, build a 1-row series
       if (
         !isGaTopPagesTable &&
-        !isRecentPostsTable &&
+        !isListTable &&
         !gaRows &&
         (!seriesRows || seriesRows.length === 0) &&
         metricConfig?.metricKey &&
@@ -655,7 +655,7 @@ export const renderWidgetContent = (
         !usingSeriesRows &&
         !!resolvedRows &&
         resolvedRows.length > 0 &&
-        (isRecentPostsTable || !metricConfig?.groupBy || metricConfig.groupBy === 'none' || metricConfig.groupBy === 'date');
+        (isListTable || !metricConfig?.groupBy || metricConfig.groupBy === 'none' || metricConfig.groupBy === 'date');
       const usingTableData =
         !usingGaRows &&
         !usingDemographicRows &&
@@ -675,18 +675,7 @@ export const renderWidgetContent = (
         (usingTableData ? tableData?.rows : null) ??
         (metricConfig?.metricKey ? [] : reportTableRows);
 
-      if (isRecentPostsTable) {
-        console.log("🔍 [Table Render] Recent Posts Data Sources:", {
-          usingGaRows,
-          usingDimensionalRows,
-          usingResolvedRows,
-          usingSeriesRows,
-          usingTableData,
-          resolvedRowsCount: resolvedRows?.length || 0,
-          finalRowsCount: rows?.length || 0,
-          metricKey: metricConfig?.metricKey
-        });
-      }
+
 
       const autoColumns =
         resolvedRows &&
@@ -708,12 +697,13 @@ export const renderWidgetContent = (
         tableData?.caption ??
         (isGaTopPagesTable
           ? "Pages with the highest number of views."
-          : isRecentPostsTable
-            ? (metricConfig?.metricKey === 'meta.ads.campaign_performance'
-              ? "Performance metrics for your Meta Ads campaigns."
-              : metricConfig?.metricKey === 'meta.instagram.recent_media'
-                ? "Recent media from your Instagram account."
-                : "Recent posts from your Facebook Page.")
+          : isListTable
+            ? (() => {
+              if (metricConfig?.metricKey === 'google_ads.campaign_performance') return "Performance metrics for your Google Ads campaigns.";
+              if (metricConfig?.metricKey === 'meta.ads.campaign_performance') return "Performance metrics for your Meta Ads campaigns.";
+              if (metricConfig?.metricKey === 'meta.instagram.recent_media') return "Recent media from your Instagram account.";
+              return "Recent posts from your Facebook Page.";
+            })()
             : "Queue of report deliveries.");
 
       const columns =
@@ -723,7 +713,7 @@ export const renderWidgetContent = (
             { name: "Title", width: "35%" },
             { name: "Views" },
           ]
-          : isRecentPostsTable
+          : isListTable
             ? (() => {
               // Check if tableData has generic "Name/Value" columns (legacy default)
               const hasGenericColumns = tableData?.columns?.length === 2 &&
@@ -741,6 +731,19 @@ export const renderWidgetContent = (
                     { name: "Impressions", width: "12%", dataKey: "impressions" },
                     { name: "Average CPC", width: "12%", dataKey: "cpc" },
                     { name: "CTR", width: "11%", dataKey: "ctr" }
+                  ];
+                }
+                if (metricConfig?.metricKey === 'google_ads.campaign_performance') {
+                  return [
+                    { name: "Campaign", width: "18%", dataKey: "name" },
+                    { name: "View-through conversions", width: "10%", dataKey: "viewThroughConversions" },
+                    { name: "Avg CPC", width: "10%", dataKey: "cpc" },
+                    { name: "Clicks", width: "9%", dataKey: "clicks" },
+                    { name: "Conversion rate", width: "10%", dataKey: "conversionRate" },
+                    { name: "Conversions", width: "10%", dataKey: "conversions" },
+                    { name: "Cost", width: "11%", dataKey: "cost" },
+                    { name: "Cost / conv.", width: "11%", dataKey: "costPerConversion" },
+                    { name: "Impressions", width: "11%", dataKey: "impressions" },
                   ];
                 }
                 return metricConfig?.metricKey === 'meta.instagram.recent_media'
@@ -765,29 +768,55 @@ export const renderWidgetContent = (
               }
 
               // Otherwise use existing columns if present
-              return tableData?.columns && tableData.columns.length > 0
-                ? tableData.columns
-                : (resolvedData as any)?.columns && (resolvedData as any).columns.length > 0
-                  ? (resolvedData as any).columns
-                  : metricConfig?.metricKey === 'meta.instagram.recent_media'
-                    ? [
-                      { name: "Date", width: "15%", dataKey: "date" },
-                      { name: "Full Picture", dataKey: "fullPicture" },
-                      { name: "Post Message", width: "35%", dataKey: "post" },
-                      { name: "Impressions", dataKey: "impressions" },
-                      { name: "Clicks", dataKey: "clicks" },
-                      { name: "Likes", dataKey: "likes" },
-                      { name: "Shares", dataKey: "shares" }
-                    ]
-                    : [
-                      { name: "Date", width: "15%", dataKey: "date" },
-                      { name: "Post", width: "40%", dataKey: "post" },
-                      { name: "Impressions", dataKey: "impressions" },
-                      { name: "Clicks", dataKey: "clicks" },
-                      { name: "Likes", dataKey: "likes" },
-                      { name: "Comments", dataKey: "comments" },
-                      { name: "Shares", dataKey: "shares" }
-                    ];
+              const existingCols = tableData?.columns?.length ? tableData.columns : (resolvedData as any)?.columns;
+              if (existingCols?.length) return existingCols;
+
+              // Fallback for empty columns
+              if (metricConfig?.metricKey === 'google_ads.campaign_performance') {
+                return [
+                  { name: "Campaign", width: "18%", dataKey: "name" },
+                  { name: "View-through conversions", width: "10%", dataKey: "viewThroughConversions" },
+                  { name: "Avg CPC", width: "10%", dataKey: "cpc" },
+                  { name: "Clicks", width: "9%", dataKey: "clicks" },
+                  { name: "Conversion rate", width: "10%", dataKey: "conversionRate" },
+                  { name: "Conversions", width: "10%", dataKey: "conversions" },
+                  { name: "Cost", width: "11%", dataKey: "cost" },
+                  { name: "Cost / conv.", width: "11%", dataKey: "costPerConversion" },
+                  { name: "Impressions", width: "11%", dataKey: "impressions" },
+                ];
+              }
+
+              if (metricConfig?.metricKey === 'meta.ads.campaign_performance') {
+                return [
+                  { name: "Campaign", width: "20%", dataKey: "campaignName" },
+                  { name: "Ad", width: "20%", dataKey: "adName" },
+                  { name: "Ad Set", width: "15%", dataKey: "adsetName" },
+                  { name: "Clicks", width: "10%", dataKey: "clicks" },
+                  { name: "Impressions", width: "12%", dataKey: "impressions" },
+                  { name: "Average CPC", width: "12%", dataKey: "cpc" },
+                  { name: "CTR", width: "11%", dataKey: "ctr" }
+                ];
+              }
+
+              return metricConfig?.metricKey === 'meta.instagram.recent_media'
+                ? [
+                  { name: "Date", width: "15%", dataKey: "date" },
+                  { name: "Full Picture", dataKey: "fullPicture" },
+                  { name: "Post Message", width: "35%", dataKey: "post" },
+                  { name: "Impressions", dataKey: "impressions" },
+                  { name: "Clicks", dataKey: "clicks" },
+                  { name: "Likes", dataKey: "likes" },
+                  { name: "Shares", dataKey: "shares" }
+                ]
+                : [
+                  { name: "Date", width: "15%", dataKey: "date" },
+                  { name: "Post", width: "40%", dataKey: "post" },
+                  { name: "Impressions", dataKey: "impressions" },
+                  { name: "Clicks", dataKey: "clicks" },
+                  { name: "Likes", dataKey: "likes" },
+                  { name: "Comments", dataKey: "comments" },
+                  { name: "Shares", dataKey: "shares" }
+                ];
             })()
             : usingDemographicRows
               ? [
@@ -866,7 +895,7 @@ export const renderWidgetContent = (
                                 : col.name === "Views"
                                   ? gaRow.views
                                   : "";
-                        } else if (isRecentPostsTable) {
+                        } else if (isListTable) {
                           const pRow = row as any;
                           // Use dataKey if available, otherwise fallback to name mapping or direct property access
                           let key = (col as any).dataKey;
@@ -884,11 +913,11 @@ export const renderWidgetContent = (
                           cellValue = pRow[key];
 
                           // Handle numeric defaults if needed (though API processing usually sets defaults)
-                          if (key === 'impressions' || key === 'clicks') {
+                          if (key === 'impressions' || key === 'clicks' || key === 'conversions' || key === 'viewThroughConversions') {
                             cellValue = cellValue != null ? Number(cellValue).toLocaleString() : '0';
-                          } else if (key === 'cpc') {
+                          } else if (key === 'cpc' || key === 'cost' || key === 'costPerConversion') {
                             cellValue = cellValue != null ? `₹${Number(cellValue).toFixed(2)}` : '₹0.00';
-                          } else if (key === 'ctr') {
+                          } else if (key === 'ctr' || key === 'conversionRate') {
                             cellValue = cellValue != null ? `${Number(cellValue).toFixed(2)}%` : '0.00%';
                           }
                         } else if (usingDemographicRows) {
@@ -910,14 +939,17 @@ export const renderWidgetContent = (
                                 : "";
                         } else if (resolvedRows) {
                           const genericRow = row as Record<string, unknown>;
+                          const key = (col as any).dataKey;
                           cellValue =
-                            genericRow[col.name] ??
-                            genericRow[col.name.replace(/\s+/g, "")] ??
-                            genericRow[col.name.toLowerCase()] ??
-                            genericRow[col.name
-                              .toLowerCase()
-                              .replace(/\s+/g, "_")] ??
-                            "";
+                            (key && genericRow[key] !== undefined)
+                              ? genericRow[key]
+                              : genericRow[col.name] ??
+                              genericRow[col.name.replace(/\s+/g, "")] ??
+                              genericRow[col.name.toLowerCase()] ??
+                              genericRow[col.name
+                                .toLowerCase()
+                                .replace(/\s+/g, "_")] ??
+                              "";
                         } else {
                           cellValue =
                             col.name === "Report"
@@ -1138,7 +1170,20 @@ export const renderWidgetContent = (
         : true;
 
       const finalValue = resolvedValue ?? metricData?.value ?? 0;
-      const formattedValue = typeof finalValue === "number" ? Math.floor(finalValue * 10) / 10 : finalValue;
+      const formattedValue = typeof finalValue === "number"
+        ? (finalValue % 1 !== 0 ? Number(finalValue.toFixed(2)) : finalValue)
+        : finalValue;
+
+      // Fallback unit if not specified in config
+      let displayUnit = metricData?.unit;
+      if (!displayUnit && widget.metricConfig?.metricKey) {
+        const key = widget.metricConfig.metricKey;
+        if (key.includes(".cpc") || key.includes(".cost") || key.includes(".spend") || key.endsWith(".avgOrderValue") || key.endsWith(".revenue")) {
+          displayUnit = "₹";
+        } else if (key.includes(".ctr") || key.includes(".bounceRate") || key.includes(".conversionRate")) {
+          displayUnit = "%";
+        }
+      }
 
       // NEW: Auto-populate sparklineData from resolved series
       const sparklineData = resolvedData?.series && Array.isArray(resolvedData.series)
@@ -1158,12 +1203,12 @@ export const renderWidgetContent = (
             style={{ color: metricData?.textColor || "inherit" }}
           >
             {formattedValue}
-            {metricData?.unit && (
+            {displayUnit && (
               <span
                 className="text-base md:text-lg ml-1"
                 style={{ color: metricData?.textColor ? "inherit" : "#4b5563" }} // Default to gray-600 if no custom color
               >
-                {metricData.unit}
+                {displayUnit}
               </span>
             )}
           </span>

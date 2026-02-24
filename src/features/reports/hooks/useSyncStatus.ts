@@ -59,8 +59,10 @@ export const useSyncStatus = (clientId: number | null) => {
         let apiKey = integrationType.toLowerCase().replace(/[ _]/g, '-'); // Replace space AND underscore
         if (apiKey === 'google') apiKey = 'google-analytics';
         if (apiKey === 'woo') apiKey = 'woocommerce';
+        if (apiKey === 'googleads') apiKey = 'google-ads';
 
-        const integration = query.data.data[apiKey];
+        // Check for both hyphenated and snake_case versions (backend often uses snake_case)
+        const integration = query.data.data[apiKey] || query.data.data[apiKey.replace(/-/g, '_')];
 
         if (!integration) return false;
 
@@ -106,8 +108,9 @@ export const useSyncStatus = (clientId: number | null) => {
         let apiKey = integrationType.toLowerCase().replace(/[ _]/g, '-');
         if (apiKey === 'google') apiKey = 'google-analytics';
         if (apiKey === 'woo') apiKey = 'woocommerce';
+        if (apiKey === 'googleads') apiKey = 'google-ads';
 
-        const integration = query.data.data[apiKey];
+        const integration = query.data.data[apiKey] || query.data.data[apiKey.replace(/-/g, '_')];
         if (!integration || !integration.hasAccounts) return null;
 
         const total = integration.accounts.length;

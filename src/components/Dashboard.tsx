@@ -15,6 +15,9 @@ import { useQuery } from "@tanstack/react-query";
 import {
   listDashboards,
   fetchUnifiedMetric,
+  fetchGoogleAdsSummary,
+  fetchGoogleAdsCampaignPerformance,
+  fetchUnifiedAggregate,
 } from "@/features/reports/api/reportingApi";
 import type {
   ApiError,
@@ -138,8 +141,7 @@ function Dashboard({
   const activeDashboard = dashboards[0];
 
   const dashboardWidgets = useMemo<DashboardWidget[]>(() => {
-    console.log('🔍 [Dashboard] activeDashboard:', activeDashboard);
-    console.log('🔍 [Dashboard] activeDashboard?.widgets:', activeDashboard?.widgets);
+
 
     // If user has a saved dashboard, use it
     if (activeDashboard?.widgets) {
@@ -160,7 +162,6 @@ function Dashboard({
     }
 
     // Default to empty (User must explicitly add widgets via Edit Dashboard)
-    console.log('🔍 [Dashboard] No widgets found - returning empty array');
     return [];
   }, [activeDashboard, groupedMetrics]);
 
@@ -233,6 +234,7 @@ function Dashboard({
           // Validate metric key format (should have platform prefix)
           const hasValidPrefix =
             widget.metricKey?.startsWith('google.') ||
+            widget.metricKey?.startsWith('google_ads.') || // ✅ Added Google Ads
             widget.metricKey?.startsWith('google_seo.') ||
             widget.metricKey?.startsWith('google-console.') ||
             widget.metricKey?.startsWith('meta.') ||
@@ -258,12 +260,18 @@ function Dashboard({
             const selectedDateFrom = new Date(dateFrom); // Assuming dateFrom is YYYY-MM-DD string
             if (selectedDateFrom < ninetyDaysAgo) {
               effectiveDateFrom = formatApiDate(ninetyDaysAgo);
-              console.log(`⚠️ [Dashboard] Clamping start date for ${normalizedIntegration} to 90 days ago: ${effectiveDateFrom}`);
+
             }
           }
 
-          // For Meta Ads, do NOT send accountId to backend, fetch all and filter in frontend to handle act_ prefix
-          const shouldIncludeAccountId = !['meta-facebook', 'meta-instagram', 'meta-ads', 'meta_ads'].includes(normalizedIntegration);
+          // For Meta Ads and Google Ads, do NOT send accountId to backend for rate metrics
+          // unless it's a direct fetch. But actually, normalized filtering in frontend is safer for some types.
+          const isRateMetric =
+            widget.metricKey?.toLowerCase().includes("cpc") ||
+            widget.metricKey?.toLowerCase().includes("ctr") ||
+            widget.metricKey?.toLowerCase().includes("roas");
+
+          const shouldIncludeAccountId = !['meta-facebook', 'meta-instagram', 'meta-ads', 'meta_ads', 'google_ads', 'google-ads'].includes(normalizedIntegration) || !isRateMetric;
 
           const params: Record<string, string> = {
             integration: normalizedIntegration,
@@ -273,16 +281,178 @@ function Dashboard({
             ...(shouldIncludeAccountId && widget.accountId ? { accountId: widget.accountId } : {}),
           };
 
-          console.log(`📤 [Dashboard] GET /unified-metrics params for ${widget.metricKey}:`, params);
-          console.log(`🔧 [Dashboard] Widget config:`, {
-            id: widget.id,
-            metricKey: widget.metricKey,
-            integration: widget.integration,
-            normalizedIntegration: normalizedIntegration,
-            accountId: widget.accountId,
-            startDate: dateFrom,
-            endDate: dateTo
-          });
+          // --- START GOOGLE ADS MULTI-FETCH ---
+          if ((normalizedIntegration === 'google-ads' || normalizedIntegration === 'google_ads')) {
+            if (isRateMetric) {
+              const summaryData = await fetchGoogleAdsSummary(clientId, {
+                startDate: params.startDate,
+                endDate: params.endDate,
+                accountId: widget.accountId || undefined
+              });
+
+              if (summaryData?.success && summaryData.summary) {
+                const summary = {
+                  ctr: summaryData.summary.ctr,
+                  cpc: summaryData.summary.cpc,
+                  roas: summaryData.summary.roas,
+                  cost: summaryData.summary.spend,
+                  clicks: summaryData.summary.clicks,
+                  revenue: summaryData.summary.revenue,
+                  impressions: summaryData.summary.impressions,
+                };
+                return { id: widget.id, widget, data: { rows: [], summary } };
+              }
+            } else if (widget.metricKey === 'google_ads.campaign_performance') {
+              const campaignData = await fetchGoogleAdsCampaignPerformance(
+                clientId,
+                params.startDate,
+                params.endDate,
+                widget.accountId || undefined
+              );
+
+              if (campaignData?.success && Array.isArray(campaignData.rows)) {
+                const rows = campaignData.rows.map((row: any) => ({
+                  ...row,
+                  metricKey: widget.metricKey,
+                  integration: "google-ads",
+                }));
+
+                return {
+                  id: widget.id,
+                  widget,
+                  data: {
+                    success: true,
+                    rows,
+                    columns: [
+                      { name: "Campaign", width: "18%", dataKey: "name" },
+                      { name: "View-through conversions", width: "10%", dataKey: "viewThroughConversions" },
+                      { name: "Avg CPC", width: "10%", dataKey: "cpc" },
+                      { name: "Clicks", width: "9%", dataKey: "clicks" },
+                      { name: "Conversion rate", width: "10%", dataKey: "conversionRate" },
+                      { name: "Conversions", width: "10%", dataKey: "conversions" },
+                      { name: "Cost", width: "11%", dataKey: "cost" },
+                      { name: "Cost / conv.", width: "11%", dataKey: "costPerConversion" },
+                      { name: "Impressions", width: "11%", dataKey: "impressions" },
+                    ],
+                  }
+                };
+              }
+            }
+          }
+          // --- END GOOGLE ADS MULTI-FETCH ---
+
+          // --- START META ADS RATIO METRIC AGGREGATE FETCH ---
+          // CPC = Total Spend / Total Clicks. CTR = (Total Clicks / Total Impressions) * 100
+          // Uses the dedicated /unified-metrics/aggregate endpoint for mathematically correct totals.
+          if (
+            (normalizedIntegration === "meta-ads" || normalizedIntegration === "meta_ads") &&
+            (widget.metricKey === "meta.ads.cpc" || widget.metricKey === "meta.ads.ctr")
+          ) {
+            console.log(`📡 [Dashboard] Aggregate fetch for ${widget.metricKey}`);
+            try {
+              // Fetch trend data (for sparklines) and aggregate (for total) in parallel
+              const [trendData, aggregateResult] = await Promise.all([
+                fetchUnifiedMetric(clientId, params as any),
+                fetchUnifiedAggregate({
+                  metricKey: widget.metricKey,
+                  integration: "meta_ads",
+                  startDate: params.startDate,
+                  endDate: params.endDate,
+                  accountId: widget.accountId || undefined,
+                }),
+              ]);
+
+              if (aggregateResult?.success && typeof aggregateResult.value === "number") {
+                console.log(`📡 [Dashboard] Aggregate OK for ${widget.metricKey}:`, aggregateResult.value);
+                const metricSuffix = widget.metricKey!.split(".").pop() || "";
+                return {
+                  id: widget.id,
+                  widget,
+                  data: {
+                    ...trendData,
+                    rows: trendData?.rows ?? [],   // Ensure rows is always an array so the processing loop doesn't early-return 0
+                    value: aggregateResult.value,
+                    total: aggregateResult.value,
+                    summary: {
+                      ...trendData?.summary,
+                      [metricSuffix]: aggregateResult.value,
+                      cpc: metricSuffix === "cpc" ? aggregateResult.value : trendData?.summary?.cpc,
+                      ctr: metricSuffix === "ctr" ? aggregateResult.value : trendData?.summary?.ctr,
+                    },
+                  },
+                };
+              } else {
+                console.warn(`📡 [Dashboard] Aggregate returned no value for ${widget.metricKey}:`, aggregateResult);
+              }
+            } catch (err) {
+              console.error("Failed to fetch Meta Ads aggregate for dashboard", err);
+            }
+          }
+          // --- END META ADS RATIO METRIC AGGREGATE FETCH ---
+
+          // --- START GOOGLE SEARCH CONSOLE AGGREGATE FETCH ---
+          // Uses /unified-metrics/aggregate for all 4 GSC metric keys.
+          // Clicks/Impressions → summed. CTR → already in % (e.g. 0.69 = 0.69%). Position → averaged.
+          const GSC_AGGREGATE_KEYS = [
+            "google_seo.clicks",
+            "google_seo.impressions",
+            "google_seo.ctr",
+            "google_seo.position",
+          ];
+          const isGscWidget =
+            (normalizedIntegration === "google-search-console" ||
+              normalizedIntegration === "google-console") &&
+            GSC_AGGREGATE_KEYS.includes(widget.metricKey!);
+
+          if (isGscWidget) {
+            console.log(`📡 [Dashboard] GSC Aggregate fetch for ${widget.metricKey}`);
+            try {
+              const [trendData, aggregateResult] = await Promise.all([
+                fetchUnifiedMetric(clientId, params as any),
+                fetchUnifiedAggregate({
+                  metricKey: widget.metricKey!,
+                  integration: "google-search-console",
+                  startDate: params.startDate,
+                  endDate: params.endDate,
+                  accountId: widget.accountId || undefined,
+                }),
+              ]);
+
+              if (
+                aggregateResult?.success &&
+                typeof aggregateResult.value === "number"
+              ) {
+                console.log(
+                  `📡 [Dashboard] GSC Aggregate OK for ${widget.metricKey}:`,
+                  aggregateResult.value
+                );
+                const metricSuffix = widget.metricKey!.split(".").pop() || "";
+                return {
+                  id: widget.id,
+                  widget,
+                  data: {
+                    ...trendData,
+                    rows: trendData?.rows ?? [],
+                    value: aggregateResult.value,
+                    total: aggregateResult.value,
+                    rowCount: aggregateResult.rowCount,
+                    summary: {
+                      ...trendData?.summary,
+                      [metricSuffix]: aggregateResult.value,
+                    },
+                  },
+                };
+              } else {
+                console.warn(
+                  `📡 [Dashboard] GSC Aggregate returned no value for ${widget.metricKey}:`,
+                  aggregateResult
+                );
+              }
+            } catch (err) {
+              console.error("Failed to fetch GSC aggregate for dashboard", err);
+            }
+          }
+          // --- END GOOGLE SEARCH CONSOLE AGGREGATE FETCH ---
 
           const data = await fetchUnifiedMetric(clientId, params as {
             integration: string;
@@ -290,9 +460,6 @@ function Dashboard({
             startDate: string;
             endDate: string;
           });
-
-          // Log the full API response for debugging
-          // console.log(`📡 [Dashboard] GET raw response...`);
 
           return { id: widget.id, widget, data };
         } catch (error) {
@@ -309,7 +476,7 @@ function Dashboard({
       results.forEach(({ id, widget, data }) => {
         // Check for different response structures
         if (!data) {
-          console.log(`⚠️ [Dashboard] Widget ${id} (${widget.metricKey}) has no data - data is null/undefined`);
+
           merged[id] = { value: 0, total: 0, rawCount: 0, rows: [], series: [] };
           return;
         }
@@ -398,13 +565,6 @@ function Dashboard({
           return matchesBasic && (!isDimensional || isWooDateDimension || isYouTubeDimension || isMetaSpecificDimension);
         });
 
-        console.log(`📊 [Dashboard] Widget ${id} filtered rows:`, {
-          beforeFilter: data.rows.length,
-          afterFilter: filteredRows.length,
-          integration: widget.integration,
-          metricKey: widget.metricKey
-        });
-
         // Check for rate metrics vs countable metrics
         const isRateMetric =
           widget.metricKey?.toLowerCase().includes("cpc") ||
@@ -418,24 +578,34 @@ function Dashboard({
           widget.metricKey?.toLowerCase().includes("perview"); // Covers likesPerView, commentsPerView
 
         // Calculate total value
-        let total = 0;
+        const metricSuffix = widget.metricKey?.split('.').pop()?.toLowerCase() || '';
 
-        // Try to use API-provided summary (Blended Calculation) first
-        const summary = (data as any).summary;
-        const metricSuffix = widget.metricKey?.split('.').pop()?.toLowerCase();
-        let summaryUsed = false;
+        // 1. Try pre-calculated total/value from individual fetcher first (e.g. Meta Ads Aggregate)
+        //    IMPORTANT: Only treat as pre-computed when non-zero. A value of 0 from the
+        //    standard API should fall through to blended/averaging to avoid locking at 0.
+        const precomputedValue =
+          typeof data.value === 'number' && data.value !== 0 ? data.value
+            : typeof data.total === 'number' && data.total !== 0 ? data.total
+              : null;
+        let total = precomputedValue ?? 0;
+        let summaryUsed = precomputedValue !== null;
 
-        if (summary && metricSuffix) {
-          let summaryKey = metricSuffix;
-          // Map common variations
-          if (summaryKey === 'cost_per_click') summaryKey = 'cpc';
-          else if (summaryKey === 'click_through_rate') summaryKey = 'ctr';
-          else if (summaryKey === 'cost_per_mille') summaryKey = 'cpm';
-          else if (summaryKey === 'amount_spent') summaryKey = 'spend';
+        // 2. Try to use API-provided summary (Blended Calculation) second
+        if (!summaryUsed) {
+          const summary = (data as any).summary;
 
-          if (typeof summary[summaryKey] === 'number') {
-            total = summary[summaryKey];
-            summaryUsed = true;
+          if (summary && metricSuffix) {
+            let summaryKey = metricSuffix;
+            // Map common variations
+            if (summaryKey === 'cost_per_click') summaryKey = 'cpc';
+            else if (summaryKey === 'click_through_rate') summaryKey = 'ctr';
+            else if (summaryKey === 'cost_per_mille') summaryKey = 'cpm';
+            else if (summaryKey === 'amount_spent') summaryKey = 'spend';
+
+            if (typeof summary[summaryKey] === 'number') {
+              total = summary[summaryKey];
+              summaryUsed = true;
+            }
           }
         }
 

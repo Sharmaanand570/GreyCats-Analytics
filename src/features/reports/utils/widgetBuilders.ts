@@ -295,9 +295,13 @@ export function buildWidgetsFromTemplate(
         value: 0,
         hideDataPoints: true,
       };
-    } else if (widgetTemplate.type === 'chart') {
+    } else if (widgetTemplate.type === 'chart' || widgetTemplate.type === 'line_chart' || widgetTemplate.type === 'bar_chart' || widgetTemplate.type === 'area_chart' || widgetTemplate.type === 'pie_chart') {
       widgetData = {
-        chartType: widgetTemplate.chartType || 'column',
+        chartType: widgetTemplate.chartType ||
+          (widgetTemplate.type === 'line_chart' ? 'line' :
+            widgetTemplate.type === 'bar_chart' ? 'bar' :
+              widgetTemplate.type === 'area_chart' ? 'area' :
+                widgetTemplate.type === 'pie_chart' ? 'pie' : 'column'),
         title: widgetTemplate.displayName || prettifyMetricLabel(widgetTemplate.metricKey),
         ...(widgetTemplate.customConfig || {}),
       };
@@ -335,7 +339,7 @@ export function buildWidgetsFromTemplate(
         groupBy: widgetTemplate.groupBy || (widgetTemplate.type === 'metric' ? 'none' : 'day'),
         aggregation: widgetTemplate.aggregation || 'sum',
         type: widgetTemplate.type === 'metric' ? 'metric_card' :
-          widgetTemplate.type === 'chart' ? 'bar_chart' :
+          (widgetTemplate.type === 'chart' || widgetTemplate.type === 'line_chart' || widgetTemplate.type === 'bar_chart' || widgetTemplate.type === 'area_chart' || widgetTemplate.type === 'pie_chart') ? 'bar_chart' :
             widgetTemplate.type === 'table' ? 'table' : 'metric_card',
         displayName: widgetTemplate.displayName || prettifyMetricLabel(widgetTemplate.metricKey),
         layout: {

@@ -75,7 +75,9 @@ export function AccountSelectionModal({
                 selectedAccount.id
             );
 
-            // Invalidate queries to refresh ReportBuilder sidebar
+            // Invalidate queries to refresh integration list and progress
+            queryClient.invalidateQueries({ queryKey: ["clients", "detail", clientId] });
+            queryClient.invalidateQueries({ queryKey: ["sync-status", clientId] });
             queryClient.invalidateQueries({ queryKey: ["integrations", clientId] });
             queryClient.invalidateQueries({ queryKey: ["available-metrics", clientId] });
 

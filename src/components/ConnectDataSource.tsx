@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { IconType } from "react-icons";
-import { SiGoogleanalytics, SiGooglesearchconsole, SiYoutube, SiWoocommerce, SiShopify, SiMeta } from "react-icons/si";
+import { SiGoogleanalytics, SiGooglesearchconsole, SiYoutube, SiWoocommerce, SiShopify, SiMeta, SiGoogleads } from "react-icons/si";
 import React from "react";
 import { useYouTubeConnect } from "@/features/YouTube/hooks/useYouTubeConnect";
 import { toast } from "sonner";
@@ -22,6 +22,7 @@ import { useWooCommerceConnect } from "@/features/woocommerce/hooks/useWooCommer
 import { useShopifyConnect } from "@/features/shopify/hooks/useShopify";
 import { useMetaConnect } from "@/features/meta/hooks/useMetaConnect";
 import { useMetaBusinessConnect } from "@/features/meta/hooks/useMetaBusinessData";
+import { useGoogleAdsConnect } from "@/features/googleAds/hooks/useGoogleAds";
 import { useQueryClient } from "@tanstack/react-query";
 import { getPlatformConfig } from "@/utils/platformMapping";
 import { assignAccountToClient } from "@/api/integrationApi";
@@ -100,6 +101,12 @@ const dataSourceOptions: DataSourceOption[] = [
     icon: SiMeta,
     color: getPlatformConfig("meta-business")?.color,
   },
+  {
+    id: "google-ads",
+    name: "Google Ads",
+    icon: SiGoogleads,
+    color: getPlatformConfig("google-ads")?.color,
+  },
 
 ];
 
@@ -139,6 +146,7 @@ function ConnectDataSource({
     shopify: useShopifyConnect(),
     meta: useMetaConnect(),
     metaBusiness: useMetaBusinessConnect(),
+    googleAds: useGoogleAdsConnect(),
   };
 
   const connectYouTube = mutations.youtube.mutateAsync;
@@ -148,16 +156,17 @@ function ConnectDataSource({
   const connectShopify = mutations.shopify.mutateAsync;
   const connectMeta = mutations.meta.mutateAsync;
   const connectMetaBusiness = mutations.metaBusiness.mutateAsync;
+  const connectGoogleAds = mutations.googleAds.mutateAsync;
 
   const isConnecting =
     mutations.youtube.isPending ||
     mutations.google.isPending ||
     mutations.googleConsole.isPending ||
     mutations.woocommerce.isPending ||
-    mutations.woocommerce.isPending ||
     mutations.shopify.isPending ||
     mutations.meta.isPending ||
-    mutations.metaBusiness.isPending;
+    mutations.metaBusiness.isPending ||
+    mutations.googleAds.isPending;
 
   const queryClient = useQueryClient();
 
@@ -376,16 +385,30 @@ function ConnectDataSource({
                       try {
                         await connectMetaBusiness();
                         if (clientId) {
-                          // Meta Business hook might handle redirect immediately, 
-                          // but if it returns a URL or promise, we should set state there.
-                          // Assuming the hook handles it or we need to look into it. 
-                          // For now, setting it here safety.
                           localStorage.setItem("pending_oauth_client_id", clientId.toString());
                           localStorage.setItem("pending_oauth_integration", "meta-business");
                         }
-                        // The hook handles redirection or toast on error
                       } catch (error) {
                         console.error(error);
+                      }
+                    } else if (SelectedSource.id === "google-ads") {
+                      try {
+                        const response = await connectGoogleAds();
+                        if (response.success && response.url) {
+                          if (clientId) {
+                            localStorage.setItem("pending_oauth_client_id", clientId.toString());
+                            localStorage.setItem("pending_oauth_integration", "google-ads");
+                          }
+                          window.location.href = response.url;
+                        } else {
+                          toast.error("Failed to initiate Google Ads connection");
+                        }
+                      } catch (error) {
+                        const errorMessage =
+                          error instanceof Error
+                            ? error.message
+                            : "Failed to connect Google Ads";
+                        toast.error(errorMessage);
                       }
                     } else {
                       // For other sources, just go to next step

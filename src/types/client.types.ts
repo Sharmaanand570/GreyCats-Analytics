@@ -8,7 +8,8 @@ export type IntegrationType =
   | 'shopify'
   | 'woocommerce'
   | 'google-search-console'
-  | 'google-analytics';
+  | 'google-analytics'
+  | 'google-ads';
 
 export interface Client {
   id: number;
@@ -27,6 +28,7 @@ export interface Client {
     woocommerceAccounts: number;
     googleSearchConsoleAccounts: number;
     googleAnalyticsAccounts: number;
+    googleAdsAccounts: number;
   };
 }
 
@@ -79,6 +81,7 @@ export interface ClientWithIntegrations extends Client {
   woocommerceAccounts?: any[];
   googleSearchConsoleAccounts?: any[];
   googleAnalyticsAccounts?: any[];
+  googleAdsAccounts?: any[];
 }
 
 // API Response Types

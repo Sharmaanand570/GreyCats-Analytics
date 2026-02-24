@@ -181,6 +181,24 @@ export const getIntegrations = async (
       });
     }
 
+    // Google Ads Accounts
+    const googleAds = client.googleAdsAccounts || client.googleAdsProperties;
+    if (googleAds) {
+      googleAds.forEach((acc: any) => {
+        integrations.push({
+          id: acc.id,
+          userId: client.userId,
+          platform: 'google-ads',
+          accountId: acc.customerId || acc.id.toString(),
+          accountName: acc.customerName || acc.descriptiveName || 'Google Ads Account',
+          status: 'connected',
+          lastSyncedAt: acc.lastSynced || null,
+          connectedAt: acc.createdAt,
+          extra: null,
+        });
+      });
+    }
+
     return {
       success: true,
       integrations,

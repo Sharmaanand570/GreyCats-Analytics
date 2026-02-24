@@ -486,11 +486,21 @@ export default function AuthPage() {
           {/* Policies */}
           <p className="px-4 text-center text-xs text-muted-foreground">
             By continuing, you agree to our{" "}
-            <Link to="#" className="underline underline-offset-2">
+            <Link
+              to="/terms-of-service"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
               Terms of Service
             </Link>{" "}
             and{" "}
-            <Link to="#" className="underline underline-offset-2">
+            <Link
+              to="/privacy-policy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
               Privacy Policy
             </Link>
             .
@@ -509,13 +519,13 @@ export default function AuthPage() {
 "
         />
 
-       <blockquote className="relative mt-auto text-sm md:text-base italic text-accent z-10">
-  “This platform gives me a complete view of all my client metrics in one place. Reporting that used to take hours now takes minutes.”
-  <br />
-  <span className="mt-2 block not-italic text-muted-foreground font-medium">
-    – Digital Marketing Manager
-  </span>
-</blockquote>
+        <blockquote className="relative mt-auto text-sm md:text-base italic text-accent z-10">
+          “This platform gives me a complete view of all my client metrics in one place. Reporting that used to take hours now takes minutes.”
+          <br />
+          <span className="mt-2 block not-italic text-muted-foreground font-medium">
+            – Digital Marketing Manager
+          </span>
+        </blockquote>
 
       </div>
     </div>

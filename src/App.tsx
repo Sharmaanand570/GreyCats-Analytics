@@ -39,6 +39,7 @@ const FacebookInsightsPage = lazy(() => import("./pages/FacebookInsightsPage"));
 const InstagramInsightsPage = lazy(
   () => import("./pages/InstagramInsightsPage")
 );
+const GoogleAdsDetailPage = lazy(() => import("./pages/GoogleAdsDetailPage"));
 const ReportsLandingPage = lazy(() => import("./pages/ReportsLandingPage"));
 
 const Reports = lazy(() => import("./components/Reports"));
@@ -63,6 +64,8 @@ const ClientsPage = lazy(() => import("./pages/ClientsPage"));
 const ClientDetailPage = lazy(() => import("./pages/ClientDetailPage"));
 const OAuthCallbackPage = lazy(() => import("./pages/OAuthCallbackPage"));
 const SharedReportPage = lazy(() => import("./pages/SharedReportPage"));
+const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
+const TermsOfServicePage = lazy(() => import("./pages/TermsOfServicePage"));
 
 // Admin Pages
 const AdminLayout = lazy(() => import("./components/AdminLayout"));
@@ -137,6 +140,7 @@ function App() {
                   path="meta-instagram/:clientId?"
                   element={<InstagramInsightsPage />}
                 />
+                <Route path="google-ads/:clientId?" element={<GoogleAdsDetailPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
 
@@ -195,6 +199,7 @@ function App() {
             <Route path="shopify/callback" element={<ShopifyCallbackHandler />} />
             <Route path="meta/callback" element={<MetaCallbackHandler />} />
             <Route path="meta-business/callback" element={<MetaCallbackHandler />} />
+            <Route path="google-ads/callback" element={<OAuthCallbackPage />} />
 
             {/* Multi-Client OAuth Callback */}
             <Route path="oauth/callback" element={<OAuthCallbackPage />} />
@@ -203,6 +208,10 @@ function App() {
 
           {/* Shared Report View (Public) */}
           <Route path="shared/reports/:id" element={<SharedReportPage />} />
+
+          {/* Legal Pages (Public - no auth required) */}
+          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms-of-service" element={<TermsOfServicePage />} />
 
           {/* Dedicated 404 route (accessible from anywhere) */}
           <Route path="/404" element={<NotFoundPage />} />

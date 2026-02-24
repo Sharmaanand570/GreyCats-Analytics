@@ -158,6 +158,20 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
     "woo.orders",
     "woo.itemsSold",
   ],
+  "google-ads": [
+    "google_ads.impressions",
+    "google_ads.clicks",
+    "google_ads.cost",
+    "google_ads.conversions",
+    "google_ads.revenue",
+    "google_ads.roas",
+  ],
+  "google_ads": [
+    "google_ads.impressions",
+    "google_ads.clicks",
+    "google_ads.cost",
+    "google_ads.roas",
+  ],
 };
 
 export const MAX_DEFAULT_WIDGETS = 25;
@@ -172,6 +186,7 @@ export type WidgetTemplate = {
   h: number;
   displayName?: string;
   chartType?: 'column' | 'line' | 'area' | 'pie' | 'bar';
+  unit?: string;
   groupBy?: 'none' | 'day' | 'week' | 'month';
   aggregation?: string;
   customConfig?: Record<string, any>;
@@ -506,9 +521,9 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
       // Row 2: Number widgets (5 metrics)
       { type: 'metric', metricKey: 'meta.ads.clicks', x: 0, y: 5, w: 2.4, h: 3, displayName: 'Clicks' },
       { type: 'metric', metricKey: 'meta.ads.impressions', x: 2.4, y: 5, w: 2.4, h: 3, displayName: 'Impressions' },
-      { type: 'metric', metricKey: 'meta.ads.cpc', x: 4.8, y: 5, w: 2.4, h: 3, displayName: 'CPC' },
-      { type: 'metric', metricKey: 'meta.ads.ctr', x: 7.2, y: 5, w: 2.4, h: 3, displayName: 'CTR' },
-      { type: 'metric', metricKey: 'meta.ads.spend', x: 9.6, y: 5, w: 2.4, h: 3, displayName: 'Spend' },
+      { type: 'metric', metricKey: 'meta.ads.cpc', x: 4.8, y: 5, w: 2.4, h: 3, displayName: 'CPC', unit: '₹' },
+      { type: 'metric', metricKey: 'meta.ads.ctr', x: 7.2, y: 5, w: 2.4, h: 3, displayName: 'CTR', unit: '%' },
+      { type: 'metric', metricKey: 'meta.ads.spend', x: 9.6, y: 5, w: 2.4, h: 3, displayName: 'Spend', unit: '₹' },
 
       // Row 3: Campaign Performance Table (5 columns)
       {
@@ -528,6 +543,47 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
             { name: 'Impressions', width: '12%', dataKey: 'impressions' },
             { name: 'Average CPC', width: '12%', dataKey: 'cpc' },
             { name: 'CTR', width: '11%', dataKey: 'ctr' }
+          ]
+        }
+      },
+    ]
+  },
+
+  // GOOGLE ADS
+  'google-ads': {
+    widgets: [
+      // Row 1: Trend charts
+      { type: 'line_chart', metricKey: 'google_ads.clicks', x: 0, y: 0, w: 6, h: 5, displayName: 'Clicks' },
+      { type: 'line_chart', metricKey: 'google_ads.impressions', x: 6, y: 0, w: 6, h: 5, displayName: 'Impressions' },
+
+      // Row 2: 6 metric cards
+      { type: 'metric', metricKey: 'google_ads.cost', x: 0, y: 5, w: 2, h: 3, displayName: 'Spend' },
+      { type: 'metric', metricKey: 'google_ads.impressions', x: 2, y: 5, w: 2, h: 3, displayName: 'Impressions' },
+      { type: 'metric', metricKey: 'google_ads.clicks', x: 4, y: 5, w: 2, h: 3, displayName: 'Clicks' },
+      { type: 'metric', metricKey: 'google_ads.ctr', x: 6, y: 5, w: 2, h: 3, displayName: 'CTR' },
+      { type: 'metric', metricKey: 'google_ads.cpc', x: 8, y: 5, w: 2, h: 3, displayName: 'Avg. CPC' },
+      { type: 'metric', metricKey: 'google_ads.roas', x: 10, y: 5, w: 2, h: 3, displayName: 'ROAS' },
+
+      // Row 3: Campaign performance table
+      {
+        type: 'table',
+        metricKey: 'google_ads.campaign_performance',
+        x: 0,
+        y: 8,
+        w: 12,
+        h: 8,
+        displayName: 'Campaign Performance',
+        customConfig: {
+          columns: [
+            { name: 'Campaign', width: '18%', dataKey: 'name' },
+            { name: 'View-through conversions', width: '10%', dataKey: 'viewThroughConversions' },
+            { name: 'Avg CPC', width: '10%', dataKey: 'cpc' },
+            { name: 'Clicks', width: '9%', dataKey: 'clicks' },
+            { name: 'Conversion rate', width: '10%', dataKey: 'conversionRate' },
+            { name: 'Conversions', width: '10%', dataKey: 'conversions' },
+            { name: 'Cost', width: '11%', dataKey: 'cost' },
+            { name: 'Cost / conv.', width: '11%', dataKey: 'costPerConversion' },
+            { name: 'Impressions', width: '11%', dataKey: 'impressions' },
           ]
         }
       },
@@ -554,6 +610,11 @@ INTEGRATION_TEMPLATES['meta_ads'] = INTEGRATION_TEMPLATES['meta-ads'];
 INTEGRATION_TEMPLATES['ads'] = INTEGRATION_TEMPLATES['meta-ads'];
 INTEGRATION_TEMPLATES['metaads'] = INTEGRATION_TEMPLATES['meta-ads'];
 INTEGRATION_TEMPLATES['meta-ads-campaign'] = INTEGRATION_TEMPLATES['meta-ads'];
+
+// Google Ads aliases
+INTEGRATION_TEMPLATES['google_ads'] = INTEGRATION_TEMPLATES['google-ads'];
+INTEGRATION_TEMPLATES['googleads'] = INTEGRATION_TEMPLATES['google-ads'];
+INTEGRATION_TEMPLATES['google-ads-campaign'] = INTEGRATION_TEMPLATES['google-ads'];
 
 
 // COMPREHENSIVE ALIASES - Force fixed templates for all naming variations

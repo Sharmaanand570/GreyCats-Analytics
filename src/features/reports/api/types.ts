@@ -505,6 +505,24 @@ export interface MetaAdsCampaignPerformanceResponse {
   rows: MetaAdsCampaignRow[];
 }
 
+// Google Ads Campaign Performance
+export interface GoogleAdsCampaignRow {
+  name: string;
+  status: string;
+  cost: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  cpc: number;
+  conversionRate: number;
+  roas: number;
+}
+
+export interface GoogleAdsCampaignPerformanceResponse {
+  success: boolean;
+  rows: GoogleAdsCampaignRow[];
+}
+
 // Moved from ReportBuilder.tsx - Shared types for Store
 export interface DashboardLayout extends Layout {
   widgetType: ReportWidgetType; // ReportWidgetType (string union)

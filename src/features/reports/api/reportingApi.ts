@@ -29,6 +29,7 @@ import type {
   MetaStoredPostsResponse,
   InstagramMediaResponse,
   MetaAdsCampaignPerformanceResponse,
+  GoogleAdsCampaignPerformanceResponse,
 } from "./types";
 import { buildApiError, type AxiosApiError } from "./types";
 import { prettifyMetricLabel } from "@/utils/labelUtils";
@@ -92,6 +93,72 @@ export const fetchMetaAdsCampaignPerformance = (
     return response.data;
   });
 
+// New API function for Google Ads Campaign Performance
+export const fetchGoogleAdsCampaignPerformance = (
+  clientId: number,
+  startDate?: string,
+  endDate?: string,
+  accountId?: string
+) =>
+  handleRequest<GoogleAdsCampaignPerformanceResponse>(async () => {
+    const { getGoogleAdsCampaigns } = await import('@/features/googleAds/API/googleAdsApi');
+    const response = await getGoogleAdsCampaigns(clientId, {
+      startDate,
+      endDate,
+      accountId
+    });
+
+    return {
+      success: true,
+      rows: response.campaigns as any[],
+    };
+  });
+
+export const fetchGoogleAdsSummary = (
+  clientId: number,
+  params?: { startDate?: string; endDate?: string; accountId?: string }
+) =>
+  handleRequest<any>(async () => {
+    const { getGoogleAdsSummary } = await import('@/features/googleAds/API/googleAdsApi');
+    return await getGoogleAdsSummary(clientId, params);
+  });
+
+/**
+ * Fetch a single aggregated value for a metric over a date range.
+ * Endpoint: GET /api/unified-metrics/aggregate
+ * Auth: JWT Bearer token — client is identified from the token, NOT from a clientId query param.
+ * Returns: { success: true, metricKey, value, numerator?, denominator?, rowCount? }
+ */
+export const fetchUnifiedAggregate = (params: {
+  metricKey: string;
+  integration: string;
+  startDate: string;
+  endDate: string;
+  accountId?: string;
+}) =>
+  handleRequest<{
+    success: boolean;
+    metricKey: string;
+    value: number;
+    numerator?: number;
+    denominator?: number;
+    rowCount?: number;
+  }>(async () => {
+    // Only send the 4 documented params. Client is scoped by JWT Bearer — no clientId needed.
+    const queryParams: Record<string, string> = {
+      metricKey: params.metricKey,
+      integration: params.integration,
+      startDate: params.startDate,
+      endDate: params.endDate,
+    };
+    if (params.accountId) queryParams.accountId = params.accountId;
+
+    console.log('[Aggregate API] Request:', queryParams);
+    const response = await api.get('/unified-metrics/aggregate', { params: queryParams });
+    console.log('[Aggregate API] Response:', response.data);
+    return response.data;
+  });
+
 // Sync Status Types
 export interface SyncStatusAccount {
   assignmentId: number;
@@ -115,7 +182,7 @@ export interface SyncStatusResponse {
 export const getSyncStatus = (clientId: number) =>
   handleRequest<SyncStatusResponse>(async () => {
     try {
-      console.log(`Fetching sync status for client ${clientId} at /clients/${clientId}/sync-status`);
+
       const response = await api.get<SyncStatusResponse>(
         `/clients/${clientId}/sync-status`
       );
@@ -433,6 +500,7 @@ export const fetchUnifiedMetric = (
     endDate: string;
     token?: string;
     groupBy?: string;
+    accountId?: string;
   }
 ) =>
   handleRequest(async () => {
@@ -460,6 +528,7 @@ export const fetchUnifiedMetric = (
       endDate: params.endDate,
       ...(params.token ? { token: params.token } : {}),
       ...(params.groupBy ? { groupBy: params.groupBy } : {}),
+      ...(params.accountId ? { accountId: params.accountId } : {}),
     };
 
     if (clientId) {
@@ -1123,5 +1192,4 @@ export const resolveWidgets = (
     );
     return response.data;
   });
-
 

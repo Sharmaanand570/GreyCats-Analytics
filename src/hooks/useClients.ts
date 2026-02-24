@@ -101,8 +101,8 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
         identifier = account.youtubeAccount?.channelId || account.channelId || identifier;
         break;
       case 'meta-ads':
-        name = account.metaAdAccount?.name || account.name || name;
-        identifier = account.metaAdAccount?.accountId || account.accountId || identifier;
+        name = account.adAccount?.name || account.metaAdAccount?.name || account.name || name;
+        identifier = account.adAccount?.accountId || account.metaAdAccount?.accountId || account.accountId || identifier;
         break;
       case 'meta-insights':
         name = account.platform || account.name || name;
@@ -117,13 +117,17 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
         identifier = account.woocommerceAccount?.storeUrl || account.storeUrl || identifier;
         break;
       case 'google-search-console':
-        name = account.searchConsoleAccount?.siteUrl || account.siteUrl || name;
-        identifier = account.searchConsoleAccount?.siteUrl || account.siteUrl || identifier;
+        name = account.property?.siteUrl || account.searchConsoleAccount?.siteUrl || account.siteUrl || name;
+        identifier = account.property?.siteUrl || account.searchConsoleAccount?.siteUrl || account.siteUrl || identifier;
         break;
       case 'google-analytics':
         // Try to get propertyId as identifier first, as that's what metrics use
         identifier = account.analyticsAccount?.propertyId || account.propertyId || account.analyticsAccount?.id || account.id || identifier;
         name = account.analyticsAccount?.propertyName || account.propertyName || account.platform || name;
+        break;
+      case 'google-ads':
+        name = account.customerName || account.descriptiveName || name;
+        identifier = account.customerId || identifier;
         break;
     }
 
@@ -310,6 +314,14 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
           processedIds.add(propertyIdKey);
         }
       }
+    });
+  }
+
+  const googleAds = client.googleAdsAccounts || client.googleAdsProperties;
+  if (googleAds) {
+    googleAds.forEach((acc: any) => {
+      const result = mapAccount(acc, 'google-ads');
+      if (result) integrations.push(result);
     });
   }
 

@@ -6,8 +6,8 @@ import {
   TabsTrigger,
 } from "./ui/tabs";
 
-import { TableGeneralTab, DEFAULT_RECENT_POSTS_COLUMNS, DEFAULT_INSTAGRAM_MEDIA_COLUMNS, DEFAULT_META_ADS_CAMPAIGN_COLUMNS } from "./WidgetEditor/TableGeneralTab";
-export { TableGeneralTab, DEFAULT_RECENT_POSTS_COLUMNS, DEFAULT_INSTAGRAM_MEDIA_COLUMNS, DEFAULT_META_ADS_CAMPAIGN_COLUMNS };
+import { TableGeneralTab, DEFAULT_RECENT_POSTS_COLUMNS, DEFAULT_INSTAGRAM_MEDIA_COLUMNS, DEFAULT_META_ADS_CAMPAIGN_COLUMNS, DEFAULT_GOOGLE_ADS_CAMPAIGN_COLUMNS } from "./WidgetEditor/TableGeneralTab";
+export { TableGeneralTab, DEFAULT_RECENT_POSTS_COLUMNS, DEFAULT_INSTAGRAM_MEDIA_COLUMNS, DEFAULT_META_ADS_CAMPAIGN_COLUMNS, DEFAULT_GOOGLE_ADS_CAMPAIGN_COLUMNS };
 import { TableDataTab } from "./WidgetEditor/TableDataTab";
 
 import type { TableWidgetData } from "./widgetTypes";
@@ -28,7 +28,8 @@ function TableWidgetForm({
   const isRecentPosts = metricKey === 'meta.facebook.recent_posts';
   const isInstagramMedia = metricKey === 'meta.instagram.recent_media';
   const isMetaAdsCampaign = metricKey === 'meta.ads.campaign_performance';
-  const isDynamicTable = isRecentPosts || isInstagramMedia || isMetaAdsCampaign;
+  const isGoogleAdsCampaign = metricKey === 'google_ads.campaign_performance';
+  const isDynamicTable = isRecentPosts || isInstagramMedia || isMetaAdsCampaign || isGoogleAdsCampaign;
 
   const [localData, setLocalData] = React.useState(data);
   const lastWidgetId = React.useRef(id);
@@ -75,13 +76,15 @@ function TableWidgetForm({
         newCols = DEFAULT_INSTAGRAM_MEDIA_COLUMNS;
       } else if (isMetaAdsCampaign && (columns.length === 0 || isGenericDefault)) {
         newCols = DEFAULT_META_ADS_CAMPAIGN_COLUMNS;
+      } else if (isGoogleAdsCampaign && (columns.length === 0 || isGenericDefault)) {
+        newCols = DEFAULT_GOOGLE_ADS_CAMPAIGN_COLUMNS;
       }
 
       if (newCols) {
         onChange({ ...data, columns: newCols });
       }
     }
-  }, [metricKey, columns.length, isGenericDefault, isRecentPosts, isInstagramMedia, isMetaAdsCampaign]);
+  }, [metricKey, columns.length, isGenericDefault, isRecentPosts, isInstagramMedia, isMetaAdsCampaign, isGoogleAdsCampaign]);
 
   // Note: useEffect might trigger an update.
 

@@ -6,6 +6,9 @@ import {
   fetchMetaStoredPosts,
   fetchInstagramStoredMedia,
   fetchMetaAdsCampaignPerformance,
+  fetchGoogleAdsCampaignPerformance,
+  fetchGoogleAdsSummary,
+  fetchUnifiedAggregate,
 } from "../api/reportingApi";
 import { getShopifyTrends } from "@/features/shopify/API/shopifyApi";
 import { getMetricAggregation } from "@/utils/facebookMetrics";
@@ -105,6 +108,7 @@ const VALID_INTEGRATIONS = [
   "youtube",
   "shopify",
   "woo",
+  "google-ads",
 ];
 
 function hasValidMetricPrefix(metricKey: string): boolean {
@@ -115,7 +119,8 @@ function hasValidMetricPrefix(metricKey: string): boolean {
     metricKey.startsWith("meta.") ||
     metricKey.startsWith("youtube.") ||
     metricKey.startsWith("shopify.") ||
-    metricKey.startsWith("woo.")
+    metricKey.startsWith("woo.") ||
+    metricKey.startsWith("google_ads.")
   );
 }
 
@@ -263,7 +268,7 @@ async function fetchRawWidgetData(
             integrations = Array.isArray(integrationsResponse.data)
               ? integrationsResponse.data
               : integrationsResponse.data?.integrations ||
-                integrationsResponse.data;
+              integrationsResponse.data;
           }
 
           if (Array.isArray(integrations)) {
@@ -406,10 +411,96 @@ async function fetchRawWidgetData(
     }
   }
 
+  // --- Google Ads Campaign Performance ---
+  if (widget.metricKey === "google_ads.campaign_performance") {
+    try {
+      if (effectiveClientId) {
+        const campaignData = await fetchGoogleAdsCampaignPerformance(
+          effectiveClientId,
+          dateFrom,
+          dateTo,
+          widget.accountId || undefined
+        );
+
+        if (campaignData?.success && Array.isArray(campaignData.rows)) {
+          const rows = campaignData.rows.map((row: any) => ({
+            ...row,
+            metricKey: widget.metricKey,
+            integration: "google-ads",
+          }));
+
+          return {
+            success: true,
+            rows,
+            pagination: {
+              page: 1,
+              limit: rows.length,
+              total: rows.length,
+              totalPages: 1,
+            },
+            columns: [
+              { name: "Campaign", width: "18%", dataKey: "name" },
+              { name: "View-through conversions", width: "10%", dataKey: "viewThroughConversions" },
+              { name: "Avg CPC", width: "10%", dataKey: "cpc" },
+              { name: "Clicks", width: "9%", dataKey: "clicks" },
+              { name: "Conversion rate", width: "10%", dataKey: "conversionRate" },
+              { name: "Conversions", width: "10%", dataKey: "conversions" },
+              { name: "Cost", width: "11%", dataKey: "cost" },
+              { name: "Cost / conv.", width: "11%", dataKey: "costPerConversion" },
+              { name: "Impressions", width: "11%", dataKey: "impressions" },
+            ],
+          };
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch Google Ads campaign performance", err);
+    }
+  }
+
+  // --- Google Ads Rate Metrics (Summary Refresh) ---
+  if (
+    normalizedInteg === "google-ads" &&
+    ["google_ads.ctr", "google_ads.cpc", "google_ads.roas"].includes(
+      widget.metricKey
+    )
+  ) {
+    try {
+      const summaryData = await fetchGoogleAdsSummary(effectiveClientId!, {
+        startDate: dateFrom,
+        endDate: dateTo,
+        accountId: widget.accountId || undefined
+      });
+
+      if (summaryData?.success && summaryData.summary) {
+        // Map summary values back to expected keys for cards
+        const summary = {
+          ctr: summaryData.summary.ctr,
+          cpc: summaryData.summary.cpc,
+          roas: summaryData.summary.roas,
+          cost: summaryData.summary.spend,
+          clicks: summaryData.summary.clicks,
+          revenue: summaryData.summary.revenue,
+          impressions: summaryData.summary.impressions,
+        };
+
+        return {
+          success: true,
+          rows: [], // Metrics cards usually use the summary object
+          summary,
+        };
+      }
+    } catch (err) {
+      console.error("Failed to fetch Google Ads summary", err);
+    }
+  }
+
   // --- Standard: Unified Metrics API ---
-  const shouldIncludeAccountId = !["meta-facebook", "meta-instagram"].includes(
-    normalizedInteg
-  );
+  const shouldIncludeAccountId = ![
+    "meta-facebook",
+    "meta-instagram",
+    "meta-ads",
+    "meta_ads",
+  ].includes(normalizedInteg);
 
   const params: any = {
     integration: normalizedInteg,
@@ -419,7 +510,7 @@ async function fetchRawWidgetData(
     token: shareToken,
     groupBy:
       widget.type === "chart" ||
-      (widget as any).widgetType === "chart"
+        (widget as any).widgetType === "chart"
         ? "day"
         : widget.groupBy && widget.groupBy !== "none"
           ? widget.groupBy
@@ -431,6 +522,99 @@ async function fetchRawWidgetData(
   };
 
   const data = await fetchUnifiedMetric(effectiveClientId, params);
+
+  // --- Google Search Console: Aggregate Fetch ---
+  // Uses the /unified-metrics/aggregate endpoint for all 4 GSC metric keys.
+  // Clicks/Impressions → summed integer. CTR → already in % (e.g. 0.69 = 0.69%). Position → averaged.
+  const GSC_AGGREGATE_KEYS = [
+    "google_seo.clicks",
+    "google_seo.impressions",
+    "google_seo.ctr",
+    "google_seo.position",
+  ] as const;
+  if (
+    (normalizedInteg === "google-search-console" ||
+      normalizedInteg === "google-console") &&
+    GSC_AGGREGATE_KEYS.includes(widget.metricKey as any)
+  ) {
+    console.log(`📡 [useWidgetData] GSC Aggregate fetch for ${widget.metricKey}`);
+    try {
+      const aggregateResult = await fetchUnifiedAggregate({
+        metricKey: widget.metricKey,
+        integration: "google-search-console",
+        startDate: dateFrom,
+        endDate: dateTo,
+        accountId: widget.accountId || undefined,
+      });
+
+      if (aggregateResult?.success && typeof aggregateResult.value === "number") {
+        console.log(
+          `📡 [useWidgetData] GSC Aggregate OK for ${widget.metricKey}:`,
+          aggregateResult.value
+        );
+        const metricSuffix = widget.metricKey.split(".").pop() || "";
+        return {
+          ...data,
+          rows: data?.rows ?? [],
+          value: aggregateResult.value,
+          total: aggregateResult.value,
+          rowCount: aggregateResult.rowCount,
+          summary: {
+            ...data?.summary,
+            [metricSuffix]: aggregateResult.value,
+          },
+        };
+      } else {
+        console.warn(
+          `📡 [useWidgetData] GSC Aggregate returned no value for ${widget.metricKey}:`,
+          aggregateResult
+        );
+      }
+    } catch (err) {
+      console.error("Failed to fetch GSC aggregate metric", err);
+    }
+  }
+
+  // --- Meta Ads Ratio Metrics: Aggregate Fetch for Accurate Blended Calculation ---
+  // CPC = Total Spend / Total Clicks. CTR = (Total Clicks / Total Impressions) * 100
+  // We use the dedicated /aggregate endpoint to get mathematically correct totals.
+  if (
+    (normalizedInteg === "meta-ads" || normalizedInteg === "meta_ads") &&
+    (widget.metricKey === "meta.ads.cpc" || widget.metricKey === "meta.ads.ctr")
+  ) {
+    console.log(`📡 [useWidgetData] Aggregate fetch for ${widget.metricKey}`);
+    try {
+      const aggregateResult = await fetchUnifiedAggregate({
+        metricKey: widget.metricKey,
+        integration: "meta_ads",
+        startDate: dateFrom,
+        endDate: dateTo,
+        accountId: widget.accountId || undefined,
+      });
+
+      if (aggregateResult?.success && typeof aggregateResult.value === "number") {
+        console.log(`📡 [useWidgetData] Aggregate OK for ${widget.metricKey}:`, aggregateResult.value);
+        const metricSuffix = widget.metricKey.split(".").pop() || "";
+        return {
+          ...data,
+          rows: data?.rows ?? [],   // Ensure rows is always an array so processWidgetData doesn't early-return 0
+          value: aggregateResult.value,
+          total: aggregateResult.value,
+          summary: {
+            ...data?.summary,
+            [metricSuffix]: aggregateResult.value,
+            cpc: metricSuffix === "cpc" ? aggregateResult.value : data?.summary?.cpc,
+            ctr: metricSuffix === "ctr" ? aggregateResult.value : data?.summary?.ctr,
+          },
+        };
+      } else {
+        console.warn(`📡 [useWidgetData] Aggregate returned no value for ${widget.metricKey}:`, aggregateResult);
+      }
+    } catch (err) {
+      console.error("Failed to fetch Meta Ads aggregate metric", err);
+    }
+  }
+
   return data;
 }
 
@@ -527,8 +711,23 @@ export function processWidgetData(
       clientMatch = String(row.clientId) === String(effectiveClientId);
     }
 
+    const isRateWidget =
+      widgetInteg === "google-ads" ||
+      widgetInteg === "meta-ads" ||
+      widgetInteg === "meta-business";
+
+    // For rate metrics, we might have multiple component metrics (clicks, impressions, etc.)
+    const isComponentMetric =
+      isRateWidget &&
+      (row.metricKey.endsWith(".clicks") ||
+        row.metricKey.endsWith(".impressions") ||
+        row.metricKey.endsWith(".cost") ||
+        row.metricKey.endsWith(".spend") ||
+        row.metricKey.endsWith(".revenue") ||
+        row.metricKey.endsWith("amount_spent"));
+
     return (
-      row.metricKey === widget.metricKey &&
+      (row.metricKey === widget.metricKey || isComponentMetric) &&
       (rowInteg === widgetInteg ||
         (widgetInteg === "meta-business" && rowInteg.startsWith("meta"))) &&
       accountMatch &&
@@ -592,30 +791,39 @@ export function processWidgetData(
     metricKeyLower.includes("avg") ||
     metricKeyLower.includes("rate") ||
     metricKeyLower.includes("duration") ||
-    metricKeyLower.includes("perview");
+    metricKeyLower.includes("perview") ||
+    metricKeyLower.includes("roas");
 
   // --- Total calculation ---
-  let total = 0;
+  // 1. Try pre-calculated total/value from aggregate fetcher first
+  //    IMPORTANT: Only treat as pre-computed when non-zero. A value of 0 from the
+  //    standard API should fall through to blended/averaging to avoid locking at 0.
+  const precomputedValue =
+    typeof data.value === 'number' && data.value !== 0 ? data.value
+      : typeof data.total === 'number' && data.total !== 0 ? data.total
+        : null;
+  let total = precomputedValue ?? 0;
+  let summaryUsed = precomputedValue !== null;
 
-  // Try API-provided summary first
-  const summary = (data as any).summary;
-  const metricSuffix =
-    widget.metricKey.split(".").pop()?.toLowerCase() || "";
+  const metricSuffix = widget.metricKey.split(".").pop()?.toLowerCase() || "";
 
-  if (summary) {
-    let summaryKey = metricSuffix;
-    if (summaryKey === "cost_per_click") summaryKey = "cpc";
-    if (summaryKey === "click_through_rate") summaryKey = "ctr";
-    if (summaryKey === "cost_per_mille") summaryKey = "cpm";
-    if (summaryKey === "amount_spent") summaryKey = "spend";
+  // 2. Try API-provided summary second
+  if (!summaryUsed) {
+    const summary = (data as any).summary;
 
-    if (summaryKey && typeof summary[summaryKey] === "number") {
-      total = summary[summaryKey];
+    if (summary) {
+      let summaryKey = metricSuffix;
+      if (summaryKey === "cost_per_click") summaryKey = "cpc";
+      if (summaryKey === "click_through_rate") summaryKey = "ctr";
+      if (summaryKey === "cost_per_mille") summaryKey = "cpm";
+      if (summaryKey === "amount_spent") summaryKey = "spend";
+
+      if (summaryKey && typeof summary[summaryKey] === "number") {
+        total = summary[summaryKey];
+        summaryUsed = true;
+      }
     }
   }
-
-  const summaryUsed =
-    summary && typeof summary[metricSuffix] === "number";
 
   if (!summaryUsed && filteredRows.length > 0) {
     const aggregationType = getMetricAggregation(widget.metricKey);
@@ -653,10 +861,11 @@ export function processWidgetData(
               (r.integration || "")
                 .replace("_", "-")
                 .toLowerCase() ===
-                (widgetIntegration || "")
-                  .replace("_", "-")
-                  .toLowerCase() &&
+              (widgetIntegration || "")
+                .replace("_", "-")
+                .toLowerCase() &&
               (widgetIntegration === "meta-business" ||
+                widgetIntegration === "google-ads" ||
                 String(r.accountId) === String(widget.accountId))
           )
           .reduce(
@@ -666,7 +875,7 @@ export function processWidgetData(
       };
 
       if (metricSuffix === "cpc") {
-        const sumSpend = getSum("spend") || getSum("amount_spent");
+        const sumSpend = getSum("spend") || getSum("amount_spent") || getSum(".cost");
         const sumClicks = getSum("clicks");
         if (sumClicks > 0) {
           total = sumSpend / sumClicks;
@@ -680,10 +889,17 @@ export function processWidgetData(
           blendedCalculated = true;
         }
       } else if (metricSuffix === "cpm") {
-        const sumSpend = getSum("spend");
+        const sumSpend = getSum("spend") || getSum(".cost");
         const sumImpressions = getSum("impressions");
         if (sumImpressions > 0) {
           total = (sumSpend / sumImpressions) * 1000;
+          blendedCalculated = true;
+        }
+      } else if (metricSuffix === "roas") {
+        const sumRevenue = getSum("revenue");
+        const sumCost = getSum("cost") || getSum(".cost");
+        if (sumCost > 0) {
+          total = sumRevenue / sumCost;
           blendedCalculated = true;
         }
       }
@@ -706,22 +922,54 @@ export function processWidgetData(
   }
 
   // --- Series aggregation ---
-  const seriesMap = new Map<string, { sum: number; count: number }>();
+  const dailyMetrics = new Map<string, Record<string, number>>();
+
   filteredRows.forEach((row: any) => {
-    const dateKey = row.date || row.dimensionValue || "";
-    if (dateKey) {
-      const current = seriesMap.get(dateKey) || { sum: 0, count: 0 };
-      seriesMap.set(dateKey, {
-        sum: current.sum + (row.value || 0),
-        count: current.count + 1,
-      });
+    const dateKey = row.date ? row.date.split("T")[0] : row.dimensionValue || "";
+    if (!dateKey) return;
+
+    const metrics = dailyMetrics.get(dateKey) || { _count: 0, _sum: 0 };
+    const mKey = row.metricKey?.toLowerCase() || "";
+    const suffix = mKey.split(".").pop() || "";
+
+    // Store component values for blending
+    if (suffix === "clicks") metrics.clicks = (metrics.clicks || 0) + (Number(row.value) || 0);
+    if (suffix === "impressions") metrics.impressions = (metrics.impressions || 0) + (Number(row.value) || 0);
+    if (suffix === "cost" || suffix === "spend" || suffix === "amount_spent") {
+      metrics.spend = (metrics.spend || 0) + (Number(row.value) || 0);
     }
+    if (suffix === "revenue") metrics.revenue = (metrics.revenue || 0) + (Number(row.value) || 0);
+
+    if (row.metricKey === widget.metricKey) {
+      metrics._primary = (metrics._primary || 0) + (Number(row.value) || 0);
+      metrics._sum += Number(row.value) || 0;
+      metrics._count += 1;
+    }
+
+    dailyMetrics.set(dateKey, metrics);
   });
 
-  const series = Array.from(seriesMap.entries())
-    .map(([x, { sum, count }]) => {
-      const value = isRateMetric ? sum / count : sum;
-      return { x, y: value };
+  const series = Array.from(dailyMetrics.entries())
+    .map(([x, m]) => {
+      let y = m._primary ?? (isRateMetric ? 0 : m._sum);
+
+      if (metricSuffix === "cpc") {
+        const spend = m.spend || 0;
+        const clicks = m.clicks || 0;
+        if (clicks > 0) y = spend / clicks;
+      } else if (metricSuffix === "ctr") {
+        const clicks = m.clicks || 0;
+        const imps = m.impressions || 0;
+        if (imps > 0) y = (clicks / imps) * 100;
+      } else if (metricSuffix === "roas") {
+        const rev = m.revenue || 0;
+        const cost = m.spend || 0; // mapped cost to spend above
+        if (cost > 0) y = rev / cost;
+      } else if (isRateMetric && m._count > 0 && m._primary === undefined) {
+        y = m._sum / m._count;
+      }
+
+      return { x, y };
     })
     .sort((a, b) => {
       const dateA = new Date(a.x).getTime();
@@ -865,6 +1113,54 @@ export function useWidgetData(params: UseWidgetDataParams) {
       }
 
       try {
+        // --- DIRECT SHORTCUT: Meta Ads CPC / CTR via Campaign Performance ---
+        // Uses fetchMetaAdsCampaignPerformance — the proven endpoint that already
+        // returns correct cpc/ctr/clicks/impressions for the campaign table.
+        //   CPC (weighted avg) = Σ(clicks × rowCpc) / Σ(clicks)  === total_spend / total_clicks
+        //   CTR               = Σ(clicks) / Σ(impressions) × 100
+        if (
+          (normalizedInteg === "meta-ads" || normalizedInteg === "meta_ads") &&
+          (widget.metricKey === "meta.ads.cpc" || widget.metricKey === "meta.ads.ctr")
+        ) {
+          try {
+            const campaignData = await fetchMetaAdsCampaignPerformance(
+              effectiveClientId!,
+              dateFrom,
+              dateTo
+            );
+
+            if (campaignData?.success && Array.isArray(campaignData.rows) && campaignData.rows.length > 0) {
+              const rows = campaignData.rows;
+              const totalClicks = rows.reduce((s, r) => s + (r.clicks || 0), 0);
+              const totalImpressions = rows.reduce((s, r) => s + (r.impressions || 0), 0);
+
+              if (widget.metricKey === "meta.ads.cpc") {
+                // Weighted average CPC = Σ(clicks × cpc) / Σ(clicks) = totalSpend / totalClicks
+                const weightedSpend = rows.reduce((s, r) => s + ((r.clicks || 0) * (r.cpc || 0)), 0);
+                if (totalClicks > 0 && weightedSpend > 0) {
+                  const cpc = weightedSpend / totalClicks;
+                  console.log(`✅ [CPC Campaign] weightedSpend=${weightedSpend} clicks=${totalClicks} → cpc=${cpc}`);
+                  return { value: cpc, total: cpc, rawCount: 0, rows: [], series: [] };
+                }
+                console.warn(`⚠️ [CPC Campaign] weightedSpend=${weightedSpend} clicks=${totalClicks}`);
+
+              } else {
+                // CTR = Σ(clicks) / Σ(impressions) × 100
+                if (totalClicks > 0 && totalImpressions > 0) {
+                  const ctr = (totalClicks / totalImpressions) * 100;
+                  console.log(`✅ [CTR Campaign] (${totalClicks}/${totalImpressions})*100 = ${ctr}`);
+                  return { value: ctr, total: ctr, rawCount: 0, rows: [], series: [] };
+                }
+                console.warn(`⚠️ [CTR Campaign] clicks=${totalClicks} impressions=${totalImpressions}`);
+              }
+            } else {
+              console.warn(`⚠️ [CPC/CTR Campaign] No campaign rows returned`, campaignData);
+            }
+          } catch (shortcutErr) {
+            console.warn(`⚠️ [CPC/CTR Campaign] Failed for ${widget.metricKey}:`, shortcutErr);
+          }
+        }
+
         const rawData = await fetchRawWidgetData(
           widget,
           normalizedInteg,
@@ -886,3 +1182,4 @@ export function useWidgetData(params: UseWidgetDataParams) {
     },
   });
 }
+
