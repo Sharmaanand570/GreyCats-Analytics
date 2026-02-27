@@ -829,7 +829,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   }, []);
 
   const inferIntegrationInfoFromWidgets = useCallback((
-    widgets: DashboardLayout | undefined,
+    widgets: DashboardLayout[] | undefined,
     titleHint?: string
   ) => {
     if (!widgets || widgets.length === 0) return null;
@@ -902,7 +902,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
   const getIntegrationInfoForSlideIdOrWidgets = useCallback((
     id: number,
-    widgets: DashboardLayout | undefined,
+    widgets: DashboardLayout[] | undefined,
     titleHint?: string
   ) => {
     const byId = getIntegrationInfoForSlideId(id);
@@ -2131,11 +2131,22 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             }
           }
 
-          // A slide is "broken" if it's empty OR if it has 4 or fewer widgets for a Meta integration (our old partial default)
-          const isMeta = !!integrationInfo?.platform?.toLowerCase().match(/meta|fb|ig|ads/);
+          // A slide is "broken" if it is clearly an old auto-generated partial layout.
+          const normalizedPlatform = integrationInfo?.platform?.toLowerCase().replace(/[_ ]/g, '-') || '';
+          const isMeta = normalizedPlatform.includes('meta') || normalizedPlatform.includes('facebook') || normalizedPlatform.includes('instagram') || normalizedPlatform.includes('ads');
+          const isGoogleAnalytics = normalizedPlatform === 'google-analytics' || normalizedPlatform === 'google';
+          const gaTableMetricKeys = ['google.channel_traffic', 'google.browser_used', 'google.device_category', 'google.geo_country', 'google.geo_city', 'google.top_pages'];
+          const hasAnyGaTableWidget = !!existing?.some(w => gaTableMetricKeys.includes(String(w.metricConfig?.metricKey || '')));
+          const isLegacyGaAutoState = !!existing &&
+            isGoogleAnalytics &&
+            existing.length <= 6 &&
+            existing.every(w => w.i.includes('auto')) &&
+            !hasAnyGaTableWidget;
+
           const isBrokenState = existing && (
             (existing.length === 4 && existing.every(w => w.i.includes('auto'))) ||
-            (existing.length < 5 && isMeta)
+            (existing.length < 5 && isMeta) ||
+            isLegacyGaAutoState
           );
 
 
@@ -2828,7 +2839,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         }
         // --- END FIX ---
 
-        const integrationWidgets = buildDefaultWidgetsForIntegration(index, metrics);
+        const integrationWidgets = buildDefaultWidgetsForIntegration(index, metrics, integration.platform, integration.accountId, 0);
 
         integrationWidgets.forEach((w) => {
           if (w.metricConfig) {
@@ -5001,7 +5012,13 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             <Button variant="outline" onClick={handleCancelNewReport}>
               Cancel
             </Button>
-            <Button onClick={handleConfirmNewReport} isLoading={isCreatingTemplate} disabled={isLoadingAvailableMetrics}>Create Report</Button>
+                        <Button
+              onClick={handleConfirmNewReport}
+              isLoading={isCreatingTemplate}
+              disabled={isLoadingIntegrations || !newReportName.trim()}
+            >
+              Create Report
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -5892,8 +5909,16 @@ const ReportBuilder = (props: ReportBuilderProps) => {
 
   const parsedClientId = clientId ? parseInt(clientId) : null;
   const { overallProgress } = useSyncStatus(parsedClientId);
+  const pendingClientId = localStorage.getItem("pending_oauth_client_id");
+  const pendingIntegration = localStorage.getItem("pending_oauth_integration");
+  const hasPendingOAuthForClient = Boolean(
+    parsedClientId &&
+    pendingClientId &&
+    Number(pendingClientId) === parsedClientId &&
+    pendingIntegration
+  );
 
-  if (parsedClientId && overallProgress.isSyncing && !props.readOnly) {
+  if (parsedClientId && (overallProgress.isSyncing || hasPendingOAuthForClient) && !props.readOnly) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/95 backdrop-blur-sm">
         <div className="flex flex-col items-center max-w-md p-8 text-center bg-white rounded-xl shadow-xl border border-zinc-200">
@@ -5934,3 +5959,4 @@ const ReportBuilder = (props: ReportBuilderProps) => {
 };
 
 export default ReportBuilder;
+

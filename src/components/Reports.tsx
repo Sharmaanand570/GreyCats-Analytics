@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FiBell, FiSearch } from "react-icons/fi";
 import { Button } from "./ui/button";
 import TableComponent from "./TableComponent";
@@ -80,6 +80,32 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
   // New: Check sync status
   const { overallProgress } = useSyncStatus(parsedClientId);
   const isSyncing = overallProgress.isSyncing;
+  const [hasPendingOAuthForClient, setHasPendingOAuthForClient] = useState(false);
+
+  useEffect(() => {
+    const checkPendingOAuth = () => {
+      if (!parsedClientId) {
+        setHasPendingOAuthForClient(false);
+        return;
+      }
+
+      const pendingClientId = localStorage.getItem("pending_oauth_client_id");
+      const pendingIntegration = localStorage.getItem("pending_oauth_integration");
+      const matchesClient = pendingClientId && Number(pendingClientId) === parsedClientId;
+      setHasPendingOAuthForClient(Boolean(matchesClient && pendingIntegration));
+    };
+
+    checkPendingOAuth();
+    window.addEventListener("storage", checkPendingOAuth);
+    window.addEventListener("focus", checkPendingOAuth);
+
+    return () => {
+      window.removeEventListener("storage", checkPendingOAuth);
+      window.removeEventListener("focus", checkPendingOAuth);
+    };
+  }, [parsedClientId]);
+
+  const isReportAccessLocked = isSyncing || hasPendingOAuthForClient;
 
   const hasIntegrations =
     (integrationsData?.integrations?.length ?? 0) > 0;
@@ -89,11 +115,16 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
     integrationsData,
     hasIntegrations,
     isLoadingIntegrations,
-    isSyncing
+    isSyncing,
+    hasPendingOAuthForClient,
+    isReportAccessLocked,
   });
 
   const handleCreateReportClick = () => {
-    if (isLoadingIntegrations || isSyncing) {
+    if (isLoadingIntegrations || isReportAccessLocked) {
+      if (hasPendingOAuthForClient) {
+        toast.info("Connection is in progress. Please complete setup in Data Sources.");
+      }
       return;
     }
 
@@ -104,7 +135,7 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
       return;
     }
 
-    navigate(`/clients/${clientId}/reports/new`);
+    navigate(`/clients/${parsedClientId}/reports/new`);
   };
 
   const templates = (rawTemplates ?? []) as ReportTemplateSummary[];
@@ -140,9 +171,9 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
       ...mapTemplateToRow(template),
       link: `/clients/${parsedClientId}/reports/${template.id}`,
       onDelete: () => deleteTemplate(template.id),
-      disabled: isSyncing, // Disable row if syncing
+      disabled: isReportAccessLocked, // Disable row if syncing/connecting
     }));
-  }, [filteredTemplates, deleteTemplate, isSyncing, parsedClientId]);
+  }, [filteredTemplates, deleteTemplate, isReportAccessLocked, parsedClientId]);
 
   const showTable = tableRows.length > 0;
 
@@ -164,12 +195,12 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
               <Button
                 className="rounded-[0.4rem]"
                 onClick={handleCreateReportClick}
-                disabled={isLoadingIntegrations || isSyncing}
+                disabled={isLoadingIntegrations || isReportAccessLocked}
               >
-                {isSyncing ? (
+                {isReportAccessLocked ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Syncing...
+                    {hasPendingOAuthForClient ? "Connecting..." : "Syncing..."}
                   </>
                 ) : (
                   "Create Report"
@@ -200,12 +231,12 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
             <Button
               className="rounded-[0.4rem]"
               onClick={handleCreateReportClick}
-              disabled={isLoadingIntegrations || isSyncing}
+              disabled={isLoadingIntegrations || isReportAccessLocked}
             >
-              {isSyncing ? (
+              {isReportAccessLocked ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Syncing...
+                  {hasPendingOAuthForClient ? "Connecting..." : "Syncing..."}
                 </>
               ) : (
                 "Create Report"
@@ -250,3 +281,4 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
 
 
 export default Reports;
+

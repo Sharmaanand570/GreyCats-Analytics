@@ -15,6 +15,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Loader2, LayoutDashboard, FileBarChart, Database, CalendarDays, Edit2 } from 'lucide-react';
 import { FiBell } from "react-icons/fi";
 import { ReportSchedules } from '../components/ReportSchedules';
+import { useSyncStatus } from '@/features/reports/hooks/useSyncStatus';
 import ClientFormModal from '../components/clients/ClientFormModal';
 import { getProfileImageUrl } from "@/utils/imageUtils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -33,7 +34,10 @@ const ClientDetailPage: React.FC = () => {
     const [pendingIntegration, setPendingIntegration] = useState<IntegrationType | null>(null);
     const [dateRange, setDateRange] = useState<DateRange | undefined>(getDefaultDateRange());
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [hasPendingOAuthForClient, setHasPendingOAuthForClient] = useState(false);
     const queryClient = useQueryClient();
+    const { overallProgress } = useSyncStatus(parsedClientId);
+    const isReportAccessLocked = overallProgress.isSyncing || hasPendingOAuthForClient;
 
     React.useEffect(() => {
         const storedClientId = localStorage.getItem("pending_oauth_client_id");
@@ -41,12 +45,44 @@ const ClientDetailPage: React.FC = () => {
 
         if (storedClientId && storedIntegration && parsedClientId) {
             if (parseInt(storedClientId) === parsedClientId) {
+                setHasPendingOAuthForClient(true);
                 setPendingIntegration(storedIntegration as IntegrationType);
                 setAccountModalOpen(true);
                 setActiveTab("data-sources");
+                return;
             }
         }
+
+        setHasPendingOAuthForClient(false);
     }, [parsedClientId]);
+
+    React.useEffect(() => {
+        const checkPendingOAuth = () => {
+            if (!parsedClientId) {
+                setHasPendingOAuthForClient(false);
+                return;
+            }
+
+            const pendingClientId = localStorage.getItem("pending_oauth_client_id");
+            const pendingIntegration = localStorage.getItem("pending_oauth_integration");
+            const matchesClient = pendingClientId && Number(pendingClientId) === parsedClientId;
+            setHasPendingOAuthForClient(Boolean(matchesClient && pendingIntegration));
+        };
+
+        checkPendingOAuth();
+        window.addEventListener("storage", checkPendingOAuth);
+        window.addEventListener("focus", checkPendingOAuth);
+        return () => {
+            window.removeEventListener("storage", checkPendingOAuth);
+            window.removeEventListener("focus", checkPendingOAuth);
+        };
+    }, [parsedClientId]);
+
+    React.useEffect(() => {
+        if (isReportAccessLocked && activeTab === "reports") {
+            setActiveTab("data-sources");
+        }
+    }, [activeTab, isReportAccessLocked]);
 
     const handleAccountConnected = () => {
         if (!parsedClientId) return;
@@ -138,13 +174,23 @@ const ClientDetailPage: React.FC = () => {
 
                     {/* Content Area */}
                     <div className="flex-1 overflow-y-auto p-6">
-                        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                        <Tabs
+                            value={activeTab}
+                            onValueChange={(value) => {
+                                if (value === "reports" && isReportAccessLocked) {
+                                    setActiveTab("data-sources");
+                                    return;
+                                }
+                                setActiveTab(value);
+                            }}
+                            className="space-y-6"
+                        >
                             <TabsList className="bg-zinc-100/50 p-1 border border-zinc-200/50">
                                 <TabsTrigger value="overview" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
                                     <LayoutDashboard className="w-4 h-4 mr-2" />
                                     Overview
                                 </TabsTrigger>
-                                <TabsTrigger value="reports" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                                <TabsTrigger value="reports" disabled={isReportAccessLocked} className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
                                     <FileBarChart className="w-4 h-4 mr-2" />
                                     Reports
                                 </TabsTrigger>
@@ -157,6 +203,11 @@ const ClientDetailPage: React.FC = () => {
                                     Data Sources
                                 </TabsTrigger>
                             </TabsList>
+                            {isReportAccessLocked && (
+                                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
+                                    Reports are temporarily disabled while data source connection/sync is in progress.
+                                </p>
+                            )}
 
                             <TabsContent value="overview" className="space-y-4 focus-visible:outline-none">
                                 <div className="min-h-[500px]">

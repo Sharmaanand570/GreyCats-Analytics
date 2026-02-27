@@ -777,7 +777,6 @@ const LandingPage = () => {
             <div className="flex items-center gap-6">
                <span className="flex items-center gap-2"><Lock className="w-4 h-4" /> Secure Data</span>
                <span className="flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Data Security</span>
-               <span className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> Google Verified</span>
             </div>
           </div>
         </div>
