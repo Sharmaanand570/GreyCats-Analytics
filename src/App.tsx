@@ -57,6 +57,9 @@ const GoogleCallbackHandler = lazy(
 const GoogleConsoleCallbackHandler = lazy(
   () => import("./components/GoogleConsoleCallbackHandler")
 );
+const GoogleAdsCallbackHandler = lazy(
+  () => import("./components/GoogleAdsCallbackHandler")
+);
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
 // Multi-Client Pages
@@ -66,6 +69,9 @@ const OAuthCallbackPage = lazy(() => import("./pages/OAuthCallbackPage"));
 const SharedReportPage = lazy(() => import("./pages/SharedReportPage"));
 const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
 const TermsOfServicePage = lazy(() => import("./pages/TermsOfServicePage"));
+const ContactPage = lazy(() => import("./pages/ContactPage"));
+const CookiePolicyPage = lazy(() => import("./pages/CookiePolicyPage"));
+const LandingPage = lazy(() => import("./pages/LandingPage"));
 
 // Admin Pages
 const AdminLayout = lazy(() => import("./components/AdminLayout"));
@@ -95,6 +101,8 @@ function App() {
         <ScrollToTop />
         <Routes>
           <Route path="/" element={<AuthParentComp />}>
+            <Route index element={<LandingPage />} />
+            {/* Public auth routes */}
             {/* Public auth routes */}
             <Route path="auth">
               <Route index element={<AuthPage />} />
@@ -199,7 +207,7 @@ function App() {
             <Route path="shopify/callback" element={<ShopifyCallbackHandler />} />
             <Route path="meta/callback" element={<MetaCallbackHandler />} />
             <Route path="meta-business/callback" element={<MetaCallbackHandler />} />
-            <Route path="google-ads/callback" element={<OAuthCallbackPage />} />
+            <Route path="google-ads/callback" element={<GoogleAdsCallbackHandler />} />
 
             {/* Multi-Client OAuth Callback */}
             <Route path="oauth/callback" element={<OAuthCallbackPage />} />
@@ -211,7 +219,11 @@ function App() {
 
           {/* Legal Pages (Public - no auth required) */}
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+          <Route path="/terms" element={<Navigate to="/terms-of-service" replace />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/cookies" element={<CookiePolicyPage />} />
 
           {/* Dedicated 404 route (accessible from anywhere) */}
           <Route path="/404" element={<NotFoundPage />} />

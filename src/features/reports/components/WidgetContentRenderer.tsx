@@ -492,7 +492,26 @@ export const renderWidgetContent = (
         metricConfig?.metricKey === "ga.top_pages_views" &&
         !!metricConfig?.integration;
 
+      // GA4 dimensional table widgets (channel, browser, device, country, city, top_pages)
+      const GA4_DIMENSIONAL_KEYS = new Set([
+        'google.channel_traffic',
+        'google.browser_used',
+        'google.device_category',
+        'google.geo_country',
+        'google.geo_city',
+        'google.top_pages',
+        'google_seo.top_pages',
+        'google_seo.top_queries',
+      ]);
+      const isGa4DimensionalTable =
+        !!metricConfig?.metricKey &&
+        GA4_DIMENSIONAL_KEYS.has(metricConfig.metricKey);
 
+      // Pull column definitions from resolvedData.columns (injected by useWidgetData GA4 path)
+      const ga4Columns: Array<{ name: string; width?: string; dataKey: string }> =
+        isGa4DimensionalTable && (resolvedData as any)?.columns
+          ? (resolvedData as any).columns
+          : [];
 
       // Check if it's a list-style table (Recent Posts, Media, or Campaign Performance)
       const isListTable =
@@ -515,6 +534,12 @@ export const renderWidgetContent = (
       const resolvedRows =
         resolvedData && Array.isArray((resolvedData as any).rows)
           ? ((resolvedData as any).rows as unknown[])
+          : null;
+
+      // Aggregated GA4 rows have flat fields (activeUsers, sessions, etc.) — declared after resolvedRows
+      const ga4DimensionalRows: any[] | null =
+        isGa4DimensionalTable && resolvedRows && resolvedRows.length > 0
+          ? (resolvedRows as any[])
           : null;
 
       // Check if this is dimensional data (from GET /unified-metrics with dimensionType)
@@ -645,11 +670,14 @@ export const renderWidgetContent = (
 
       // Identify which data source is driving the table so we render correct columns
       const usingGaRows = !!gaRows && gaRows.length > 0;
-      const usingDemographicRows = !usingGaRows && !!demographicTableRows && demographicTableRows.length > 0;
-      const usingDimensionalRows = !usingGaRows && !usingDemographicRows && !!dimensionalRows && dimensionalRows.length > 0;
-      const usingSeriesRows = !usingGaRows && !usingDemographicRows && !usingDimensionalRows && !!seriesRows && seriesRows.length > 0;
+      console.log('[Renderer Debug] metricKey:', metricConfig?.metricKey, '| isGa4DimensionalTable:', isGa4DimensionalTable, '| resolvedRows:', resolvedRows?.length, '| ga4DimensionalRows:', ga4DimensionalRows?.length, '| ga4Columns:', ga4Columns?.length);
+      const usingGa4DimensionalRows = !usingGaRows && !!ga4DimensionalRows && ga4DimensionalRows.length > 0;
+      const usingDemographicRows = !usingGaRows && !usingGa4DimensionalRows && !!demographicTableRows && demographicTableRows.length > 0;
+      const usingDimensionalRows = !usingGaRows && !usingGa4DimensionalRows && !usingDemographicRows && !!dimensionalRows && dimensionalRows.length > 0;
+      const usingSeriesRows = !usingGaRows && !usingGa4DimensionalRows && !usingDemographicRows && !usingDimensionalRows && !!seriesRows && seriesRows.length > 0;
       const usingResolvedRows =
         !usingGaRows &&
+        !usingGa4DimensionalRows &&
         !usingDemographicRows &&
         !usingDimensionalRows &&
         !usingSeriesRows &&
@@ -658,16 +686,18 @@ export const renderWidgetContent = (
         (isListTable || !metricConfig?.groupBy || metricConfig.groupBy === 'none' || metricConfig.groupBy === 'date');
       const usingTableData =
         !usingGaRows &&
+        !usingGa4DimensionalRows &&
         !usingDemographicRows &&
         !usingDimensionalRows &&
         !usingSeriesRows &&
         !usingResolvedRows &&
-        (!metricConfig?.metricKey) && // Never use static table data if a metric is configured
+        (!metricConfig?.metricKey) &&
         !!tableData?.rows &&
         tableData.rows.length > 0;
 
       const rows =
         (usingGaRows ? (gaRows as any[]) : null) ??
+        (usingGa4DimensionalRows ? (ga4DimensionalRows as any[]) : null) ??
         (usingDemographicRows ? (demographicTableRows as any[]) : null) ??
         (usingDimensionalRows ? (dimensionalRows as any[]) : null) ??
         (usingResolvedRows ? (resolvedRows as any[]) : null) ??
@@ -818,32 +848,34 @@ export const renderWidgetContent = (
                   { name: "Shares", dataKey: "shares" }
                 ];
             })()
-            : usingDemographicRows
-              ? [
-                { name: demographicsConfig?.type === 'country' ? 'Country' : 'City', width: "60%" },
-                { name: "Followers", width: "40%" },
-              ]
-              : usingDimensionalRows
+            : usingGa4DimensionalRows
+              ? ga4Columns
+              : usingDemographicRows
                 ? [
-                  { name: dimensionType.charAt(0).toUpperCase() + dimensionType.slice(1), width: "60%" },
-                  { name: metricName.charAt(0).toUpperCase() + metricName.slice(1) },
+                  { name: demographicsConfig?.type === 'country' ? 'Country' : 'City', width: "60%" },
+                  { name: "Followers", width: "40%" },
                 ]
-                : usingSeriesRows
+                : usingDimensionalRows
                   ? [
-                    { name: "Metric", width: "60%" },
-                    { name: "Value" },
+                    { name: dimensionType.charAt(0).toUpperCase() + dimensionType.slice(1), width: "60%" },
+                    { name: metricName.charAt(0).toUpperCase() + metricName.slice(1) },
                   ]
-                  : usingResolvedRows && autoColumns
-                    ? autoColumns
-                    : tableData?.columns && tableData.columns.length
-                      ? tableData.columns
-                      : [
-                        { name: "Report", width: "35%" },
-                        { name: "Audience" },
-                        { name: "Status" },
-                        { name: "Last Run" },
-                        { name: "Next Send" },
-                      ];
+                  : usingSeriesRows
+                    ? [
+                      { name: "Metric", width: "60%" },
+                      { name: "Value" },
+                    ]
+                    : usingResolvedRows && autoColumns
+                      ? autoColumns
+                      : tableData?.columns && tableData.columns.length
+                        ? tableData.columns
+                        : [
+                          { name: "Report", width: "35%" },
+                          { name: "Audience" },
+                          { name: "Status" },
+                          { name: "Last Run" },
+                          { name: "Next Send" },
+                        ];
 
       const rawCount =
         typeof resolvedData?.rawCount === "number" ? resolvedData.rawCount : 0;
@@ -895,6 +927,23 @@ export const renderWidgetContent = (
                                 : col.name === "Views"
                                   ? gaRow.views
                                   : "";
+                        } else if (isGa4DimensionalTable && usingGa4DimensionalRows) {
+                          // GA4 dimensional table: use dataKey to access the pre-aggregated row fields
+                          const gaRow = row as any;
+                          const dataKey = (col as any).dataKey || '';
+                          const raw = gaRow[dataKey];
+                          if (dataKey === 'avgSessionDuration' && typeof raw === 'number') {
+                            // Convert seconds to m:ss
+                            const minutes = Math.floor(raw / 60);
+                            const seconds = Math.floor(raw % 60);
+                            cellValue = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                          } else if (dataKey === 'engagementRate' && typeof raw === 'number') {
+                            cellValue = `${raw.toFixed(1)}%`;
+                          } else if (typeof raw === 'number') {
+                            cellValue = raw.toLocaleString();
+                          } else {
+                            cellValue = raw ?? '—';
+                          }
                         } else if (isListTable) {
                           const pRow = row as any;
                           // Use dataKey if available, otherwise fallback to name mapping or direct property access

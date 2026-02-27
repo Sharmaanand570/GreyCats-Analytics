@@ -176,7 +176,9 @@ export const useAvailableMetrics = (clientId: number | null, options?: { enabled
             // 2. Inject all known Instagram metrics
             const allKnownInstagramMetrics = [
               ...FACEBOOK_DAILY_METRICS,
-              ...FACEBOOK_CUMULATIVE_METRICS
+              ...FACEBOOK_CUMULATIVE_METRICS,
+              'meta.instagram.reelCount',
+              'meta.instagram.postCount'
             ].filter(key => key.includes('instagram') && key !== 'meta.instagram.recent_media');
 
             allKnownInstagramMetrics.forEach(key => {
@@ -227,6 +229,56 @@ export const useAvailableMetrics = (clientId: number | null, options?: { enabled
               }
             });
           }
+        });
+      }
+    });
+
+    // --- Google Analytics: Inject dimensional table metric keys ---
+    // These are frontend-only metric keys that drive the dimensional table widgets.
+    // The /unified-metrics API doesn't return them as individual rows, so we inject them.
+    const GA_TABLE_METRICS: Array<{ metricKey: string; displayName: string; category: string }> = [
+      { metricKey: 'google.channel_traffic', displayName: 'Monthly All Channel Traffic', category: 'Channel' },
+      { metricKey: 'google.browser_used', displayName: 'Technology: Browser Used', category: 'Technology' },
+      { metricKey: 'google.device_category', displayName: 'Technology: Device Category', category: 'Technology' },
+      { metricKey: 'google.geo_country', displayName: 'Geo Location: Country', category: 'Geography' },
+      { metricKey: 'google.geo_city', displayName: 'Geo Location: City', category: 'Geography' },
+      { metricKey: 'google.top_pages', displayName: 'Top Landing Pages', category: 'Pages' },
+    ];
+
+    // Also inject any missing base GA4 metric keys
+    const GA_BASE_METRICS: Array<{ metricKey: string; displayName: string; category: string }> = [
+      { metricKey: 'google.sessions', displayName: 'Sessions', category: 'Overview' },
+      { metricKey: 'google.activeUsers', displayName: 'Active Users', category: 'Overview' },
+      { metricKey: 'google.newUsers', displayName: 'New Users', category: 'Overview' },
+      { metricKey: 'google.pageViews', displayName: 'Page Views', category: 'Overview' },
+      { metricKey: 'google.bounceRate', displayName: 'Bounce Rate', category: 'Overview' },
+      { metricKey: 'google.engagementRate', displayName: 'Engagement Rate', category: 'Overview' },
+      { metricKey: 'google.avgSessionDuration', displayName: 'Avg. Session Duration', category: 'Overview' },
+      { metricKey: 'google.eventCount', displayName: 'Event Count', category: 'Overview' },
+      { metricKey: 'google.engagedSessions', displayName: 'Engaged Sessions', category: 'Overview' },
+    ];
+
+    Object.keys(grouped).forEach((integration) => {
+      const normalizedInt = integration.toLowerCase().replace(/_/g, '-');
+      const isGAIntegration = ['google-analytics', 'google'].includes(normalizedInt);
+
+      if (isGAIntegration) {
+        Object.keys(grouped[integration]).forEach((accountId) => {
+          const metrics = grouped[integration][accountId];
+
+          // Inject base metric keys that may be missing
+          GA_BASE_METRICS.forEach(({ metricKey, displayName, category }) => {
+            if (!metrics.some(m => m.metricKey === metricKey)) {
+              metrics.push({ metricKey, integration, accountId, displayName, category });
+            }
+          });
+
+          // Inject dimensional table metric keys
+          GA_TABLE_METRICS.forEach(({ metricKey, displayName, category }) => {
+            if (!metrics.some(m => m.metricKey === metricKey)) {
+              metrics.push({ metricKey, integration, accountId, displayName, category });
+            }
+          });
         });
       }
     });

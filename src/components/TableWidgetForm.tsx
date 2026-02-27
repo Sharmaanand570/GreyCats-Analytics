@@ -6,8 +6,8 @@ import {
   TabsTrigger,
 } from "./ui/tabs";
 
-import { TableGeneralTab, DEFAULT_RECENT_POSTS_COLUMNS, DEFAULT_INSTAGRAM_MEDIA_COLUMNS, DEFAULT_META_ADS_CAMPAIGN_COLUMNS, DEFAULT_GOOGLE_ADS_CAMPAIGN_COLUMNS } from "./WidgetEditor/TableGeneralTab";
-export { TableGeneralTab, DEFAULT_RECENT_POSTS_COLUMNS, DEFAULT_INSTAGRAM_MEDIA_COLUMNS, DEFAULT_META_ADS_CAMPAIGN_COLUMNS, DEFAULT_GOOGLE_ADS_CAMPAIGN_COLUMNS };
+import { TableGeneralTab, DEFAULT_RECENT_POSTS_COLUMNS, DEFAULT_INSTAGRAM_MEDIA_COLUMNS, DEFAULT_META_ADS_CAMPAIGN_COLUMNS, DEFAULT_GOOGLE_ADS_CAMPAIGN_COLUMNS, DEFAULT_GSC_TOP_PAGES_COLUMNS, DEFAULT_GSC_TOP_QUERIES_COLUMNS } from "./WidgetEditor/TableGeneralTab";
+export { TableGeneralTab, DEFAULT_RECENT_POSTS_COLUMNS, DEFAULT_INSTAGRAM_MEDIA_COLUMNS, DEFAULT_META_ADS_CAMPAIGN_COLUMNS, DEFAULT_GOOGLE_ADS_CAMPAIGN_COLUMNS, DEFAULT_GSC_TOP_PAGES_COLUMNS, DEFAULT_GSC_TOP_QUERIES_COLUMNS };
 import { TableDataTab } from "./WidgetEditor/TableDataTab";
 
 import type { TableWidgetData } from "./widgetTypes";
@@ -29,7 +29,9 @@ function TableWidgetForm({
   const isInstagramMedia = metricKey === 'meta.instagram.recent_media';
   const isMetaAdsCampaign = metricKey === 'meta.ads.campaign_performance';
   const isGoogleAdsCampaign = metricKey === 'google_ads.campaign_performance';
-  const isDynamicTable = isRecentPosts || isInstagramMedia || isMetaAdsCampaign || isGoogleAdsCampaign;
+  const isGscTopPages = metricKey === 'google_seo.top_pages';
+  const isGscTopQueries = metricKey === 'google_seo.top_queries';
+  const isDynamicTable = isRecentPosts || isInstagramMedia || isMetaAdsCampaign || isGoogleAdsCampaign || isGscTopPages || isGscTopQueries;
 
   const [localData, setLocalData] = React.useState(data);
   const lastWidgetId = React.useRef(id);
@@ -78,13 +80,17 @@ function TableWidgetForm({
         newCols = DEFAULT_META_ADS_CAMPAIGN_COLUMNS;
       } else if (isGoogleAdsCampaign && (columns.length === 0 || isGenericDefault)) {
         newCols = DEFAULT_GOOGLE_ADS_CAMPAIGN_COLUMNS;
+      } else if (isGscTopPages && (columns.length === 0 || isGenericDefault)) {
+        newCols = DEFAULT_GSC_TOP_PAGES_COLUMNS;
+      } else if (isGscTopQueries && (columns.length === 0 || isGenericDefault)) {
+        newCols = DEFAULT_GSC_TOP_QUERIES_COLUMNS;
       }
 
       if (newCols) {
         onChange({ ...data, columns: newCols });
       }
     }
-  }, [metricKey, columns.length, isGenericDefault, isRecentPosts, isInstagramMedia, isMetaAdsCampaign, isGoogleAdsCampaign]);
+  }, [metricKey, columns.length, isGenericDefault, isRecentPosts, isInstagramMedia, isMetaAdsCampaign, isGoogleAdsCampaign, isGscTopPages, isGscTopQueries]);
 
   // Note: useEffect might trigger an update.
 

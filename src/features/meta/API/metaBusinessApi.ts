@@ -320,15 +320,16 @@ export const refreshMetaBusinessAccount = async (
 };
 
 /**
- * 5) DISCONNECT META ACCOUNT
- * DELETE /metabusiness/disconnect/:id
+ * 5) DISCONNECT META ACCOUNT (full removal)
+ * DELETE /api/meta-business/disconnect/:id
+ * :id = MetaBusinessAccount.id
  */
 export const disconnectMetaBusinessAccount = async (
   id: number
 ): Promise<MetaBusinessDisconnectResponse> => {
   try {
     const response = await api.delete<MetaBusinessDisconnectResponse>(
-      `/metabusiness/disconnect/${id}`
+      `/meta-business/disconnect/${id}`
     );
     return response.data;
   } catch (error) {
@@ -337,6 +338,36 @@ export const disconnectMetaBusinessAccount = async (
       axiosError.response?.data?.message ||
       axiosError.response?.data?.error ||
       "Failed to disconnect Meta Business account"
+    );
+  }
+};
+
+/**
+ * 5b) UNASSIGN META ACCOUNT FROM CLIENT
+ * DELETE /api/meta-business/:clientId/disconnect
+ * :clientId = Client.id
+ */
+export const unassignMetaBusinessFromClient = async (
+  clientId: number
+): Promise<MetaBusinessDisconnectResponse> => {
+  try {
+    console.log(`[META-BUSINESS] Unassign request: DELETE /meta-business/${clientId}/disconnect`);
+    const response = await api.delete<MetaBusinessDisconnectResponse>(
+      `/meta-business/${clientId}/disconnect`
+    );
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    console.error("[META-BUSINESS] Unassign error:", {
+      status: axiosError.response?.status,
+      data: axiosError.response?.data,
+      url: axiosError.config?.url,
+      method: axiosError.config?.method,
+    });
+    throw new Error(
+      axiosError.response?.data?.message ||
+      axiosError.response?.data?.error ||
+      "Failed to unassign Meta Business account from client"
     );
   }
 };

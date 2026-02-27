@@ -35,6 +35,7 @@ import { useUserStore } from "@/utils/useUserStore";
 import { getProfileImageUrl } from "@/utils/imageUtils";
 
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
+import { GlobalOAuthHandler } from "@/components/GlobalOAuthHandler";
 import { useQueryClient } from "@tanstack/react-query";
 import { useClientContext } from "@/context/ClientContext";
 
@@ -394,6 +395,7 @@ function MainSideBar(): React.JSX.Element {
       {/* ---------- PAGE CONTENT ---------- */}
       <main className="flex-1 bg-[#F9FAFB] overflow-y-auto transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]">
         <ImpersonationBanner />
+        <GlobalOAuthHandler />
         <Outlet />
       </main>
     </div>

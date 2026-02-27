@@ -3,22 +3,46 @@ import { type ReportWidgetType } from "@/components/reportTypes";
 // Curated default metrics per integration platform
 export const CURATED_DEFAULTS: Record<string, string[]> = {
   "google-analytics": [
-    "google.sessions",        // Match backend format
+    // Base daily metrics (metric cards)
+    "google.sessions",
     "google.activeUsers",
+    "google.newUsers",
     "google.pageViews",
     "google.bounceRate",
+    "google.engagementRate",
+    "google.avgSessionDuration",
+    "google.eventCount",
+    // Dimensional table widgets
+    "google.channel_traffic",
+    "google.browser_used",
+    "google.device_category",
+    "google.geo_country",
+    "google.geo_city",
+    "google.top_pages",
   ],
   "google": [                 // Alias for Google Analytics
     "google.sessions",
     "google.activeUsers",
+    "google.newUsers",
     "google.pageViews",
     "google.bounceRate",
+    "google.engagementRate",
+    "google.avgSessionDuration",
+    "google.eventCount",
+    "google.channel_traffic",
+    "google.browser_used",
+    "google.device_category",
+    "google.geo_country",
+    "google.geo_city",
+    "google.top_pages",
   ],
   "google-search-console": [
     "google_seo.clicks",      // Match actual DB format
     "google_seo.impressions",
     "google_seo.ctr",
     "google_seo.position",
+    "google_seo.top_pages",
+    "google_seo.top_queries",
   ],
   "google-console": [
     "google-console.billing.cost",
@@ -44,6 +68,8 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
     "meta.instagram.reach",
     "meta.instagram.media.aggregated.reach",
     "meta.instagram.mediaCount",
+    "meta.instagram.reelCount",
+    "meta.instagram.postCount",
     "meta.instagram.media.aggregated.likes",
     "meta.instagram.followers",
     "meta.instagram.media.aggregated.shares",
@@ -59,6 +85,8 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
     "meta.instagram.reach",
     "meta.instagram.media.aggregated.reach",
     "meta.instagram.mediaCount",
+    "meta.instagram.reelCount",
+    "meta.instagram.postCount",
     "meta.instagram.media.aggregated.likes",
     "meta.instagram.followers",
     "meta.instagram.media.aggregated.shares",
@@ -85,6 +113,8 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
     "meta.instagram.reach",
     "meta.instagram.media.aggregated.reach",
     "meta.instagram.mediaCount",
+    "meta.instagram.reelCount",
+    "meta.instagram.postCount",
     "meta.instagram.media.aggregated.likes",
     "meta.instagram.followers",
     "meta.instagram.media.aggregated.shares",
@@ -110,6 +140,8 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
     "meta.instagram.reach",
     "meta.instagram.media.aggregated.reach",
     "meta.instagram.mediaCount",
+    "meta.instagram.reelCount",
+    "meta.instagram.postCount",
     "meta.instagram.media.aggregated.likes",
     "meta.instagram.followers",
     "meta.instagram.media.aggregated.shares",
@@ -251,8 +283,8 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
           // Row 1: 4 metric cards
           { type: 'metric', metricKey: 'meta.instagram.mediaCount', x: 0, y: 0, w: 3, h: 3, displayName: 'Posted content' },
           { type: 'metric', metricKey: 'meta.instagram.reach', x: 3, y: 0, w: 3, h: 3, displayName: 'Reach' },
-          { type: 'metric', metricKey: 'meta.instagram.mediaCount', x: 6, y: 0, w: 3, h: 3, displayName: 'Reels' },
-          { type: 'metric', metricKey: 'meta.instagram.mediaCount', x: 9, y: 0, w: 3, h: 3, displayName: 'Posts' },
+          { type: 'metric', metricKey: 'meta.instagram.reelCount', x: 6, y: 0, w: 3, h: 3, displayName: 'Reels' },
+          { type: 'metric', metricKey: 'meta.instagram.postCount', x: 9, y: 0, w: 3, h: 3, displayName: 'Posts' },
 
           // Row 2: 4 metric cards
           { type: 'metric', metricKey: 'meta.instagram.media.aggregated.reach', x: 0, y: 3, w: 3, h: 3, displayName: 'Engagement' },
@@ -384,8 +416,8 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
       // Row 1: 4 metric cards
       { type: 'metric', metricKey: 'meta.instagram.mediaCount', x: 0, y: 0, w: 3, h: 3, displayName: 'Posted content' },
       { type: 'metric', metricKey: 'meta.instagram.reach', x: 3, y: 0, w: 3, h: 3, displayName: 'Reach' },
-      { type: 'metric', metricKey: 'meta.instagram.mediaCount', x: 6, y: 0, w: 3, h: 3, displayName: 'Reels' },
-      { type: 'metric', metricKey: 'meta.instagram.mediaCount', x: 9, y: 0, w: 3, h: 3, displayName: 'Posts' },
+      { type: 'metric', metricKey: 'meta.instagram.reelCount', x: 6, y: 0, w: 3, h: 3, displayName: 'Reels' },
+      { type: 'metric', metricKey: 'meta.instagram.postCount', x: 9, y: 0, w: 3, h: 3, displayName: 'Posts' },
 
       // Row 2: 4 metric cards
       { type: 'metric', metricKey: 'meta.instagram.media.aggregated.reach', x: 0, y: 3, w: 3, h: 3, displayName: 'Engagement' },
@@ -589,6 +621,180 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
       },
     ]
   },
+
+  // GOOGLE SEARCH CONSOLE
+  'google-search-console': {
+    widgets: [
+      // Row 1: Trend charts
+      { type: 'line_chart', metricKey: 'google_seo.clicks', x: 0, y: 0, w: 6, h: 5, displayName: 'Total Clicks' },
+      { type: 'line_chart', metricKey: 'google_seo.impressions', x: 6, y: 0, w: 6, h: 5, displayName: 'Total Impressions' },
+
+      // Row 2: Metric cards
+      { type: 'metric', metricKey: 'google_seo.clicks', x: 0, y: 5, w: 3, h: 3, displayName: 'Clicks' },
+      { type: 'metric', metricKey: 'google_seo.impressions', x: 3, y: 5, w: 3, h: 3, displayName: 'Impressions' },
+      { type: 'metric', metricKey: 'google_seo.ctr', x: 6, y: 5, w: 3, h: 3, displayName: 'Average CTR', unit: '%' },
+      { type: 'metric', metricKey: 'google_seo.position', x: 9, y: 5, w: 3, h: 3, displayName: 'Avg Position' },
+
+      // Row 3: Top Pages and Top Queries Tables side by side
+      {
+        type: 'table',
+        metricKey: 'google_seo.top_pages',
+        x: 0,
+        y: 8,
+        w: 6,
+        h: 8,
+        displayName: 'Top Performing Pages',
+        customConfig: {
+          columns: [
+            { name: 'Page', width: '50%', dataKey: 'page' },
+            { name: 'Clicks', width: '15%', dataKey: 'clicks' },
+            { name: 'Impressions', width: '15%', dataKey: 'impressions' },
+            { name: 'CTR', width: '10%', dataKey: 'ctr' },
+            { name: 'Position', width: '10%', dataKey: 'position' },
+          ]
+        }
+      },
+      {
+        type: 'table',
+        metricKey: 'google_seo.top_queries',
+        x: 6,
+        y: 8,
+        w: 6,
+        h: 8,
+        displayName: 'Top Search Queries',
+        customConfig: {
+          columns: [
+            { name: 'Query', width: '50%', dataKey: 'query' },
+            { name: 'Clicks', width: '15%', dataKey: 'clicks' },
+            { name: 'Impressions', width: '15%', dataKey: 'impressions' },
+            { name: 'CTR', width: '10%', dataKey: 'ctr' },
+            { name: 'Position', width: '10%', dataKey: 'position' },
+          ]
+        }
+      }
+    ]
+  },
+
+  // GOOGLE ANALYTICS
+  'google-analytics': {
+    widgets: [
+      // ── Row 1: 4 metric cards (sessions, activeUsers, newUsers, pageViews)
+      { type: 'metric', metricKey: 'google.sessions', x: 0, y: 0, w: 3, h: 3, displayName: 'Sessions' },
+      { type: 'metric', metricKey: 'google.activeUsers', x: 3, y: 0, w: 3, h: 3, displayName: 'Active Users' },
+      { type: 'metric', metricKey: 'google.newUsers', x: 6, y: 0, w: 3, h: 3, displayName: 'New Users' },
+      { type: 'metric', metricKey: 'google.pageViews', x: 9, y: 0, w: 3, h: 3, displayName: 'Page Views' },
+
+      // ── Row 2: 4 metric cards (bounceRate, engagementRate, avgSessionDuration, eventCount)
+      { type: 'metric', metricKey: 'google.bounceRate', x: 0, y: 3, w: 3, h: 3, displayName: 'Bounce Rate' },
+      { type: 'metric', metricKey: 'google.engagementRate', x: 3, y: 3, w: 3, h: 3, displayName: 'Engagement Rate' },
+      { type: 'metric', metricKey: 'google.avgSessionDuration', x: 6, y: 3, w: 3, h: 3, displayName: 'Avg. Session Duration' },
+      { type: 'metric', metricKey: 'google.eventCount', x: 9, y: 3, w: 3, h: 3, displayName: 'Event Count' },
+
+      // ── Row 3: Sessions trend + Active Users trend
+      { type: 'line_chart', metricKey: 'google.sessions', x: 0, y: 6, w: 6, h: 5, displayName: 'Sessions Trend' },
+      { type: 'line_chart', metricKey: 'google.activeUsers', x: 6, y: 6, w: 6, h: 5, displayName: 'Active Users Trend' },
+
+      // ── Row 4: Monthly All Channel Traffic table
+      {
+        type: 'table',
+        metricKey: 'google.channel_traffic',
+        x: 0, y: 11, w: 12, h: 8,
+        displayName: 'Monthly All Channel Traffic',
+        customConfig: {
+          columns: [
+            { name: 'Channel', width: '20%', dataKey: 'dimensionValue' },
+            { name: 'Sessions', width: '13%', dataKey: 'sessions' },
+            { name: 'Engaged Sessions', width: '13%', dataKey: 'engagedSessions' },
+            { name: 'Engagement Rate', width: '13%', dataKey: 'engagementRate' },
+            { name: 'Avg. Session Duration', width: '13%', dataKey: 'avgSessionDuration' },
+            { name: 'Event Count', width: '13%', dataKey: 'eventCount' },
+          ]
+        }
+      },
+
+      // ── Row 5: Browser + Device side by side
+      {
+        type: 'table',
+        metricKey: 'google.browser_used',
+        x: 0, y: 19, w: 6, h: 8,
+        displayName: 'Technology: Browser Used',
+        customConfig: {
+          columns: [
+            { name: 'Browser', width: '30%', dataKey: 'dimensionValue' },
+            { name: 'Active Users', width: '17%', dataKey: 'activeUsers' },
+            { name: 'New Users', width: '17%', dataKey: 'newUsers' },
+            { name: 'Engaged Sessions', width: '18%', dataKey: 'engagedSessions' },
+            { name: 'Event Count', width: '18%', dataKey: 'eventCount' },
+          ]
+        }
+      },
+      {
+        type: 'table',
+        metricKey: 'google.device_category',
+        x: 6, y: 19, w: 6, h: 8,
+        displayName: 'Technology: Device Category',
+        customConfig: {
+          columns: [
+            { name: 'Device', width: '30%', dataKey: 'dimensionValue' },
+            { name: 'Active Users', width: '17%', dataKey: 'activeUsers' },
+            { name: 'New Users', width: '17%', dataKey: 'newUsers' },
+            { name: 'Engaged Sessions', width: '18%', dataKey: 'engagedSessions' },
+            { name: 'Event Count', width: '18%', dataKey: 'eventCount' },
+          ]
+        }
+      },
+
+      // ── Row 6: Geo Country + City side by side
+      {
+        type: 'table',
+        metricKey: 'google.geo_country',
+        x: 0, y: 27, w: 6, h: 8,
+        displayName: 'Geo Location: Country',
+        customConfig: {
+          columns: [
+            { name: 'Country', width: '30%', dataKey: 'dimensionValue' },
+            { name: 'Active Users', width: '17%', dataKey: 'activeUsers' },
+            { name: 'New Users', width: '17%', dataKey: 'newUsers' },
+            { name: 'Engaged Sessions', width: '18%', dataKey: 'engagedSessions' },
+            { name: 'Event Count', width: '18%', dataKey: 'eventCount' },
+          ]
+        }
+      },
+      {
+        type: 'table',
+        metricKey: 'google.geo_city',
+        x: 6, y: 27, w: 6, h: 8,
+        displayName: 'Geo Location: City',
+        customConfig: {
+          columns: [
+            { name: 'City', width: '30%', dataKey: 'dimensionValue' },
+            { name: 'Active Users', width: '17%', dataKey: 'activeUsers' },
+            { name: 'New Users', width: '17%', dataKey: 'newUsers' },
+            { name: 'Engaged Sessions', width: '18%', dataKey: 'engagedSessions' },
+            { name: 'Event Count', width: '18%', dataKey: 'eventCount' },
+          ]
+        }
+      },
+
+      // ── Row 7: Top Landing Pages (full width)
+      {
+        type: 'table',
+        metricKey: 'google.top_pages',
+        x: 0, y: 35, w: 12, h: 8,
+        displayName: 'Top Landing Pages',
+        customConfig: {
+          columns: [
+            { name: 'Page Path', width: '30%', dataKey: 'dimensionValue' },
+            { name: 'Views', width: '14%', dataKey: 'pageViews' },
+            { name: 'Active Users', width: '14%', dataKey: 'activeUsers' },
+            { name: 'Avg. Session Duration', width: '21%', dataKey: 'avgSessionDuration' },
+            { name: 'Event Count', width: '21%', dataKey: 'eventCount' },
+          ]
+        }
+      },
+    ]
+  },
+
 };
 
 // Aliases for consistent matching
@@ -615,6 +821,12 @@ INTEGRATION_TEMPLATES['meta-ads-campaign'] = INTEGRATION_TEMPLATES['meta-ads'];
 INTEGRATION_TEMPLATES['google_ads'] = INTEGRATION_TEMPLATES['google-ads'];
 INTEGRATION_TEMPLATES['googleads'] = INTEGRATION_TEMPLATES['google-ads'];
 INTEGRATION_TEMPLATES['google-ads-campaign'] = INTEGRATION_TEMPLATES['google-ads'];
+
+// Google Analytics aliases
+INTEGRATION_TEMPLATES['google'] = INTEGRATION_TEMPLATES['google-analytics'];
+INTEGRATION_TEMPLATES['google_analytics'] = INTEGRATION_TEMPLATES['google-analytics'];
+INTEGRATION_TEMPLATES['googleanalytics'] = INTEGRATION_TEMPLATES['google-analytics'];
+INTEGRATION_TEMPLATES['ga'] = INTEGRATION_TEMPLATES['google-analytics'];
 
 
 // COMPREHENSIVE ALIASES - Force fixed templates for all naming variations

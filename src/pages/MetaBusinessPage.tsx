@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
   useFacebookPosts,
@@ -6,7 +6,7 @@ import {
   useInstagramProfile,
   useMetaBusinessAccounts,
   useMetaBusinessAnalyticsSummary,
-  useMetaBusinessDisconnect,
+  useMetaBusinessClientUnassign,
   useMetaBusinessRefreshPage,
   useMetaBusinessSync,
 } from "@/features/meta/hooks/useMetaBusinessData";
@@ -48,6 +48,7 @@ import { format } from "date-fns";
 
 function MetaBusinessPage() {
   const navigate = useNavigate();
+  const { clientId: clientIdParam } = useParams<{ clientId: string }>();
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
 
   const {
@@ -67,9 +68,9 @@ function MetaBusinessPage() {
   } = useMetaBusinessRefreshPage();
 
   const {
-    mutateAsync: disconnectAccount,
+    mutateAsync: unassignClient,
     isPending: isDisconnecting,
-  } = useMetaBusinessDisconnect();
+  } = useMetaBusinessClientUnassign();
 
   // Select first account by default
   useEffect(() => {
@@ -121,9 +122,9 @@ function MetaBusinessPage() {
   };
 
   const handleDisconnect = async () => {
-    if (!accountIdNumber) return;
+    if (!clientIdParam) return;
     try {
-      await disconnectAccount(accountIdNumber);
+      await unassignClient(parseInt(clientIdParam));
       setSelectedAccountId(null);
     } catch (error) {
       console.error(error);
@@ -217,7 +218,7 @@ function MetaBusinessPage() {
                 size="sm"
                 onClick={handleDisconnect}
                 isLoading={isDisconnecting}
-                disabled={!selectedAccountId}
+                disabled={!selectedAccountId || !clientIdParam}
               >
                 Disconnect
               </Button>

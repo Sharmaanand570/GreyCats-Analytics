@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { format, subDays } from "date-fns";
 import { FaGoogle } from "react-icons/fa6";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,11 +65,25 @@ function GoogleConsoleDetailPage() {
   const { data: clients } = useClients();
   const { data: client } = useClient(selectedClientId || null);
 
-  // Auto-select first client if none is selected
+  // Auto-select first GSC-connected client if none selected or current client has no GSC
   useEffect(() => {
-    if (!selectedClientId && clients && clients.length > 0) {
-      setCurrentClient(clients[0]);
+    if (!clients || clients.length === 0) return;
+
+    // Find first client that has GSC integration
+    const gscClient = clients.find((c: any) =>
+      c.integrations?.some((i: any) =>
+        i.integrationType === 'google-search-console' ||
+        i.platform === 'google-search-console'
+      )
+    );
+
+    if (!selectedClientId) {
+      // No client selected at all — pick the GSC client or first client
+      setCurrentClient(gscClient || clients[0]);
     }
+
+    // Debug log so you can confirm which clientId is being used
+    console.log('[GSC Detail] selectedClientId:', selectedClientId, '| gscClient:', gscClient?.id, gscClient?.name);
   }, [selectedClientId, clients, setCurrentClient]);
 
   // Handle client selection - update URL
@@ -78,14 +93,32 @@ function GoogleConsoleDetailPage() {
 
   const clientId = selectedClientId || 0;
 
-  // Use new overview endpoints
+  // Check if selected client actually has GSC connected
+  const hasGscIntegration = client?.integrations?.some((i: any) =>
+    i.integrationType === 'google-search-console' ||
+    i.platform === 'google-search-console'
+  );
+
+  // Calculate default 30-day date range for SEO metrics
+  const dateParams = useMemo(() => {
+    const end = new Date();
+    const start = subDays(end, 30);
+    return {
+      startDate: format(start, 'yyyy-MM-dd'),
+      endDate: format(end, 'yyyy-MM-dd')
+    };
+  }, []);
+
+  console.log('[GSC Detail] clientId:', clientId, '| dateParams:', dateParams, '| hasGscIntegration:', hasGscIntegration, '| integrations:', client?.integrations);
+
+  // Use new overview endpoints — only fetch when we have a valid clientId
   const {
     data: summaryData,
     isLoading: isLoadingSummary,
     error: summaryError,
-  } = useGoogleConsoleSummary(clientId);
+  } = useGoogleConsoleSummary(clientId, dateParams);
 
-  const summaryMetrics = summaryData?.summary || {
+  const summaryMetrics = summaryData?.summary ?? (summaryData as any)?.data?.summary ?? {
     totalClicks: 0,
     totalImpressions: 0,
     avgCTR: 0,
@@ -95,12 +128,15 @@ function GoogleConsoleDetailPage() {
   const {
     data: topPagesData,
     isLoading: isLoadingTopPages,
-  } = useGoogleConsoleTopPages(clientId);
+  } = useGoogleConsoleTopPages(clientId, dateParams);
 
   const {
     data: topQueriesData,
     isLoading: isLoadingTopQueries,
-  } = useGoogleConsoleTopQueries(clientId);
+  } = useGoogleConsoleTopQueries(clientId, dateParams);
+
+  const topPages = topPagesData?.topPages ?? (topPagesData as any)?.data?.topPages ?? [];
+  const topQueries = topQueriesData?.topQueries ?? (topQueriesData as any)?.data?.topQueries ?? [];
 
   const removeAccount = useRemoveAccount();
   const handleDisconnect = async () => {
@@ -179,7 +215,7 @@ function GoogleConsoleDetailPage() {
           </div>
 
           <div className="w-full px-5 py-6 space-y-6">
-            {!isLoadingSummary && !summaryData?.summary && <DataSyncBanner />}
+            {!isLoadingSummary && !summaryMetrics.totalClicks && !summaryMetrics.totalImpressions && <DataSyncBanner />}
 
 
             {/* Error display removed for properties error as requested */}
@@ -307,7 +343,7 @@ function GoogleConsoleDetailPage() {
                       <Skeleton className="h-12 w-full" />
                       <Skeleton className="h-12 w-full" />
                     </div>
-                  ) : topPagesData?.topPages && topPagesData.topPages.length > 0 ? (
+                  ) : topPages.length > 0 ? (
                     <div className="rounded-md border">
                       <Table>
                         <TableHeader>
@@ -320,7 +356,7 @@ function GoogleConsoleDetailPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {topPagesData.topPages.map((page, idx) => (
+                          {topPages.map((page: any, idx: number) => (
                             <TableRow key={idx} className="hover:bg-muted/50">
                               <TableCell className="font-medium">
                                 <div className="flex items-center gap-2 max-w-md">
@@ -372,7 +408,7 @@ function GoogleConsoleDetailPage() {
                       <Skeleton className="h-12 w-full" />
                       <Skeleton className="h-12 w-full" />
                     </div>
-                  ) : topQueriesData?.topQueries && topQueriesData.topQueries.length > 0 ? (
+                  ) : topQueries.length > 0 ? (
                     <div className="rounded-md border">
                       <Table>
                         <TableHeader>
@@ -385,7 +421,7 @@ function GoogleConsoleDetailPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {topQueriesData.topQueries.map((query, idx) => (
+                          {topQueries.map((query: any, idx: number) => (
                             <TableRow key={idx} className="hover:bg-muted/50">
                               <TableCell className="font-medium">{query.query}</TableCell>
                               <TableCell className="text-right font-medium">{query.clicks.toLocaleString()}</TableCell>

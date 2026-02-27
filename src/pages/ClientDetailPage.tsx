@@ -45,9 +45,6 @@ const ClientDetailPage: React.FC = () => {
                 setAccountModalOpen(true);
                 setActiveTab("data-sources");
             }
-            // Clear storage
-            localStorage.removeItem("pending_oauth_client_id");
-            localStorage.removeItem("pending_oauth_integration");
         }
     }, [parsedClientId]);
 

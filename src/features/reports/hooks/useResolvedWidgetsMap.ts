@@ -45,10 +45,9 @@ export function useResolvedWidgetsMap(
     return configs;
   }, [dashboards]);
 
-  // Watch all widget query keys reactively.
-  // enabled: false means we only read from cache — we never trigger fetches here.
-  const results = useQueries({
-    queries: widgetConfigs.map((config) => ({
+  // Memoize the query configurations array to prevent useQueries from thrashing
+  const queryDefinitions = useMemo(() => {
+    return widgetConfigs.map((config) => ({
       queryKey: getWidgetQueryKey(
         config.widget,
         dateFrom,
@@ -57,7 +56,13 @@ export function useResolvedWidgetsMap(
       ),
       enabled: false,
       staleTime: Infinity,
-    })),
+    }));
+  }, [widgetConfigs, dateFrom, dateTo, shareToken]);
+
+  // Watch all widget query keys reactively.
+  // enabled: false means we only read from cache — we never trigger fetches here.
+  const results = useQueries({
+    queries: queryDefinitions,
   });
 
   // Build the resolved map

@@ -153,9 +153,7 @@ export const fetchUnifiedAggregate = (params: {
     };
     if (params.accountId) queryParams.accountId = params.accountId;
 
-    console.log('[Aggregate API] Request:', queryParams);
     const response = await api.get('/unified-metrics/aggregate', { params: queryParams });
-    console.log('[Aggregate API] Response:', response.data);
     return response.data;
   });
 
@@ -533,12 +531,10 @@ export const fetchUnifiedMetric = (
       requestParams.client_id = String(clientId);
     }
 
-    console.log("[UnifiedMetric API] Request Params:", requestParams);
     const response = await api.get(`/unified-metrics`, {
       params: requestParams,
       skipAuthRedirect: !!params.token,
     } as any);
-    console.log("[UnifiedMetric API] Response Data:", response.data);
     return response.data;
   });
 

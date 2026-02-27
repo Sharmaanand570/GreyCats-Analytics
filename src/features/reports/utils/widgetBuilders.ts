@@ -29,7 +29,7 @@ export function pickDefaultMetricsForIntegration(
   // This handles "Meta Ads" -> "meta-ads"
   const normalized = integrationKey.toLowerCase().replace(/[ _]/g, "-");
 
-  // console.log(`🔍 [pickMetrics] Input: '${integrationKey}', Normalized: '${normalized}', Account: '${accountId}'`);
+  // console.log(`ðŸ” [pickMetrics] Input: '${integrationKey}', Normalized: '${normalized}', Account: '${accountId}'`);
 
   // Special case: meta-business... (keep existing)
 
@@ -43,7 +43,7 @@ export function pickDefaultMetricsForIntegration(
     groupedMetrics[normalized === "google-console" ? "google-search-console" : ""] ??
     {};
 
-  // console.log(`🔍 [pickMetrics] perAccount keys for '${normalized}':`, Object.keys(perAccount));
+  // console.log(`ðŸ” [pickMetrics] perAccount keys for '${normalized}':`, Object.keys(perAccount));
 
   // For Shopify, WooCommerce, and Meta Ads/Business, if no metrics are found (cold start), force the curated list immediately
   const coldStartPlatforms = [
@@ -55,10 +55,10 @@ export function pickDefaultMetricsForIntegration(
 
   // LOGIC CHECK: Is cold start triggered?
   const isColdStart = coldStartPlatforms.includes(normalized) && (!perAccount || Object.keys(perAccount).length === 0);
-  // console.log(`❄️ [pickMetrics] Cold Start Check: Platform supported? ${coldStartPlatforms.includes(normalized)}, Empty? ${(!perAccount || Object.keys(perAccount).length === 0)}, Triggered? ${isColdStart}`);
+  // console.log(`â„ï¸ [pickMetrics] Cold Start Check: Platform supported? ${coldStartPlatforms.includes(normalized)}, Empty? ${(!perAccount || Object.keys(perAccount).length === 0)}, Triggered? ${isColdStart}`);
 
   if (isColdStart) {
-    // console.log(`❄️ ${integrationKey} cold start detected - using forced defaults`);
+    // console.log(`â„ï¸ ${integrationKey} cold start detected - using forced defaults`);
     const defaults = CURATED_DEFAULTS[normalized] ?? [];
     return defaults.map(key => ({
       metricKey: key,
@@ -75,7 +75,7 @@ export function pickDefaultMetricsForIntegration(
 
   // Special handling for Meta Business: aggregate from sub-integrations if essentially empty
   if (normalized === 'meta-business' && candidates.length === 0) {
-    // console.log('✨ aggregating Meta Business metrics from sub-platforms');
+    // console.log('âœ¨ aggregating Meta Business metrics from sub-platforms');
     const fb = groupedMetrics['meta-facebook'] || groupedMetrics['meta_facebook'] || {};
     const ig = groupedMetrics['meta-instagram'] || groupedMetrics['meta_instagram'] || {};
 
@@ -103,31 +103,31 @@ export function pickDefaultMetricsForIntegration(
     const availableAccounts = Object.keys(perAccount);
     if (availableAccounts.length > 0) {
       // Use the first available account's metrics
-      console.log(`⚠️ Metrics mismatch for ${integrationKey}: requested ${accountId}, falling back to ${availableAccounts[0]}`);
+      console.log(`âš ï¸ Metrics mismatch for ${integrationKey}: requested ${accountId}, falling back to ${availableAccounts[0]}`);
       candidates = perAccount[availableAccounts[0]];
     }
   }
 
   // DEBUG: Log what metrics we found
-  console.log('📊 Available metrics for', integrationKey, ':', {
+  console.log('ðŸ“Š Available metrics for', integrationKey, ':', {
     candidateCount: candidates.length,
     sampleKeys: candidates.slice(0, 5).map(m => m.metricKey),
   });
 
   if (!candidates.length) {
-    console.warn('⚠️ No metrics found in debug list for', integrationKey, accountId);
+    console.warn('âš ï¸ No metrics found in debug list for', integrationKey, accountId);
 
     // Try to find the ACTUAL accountId from available metrics if the provided one has no hits
     const availableAccounts = Object.keys(perAccount);
     const bestAccountId = availableAccounts.length > 0 ? availableAccounts[0] : accountId;
     if (bestAccountId !== accountId) {
-      console.log(`✨ Using accountId fallback for synthetic metrics: ${accountId} -> ${bestAccountId}`);
+      console.log(`âœ¨ Using accountId fallback for synthetic metrics: ${accountId} -> ${bestAccountId}`);
     }
 
     // Fallback: use curated defaults if available
     const curated = CURATED_DEFAULTS[normalized] ?? CURATED_DEFAULTS[integrationKey] ?? [];
     if (curated.length > 0) {
-      console.log('✨ Using curated defaults as fallback:', curated);
+      console.log('âœ¨ Using curated defaults as fallback:', curated);
       // Create synthetic metric options from curated defaults
       const syntheticMetrics: MetricOption[] = curated.map(metricKey => ({
         metricKey,
@@ -138,7 +138,7 @@ export function pickDefaultMetricsForIntegration(
       return syntheticMetrics;
     }
 
-    console.error('❌ No curated defaults available for', integrationKey);
+    console.error('âŒ No curated defaults available for', integrationKey);
     return [];
   }
 
@@ -154,16 +154,16 @@ export function pickDefaultMetricsForIntegration(
         m.metricKey.toLowerCase().includes(key.toLowerCase())
     );
     if (hit) {
-      console.log('✅ Matched curated metric:', key, '→', hit.metricKey);
+      console.log('âœ… Matched curated metric:', key, 'â†’', hit.metricKey);
       curatedFound.push(hit);
     } else {
-      console.log('❌ Curated metric not found:', key);
+      console.log('âŒ Curated metric not found:', key);
     }
   });
 
   // If no curated metrics found, use fallback
   if (!curatedFound.length && candidates.length) {
-    console.warn('⚠️ Using fallback metrics for', integrationKey);
+    console.warn('âš ï¸ Using fallback metrics for', integrationKey);
     notifyFallback(
       `Using available metrics for ${integrationKey} (curated metrics not found).`
     );
@@ -184,7 +184,7 @@ export function pickDefaultMetricsForIntegration(
     accountId: (m.accountId || accountId).replace(/^act_/, '')
   }));
 
-  console.log('✨ Final metrics selected:', sanitizedResult.map(m => m.metricKey));
+  console.log('âœ¨ Final metrics selected:', sanitizedResult.map(m => m.metricKey));
 
   return sanitizedResult;
 }
@@ -205,7 +205,7 @@ export function buildDefaultWidgetsForIntegration(
   // Normalize platform key for template lookup - very aggressive to catch all naming variations
   const normalizedPlatform = integrationPlatform?.toLowerCase().trim().replace(/[ _-]/g, '');
 
-  console.log(`🔍 [TemplateMatch] Trying to match: "${integrationPlatform}" -> normalized: "${normalizedPlatform}"`);
+  console.log(`ðŸ” [TemplateMatch] Trying to match: "${integrationPlatform}" -> normalized: "${normalizedPlatform}"`);
 
   // Try exact, then normalized, then hyphenated versions
   const template = normalizedPlatform ? (
@@ -216,12 +216,12 @@ export function buildDefaultWidgetsForIntegration(
 
   // If we have a template, use it
   if (template) {
-    console.log(`📋 Using fixed template for ${normalizedPlatform}`);
+    console.log(`ðŸ“‹ Using fixed template for ${normalizedPlatform}`);
     return buildWidgetsFromTemplate(slideId, template, metrics, integrationPlatform, defaultAccountId, subSlideIndex);
   }
 
   // Otherwise, fall back to dynamic generation
-  console.log(`🔧 Using dynamic widget generation for ${integrationPlatform || 'unknown platform'}`);
+  console.log(`ðŸ”§ Using dynamic widget generation for ${integrationPlatform || 'unknown platform'}`);
   return buildDynamicWidgets(slideId, metrics);
 }
 
@@ -244,9 +244,9 @@ export function buildWidgetsFromTemplate(
     ? template.slides[subSlideIndex]?.widgets || []
     : template.widgets;
 
-  // 🔍 DIAGNOSTIC: Log which slide we're building
+  // ðŸ” DIAGNOSTIC: Log which slide we're building
   if (integrationPlatform?.toLowerCase().includes('business') && template.slides) {
-    console.log(`📋 [WidgetBuilder] Building ${integrationPlatform} slide ${subSlideIndex}:`, {
+    console.log(`ðŸ“‹ [WidgetBuilder] Building ${integrationPlatform} slide ${subSlideIndex}:`, {
       slideName: template.slides[subSlideIndex]?.name,
       widgetCount: widgetTemplates.length,
       slideId
@@ -261,25 +261,40 @@ export function buildWidgetsFromTemplate(
 
     // Use the first available metric's integration and accountId as fallback
     const fallbackMetric = availableMetrics[0];
-
-    // Determine integration fallback from platform name if metrics are missing
+    // Determine integration fallback from metric key/platform when metrics are missing.
+    // This keeps cold-start template widgets aligned with their data source.
     let integration = metricOption?.integration || fallbackMetric?.integration;
-    if (!integration && integrationPlatform) {
-      const p = integrationPlatform.toLowerCase();
-      if (p.includes('instagram')) integration = 'meta-instagram';
-      else if (p.includes('ads')) integration = 'meta-ads';
-      else if (p.includes('facebook') || p.includes('business')) {
-        // 🔧 FIX: For meta-business, check subSlideIndex to determine Facebook vs Instagram
-        if (p.includes('business')) {
-          // subSlideIndex 0 = Facebook, subSlideIndex 1 = Instagram
-          integration = subSlideIndex === 1 ? 'meta-instagram' : 'meta-facebook';
-          console.log(`🔧 [WidgetBuilder] Meta-business widget: subSlideIndex=${subSlideIndex} → integration=${integration}, metricKey=${widgetTemplate.metricKey}`);
-        } else {
-          integration = 'meta-facebook';
-        }
-      }
-      else integration = 'meta';
+
+    if (!integration && widgetTemplate.metricKey) {
+      const m = widgetTemplate.metricKey.toLowerCase();
+      if (m.startsWith('google_seo.')) integration = 'google-search-console';
+      else if (m.startsWith('google_ads.')) integration = 'google-ads';
+      else if (m.startsWith('google.')) integration = 'google-analytics';
+      else if (m.startsWith('meta.instagram.')) integration = 'meta-instagram';
+      else if (m.startsWith('meta.facebook.') || m.startsWith('meta.page.')) integration = 'meta-facebook';
+      else if (m.startsWith('meta.ads.')) integration = 'meta-ads';
+      else if (m.startsWith('youtube.')) integration = 'youtube';
+      else if (m.startsWith('shopify.')) integration = 'shopify';
+      else if (m.startsWith('woo.')) integration = 'woo';
     }
+
+    if (!integration && integrationPlatform) {
+      const p = integrationPlatform.toLowerCase().replace(/[_ ]/g, '-');
+      if (p.includes('google-search-console') || p.includes('google-console')) integration = 'google-search-console';
+      else if (p.includes('google-analytics') || p === 'google') integration = 'google-analytics';
+      else if (p.includes('google-ads')) integration = 'google-ads';
+      else if (p.includes('youtube')) integration = 'youtube';
+      else if (p.includes('shopify')) integration = 'shopify';
+      else if (p.includes('woocommerce') || p === 'woo') integration = 'woo';
+      else if (p.includes('meta-business') || p.includes('business')) {
+        integration = subSlideIndex === 1 ? 'meta-instagram' : 'meta-facebook';
+        console.log(`[WidgetBuilder] Meta-business widget: subSlideIndex=${subSlideIndex} -> integration=${integration}, metricKey=${widgetTemplate.metricKey}`);
+      } else if (p.includes('meta-instagram') || p.includes('instagram')) integration = 'meta-instagram';
+      else if (p.includes('meta-facebook') || p.includes('facebook')) integration = 'meta-facebook';
+      else if (p.includes('meta-ads')) integration = 'meta-ads';
+      else if (p.includes('meta')) integration = 'meta';
+    }
+
     if (!integration) integration = 'meta';
 
     let accountId = metricOption?.accountId || fallbackMetric?.accountId || defaultAccountId || '';

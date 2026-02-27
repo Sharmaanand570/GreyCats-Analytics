@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   disconnectMetaBusinessAccount,
+  unassignMetaBusinessFromClient,
   getFacebookPageInsights,
   getFacebookPagePosts,
   getFacebookPostInsights,
@@ -89,6 +90,20 @@ export const useMetaBusinessDisconnect = () => {
     },
     onError: (error) => {
       toast.error(error.message || "Failed to disconnect account");
+    },
+  });
+};
+
+export const useMetaBusinessClientUnassign = () => {
+  const queryClient = useQueryClient();
+  return useMutation<MetaBusinessDisconnectResponse, Error, number>({
+    mutationFn: (clientId) => unassignMetaBusinessFromClient(clientId),
+    onSuccess: (data) => {
+      toast.success(data.message || "Meta Business unassigned from client");
+      queryClient.invalidateQueries({ queryKey: ["meta-business"] });
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to unassign Meta Business from client");
     },
   });
 };

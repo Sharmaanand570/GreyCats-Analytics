@@ -128,10 +128,13 @@ export const useGoogleConsoleUnifiedMetrics = (
 
 // ==================== OVERVIEW HOOKS ====================
 
-export const useGoogleConsoleSummary = (clientId: number) => {
+export const useGoogleConsoleSummary = (
+  clientId: number,
+  params: { startDate?: string; endDate?: string } = {}
+) => {
   return useQuery<GoogleConsoleSummaryResponse, Error>({
-    queryKey: ["google-console", "summary", clientId],
-    queryFn: () => getGoogleConsoleSummary(clientId),
+    queryKey: ["google-console", "summary", clientId, params],
+    queryFn: () => getGoogleConsoleSummary(clientId, params),
     enabled: !!clientId,
     ...commonQueryOptions,
   });
@@ -146,19 +149,25 @@ export const useGoogleConsoleTrends = (clientId: number) => {
   });
 };
 
-export const useGoogleConsoleTopPages = (clientId: number) => {
+export const useGoogleConsoleTopPages = (
+  clientId: number,
+  params: { startDate?: string; endDate?: string } = {}
+) => {
   return useQuery<GoogleConsoleTopPagesResponse, Error>({
-    queryKey: ["google-console", "top-pages", clientId],
-    queryFn: () => getGoogleConsoleTopPages(clientId),
+    queryKey: ["google-console", "top-pages", clientId, params],
+    queryFn: () => getGoogleConsoleTopPages(clientId, params),
     enabled: !!clientId,
     ...commonQueryOptions,
   });
 };
 
-export const useGoogleConsoleTopQueries = (clientId: number) => {
+export const useGoogleConsoleTopQueries = (
+  clientId: number,
+  params: { startDate?: string; endDate?: string } = {}
+) => {
   return useQuery<GoogleConsoleTopQueriesResponse, Error>({
-    queryKey: ["google-console", "top-queries", clientId],
-    queryFn: () => getGoogleConsoleTopQueries(clientId),
+    queryKey: ["google-console", "top-queries", clientId, params],
+    queryFn: () => getGoogleConsoleTopQueries(clientId, params),
     enabled: !!clientId,
     ...commonQueryOptions,
   });

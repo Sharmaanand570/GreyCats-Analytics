@@ -1,4 +1,5 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useRef } from "react";
 import type { ReportWidgetDefinition, ResolvedWidgetData } from "../api/types";
 import type { UnifiedMetricRow } from "../api/reportingApi";
 import {
@@ -10,9 +11,18 @@ import {
   fetchGoogleAdsSummary,
   fetchUnifiedAggregate,
 } from "../api/reportingApi";
+import {
+  getGoogleConsoleTopPages,
+  getGoogleConsoleTopQueries
+} from "@/features/YouTube/API/googleConsoleapi";
 import { getShopifyTrends } from "@/features/shopify/API/shopifyApi";
 import { getMetricAggregation } from "@/utils/facebookMetrics";
 import api from "@/apiConfig";
+
+// ---------------------------------------------------------------------------
+// Concurrency limiter – REMOVED: Let the browser native HTTP/2 multiplexing handle it.
+// The artificial JS queue was deadlocking/pausing fast API responses.
+// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,12 +50,33 @@ export function getWidgetQueryKey(
   dateTo: string,
   shareToken?: string
 ) {
+  const metricKeyLower = (widget.metricKey || "").toLowerCase();
+  let integrationForKey = widget.integration;
+  if (metricKeyLower.startsWith("google_seo.")) integrationForKey = "google-search-console";
+  else if (metricKeyLower.startsWith("google_ads.")) integrationForKey = "google-ads";
+  else if (metricKeyLower.startsWith("google.")) integrationForKey = "google-analytics";
+  else if (metricKeyLower.startsWith("meta.instagram.")) integrationForKey = "meta-instagram";
+  else if (metricKeyLower.startsWith("meta.facebook.") || metricKeyLower.startsWith("meta.page.")) integrationForKey = "meta-facebook";
+  else if (metricKeyLower.startsWith("meta.ads.")) integrationForKey = "meta-ads";
+
+  // Derive effective groupBy the same way fetchRawWidgetData does.
+  // NOTE: widget.filters is intentionally excluded — it contains heavy snapshot/widget data
+  // (widgetData, snapshotData, displayName, slideTitle) that is never sent to any API call.
+  // Including it caused multi-MB JSON.stringify per widget on every render cycle.
+  const wType = widget.type || (widget as any).widgetType || "";
+  const isChart = wType === "chart" || wType === "line_chart" || wType === "bar_chart";
+  const effectiveGroupBy = isChart
+    ? "day"
+    : widget.groupBy && widget.groupBy !== "none"
+      ? widget.groupBy
+      : "none";
+
   return [
     "widget-data",
-    widget.integration,
+    integrationForKey,
     widget.metricKey,
     widget.accountId ?? "",
-    JSON.stringify(widget.filters ?? {}),
+    effectiveGroupBy,
     dateFrom,
     dateTo,
     shareToken ?? "",
@@ -57,6 +88,17 @@ export function getWidgetQueryKey(
 // ---------------------------------------------------------------------------
 
 function normalizeIntegration(widget: ReportWidgetDefinition): string {
+  const metricKey = (widget.metricKey || "").toLowerCase();
+
+  // Prefer metric-key-derived integration first to self-heal stale widget configs
+  // (e.g. GA metric accidentally saved with integration "meta").
+  if (metricKey.startsWith("google_seo.")) return "google-search-console";
+  if (metricKey.startsWith("google_ads.")) return "google-ads";
+  if (metricKey.startsWith("google.")) return "google-analytics";
+  if (metricKey.startsWith("meta.instagram.")) return "meta-instagram";
+  if (metricKey.startsWith("meta.facebook.") || metricKey.startsWith("meta.page.")) return "meta-facebook";
+  if (metricKey.startsWith("meta.ads.")) return "meta-ads";
+
   let normalized = widget.integration.toLowerCase();
 
   if (!normalized.startsWith("meta_")) {
@@ -96,6 +138,8 @@ function normalizeIntegration(widget: ReportWidgetDefinition): string {
 
 const VALID_INTEGRATIONS = [
   "google-analytics",
+  "google",
+  "google_analytics",
   "google-search-console",
   "google-console",
   "meta",
@@ -256,47 +300,31 @@ async function fetchRawWidgetData(
     try {
       let targetAccountId: any = widget.accountId;
 
-      // If widget.accountId is empty, look up from integrations data
+      // If widget.accountId is empty, look up from already-loaded integrations data.
+      // NOTE: integrationsData is guaranteed to be available here because useWidgetData
+      // has enabled: !isLoadingIntegrations && !!integrationsData.
       if (!targetAccountId) {
-        try {
-          let integrations = integrationsData?.integrations;
-
-          if (!integrations && effectiveClientId) {
-            const integrationsResponse = await api.get(
-              `/integrations/client/${effectiveClientId}`
-            );
-            integrations = Array.isArray(integrationsResponse.data)
-              ? integrationsResponse.data
-              : integrationsResponse.data?.integrations ||
-              integrationsResponse.data;
-          }
-
-          if (Array.isArray(integrations)) {
-            let found = integrations.find(
-              (int: any) =>
-                int.platform &&
-                int.platform.toLowerCase().includes("instagram")
-            );
-
-            if (!found) {
-              found = integrations.find(
-                (int: any) =>
-                  (int.platform === "meta-business" ||
-                    int.platform === "meta_business") &&
-                  int.accountId &&
-                  String(int.accountId) !== String(effectiveClientId)
-              );
-            }
-
-            if (found) {
-              targetAccountId = found.accountId;
-            }
-          }
-        } catch (err) {
-          console.error(
-            "Failed to fetch Instagram page ID from integrations",
-            err
+        const integrations = integrationsData?.integrations;
+        if (Array.isArray(integrations)) {
+          let found = integrations.find(
+            (int: any) =>
+              int.platform &&
+              int.platform.toLowerCase().includes("instagram")
           );
+
+          if (!found) {
+            found = integrations.find(
+              (int: any) =>
+                (int.platform === "meta-business" ||
+                  int.platform === "meta_business") &&
+                int.accountId &&
+                String(int.accountId) !== String(effectiveClientId)
+            );
+          }
+
+          if (found) {
+            targetAccountId = found.accountId;
+          }
         }
       }
 
@@ -494,13 +522,288 @@ async function fetchRawWidgetData(
     }
   }
 
+  // --- Google Analytics: Dimensional Table Widgets ---
+  // These special metricKeys trigger dimension-specific API calls to /api/unified-metrics
+  // and aggregate multi-metric rows into a single row per dimensionValue.
+  // dateFrom and dateTo are always forwarded so tables respect the date range picker.
+  const GA_DIMENSIONAL_TABLES: Record<string, {
+    dimensionType: string;
+    metricKeys: string[];
+    columns: { name: string; width: string; dataKey: string }[];
+    label: string;
+  }> = {
+    'google.channel_traffic': {
+      dimensionType: 'channel',
+      metricKeys: ['google.sessions', 'google.engagedSessions', 'google.engagementRate', 'google.avgSessionDuration', 'google.eventCount'],
+      columns: [
+        { name: 'Channel', width: '20%', dataKey: 'dimensionValue' },
+        { name: 'Sessions', width: '13%', dataKey: 'sessions' },
+        { name: 'Engaged Sessions', width: '13%', dataKey: 'engagedSessions' },
+        { name: 'Engagement Rate', width: '13%', dataKey: 'engagementRate' },
+        { name: 'Avg. Session Duration', width: '13%', dataKey: 'avgSessionDuration' },
+        { name: 'Event Count', width: '13%', dataKey: 'eventCount' },
+      ],
+      label: 'Monthly All Channel Traffic',
+    },
+    'google.browser_used': {
+      dimensionType: 'browser',
+      metricKeys: ['google.activeUsers', 'google.newUsers', 'google.engagedSessions', 'google.engagementRate', 'google.eventCount'],
+      columns: [
+        { name: 'Browser', width: '30%', dataKey: 'dimensionValue' },
+        { name: 'Active Users', width: '17%', dataKey: 'activeUsers' },
+        { name: 'New Users', width: '17%', dataKey: 'newUsers' },
+        { name: 'Engaged Sessions', width: '18%', dataKey: 'engagedSessions' },
+        { name: 'Event Count', width: '18%', dataKey: 'eventCount' },
+      ],
+      label: 'Technology: Browser Used',
+    },
+    'google.device_category': {
+      dimensionType: 'device',
+      metricKeys: ['google.activeUsers', 'google.newUsers', 'google.engagedSessions', 'google.engagementRate', 'google.eventCount'],
+      columns: [
+        { name: 'Device', width: '30%', dataKey: 'dimensionValue' },
+        { name: 'Active Users', width: '17%', dataKey: 'activeUsers' },
+        { name: 'New Users', width: '17%', dataKey: 'newUsers' },
+        { name: 'Engaged Sessions', width: '18%', dataKey: 'engagedSessions' },
+        { name: 'Event Count', width: '18%', dataKey: 'eventCount' },
+      ],
+      label: 'Technology: Device Category',
+    },
+    'google.geo_country': {
+      dimensionType: 'country',
+      metricKeys: ['google.activeUsers', 'google.newUsers', 'google.engagedSessions', 'google.engagementRate', 'google.eventCount'],
+      columns: [
+        { name: 'Country', width: '30%', dataKey: 'dimensionValue' },
+        { name: 'Active Users', width: '17%', dataKey: 'activeUsers' },
+        { name: 'New Users', width: '17%', dataKey: 'newUsers' },
+        { name: 'Engaged Sessions', width: '18%', dataKey: 'engagedSessions' },
+        { name: 'Event Count', width: '18%', dataKey: 'eventCount' },
+      ],
+      label: 'Geo Location: Country',
+    },
+    'google.geo_city': {
+      dimensionType: 'city',
+      metricKeys: ['google.activeUsers', 'google.newUsers', 'google.engagedSessions', 'google.engagementRate', 'google.eventCount'],
+      columns: [
+        { name: 'City', width: '30%', dataKey: 'dimensionValue' },
+        { name: 'Active Users', width: '17%', dataKey: 'activeUsers' },
+        { name: 'New Users', width: '17%', dataKey: 'newUsers' },
+        { name: 'Engaged Sessions', width: '18%', dataKey: 'engagedSessions' },
+        { name: 'Event Count', width: '18%', dataKey: 'eventCount' },
+      ],
+      label: 'Geo Location: City',
+    },
+    'google.top_pages': {
+      dimensionType: 'page',
+      metricKeys: ['google.pageViews', 'google.activeUsers', 'google.avgSessionDuration', 'google.eventCount'],
+      columns: [
+        { name: 'Page Path', width: '30%', dataKey: 'dimensionValue' },
+        { name: 'Views', width: '14%', dataKey: 'pageViews' },
+        { name: 'Active Users', width: '14%', dataKey: 'activeUsers' },
+        { name: 'Avg. Session Duration', width: '21%', dataKey: 'avgSessionDuration' },
+        { name: 'Event Count', width: '21%', dataKey: 'eventCount' },
+      ],
+      label: 'Top Landing Pages',
+    },
+    'google_seo.top_pages': {
+      dimensionType: 'page',
+      metricKeys: ['google_seo.clicks', 'google_seo.impressions', 'google_seo.ctr', 'google_seo.position'],
+      columns: [
+        { name: 'Page', width: '50%', dataKey: 'dimensionValue' },
+        { name: 'Clicks', width: '15%', dataKey: 'clicks' },
+        { name: 'Impressions', width: '15%', dataKey: 'impressions' },
+        { name: 'CTR', width: '10%', dataKey: 'ctr' },
+        { name: 'Position', width: '10%', dataKey: 'position' },
+      ],
+      label: 'Top Performing Pages',
+    },
+    'google_seo.top_queries': {
+      dimensionType: 'query',
+      metricKeys: ['google_seo.clicks', 'google_seo.impressions', 'google_seo.ctr', 'google_seo.position'],
+      columns: [
+        { name: 'Query', width: '50%', dataKey: 'dimensionValue' },
+        { name: 'Clicks', width: '15%', dataKey: 'clicks' },
+        { name: 'Impressions', width: '15%', dataKey: 'impressions' },
+        { name: 'CTR', width: '10%', dataKey: 'ctr' },
+        { name: 'Position', width: '10%', dataKey: 'position' },
+      ],
+      label: 'Top Search Queries',
+    },
+  };
+
+  const gaDimTable = GA_DIMENSIONAL_TABLES[widget.metricKey];
+  if (
+    gaDimTable &&
+    (normalizedInteg === 'google-analytics' || normalizedInteg === 'google' || normalizedInteg === 'google_analytics' || normalizedInteg === 'google-search-console' || normalizedInteg === 'google-console')
+  ) {
+    try {
+      // IMPORTANT: Use direct api.get instead of fetchUnifiedMetric here.
+      // fetchUnifiedMetric builds a fixed requestParams whitelist that strips dimensionType,
+      // so the backend would return ALL metrics with no dimensional filtering.
+      const isGsc = normalizedInteg === 'google-search-console' || normalizedInteg === 'google-console';
+
+      let dimResponse: any;
+
+      if (isGsc && (widget.metricKey === 'google_seo.top_pages' || widget.metricKey === 'google_seo.top_queries')) {
+        const fetchFn = widget.metricKey === 'google_seo.top_pages' ? getGoogleConsoleTopPages : getGoogleConsoleTopQueries;
+        const gscResp = await fetchFn(Number(effectiveClientId), { startDate: dateFrom, endDate: dateTo });
+
+        // Normalize GSC response to look like unified metrics rows for the aggregator below
+        const rawRows = (gscResp as any).topPages || (gscResp as any).topQueries || [];
+
+        dimResponse = {
+          success: true,
+          rows: rawRows.map((r: any) => ([
+            { metricKey: 'google_seo.clicks', value: r.clicks, dimensionValue: r.page || r.query },
+            { metricKey: 'google_seo.impressions', value: r.impressions, dimensionValue: r.page || r.query },
+            { metricKey: 'google_seo.ctr', value: r.ctr, dimensionValue: r.page || r.query },
+            { metricKey: 'google_seo.position', value: r.position, dimensionValue: r.page || r.query },
+          ])).flat()
+        };
+      } else {
+        const queryParams = {
+          integration: isGsc ? 'google-search-console' : 'google_analytics',
+          dimensionType: gaDimTable.dimensionType,
+          startDate: dateFrom,
+          endDate: dateTo,
+          clientId: effectiveClientId ? Number(effectiveClientId) : undefined,
+          client_id: effectiveClientId ? Number(effectiveClientId) : undefined,
+          limit: 50, // Reduced from 500 to prevent massive payload processing delays
+        };
+        dimResponse = await api.get('/unified-metrics', {
+          params: queryParams,
+        }).then((r: any) => r.data);
+      }
+
+      if (dimResponse?.rows && Array.isArray(dimResponse.rows) && dimResponse.rows.length > 0) {
+        // Aggregate rows by dimensionValue — sum each metricKey across all dates
+        const byDimension = new Map<string, Record<string, number>>();
+
+        dimResponse.rows.forEach((row: any) => {
+          const dim = row.dimensionValue || '(not set)';
+          const metricSuffix = (row.metricKey || '').split('.').pop() || '';
+
+          if (!byDimension.has(dim)) {
+            byDimension.set(dim, {
+              _activeUsers: 0, _newUsers: 0, _engagedSessions: 0, _engagementRate: 0, _engagementRateCount: 0, _avgSessionDuration: 0, _avgDurationCount: 0, _sessions: 0, _eventCount: 0, _pageViews: 0,
+              _clicks: 0, _impressions: 0, _ctr: 0, _ctrCount: 0, _position: 0, _positionCount: 0
+            });
+          }
+          const acc = byDimension.get(dim)!;
+          const val = Number(row.value) || 0;
+
+          if (metricSuffix === 'activeUsers') acc._activeUsers += val;
+          else if (metricSuffix === 'newUsers') acc._newUsers += val;
+          else if (metricSuffix === 'engagedSessions') acc._engagedSessions += val;
+          else if (metricSuffix === 'engagementRate') { acc._engagementRate += val; acc._engagementRateCount += 1; }
+          else if (metricSuffix === 'avgSessionDuration') { acc._avgSessionDuration += val; acc._avgDurationCount += 1; }
+          else if (metricSuffix === 'sessions') acc._sessions += val;
+          else if (metricSuffix === 'eventCount') acc._eventCount += val;
+          else if (metricSuffix === 'pageViews') acc._pageViews += val;
+          else if (metricSuffix === 'clicks') acc._clicks += val;
+          else if (metricSuffix === 'impressions') acc._impressions += val;
+          else if (metricSuffix === 'ctr') { acc._ctr += val; acc._ctrCount += 1; }
+          else if (metricSuffix === 'position') { acc._position += val; acc._positionCount += 1; }
+        });
+
+        // Build one display row per dimension value
+        const aggregatedRows = Array.from(byDimension.entries()).map(
+          ([dim, acc], idx) => ({
+            id: idx,
+            metricKey: widget.metricKey,
+            integration: isGsc ? 'google-search-console' : 'google_analytics',
+            dimensionValue: dim,
+            activeUsers: acc._activeUsers,
+            newUsers: acc._newUsers,
+            engagedSessions: acc._engagedSessions,
+            sessions: acc._sessions,
+            eventCount: acc._eventCount,
+            pageViews: acc._pageViews,
+            engagementRate: acc._engagementRateCount > 0
+              ? parseFloat((acc._engagementRate / acc._engagementRateCount * 100).toFixed(2))
+              : 0,
+            avgSessionDuration: acc._avgDurationCount > 0
+              ? parseFloat((acc._avgSessionDuration / acc._avgDurationCount).toFixed(1))
+              : 0,
+            clicks: acc._clicks,
+            impressions: acc._impressions,
+            ctr: acc._ctrCount > 0
+              ? `${(acc._ctr / acc._ctrCount * 100).toFixed(2)}%`
+              : "0.00%",
+            position: acc._positionCount > 0
+              ? parseFloat((acc._position / acc._positionCount).toFixed(1))
+              : 0,
+            value: isGsc ? (acc._clicks || acc._impressions) : (acc._activeUsers || acc._sessions || acc._pageViews),
+          })
+        );
+
+        // Sort by primary metric descending (most relevant dimension first)
+        aggregatedRows.sort((a, b) => (b.value || 0) - (a.value || 0));
+
+        return {
+          success: true,
+          rows: aggregatedRows,
+          pagination: { page: 1, limit: aggregatedRows.length, total: aggregatedRows.length, totalPages: 1 },
+          columns: gaDimTable.columns,
+        };
+      }
+    } catch (err) {
+      console.error(`Failed to fetch dimensional table (${widget.metricKey}):`, err);
+    }
+  }
+
+  // --- Pre-start aggregate fetch in parallel with standard fetch ---
+  const GSC_AGGREGATE_KEYS = [
+    "google_seo.clicks",
+    "google_seo.impressions",
+    "google_seo.ctr",
+    "google_seo.position",
+  ] as const;
+  const needsGscAggregate =
+    (normalizedInteg === "google-search-console" ||
+      normalizedInteg === "google-console") &&
+    GSC_AGGREGATE_KEYS.includes(widget.metricKey as any);
+  const needsMetaAdsAggregate =
+    (normalizedInteg === "meta-ads" || normalizedInteg === "meta_ads") &&
+    (widget.metricKey === "meta.ads.cpc" || widget.metricKey === "meta.ads.ctr");
+
+  const aggregatePromise = (needsGscAggregate || needsMetaAdsAggregate)
+    ? fetchUnifiedAggregate({
+      metricKey: widget.metricKey,
+      integration: needsGscAggregate ? "google-search-console" : "meta_ads",
+      startDate: dateFrom,
+      endDate: dateTo,
+      accountId: widget.accountId || undefined,
+    })
+    : null;
+
+  // --- Fast path: Metric cards only need the aggregate value, skip the standard fetch ---
+  // Chart widgets still need rows for time-series rendering.
+  const wType = widget.type || (widget as any).widgetType || "";
+  const needsSeries = wType === "chart" || wType === "line_chart" || wType === "bar_chart";
+
+  if (aggregatePromise && !needsSeries) {
+    try {
+      const aggregateResult = await aggregatePromise;
+      if (aggregateResult?.success && typeof aggregateResult.value === "number") {
+        const metricSuffix = widget.metricKey.split(".").pop() || "";
+        return {
+          success: true,
+          rows: [],
+          value: aggregateResult.value,
+          total: aggregateResult.value,
+          rowCount: aggregateResult.rowCount,
+          summary: { [metricSuffix]: aggregateResult.value },
+        };
+      }
+    } catch (err) {
+      console.warn(`[useWidgetData] Aggregate-only fast path failed for ${widget.metricKey}, falling through to standard fetch`, err);
+    }
+  }
+
   // --- Standard: Unified Metrics API ---
-  const shouldIncludeAccountId = ![
-    "meta-facebook",
-    "meta-instagram",
-    "meta-ads",
-    "meta_ads",
-  ].includes(normalizedInteg);
+  // Pass accountId for all integrations if it exists on the widget.
+  const shouldIncludeAccountId = true;
 
   const params: any = {
     integration: normalizedInteg,
@@ -518,40 +821,41 @@ async function fetchRawWidgetData(
     ...(shouldIncludeAccountId && widget.accountId
       ? { accountId: widget.accountId }
       : {}),
-    filters: widget.filters,
   };
 
-  const data = await fetchUnifiedMetric(effectiveClientId, params);
+  // --- Standard / Parallel Fallback Fetch ---
+  // For Meta integrations, we often don't know if the metrics are tied to the Facebook Page ID (accountId)
+  // or a separated Instagram ID. Previously this was serial (wait 5s for fail, then try again).
+  // Now we fire both in parallel to halve the latency for Instagram widgets.
 
-  // --- Google Search Console: Aggregate Fetch ---
-  // Uses the /unified-metrics/aggregate endpoint for all 4 GSC metric keys.
-  // Clicks/Impressions → summed integer. CTR → already in % (e.g. 0.69 = 0.69%). Position → averaged.
-  const GSC_AGGREGATE_KEYS = [
-    "google_seo.clicks",
-    "google_seo.impressions",
-    "google_seo.ctr",
-    "google_seo.position",
-  ] as const;
-  if (
-    (normalizedInteg === "google-search-console" ||
+  const needsMetaFallback = normalizedInteg.startsWith("meta") && params.accountId;
+  const needsGoogleFallback =
+    (normalizedInteg === "google-analytics" ||
+      normalizedInteg === "google" ||
+      normalizedInteg === "google_analytics" ||
+      normalizedInteg === "google-search-console" ||
       normalizedInteg === "google-console") &&
-    GSC_AGGREGATE_KEYS.includes(widget.metricKey as any)
-  ) {
-    console.log(`📡 [useWidgetData] GSC Aggregate fetch for ${widget.metricKey}`);
+    params.accountId;
+  const needsNoAccountFallback = needsMetaFallback || needsGoogleFallback;
+
+  const [primaryData, fallbackData] = await Promise.all([
+    fetchUnifiedMetric(effectiveClientId, params),
+    needsNoAccountFallback
+      ? fetchUnifiedMetric(effectiveClientId, { ...params, accountId: undefined })
+      : Promise.resolve(null)
+  ]);
+
+  // Use primary if it has rows, otherwise use fallback (which might also be empty, but we tried)
+  let data = (primaryData?.rows && primaryData.rows.length > 0)
+    ? primaryData
+    : (fallbackData ?? primaryData);
+
+  // --- Google Search Console: Aggregate Fetch (parallel) ---
+  if (needsGscAggregate) {
     try {
-      const aggregateResult = await fetchUnifiedAggregate({
-        metricKey: widget.metricKey,
-        integration: "google-search-console",
-        startDate: dateFrom,
-        endDate: dateTo,
-        accountId: widget.accountId || undefined,
-      });
+      const aggregateResult = await aggregatePromise;
 
       if (aggregateResult?.success && typeof aggregateResult.value === "number") {
-        console.log(
-          `📡 [useWidgetData] GSC Aggregate OK for ${widget.metricKey}:`,
-          aggregateResult.value
-        );
         const metricSuffix = widget.metricKey.split(".").pop() || "";
         return {
           ...data,
@@ -564,36 +868,18 @@ async function fetchRawWidgetData(
             [metricSuffix]: aggregateResult.value,
           },
         };
-      } else {
-        console.warn(
-          `📡 [useWidgetData] GSC Aggregate returned no value for ${widget.metricKey}:`,
-          aggregateResult
-        );
       }
     } catch (err) {
       console.error("Failed to fetch GSC aggregate metric", err);
     }
   }
 
-  // --- Meta Ads Ratio Metrics: Aggregate Fetch for Accurate Blended Calculation ---
-  // CPC = Total Spend / Total Clicks. CTR = (Total Clicks / Total Impressions) * 100
-  // We use the dedicated /aggregate endpoint to get mathematically correct totals.
-  if (
-    (normalizedInteg === "meta-ads" || normalizedInteg === "meta_ads") &&
-    (widget.metricKey === "meta.ads.cpc" || widget.metricKey === "meta.ads.ctr")
-  ) {
-    console.log(`📡 [useWidgetData] Aggregate fetch for ${widget.metricKey}`);
+  // --- Meta Ads Ratio Metrics: Aggregate Fetch (parallel) ---
+  if (needsMetaAdsAggregate) {
     try {
-      const aggregateResult = await fetchUnifiedAggregate({
-        metricKey: widget.metricKey,
-        integration: "meta_ads",
-        startDate: dateFrom,
-        endDate: dateTo,
-        accountId: widget.accountId || undefined,
-      });
+      const aggregateResult = await aggregatePromise;
 
       if (aggregateResult?.success && typeof aggregateResult.value === "number") {
-        console.log(`📡 [useWidgetData] Aggregate OK for ${widget.metricKey}:`, aggregateResult.value);
         const metricSuffix = widget.metricKey.split(".").pop() || "";
         return {
           ...data,
@@ -607,8 +893,6 @@ async function fetchRawWidgetData(
             ctr: metricSuffix === "ctr" ? aggregateResult.value : data?.summary?.ctr,
           },
         };
-      } else {
-        console.warn(`📡 [useWidgetData] Aggregate returned no value for ${widget.metricKey}:`, aggregateResult);
       }
     } catch (err) {
       console.error("Failed to fetch Meta Ads aggregate metric", err);
@@ -676,7 +960,7 @@ export function processWidgetData(
     const rowInteg = (row.integration || "")
       .replace(/_/g, "-")
       .toLowerCase();
-    const widgetInteg = (widget.integration || "")
+    const widgetInteg = (widgetIntegration || widget.integration || "")
       .replace(/_/g, "-")
       .toLowerCase();
 
@@ -684,17 +968,19 @@ export function processWidgetData(
       return false;
 
     let accountMatch = true;
-    if (rowInteg.startsWith("meta") || widget.accountId) {
+    if (widget.accountId) {
       const rowAcc = String(row.accountId || "").replace(/^act_/, "");
       const widAcc = String(widget.accountId || "").replace(/^act_/, "");
 
       if (
-        !rowAcc &&
         (row.dimensionType === "page" || row.dimensionType === "account") &&
         row.dimensionValue
       ) {
         const dimVal = String(row.dimensionValue).replace(/^act_/, "");
-        accountMatch = dimVal === widAcc;
+        accountMatch = rowAcc === widAcc || dimVal === widAcc;
+      } else if (row.dimensionType === "demographic") {
+        // Backend filters demographic rows correctly; bypass strict ID vs username mismatch
+        accountMatch = true;
       } else {
         accountMatch = rowAcc === widAcc;
       }
@@ -726,13 +1012,15 @@ export function processWidgetData(
         row.metricKey.endsWith(".revenue") ||
         row.metricKey.endsWith("amount_spent"));
 
-    return (
+    const match = (
       (row.metricKey === widget.metricKey || isComponentMetric) &&
       (rowInteg === widgetInteg ||
         (widgetInteg === "meta-business" && rowInteg.startsWith("meta"))) &&
       accountMatch &&
       clientMatch
     );
+
+    return match;
   });
 
   // Loose match fallback
@@ -757,7 +1045,7 @@ export function processWidgetData(
   }
 
   // Dimensional filtering
-  const filteredRows = matchingRows.filter((row: any) => {
+  let filteredRows = matchingRows.filter((row: any) => {
     if (widget.type === "table") return true;
 
     const dimType = (row.dimensionType || "").replace("ga:", "").toLowerCase();
@@ -770,15 +1058,59 @@ export function processWidgetData(
       (dimType === "video" || row.dimensionType === "video");
     const isMetaAdsDimension =
       widget.metricKey.startsWith("meta.") &&
-      ["campaign", "adset", "ad", "page", "account"].includes(dimType);
+      ["campaign", "adset", "ad", "page", "account", "demographic"].includes(dimType);
+    const isGoogleAdsDimension =
+      widget.metricKey.startsWith("google_ads") &&
+      ["campaign"].includes(dimType);
 
-    return (
+    const passes = (
       !isDimensional ||
       isTimeDimension ||
       isYouTubeDimension ||
-      isMetaAdsDimension
+      isMetaAdsDimension ||
+      isGoogleAdsDimension
     );
+
+    return passes;
   });
+
+  // GA card fallback:
+  // If strict dimensional filtering removed all rows but matching GA rows exist,
+  // pick one coherent dimension bucket instead of returning 0.
+  const isGoogleMetric = widget.metricKey.startsWith("google.");
+  const isMetricCardWidget =
+    widget.type === "metric_card" ||
+    widget.type === "metric" ||
+    (widget as any).widgetType === "metric";
+
+  if (isGoogleMetric && isMetricCardWidget && filteredRows.length === 0 && matchingRows.length > 0) {
+    const byDimensionType = new Map<string, any[]>();
+    matchingRows.forEach((row: any) => {
+      const dimType = ((row.dimensionType || "").replace("ga:", "").toLowerCase()) || "__none__";
+      const list = byDimensionType.get(dimType) || [];
+      list.push(row);
+      byDimensionType.set(dimType, list);
+    });
+
+    const preferred = ["day", "date", "week", "month", "year", "__none__"];
+    let selectedRows: any[] | undefined;
+
+    for (const dim of preferred) {
+      const candidate = byDimensionType.get(dim);
+      if (candidate && candidate.length > 0) {
+        selectedRows = candidate;
+        break;
+      }
+    }
+
+    if (!selectedRows) {
+      selectedRows = Array.from(byDimensionType.values()).sort((a, b) => b.length - a.length)[0];
+    }
+
+    if (selectedRows && selectedRows.length > 0) {
+      filteredRows = selectedRows;
+    }
+  }
 
   // --- Rate metric detection ---
   const metricKeyLower = widget.metricKey?.toLowerCase() || "";
@@ -981,6 +1313,8 @@ export function processWidgetData(
     });
 
   // --- Format by widget type ---
+
+
   if (widget.type === "table") {
     return {
       rows: filteredRows,
@@ -1036,17 +1370,71 @@ export async function fetchAndProcessWidget(
     return { value: 0, total: 0, rawCount: 0, rows: [], series: [] };
   }
 
-  const rawData = await fetchRawWidgetData(
-    widget,
-    normalizedInteg,
-    effectiveClientId,
-    dateFrom,
-    dateTo,
-    shareToken,
-    integrationsData
-  );
+  // --- Acquire concurrency slot before any API calls ---
+  // (Removed manual promise queue, fetch directly)
+  try {
+    // --- SHORTCUT: Meta Ads CPC / CTR via Campaign Performance ---
+    if (
+      (normalizedInteg === "meta-ads" || normalizedInteg === "meta_ads") &&
+      (widget.metricKey === "meta.ads.cpc" || widget.metricKey === "meta.ads.ctr")
+    ) {
+      try {
+        console.time(`[Widget Timing] Meta Shortcut: ${widget.metricKey} (${widget.accountId})`);
+        const campaignData = await fetchMetaAdsCampaignPerformance(
+          effectiveClientId!,
+          dateFrom,
+          dateTo
+        );
+        console.timeEnd(`[Widget Timing] Meta Shortcut: ${widget.metricKey} (${widget.accountId})`);
 
-  return processWidgetData(widget, rawData, effectiveClientId);
+        if (campaignData?.success && Array.isArray(campaignData.rows) && campaignData.rows.length > 0) {
+          const rows = campaignData.rows;
+          const totalClicks = rows.reduce((s, r) => s + (r.clicks || 0), 0);
+          const totalImpressions = rows.reduce((s, r) => s + (r.impressions || 0), 0);
+
+          if (widget.metricKey === "meta.ads.cpc") {
+            const weightedSpend = rows.reduce((s, r) => s + ((r.clicks || 0) * (r.cpc || 0)), 0);
+            if (totalClicks > 0 && weightedSpend > 0) {
+              const cpc = weightedSpend / totalClicks;
+              return { value: cpc, total: cpc, rawCount: 0, rows: [], series: [] };
+            }
+          } else {
+            if (totalClicks > 0 && totalImpressions > 0) {
+              const ctr = (totalClicks / totalImpressions) * 100;
+              return { value: ctr, total: ctr, rawCount: 0, rows: [], series: [] };
+            }
+          }
+        }
+      } catch (shortcutErr) {
+        console.timeEnd(`[Widget Timing] Meta Shortcut: ${widget.metricKey} (${widget.accountId})`);
+        console.warn(`Shortcut failed for ${widget.metricKey}:`, shortcutErr);
+      }
+    }
+
+    console.time(`[Widget Timing] Raw API Fetch: ${widget.metricKey} (${widget.accountId})`);
+    const rawData = await fetchRawWidgetData(
+      widget,
+      normalizedInteg,
+      effectiveClientId,
+      dateFrom,
+      dateTo,
+      shareToken,
+      integrationsData
+    );
+    console.timeEnd(`[Widget Timing] Raw API Fetch: ${widget.metricKey} (${widget.accountId})`);
+
+    // GA4 pre-aggregated dimensional table — bypass processWidgetData.
+    if (rawData && Array.isArray(rawData.columns) && rawData.columns.length > 0 && Array.isArray(rawData.rows)) {
+      return rawData as ResolvedWidgetData;
+    }
+
+    console.time(`[Widget Timing] Processing/Aggregation: ${widget.metricKey} (${widget.accountId})`);
+    const processedVars = processWidgetData(widget, rawData, effectiveClientId);
+    console.timeEnd(`[Widget Timing] Processing/Aggregation: ${widget.metricKey} (${widget.accountId})`);
+    return processedVars;
+  } finally {
+    // releaseFetchSlot(); removed
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1069,109 +1457,37 @@ export function useWidgetData(params: UseWidgetDataParams) {
   const hasDateRange = !!dateFrom && !!dateTo;
   const hasClientOrToken = !!(effectiveClientId || shareToken);
 
+  const isEnabled = 
+    hasMetricKey && 
+    hasDateRange && 
+    hasClientOrToken && 
+    isSlideVisible && 
+    !isLoadingIntegrations && 
+    !!integrationsData;
+
+  // Log once when query first becomes enabled (kept for debugging convenience, low noise)
+  const wasEnabledRef = useRef(false);
+  if (isEnabled && !wasEnabledRef.current) {
+    wasEnabledRef.current = true;
+    console.log(`✅ [WIDGET ENABLED] ${widget.metricKey} at ${new Date().toISOString()}`);
+  }
+
   return useQuery<ResolvedWidgetData>({
     queryKey: getWidgetQueryKey(widget, dateFrom, dateTo, shareToken),
-    enabled:
-      hasMetricKey && hasDateRange && hasClientOrToken && isSlideVisible,
-    staleTime: 5 * 60 * 1000,
+    enabled: isEnabled,
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
     queryFn: async (): Promise<ResolvedWidgetData> => {
-      // Snapshot shortcut (Shared Reports)
-      if ((widget as any).snapshotData && shareToken) {
-        const snap = (widget as any).snapshotData;
-        const isSnapshot =
-          snap.series ||
-          typeof snap.value === "number" ||
-          typeof snap.total === "number";
-        if (isSnapshot) {
-          return {
-            value: snap.value ?? 0,
-            total: snap.total ?? 0,
-            rawCount: snap.rawCount ?? 0,
-            rows: [],
-            series: snap.series ?? [],
-          };
-        }
-      }
-
-      // Safety: Don't fetch if integrations not ready
-      if (isLoadingIntegrations || !integrationsData) {
-        return { value: 0, total: 0, rawCount: 0, rows: [], series: [] };
-      }
-
-      const normalizedInteg = normalizeIntegration(widget);
-
-      // Validate integration
-      if (!VALID_INTEGRATIONS.includes(normalizedInteg)) {
-        return { value: 0, total: 0, rawCount: 0, rows: [], series: [] };
-      }
-
-      // Validate metric key format
-      if (!hasValidMetricPrefix(widget.metricKey)) {
-        console.warn(`Invalid metric key format: ${widget.metricKey}`);
-        return { value: 0, total: 0, rawCount: 0, rows: [], series: [] };
-      }
-
       try {
-        // --- DIRECT SHORTCUT: Meta Ads CPC / CTR via Campaign Performance ---
-        // Uses fetchMetaAdsCampaignPerformance — the proven endpoint that already
-        // returns correct cpc/ctr/clicks/impressions for the campaign table.
-        //   CPC (weighted avg) = Σ(clicks × rowCpc) / Σ(clicks)  === total_spend / total_clicks
-        //   CTR               = Σ(clicks) / Σ(impressions) × 100
-        if (
-          (normalizedInteg === "meta-ads" || normalizedInteg === "meta_ads") &&
-          (widget.metricKey === "meta.ads.cpc" || widget.metricKey === "meta.ads.ctr")
-        ) {
-          try {
-            const campaignData = await fetchMetaAdsCampaignPerformance(
-              effectiveClientId!,
-              dateFrom,
-              dateTo
-            );
-
-            if (campaignData?.success && Array.isArray(campaignData.rows) && campaignData.rows.length > 0) {
-              const rows = campaignData.rows;
-              const totalClicks = rows.reduce((s, r) => s + (r.clicks || 0), 0);
-              const totalImpressions = rows.reduce((s, r) => s + (r.impressions || 0), 0);
-
-              if (widget.metricKey === "meta.ads.cpc") {
-                // Weighted average CPC = Σ(clicks × cpc) / Σ(clicks) = totalSpend / totalClicks
-                const weightedSpend = rows.reduce((s, r) => s + ((r.clicks || 0) * (r.cpc || 0)), 0);
-                if (totalClicks > 0 && weightedSpend > 0) {
-                  const cpc = weightedSpend / totalClicks;
-                  console.log(`✅ [CPC Campaign] weightedSpend=${weightedSpend} clicks=${totalClicks} → cpc=${cpc}`);
-                  return { value: cpc, total: cpc, rawCount: 0, rows: [], series: [] };
-                }
-                console.warn(`⚠️ [CPC Campaign] weightedSpend=${weightedSpend} clicks=${totalClicks}`);
-
-              } else {
-                // CTR = Σ(clicks) / Σ(impressions) × 100
-                if (totalClicks > 0 && totalImpressions > 0) {
-                  const ctr = (totalClicks / totalImpressions) * 100;
-                  console.log(`✅ [CTR Campaign] (${totalClicks}/${totalImpressions})*100 = ${ctr}`);
-                  return { value: ctr, total: ctr, rawCount: 0, rows: [], series: [] };
-                }
-                console.warn(`⚠️ [CTR Campaign] clicks=${totalClicks} impressions=${totalImpressions}`);
-              }
-            } else {
-              console.warn(`⚠️ [CPC/CTR Campaign] No campaign rows returned`, campaignData);
-            }
-          } catch (shortcutErr) {
-            console.warn(`⚠️ [CPC/CTR Campaign] Failed for ${widget.metricKey}:`, shortcutErr);
-          }
-        }
-
-        const rawData = await fetchRawWidgetData(
+        return await fetchAndProcessWidget(
           widget,
-          normalizedInteg,
           effectiveClientId,
           dateFrom,
           dateTo,
           shareToken,
           integrationsData
         );
-
-        return processWidgetData(widget, rawData, effectiveClientId);
       } catch (error) {
         console.error(
           `Failed to fetch data for widget [${widget.metricKey}]:`,

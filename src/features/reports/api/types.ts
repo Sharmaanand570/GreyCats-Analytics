@@ -58,6 +58,7 @@ export type ResolvedWidgetData =
     value?: number;
     rawCount?: number;
     rows?: unknown[];
+    columns?: any[];
   }
   | Record<string, unknown>;
 

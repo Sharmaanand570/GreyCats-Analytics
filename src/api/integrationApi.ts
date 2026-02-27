@@ -155,8 +155,8 @@ export const removeAccountFromClient = async (
         return await disconnectGoogleAds(clientId);
       }
       case 'meta-business': {
-        const { disconnectMetaBusinessAccount } = await import('../features/meta/API/metaBusinessApi');
-        return await disconnectMetaBusinessAccount(Number(accountId));
+        const { unassignMetaBusinessFromClient } = await import('../features/meta/API/metaBusinessApi');
+        return await unassignMetaBusinessFromClient(clientId);
       }
       case 'shopify': {
         const { disconnectShopify } = await import('../features/shopify/API/shopifyApi');
@@ -166,16 +166,25 @@ export const removeAccountFromClient = async (
         const { disconnectYouTube } = await import('../features/YouTube/API/youtubeApi');
         return await disconnectYouTube(clientId);
       }
-      case 'google-search-console': {
-        const { disconnectGoogleConsole } = await import('../features/YouTube/API/googleConsoleapi');
-        return await disconnectGoogleConsole(clientId);
-      }
-      default:
-        // Generic disconnection
-        const response = await api.delete(
-          `/clients/${clientId}/accounts/${integration}/${accountId}`
-        );
+      case 'google-analytics': {
+        // DELETE /api/integrations/google — clears GA4 tokens, deactivates account, removes all client assignments
+        console.log(`[removeAccountFromClient] DELETE /integrations/google`);
+        const response = await api.delete('/integrations/google');
         return response.data;
+      }
+      case 'google-search-console': {
+        // DELETE /api/integrations/google_search_console
+        console.log(`[removeAccountFromClient] DELETE /integrations/google_search_console`);
+        const response = await api.delete('/integrations/google_search_console');
+        return response.data;
+      }
+      default: {
+        // Generic disconnection fallback for any other integration types
+        const url = `/clients/${clientId}/accounts/${integration}/${accountId}`;
+        console.log(`[removeAccountFromClient] DELETE ${url}`);
+        const response = await api.delete(url);
+        return response.data;
+      }
     }
   } catch (error) {
     console.error(`Error removing account from client ${clientId}:`, error);

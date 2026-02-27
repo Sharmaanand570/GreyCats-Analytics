@@ -400,6 +400,11 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     });
 
     const filtered = Array.from(new Set(translatedOrder.filter(id => {
+      // ✅ Never render slides the user explicitly deleted
+      if (deletedSlideIds.has(id)) {
+        console.log(`🗑️ [effectivePageOrder] Excluding user-deleted slide ${id}`);
+        return false;
+      }
       const exists = dashboards.has(id);
       if (!exists) {
         console.warn(`⚠️ [effectivePageOrder] Filtering out ID ${id} - not in dashboards Map. dashboards keys:`, Array.from(dashboards.keys()));
@@ -433,11 +438,29 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   // This blocks the "Self-Healing" logic from undoing manual deletions.
   const modifiedSlideIds = useRef<Set<number>>(new Set());
 
-  // Slide visibility for lazy loading: only fetch widget data for visible/near-visible slides
+  // Slide visibility for lazy loading: only fetch widget data for visible/near-visible slides.
+  // ⚡ rootMargin "0px 0px 1200px 0px" → starts fetching ~1.5 screens before the slide enters view.
+  // ⚡ fallbackDelay 8000 → after 8s, ALL slides are marked visible so background prefetch fires.
+  // NOTE: 8s (not 5s) because hydration + rescue can take 3-6s depending on API latency.
+  //       Fetching before hydration completes caches 0 for 5 min (staleTime).
   const { registerSlide, isSlideVisible } = useSlideVisibility({
-    rootMargin: "0px 0px 300px 0px",
+    rootMargin: "0px 0px 1200px 0px",
     sticky: true,
+    fallbackDelay: 1000,
   });
+
+  const registerSlideWithBackend = useCallback((slideId: number, el: HTMLElement | null) => {
+    registerSlide(slideId, el);
+    const backendId = backendIdMap.current.get(slideId);
+    if (backendId != null && backendId !== slideId) {
+      registerSlide(backendId, el);
+    }
+  }, [registerSlide]);
+
+  const isSlideVisibleWithBackend = useCallback((slideId: number) => {
+    const backendId = backendIdMap.current.get(slideId);
+    return isSlideVisible(slideId) || (backendId != null && isSlideVisible(backendId));
+  }, [isSlideVisible]);
 
 
 
@@ -547,7 +570,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     isLoading: isLoadingIntegrations,
   } = useIntegrations(effectiveClientId, {
     enabled: !readOnly,
-    staleTime: 60 * 1000, // Cache for 60 seconds to avoid ghost slides
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes instead of 60s to prevent constant widget hydration blocking
     placeholderData: keepPreviousData // 🔧 FIX: Keep previous data during refetch to prevent slideIntegrationMap from becoming empty
   });
 
@@ -903,10 +926,41 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       cleanedSlidesMeta = rawSlidesMeta.filter((slide: any) => {
         const sId = Number(slide.id);
 
-        // Reject if explicitly deleted by user
+        // Reject if explicitly deleted by user (frontend ID match)
         if (deletedSlideIds.has(sId)) {
           console.log(`🗑️ [Hydration] Removing deleted slide: ID=${sId}, Title="${slide.title}"`);
           return false;
+        }
+
+        // ✅ CRITICAL FIX: cross-reference against frontend slots
+        if (slide.source === 'integration' && slide.integrationIndex !== undefined && slide.integrationIndex !== null) {
+          const slideIntegIdx = Number(slide.integrationIndex);
+          for (const deletedFrontendId of deletedSlideIds) {
+            const info = slideIntegrationMap.get(deletedFrontendId);
+            if (!info || info.originalIndex !== slideIntegIdx) continue;
+
+            const siblingCount = Array.from(slideIntegrationMap.values())
+              .filter(i => i.originalIndex === slideIntegIdx).length;
+
+            if (siblingCount <= 1) {
+              console.log(`🗑️ [Hydration] Blocking backend slide ${sId} — integration index ${slideIntegIdx} was explicitly deleted as frontend slot ${deletedFrontendId}`);
+              return false;
+            }
+
+            const slideTitle = (slide.title || '').toLowerCase();
+            const deletedTitle = (info.slideTitle || '').toLowerCase();
+            const sameKind =
+              (slideTitle.includes('instagram') && deletedTitle.includes('instagram')) ||
+              (slideTitle.includes('facebook') && deletedTitle.includes('facebook')) ||
+              // Fix non-Meta Business slides that share an index (should be rare)
+              (!slideTitle.includes('instagram') && !slideTitle.includes('facebook') &&
+                !deletedTitle.includes('instagram') && !deletedTitle.includes('facebook'));
+
+            if (sameKind) {
+              console.log(`🗑️ [Hydration] Blocking backend multi-slide ${sId} ("${slide.title}") — matches deleted slot ${deletedFrontendId} ("${info.slideTitle}")`);
+              return false;
+            }
+          }
         }
 
         // Reject if not in valid set
@@ -1071,39 +1125,91 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         }
 
         if (matchingSlides.length === 0) {
-          console.warn(`⚠️ [ID Mapping] Could not find any frontend IDs for integration index ${iIdx}!`);
-        } else {
-          console.log(`🔍 [ID Mapping] Found ${matchingSlides.length} slides for integration ${iIdx}:`, matchingSlides);
+          console.warn(`⚠️ [ID Mapping] Could not find any frontend IDs for integration index ${iIdx}! Attempting stable ID recovery...`);
         }
 
-        // For single-slide integrations, there's only one match
-        // For multi-slide integrations, we need to determine which sub-slide this backend ID corresponds to
-        // The backend should include a subSlideIndex or we infer from the order
+        // ✅ STABLE ID RECOVERY & DISAMBIGUATION
+        // Even if integrationIndex matches (or doesn't), we MUST verify by widget content
+        // to prevent GA widgets from ending up on GSC slides if indices shift.
+        const slideWidgets = map.get(bId) || [];
+        const firstWidget = slideWidgets[0] as any;
+        const widgetPlatform = (firstWidget?.metricConfig?.integration || firstWidget?.integration || '').toLowerCase().replace(/[_-]/g, '');
+        const widgetAccountId = firstWidget?.metricConfig?.accountId || firstWidget?.accountId;
 
-        // Check if backend data includes subSlideIndex
-        const backendSubSlideIndex = typeof slide.subSlideIndex === 'number' ? slide.subSlideIndex : 0;
+        let matchingSlide: { frontendId: number; subSlideIndex: number } | undefined;
 
-        // Find the matching frontend ID for this specific sub-slide
-        const matchingSlide = matchingSlides.find(s => s.subSlideIndex === backendSubSlideIndex);
+        if (slideWidgets.length > 0) {
+          console.log(`🔍 [ID Mapping] Slide ${bId} widget content: platform="${widgetPlatform}", accountId="${widgetAccountId}"`);
+
+          const stableMatch = Array.from(slideIntegrationMap.entries()).find(([_fId, info]) => {
+            const infoPlatform = (info.platform || '').toLowerCase().replace(/[_-]/g, '');
+            const infoAccountId = info.accountId;
+
+            // Check if platform matches
+            const platformEquals = infoPlatform === widgetPlatform;
+            const isGoogleMatch = (infoPlatform.includes('google') && widgetPlatform.includes('google'));
+
+            const platformMatches = platformEquals || (isGoogleMatch && (
+              (infoPlatform.includes('analytics') && widgetPlatform.includes('analytics')) ||
+              (infoPlatform.includes('console') && widgetPlatform.includes('console')) ||
+              (infoPlatform.includes('ads') && widgetPlatform.includes('ads'))
+            ));
+
+            // Mandatory Account ID match if both have it
+            if (widgetAccountId && infoAccountId && widgetAccountId !== infoAccountId) return false;
+
+            // For multi-slide integrations (Meta), also check against slide titles
+            if (infoPlatform.includes('meta') || infoPlatform.includes('facebook') || infoPlatform.includes('instagram')) {
+              const infoTitle = (info.slideTitle || '').toLowerCase();
+              const isInstagramContent = widgetPlatform.includes('instagram') ||
+                slideWidgets.some(w => (w.metricConfig?.metricKey || '').toLowerCase().includes('instagram'));
+
+              if (isInstagramContent) return infoTitle.includes('instagram');
+              return infoTitle.includes('facebook') || !infoTitle.includes('instagram');
+            }
+
+            return platformMatches;
+          });
+
+          if (stableMatch) {
+            const [stableFId] = stableMatch;
+            if (!deletedSlideIds.has(stableFId)) {
+              matchingSlide = { frontendId: stableFId, subSlideIndex: slideIntegrationMap.get(stableFId)!.subSlideIndex };
+              console.log(`✅ [ID Mapping] Stable match found for slide ${bId}: platform="${widgetPlatform}" -> slot ${stableFId}`);
+            } else {
+              console.log(`🗑️ [ID Mapping] Stable match for slide ${bId} is a DELETED slot (${stableFId}) — skipping`);
+            }
+          }
+        }
+
+        // Fallback to index-based if no stable match found and indices exist
+        if (!matchingSlide && matchingSlides.length > 0) {
+          matchingSlide = matchingSlides.find(s => !deletedSlideIds.has(s.frontendId)) || matchingSlides[0];
+          console.log(`⚠️ [ID Mapping] Fallback to index-based mapping for slide ${bId} -> slot ${matchingSlide.frontendId}`);
+        }
 
         if (matchingSlide) {
           const fId = matchingSlide.frontendId;
 
-          // Store the mapping: Frontend ID -> Backend ID
+          // ✅ CRITICAL FIX: Only push to pendingMoves if this frontend slot hasn't been claimed yet.
+          // Without this guard, BOTH sub-slides of a multi-slide integration (e.g. 5503=Facebook
+          // and 5504=Instagram) would both push {to: FacebookSlot}, merging Instagram into Facebook.
+          // The second sub-slide stays with its backend key and is handled by the rescue loop.
           if (!backendIdMap.current.has(fId)) {
             backendIdMap.current.set(fId, bId);
-            console.log(`🔗 [BackendIdMap] Mapped Frontend ${fId} (subSlide ${backendSubSlideIndex}) -> Backend ${bId}`);
-          } else {
-            console.warn(`⚠️ [BackendIdMap] Frontend ${fId} already mapped to ${backendIdMap.current.get(fId)}, skipping bId ${bId}`);
-          }
+            console.log(`🔗 [BackendIdMap] Mapped Frontend ${fId} (subSlide ${matchingSlide.subSlideIndex}) -> Backend ${bId}`);
 
-          if (bId !== fId) {
-            console.log('🔍 [ID Mapping] Mapping integration page:', bId, '->', fId);
-            pendingMoves.push({ from: bId, to: fId });
-            idMapping.set(bId, fId);
+            if (bId !== fId) {
+              console.log('🔍 [ID Mapping] Mapping integration page:', bId, '->', fId);
+              pendingMoves.push({ from: bId, to: fId });
+              idMapping.set(bId, fId);
+            }
+          } else {
+            console.warn(`⚠️ [BackendIdMap] Frontend ${fId} already claimed by ${backendIdMap.current.get(fId)}, leaving bId ${bId} for rescue loop`);
+            // Do NOT push to pendingMoves — rescue loop will handle this correctly
           }
         } else {
-          console.warn(`⚠️ [ID Mapping] Could not find frontend ID for integration ${iIdx} subSlide ${backendSubSlideIndex}!`);
+          console.warn(`⚠️ [ID Mapping] Could not find frontend ID for integration ${iIdx}!`);
         }
       } else if (bId < 1000 && !slide.source) {
         // Legacy: ID < 1000 is integration index 0
@@ -1152,6 +1258,17 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         const existing = map.get(move.to) || [];
         map.set(move.to, [...existing, ...updated]);
         map.delete(move.from);
+      }
+    });
+
+    // ✅ DELETED SLIDE CLEANUP: After all moves, wipe any frontend slot that was
+    // explicitly deleted by the user. Without this, dedupeSlides correctly routes
+    // Instagram widgets to slot 4 (good!), but if slot 4 was user-deleted, those
+    // widgets silently reappear.
+    deletedSlideIds.forEach(deletedFrontendId => {
+      if (map.has(deletedFrontendId)) {
+        console.log(`🗑️ [Hydration] Clearing user-deleted slide slot ${deletedFrontendId} from map`);
+        map.delete(deletedFrontendId);
       }
     });
 
@@ -1207,6 +1324,37 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           if (matchIdx !== -1) {
             const targetPlatform = normalize(integrationsData.integrations[matchIdx].platform);
 
+            // 🔧 FIX: For multi-slide integrations (e.g. Meta Business with Facebook + Instagram),
+            // `matchIdx` is the integration ARRAY INDEX (same for both sub-slides).
+            // We must find the correct SUB-SLIDE frontend ID from slideIntegrationMap
+            // based on the widget's specific integration string (e.g. meta-instagram → slot 1).
+            let targetFrontendId = matchIdx; // Default: 1:1 for single-slide integrations
+
+            const subSlides: Array<{ fId: number; info: any }> = [];
+            slideIntegrationMap.forEach((info, fId) => {
+              if (info.originalIndex === matchIdx) subSlides.push({ fId, info });
+            });
+
+            if (subSlides.length > 1) {
+              // Multi-slide: disambiguate by matching widget integration against slide title
+              const isInstagramWidget =
+                widgetIntNormalized.includes('instagram') ||
+                widgets.some(w => (w.metricConfig?.metricKey || '').includes('instagram'));
+
+              const matched = subSlides.find(({ info }) => {
+                const titleLower = (info.slideTitle || '').toLowerCase();
+                if (isInstagramWidget) return titleLower.includes('instagram');
+                return titleLower.includes('facebook') || !titleLower.includes('instagram');
+              });
+
+              if (matched) {
+                targetFrontendId = matched.fId;
+                console.log(`🔧 [Rescue] Multi-slide disambiguation: ${sId} → slot ${targetFrontendId} (${isInstagramWidget ? 'instagram' : 'facebook'})`);
+              }
+            } else if (subSlides.length === 1) {
+              targetFrontendId = subSlides[0].fId;
+            }
+
             // ✅ NEW: Strict validation for ALL widgets in this ghost slide
             const allMatch = widgets.every(w => {
               const wInt = normalize(w.metricConfig?.integration || '');
@@ -1217,31 +1365,29 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             });
 
             if (allMatch) {
-              console.log(`🩹 [Rescue] Reclaiming content from ${sId} to ${matchIdx}`);
-              const existing = map.get(matchIdx) || [];
+              console.log(`🩹 [Rescue] Reclaiming content from ${sId} to slot ${targetFrontendId}`);
+              const existing = map.get(targetFrontendId) || [];
               const updatedWidgets = widgets.map(w => {
-                const updatedW = { ...w, slideId: matchIdx } as any;
-                if (updatedW.layout) updatedW.layout = { ...updatedW.layout, slideId: matchIdx };
+                const updatedW = { ...w, slideId: targetFrontendId } as any;
+                if (updatedW.layout) updatedW.layout = { ...updatedW.layout, slideId: targetFrontendId };
                 if (updatedW.metricConfig?.layout) {
-                  updatedW.metricConfig.layout = { ...updatedW.metricConfig.layout, slideId: matchIdx };
+                  updatedW.metricConfig.layout = { ...updatedW.metricConfig.layout, slideId: targetFrontendId };
                 }
                 return updatedW;
               });
-              map.set(matchIdx, [...existing, ...updatedWidgets]);
+              map.set(targetFrontendId, [...existing, ...updatedWidgets]);
               map.delete(sId);
-              idMapping.set(sId, matchIdx);
+              idMapping.set(sId, targetFrontendId);
 
               // CRITICAL: Ensure we persist this link for the next save!
-              // map: Frontend Integration Index (0) -> Backend ID (5300)
-              if (!backendIdMap.current.has(matchIdx)) {
-                backendIdMap.current.set(matchIdx, sId);
-                console.log(`🔗 [Rescue] Mapped Frontend ${matchIdx} -> Backend ${sId}`);
+              if (!backendIdMap.current.has(targetFrontendId)) {
+                backendIdMap.current.set(targetFrontendId, sId);
+                console.log(`🔗 [Rescue] Mapped Frontend ${targetFrontendId} → Backend ${sId}`);
               } else {
-                // If we already have a mapping (from previous non-ghost slide?), be careful.
-                const existing = backendIdMap.current.get(matchIdx);
-                if (existing !== sId) {
-                  console.log(`🔗 [Rescue] Updating Frontend ${matchIdx} -> Backend ${sId} (was ${existing})`);
-                  backendIdMap.current.set(matchIdx, sId);
+                const existingBId = backendIdMap.current.get(targetFrontendId);
+                if (existingBId !== sId) {
+                  console.log(`🔗 [Rescue] Updating Frontend ${targetFrontendId} → Backend ${sId} (was ${existingBId})`);
+                  backendIdMap.current.set(targetFrontendId, sId);
                 }
               }
 
@@ -1646,11 +1792,14 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         return false;
       });
 
-      setPageOrder(finalValidatedOrder);
+      // ✅ Filter out explicitly deleted slides so they don't re-enter pageOrder
+      // (which would feed back into auto-save and re-create the slide in the backend)
+      const withoutDeleted = finalValidatedOrder.filter(id => !deletedSlideIds.has(id));
+      setPageOrder(withoutDeleted);
     } else {
-      // Fallback: Use the order of slides as they appear in metadata
       console.log('⚠️ [PageOrder Hydration] No pageOrder in template data, using dedupedMeta order');
-      setPageOrder(dedupedMeta.map(m => m.id));
+      setPageOrder(dedupedMeta.map(m => m.id).filter(id => !deletedSlideIds.has(id)));
+
     }
 
   }, [templateQuery.data, integrationsData?.integrations, isLoadingIntegrations, isDashboardsInitialized, deletedSlideIds]);
@@ -1702,6 +1851,33 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
     if (!slideIds.length || !isDashboardsInitialized) return;
 
+    const inferIntegrationForWidget = (
+      metricKey: string | undefined,
+      platform: string,
+      subSlideIndex: number
+    ): string | null => {
+      const m = (metricKey || "").toLowerCase();
+      if (m.startsWith("google_seo.")) return "google-search-console";
+      if (m.startsWith("google_ads.")) return "google-ads";
+      if (m.startsWith("google.")) return "google-analytics";
+      if (m.startsWith("meta.instagram.")) return "meta-instagram";
+      if (m.startsWith("meta.facebook.") || m.startsWith("meta.page.")) return "meta-facebook";
+      if (m.startsWith("meta.ads.")) return "meta-ads";
+
+      const p = (platform || "").toLowerCase().replace(/[_ ]/g, "-");
+      if (p.includes("google-search-console") || p.includes("google-console")) return "google-search-console";
+      if (p.includes("google-analytics") || p === "google") return "google-analytics";
+      if (p.includes("google-ads")) return "google-ads";
+      if (p.includes("meta-business") || p.includes("business")) {
+        return subSlideIndex === 1 ? "meta-instagram" : "meta-facebook";
+      }
+      if (p.includes("meta-instagram") || p.includes("instagram")) return "meta-instagram";
+      if (p.includes("meta-facebook") || p.includes("facebook")) return "meta-facebook";
+      if (p.includes("meta-ads")) return "meta-ads";
+
+      return null;
+    };
+
     setDashboards((prev) => {
       let changed = false;
       const updated = new Map(prev);
@@ -1741,36 +1917,66 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
         if (!updated.has(id)) {
           // Slide doesn't exist yet - create it ONLY if not represented!
-          if (ENABLE_AUTO_DEFAULT_WIDGETS && groupedMetrics && !isLoadingAvailableMetrics) {
-            // Auto-populate with default widgets
-            if (integrationInfo) {
-              const picked = pickDefaultMetricsForIntegration(
+          if (ENABLE_AUTO_DEFAULT_WIDGETS && integrationInfo) {
+            const picked = groupedMetrics && !isLoadingAvailableMetrics
+              ? pickDefaultMetricsForIntegration(
                 integrationInfo.platform,
                 integrationInfo.accountId,
                 groupedMetrics as any,
                 (msg) => toast.warning(msg)
-              );
-              const defaults = buildDefaultWidgetsForIntegration(
-                id,
-                picked,
-                integrationInfo.platform,
-                integrationInfo.accountId,
-                integrationInfo.subSlideIndex
-              );
-              updated.set(id, defaults);
-              changed = true;
-            } else {
-              updated.set(id, []);
-              changed = true;
-            }
+              )
+              : [];
+            // Build from integration templates during metrics cold-start to avoid empty-slide skeleton stalls.
+            const defaults = buildDefaultWidgetsForIntegration(
+              id,
+              picked,
+              integrationInfo.platform,
+              integrationInfo.accountId,
+              integrationInfo.subSlideIndex
+            );
+            updated.set(id, defaults);
+            changed = true;
           } else {
-            // Feature disabled or metrics not loaded - create empty slide
             updated.set(id, []);
             changed = true;
           }
-        } else if (ENABLE_AUTO_DEFAULT_WIDGETS && groupedMetrics && !isLoadingAvailableMetrics) {
+        } else if (ENABLE_AUTO_DEFAULT_WIDGETS) {
           // Slide exists - check if it's empty OR has a broken auto-state and should be populated/replaced
-          const existing = updated.get(id);
+          let existing = updated.get(id);
+
+          // Self-heal old/cold-start widgets that were created with wrong integration
+          // (e.g. GA metric keys accidentally tagged as meta).
+          if (existing && integrationInfo) {
+            let healedAny = false;
+            const healed = existing.map((w) => {
+              const metricKey = w.metricConfig?.metricKey;
+              const expected = inferIntegrationForWidget(
+                metricKey,
+                integrationInfo.platform,
+                integrationInfo.subSlideIndex
+              );
+              if (!expected || !w.metricConfig) return w;
+
+              const current = (w.metricConfig.integration || "").toLowerCase().replace(/_/g, "-");
+              if (current === expected) return w;
+
+              healedAny = true;
+              return {
+                ...w,
+                metricConfig: {
+                  ...w.metricConfig,
+                  integration: expected,
+                  accountId: w.metricConfig.accountId || integrationInfo.accountId,
+                },
+              };
+            });
+
+            if (healedAny) {
+              updated.set(id, healed);
+              existing = healed;
+              changed = true;
+            }
+          }
 
           // A slide is "broken" if it's empty OR if it has 4 or fewer widgets for a Meta integration (our old partial default)
           const isMeta = !!integrationInfo?.platform?.toLowerCase().match(/meta|fb|ig|ads/);
@@ -1786,12 +1992,14 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             if (integrationInfo) {
               // ... rest of logic
               console.log(`♻️ Auto-populating/Replacing slide ${id} for ${integrationInfo.platform} (Metrics: ${existing.length})`);
-              const picked = pickDefaultMetricsForIntegration(
-                integrationInfo.platform,
-                integrationInfo.accountId,
-                groupedMetrics as any,
-                (msg) => toast.warning(msg)
-              );
+              const picked = groupedMetrics && !isLoadingAvailableMetrics
+                ? pickDefaultMetricsForIntegration(
+                  integrationInfo.platform,
+                  integrationInfo.accountId,
+                  groupedMetrics as any,
+                  (msg) => toast.warning(msg)
+                )
+                : [];
               const defaults = buildDefaultWidgetsForIntegration(
                 id,
                 picked,
@@ -1869,7 +2077,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                 shareToken,
                 integrationsData
               ),
-            staleTime: 5 * 60 * 1000,
+            staleTime: 10 * 60 * 1000,
           })
         );
       });
@@ -1906,13 +2114,17 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       // Previously used dashboards.keys(), which might miss empty pages or include deleted ones.
       const rawSlideIdList = pageOrder && pageOrder.length > 0 ? pageOrder : Array.from(dashboards.keys());
 
+      // 🔧 FIX: Never include explicitly deleted integration slides in the save payload.
+      // Without this, a stale pageOrder from the backend (loaded before deletion saves) could
+      // re-add the deleted slide to the backend, causing it to reappear after every refresh.
+      const filteredSlideIdList = rawSlideIdList.filter(id => !deletedSlideIds.has(Number(id)));
+
       // 🔧 CRITICAL FIX: Deduplicate slideIdList to prevent duplicate slides in save payload
-      const slideIdList = Array.from(new Set(rawSlideIdList.map(id => Number(id))));
+      const slideIdList = Array.from(new Set(filteredSlideIdList.map(id => Number(id))));
 
       if (rawSlideIdList.length !== slideIdList.length) {
         console.warn(`⚠️ [SavePayload] Removed ${rawSlideIdList.length - slideIdList.length} duplicate slide IDs from pageOrder`, {
           raw: rawSlideIdList,
-          deduplicated: slideIdList
         });
       }
 
@@ -2349,7 +2561,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       slideIntegrationMap,
       processedSlidesMeta,
       readOnly,
-      isLoadingIntegrations
+      isLoadingIntegrations,
+      deletedSlideIds // ✅ Ensures filter always uses latest Set even in edge cases
     ]);
 
   // Ref to always have the latest payload builder for the auto-save effect
@@ -2357,6 +2570,14 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   useEffect(() => {
     payloadBuilderRef.current = buildTemplatePayloadFromDashboards;
   });
+
+  // 🔧 FIX: Track when a slide deletion happens DURING an in-progress save.
+  // If a save is already running when the user deletes a slide, isSavingTemplate=true
+  // blocks the auto-save timer. Then onSuccess resets hasUnsavedChanges=false and
+  // the deletion payload is NEVER sent to the backend.
+  // This ref flags that we must keep hasUnsavedChanges=true after the current save
+  // completes, so the auto-save fires one more time with the deletion included.
+  const deletionNeedsSaveRef = useRef(false);
 
   // MOVED: handleConfirmNewReport now lives here to access buildTemplatePayloadFromDashboards
   const handleConfirmNewReport = useCallback(() => {
@@ -2564,8 +2785,18 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       }
 
       setLastSavedTime(new Date());
-      setHasUnsavedChanges(false);
-      toast.success("Report template saved");
+
+      // 🔧 FIX: If a slide was deleted WHILE this save was in progress,
+      // DO NOT reset hasUnsavedChanges — the deletion payload hasn't been sent yet.
+      // Keeping it true lets the auto-save fire one more time with the deletion.
+      if (deletionNeedsSaveRef.current) {
+        console.log(`🔄 [SaveMutation] Pending deletion detected — keeping hasUnsavedChanges=true for follow-up save`);
+        deletionNeedsSaveRef.current = false; // Clear after first follow-up
+        // hasUnsavedChanges stays true → auto-save will fire again with the deletion
+      } else {
+        setHasUnsavedChanges(false);
+        toast.success("Report template saved");
+      }
     },
     onError: (error: ApiError) => {
       console.error(`❌ [SaveMutation] Failed:`, error);
@@ -2917,6 +3148,10 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         : prev
     );
 
+    // 🔧 FIX: Mark that a deletion is pending so that if a save is currently in
+    // progress, its onSuccess doesn't reset hasUnsavedChanges before the deletion
+    // payload is sent. This prevents the deletion from being silently dropped.
+    deletionNeedsSaveRef.current = true;
     setHasUnsavedChanges(true);
     toast.success("Page removed");
   }, []);
@@ -4522,6 +4757,36 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     };
   }, [effectivePageOrder, isTemplateLoading]); // Re-run when pages change
 
+  // ✅ PRE-SANITIZE ALL LAYOUTS AT ONCE (Fixes Rules of Hooks & Object Thrashing)
+  // Prevents resolveCompactionCollision stack overflow caused by:
+  //   1. Duplicate `i` keys (keep first occurrence)
+  //   2. Invalid positions: NaN, Infinity, or negative values
+  // By doing this once securely outside the render loop, we maintain referential
+  // identity of the layout arrays, which stops aggressive WidgetDataWrapper unmounting.
+  const sanitizedLayoutsMap = useMemo(() => {
+    const sanitizedMap = new Map<number, DashboardLayout[]>();
+    
+    dashboards.forEach((rawLayout, frontendId) => {
+      const seen = new Set<string>();
+      const sanitized = rawLayout
+        .filter(w => {
+          if (!w.i || seen.has(w.i)) return false;
+          seen.add(w.i);
+          return true;
+        })
+        .map(w => ({
+          ...w,
+          x: Number.isFinite(w.x) && w.x >= 0 ? w.x : 0,
+          y: Number.isFinite(w.y) && w.y >= 0 ? w.y : 0,
+          w: Number.isFinite(w.w) && w.w > 0 ? w.w : 4,
+          h: Number.isFinite(w.h) && w.h > 0 ? w.h : 3,
+        }));
+      sanitizedMap.set(frontendId, sanitized);
+    });
+
+    return sanitizedMap;
+  }, [dashboards]);
+
   const handleScrollToSlide = (slideId: number) => {
     const el = slidesRef.current[slideId];
     if (el) {
@@ -4549,10 +4814,11 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     isLoadingAvailableMetrics;
 
   // With per-widget lazy loading, individual widgets manage their own loading state.
-  // We only show a full-page skeleton during template/integration loading, not data loading.
-  const isInitialDataLoading = false;
-
-  const showFullPageSkeleton = isTemplateLoading || !isDashboardsInitialized || isWaitingForAutoDefaults || isInitialDataLoading;
+  // We only show a full-page skeleton during template loading and BEFORE dashboards are initialized.
+  // ⚠️ IMPORTANT: Do NOT add `isWaitingForAutoDefaults` here — it keeps the grid hidden so
+  // registerSlide is never called, IntersectionObserver never fires, isSlideVisible stays false,
+  // and ALL widget queries remain disabled for 60+ seconds.
+  const showFullPageSkeleton = isTemplateLoading || !isDashboardsInitialized;
 
 
   return (
@@ -4992,11 +5258,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                     }
                   }
 
-                  const layout = dashboards.get(frontendId);
-                  if (!layout) {
-                    console.warn(`⚠️ [SlideRender] No layout found for ID ${id} (frontend: ${frontendId})`);
-                    return null;
-                  }
+                  // Fetch pre-sanitized layout (Stable reference to prevent unmounting loop)
+                  const layout = sanitizedLayoutsMap.get(frontendId) || [];
 
                   // Format date range for display
                   const formatDateRange = () => {
@@ -5066,14 +5329,14 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                     displayTitle = `${reportName} Overview`;
                   }
 
-                  displayTitle = prettifyMetricLabel(displayTitle);
+                  // displayTitle = prettifyMetricLabel(displayTitle);
 
                   return (
                     <SlideContainer
                       key={id}
                       id={`slide-${id}`}
                       slideId={id}
-                      registerSlide={registerSlide}
+                      registerSlide={registerSlideWithBackend}
                       title={displayTitle}
                       dateRange={formatDateRange()}
                       containerRef={(el) => {
@@ -5081,16 +5344,24 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                       }}
                     >
                       {layout.length === 0 ? (
-                        isTemplateLoading ? (
-                          <div className="relative w-full min-h-[500px] flex items-center justify-center">
-                            <div className="flex flex-col items-center gap-4">
-                              <Skeleton className="h-16 w-16 rounded-full" />
-                              <Skeleton className="h-6 w-48" />
-                              <Skeleton className="h-4 w-64" />
+                        // Integration slides auto-populate after hydration — show a skeleton
+                        // grid instead of "Start Building Your Report" to avoid the blank flash.
+                        (isTemplateLoading || slideIntegrationMap.has(frontendId)) ? (
+                          <div className="relative w-full min-h-[500px] p-4 space-y-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                              <Skeleton className="h-28 w-full rounded-xl" />
+                              <Skeleton className="h-28 w-full rounded-xl" />
+                              <Skeleton className="h-28 w-full rounded-xl" />
+                              <Skeleton className="h-28 w-full rounded-xl" />
                             </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <Skeleton className="h-52 w-full rounded-xl" />
+                              <Skeleton className="h-52 w-full rounded-xl" />
+                            </div>
+                            <Skeleton className="h-40 w-full rounded-xl" />
                           </div>
                         ) : (
-                          /* Empty State - Still accepts drops */
+                          /* Empty State for custom pages - Still accepts drops */
                           <div className="relative w-full min-h-[500px]">
                             <AutoWidthGrid
                               key={`grid-empty-${id}-${isMobile ? 'm' : 'd'}`}
@@ -5206,7 +5477,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                                   shareToken={shareToken}
                                   integrationsData={integrationsData}
                                   isLoadingIntegrations={isLoadingIntegrations}
-                                  isSlideVisible={isSlideVisible(id)}
+                                  isSlideVisible={isSlideVisibleWithBackend(id)}
                                   demographicDataMap={demographicDataMap}
                                 >
                                   {({ resolvedData: finalResolvedData, isLoading, isFetching }) => {

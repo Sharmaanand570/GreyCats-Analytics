@@ -105,14 +105,22 @@ export const useRemoveAccount = () => {
       try {
         await removeAccountFromClient(clientId, integrationType as any, accountId);
       } catch (error: any) {
-        console.error('Error removing account:', error);
-        toast.error(error.response?.data?.message || 'Failed to remove account');
+        console.error('Error removing account:', {
+          url: error?.config?.url,
+          status: error?.response?.status,
+          data: error?.response?.data,
+          message: error?.message,
+        });
+        const msg = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Failed to remove account';
+        toast.error(msg);
         throw error;
       }
     },
     onSuccess: (_, variables) => {
       // Invalidate client details
       queryClient.invalidateQueries({ queryKey: clientKeys.detail(variables.clientId) });
+      // Invalidate client lists to ensure UI updates across the app
+      queryClient.invalidateQueries({ queryKey: clientKeys.lists() });
       // Invalidate available accounts
       queryClient.invalidateQueries({
         queryKey: integrationKeys.available(variables.integrationType),
@@ -121,10 +129,15 @@ export const useRemoveAccount = () => {
       queryClient.invalidateQueries({
         queryKey: [...integrationKeys.all, 'connected'] as const,
       });
+      // Invalidate sync status
+      queryClient.invalidateQueries({
+        queryKey: ["sync-status", variables.clientId],
+      });
       toast.success('Account disconnected successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to remove account');
+      const msg = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Failed to remove account';
+      toast.error(msg);
     },
   });
 };

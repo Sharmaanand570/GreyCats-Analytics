@@ -95,6 +95,22 @@ export const DEFAULT_GOOGLE_ADS_CAMPAIGN_COLUMNS = [
     { name: 'Impressions', width: '11%', dataKey: 'impressions' },
 ];
 
+export const DEFAULT_GSC_TOP_PAGES_COLUMNS = [
+    { name: 'Page', width: '50%', dataKey: 'dimensionValue' },
+    { name: 'Clicks', width: '15%', dataKey: 'clicks' },
+    { name: 'Impressions', width: '15%', dataKey: 'impressions' },
+    { name: 'CTR', width: '10%', dataKey: 'ctr' },
+    { name: 'Position', width: '10%', dataKey: 'position' },
+];
+
+export const DEFAULT_GSC_TOP_QUERIES_COLUMNS = [
+    { name: 'Query', width: '50%', dataKey: 'dimensionValue' },
+    { name: 'Clicks', width: '15%', dataKey: 'clicks' },
+    { name: 'Impressions', width: '15%', dataKey: 'impressions' },
+    { name: 'CTR', width: '10%', dataKey: 'ctr' },
+    { name: 'Position', width: '10%', dataKey: 'position' },
+];
+
 interface TableGeneralTabProps {
     data?: TableWidgetData;
     onChange: (updates: Partial<TableWidgetData>) => void;
@@ -110,7 +126,9 @@ export function TableGeneralTab({
     const isInstagramMedia = metricKey === 'meta.instagram.recent_media';
     const isMetaAdsCampaign = metricKey === 'meta.ads.campaign_performance';
     const isGoogleAdsCampaign = metricKey === 'google_ads.campaign_performance';
-    const isDynamicTable = isRecentPosts || isInstagramMedia || isMetaAdsCampaign || isGoogleAdsCampaign;
+    const isGscTopPages = metricKey === 'google_seo.top_pages';
+    const isGscTopQueries = metricKey === 'google_seo.top_queries';
+    const isDynamicTable = isRecentPosts || isInstagramMedia || isMetaAdsCampaign || isGoogleAdsCampaign || isGscTopPages || isGscTopQueries;
 
     const columns = data?.columns ?? [];
 
@@ -239,7 +257,12 @@ export function TableGeneralTab({
                                     const val = e.target.value;
                                     if (!val) return;
 
-                                    const options = isGoogleAdsCampaign ? GOOGLE_ADS_CAMPAIGN_COLUMNS : isMetaAdsCampaign ? META_ADS_CAMPAIGN_COLUMNS : isRecentPosts ? META_RECENT_POSTS_COLUMNS : INSTAGRAM_RECENT_MEDIA_COLUMNS;
+                                    const options = isGoogleAdsCampaign ? GOOGLE_ADS_CAMPAIGN_COLUMNS
+                                        : isMetaAdsCampaign ? META_ADS_CAMPAIGN_COLUMNS
+                                            : isGscTopPages ? DEFAULT_GSC_TOP_PAGES_COLUMNS.map(c => ({ value: c.dataKey, label: c.name }))
+                                                : isGscTopQueries ? DEFAULT_GSC_TOP_QUERIES_COLUMNS.map(c => ({ value: c.dataKey, label: c.name }))
+                                                    : isRecentPosts ? META_RECENT_POSTS_COLUMNS
+                                                        : INSTAGRAM_RECENT_MEDIA_COLUMNS;
                                     const opt = options.find(c => c.value === val);
 
                                     if (opt) addRecentPostColumn(opt.value, opt.label);
@@ -247,11 +270,16 @@ export function TableGeneralTab({
                                 }}
                             >
                                 <option value="">+ Add Column</option>
-                                {(isGoogleAdsCampaign ? GOOGLE_ADS_CAMPAIGN_COLUMNS : isMetaAdsCampaign ? META_ADS_CAMPAIGN_COLUMNS : isRecentPosts ? META_RECENT_POSTS_COLUMNS : INSTAGRAM_RECENT_MEDIA_COLUMNS).map(opt => (
-                                    <option key={opt.value} value={opt.value} disabled={columns.some(c => c.dataKey ? c.dataKey === opt.value : c.name === opt.label)}>
-                                        {opt.label}
-                                    </option>
-                                ))}
+                                {(isGoogleAdsCampaign ? GOOGLE_ADS_CAMPAIGN_COLUMNS
+                                    : isMetaAdsCampaign ? META_ADS_CAMPAIGN_COLUMNS
+                                        : isGscTopPages ? DEFAULT_GSC_TOP_PAGES_COLUMNS.map(c => ({ value: c.dataKey, label: c.name }))
+                                            : isGscTopQueries ? DEFAULT_GSC_TOP_QUERIES_COLUMNS.map(c => ({ value: c.dataKey, label: c.name }))
+                                                : isRecentPosts ? META_RECENT_POSTS_COLUMNS
+                                                    : INSTAGRAM_RECENT_MEDIA_COLUMNS).map(opt => (
+                                                        <option key={opt.value} value={opt.value} disabled={columns.some(c => c.dataKey ? c.dataKey === opt.value : c.name === opt.label)}>
+                                                            {opt.label}
+                                                        </option>
+                                                    ))}
                             </select>
                         </div>
                     ) : (

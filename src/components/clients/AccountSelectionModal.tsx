@@ -100,13 +100,23 @@ export function AccountSelectionModal({
     };
 
     const filteredAccounts = useMemo(() => {
-        if (!searchQuery.trim()) return accounts;
-        const lowerQuery = searchQuery.toLowerCase();
-        return accounts.filter(acc =>
+        const lowerQuery = searchQuery.toLowerCase().trim();
+        const matches = (acc: AvailableAccount) =>
+            !lowerQuery ||
             acc.name.toLowerCase().includes(lowerQuery) ||
-            acc.identifier.toLowerCase().includes(lowerQuery)
+            acc.identifier.toLowerCase().includes(lowerQuery);
+
+        // Accounts not assigned to any client OR assigned to THIS client
+        const available = accounts.filter(
+            acc => (!acc.assignedToClient || acc.assignedToClient.id === clientId) && matches(acc)
         );
-    }, [accounts, searchQuery]);
+        // Accounts already assigned to a DIFFERENT client
+        const inUse = accounts.filter(
+            acc => acc.assignedToClient && acc.assignedToClient.id !== clientId && matches(acc)
+        );
+
+        return { available, inUse };
+    }, [accounts, searchQuery, clientId]);
 
     const platformConfig = integration ? getPlatformConfig(integration.replace(/_/g, '-')) : null;
     const integrationName = platformConfig?.name || integration;
@@ -144,14 +154,15 @@ export function AccountSelectionModal({
                             <FiLoader className="animate-spin text-xl" />
                             <p>Loading accounts...</p>
                         </div>
-                    ) : filteredAccounts.length === 0 ? (
+                    ) : filteredAccounts.available.length === 0 && filteredAccounts.inUse.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full text-gray-500 p-8 text-center">
                             <p>No available accounts found.</p>
                             <p className="text-xs mt-1">Make sure you are logged into the correct account.</p>
                         </div>
                     ) : (
                         <div className="space-y-1">
-                            {filteredAccounts.map((account) => {
+                            {/* Selectable accounts */}
+                            {filteredAccounts.available.map((account: AvailableAccount) => {
                                 const isSelected = selectedAccount?.id === account.id;
                                 const isAssigned = !!account.assignedToClient;
 
@@ -190,6 +201,33 @@ export function AccountSelectionModal({
                                     </div>
                                 );
                             })}
+
+                            {/* Accounts already in use by other clients */}
+                            {filteredAccounts.inUse.length > 0 && (
+                                <>
+                                    <div className="pt-3 pb-1 px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                                        Already in use by other clients
+                                    </div>
+                                    {filteredAccounts.inUse.map((account: AvailableAccount) => (
+                                        <div
+                                            key={account.id}
+                                            className="flex items-start gap-3 p-3 rounded-lg border border-transparent bg-gray-50 opacity-50 cursor-not-allowed"
+                                        >
+                                            <div className="w-5 h-5 rounded-full border border-gray-300 mt-0.5" />
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-medium truncate">{account.name}</div>
+                                                <div className="text-xs text-gray-500 truncate font-mono">
+                                                    ID: {account.identifier}
+                                                </div>
+                                                <div className="flex items-center gap-1 text-xs text-amber-600 mt-1 font-medium bg-amber-50 px-2 py-0.5 rounded w-fit">
+                                                    <FiAlertCircle className="w-3 h-3" />
+                                                    Assigned to: {account.assignedToClient?.name}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </>
+                            )}
                         </div>
                     )}
                 </div>

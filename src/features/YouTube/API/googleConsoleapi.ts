@@ -175,7 +175,7 @@ export type GoogleConsoleMetaResponse = {
 
 
 
-const seoHeaders = { "ngrok-skip-browser-warning": "true" };
+const seoHeaders = {};
 
 const handleGoogleConsoleApiError = (
   error: unknown,
@@ -245,21 +245,14 @@ export const reconnectGoogleConsole = async (
 export const disconnectGoogleConsole = async (
   clientId: number
 ): Promise<GoogleConsoleDisconnectResponse> => {
-  try {
-    const response = await api.post<GoogleConsoleDisconnectResponse>(
-      `/google-seo/disconnect`,
-      { clientId },
-      {
-        headers: seoHeaders,
-      }
-    );
-    return response.data;
-  } catch (error) {
-    return handleGoogleConsoleApiError(
-      error,
-      "Failed to disconnect Google Search Console"
-    );
-  }
+  const response = await api.post<GoogleConsoleDisconnectResponse>(
+    `/clients/${clientId}/google-search-console/disconnect`,
+    {},
+    {
+      headers: seoHeaders,
+    }
+  );
+  return response.data;
 };
 
 /**
@@ -375,17 +368,20 @@ export const getGoogleConsoleUnifiedMetrics = async (
  * GET /clients/:clientId/google-search-console/summary
  */
 export const getGoogleConsoleSummary = async (
-  clientId: number
+  clientId: number,
+  params: { startDate?: string; endDate?: string } = {}
 ): Promise<GoogleConsoleSummaryResponse> => {
   try {
+    console.log(`[API] Fetching GSC Summary for client ${clientId}`, params);
     const response = await api.get<GoogleConsoleSummaryResponse>(
       `/clients/${clientId}/google-search-console/summary`,
-      {
-        headers: seoHeaders,
-      }
+      { params }
     );
-    return response.data;
+    console.log(`[API] GSC Summary Response for client ${clientId}:`, response.data);
+    const body = response.data as any;
+    return body.data ? { success: body.success, ...body.data } : body;
   } catch (error) {
+    console.error(`[API] GSC Summary Error for client ${clientId}:`, error);
     return handleGoogleConsoleApiError(
       error,
       "Failed to load Google Search Console summary"
@@ -421,17 +417,20 @@ export const getGoogleConsoleTrends = async (
  * GET /clients/:clientId/google-search-console/top-pages
  */
 export const getGoogleConsoleTopPages = async (
-  clientId: number
+  clientId: number,
+  params: { startDate?: string; endDate?: string } = {}
 ): Promise<GoogleConsoleTopPagesResponse> => {
   try {
+    console.log(`[API] Fetching GSC Top Pages for client ${clientId}`, params);
     const response = await api.get<GoogleConsoleTopPagesResponse>(
       `/clients/${clientId}/google-search-console/top-pages`,
-      {
-        headers: seoHeaders,
-      }
+      { params }
     );
-    return response.data;
+    console.log(`[API] GSC Top Pages Response for client ${clientId}:`, response.data);
+    const body = response.data as any;
+    return body.data ? { success: body.success, ...body.data } : body;
   } catch (error) {
+    console.error(`[API] GSC Top Pages Error for client ${clientId}:`, error);
     return handleGoogleConsoleApiError(
       error,
       "Failed to load Google Search Console top pages"
@@ -444,17 +443,20 @@ export const getGoogleConsoleTopPages = async (
  * GET /clients/:clientId/google-search-console/top-queries
  */
 export const getGoogleConsoleTopQueries = async (
-  clientId: number
+  clientId: number,
+  params: { startDate?: string; endDate?: string } = {}
 ): Promise<GoogleConsoleTopQueriesResponse> => {
   try {
+    console.log(`[API] Fetching GSC Top Queries for client ${clientId}`, params);
     const response = await api.get<GoogleConsoleTopQueriesResponse>(
       `/clients/${clientId}/google-search-console/top-queries`,
-      {
-        headers: seoHeaders,
-      }
+      { params }
     );
-    return response.data;
+    console.log(`[API] GSC Top Queries Response for client ${clientId}:`, response.data);
+    const body = response.data as any;
+    return body.data ? { success: body.success, ...body.data } : body;
   } catch (error) {
+    console.error(`[API] GSC Top Queries Error for client ${clientId}:`, error);
     return handleGoogleConsoleApiError(
       error,
       "Failed to load Google Search Console top queries"
@@ -471,10 +473,7 @@ export const getGoogleConsoleMeta = async (
 ): Promise<GoogleConsoleMetaResponse> => {
   try {
     const response = await api.get<GoogleConsoleMetaResponse>(
-      `/clients/${clientId}/google-search-console/meta`,
-      {
-        headers: seoHeaders,
-      }
+      `/clients/${clientId}/google-search-console/meta`
     );
     return response.data;
   } catch (error) {

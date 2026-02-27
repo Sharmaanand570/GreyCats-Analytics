@@ -5,7 +5,7 @@ import { reportTableRows } from "@/components/reportConstants";
 import { getReportStatusBadgeClass } from "@/utils/statusColors";
 
 // Chart color palette
-export const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658'];
+export const COLORS = ['#c55df6', '#c46df7', '#c37df8', '#c18cf9', '#c09cfa', '#bfacfb', '#bccbfd'];
 
 // Grid constants
 export const GRID_CONFIG = {

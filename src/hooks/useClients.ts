@@ -142,7 +142,8 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
   };
 
   // 1. Backend-provided integrations array (Preferred Source)
-  if (client.integrations && Array.isArray(client.integrations)) {
+  const hasPrimaryIntegrations = !!(client.integrations && Array.isArray(client.integrations));
+  if (hasPrimaryIntegrations) {
     client.integrations.forEach((integration: any) => {
       // If it's the pre-calculated format { type, id, name, assignmentId }
       if (integration.type && integration.assignmentId) {
@@ -187,7 +188,13 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
   }
 
   // 2. Fallback / supplementary checks for specific arrays (Legacy support)
-  // Only process if not already found in the main integrations array
+  // Only process if the primary integrations array was NOT provided
+  if (hasPrimaryIntegrations) {
+    return {
+      ...client,
+      integrations,
+    };
+  }
 
   if (client.metaBusinessAccounts) {
     client.metaBusinessAccounts.forEach((acc: any) => {

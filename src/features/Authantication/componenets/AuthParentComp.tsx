@@ -11,17 +11,16 @@ function AuthParentComp(): React.JSX.Element | null {
   useEffect(() => {
     const authed = isAuthenticated(StorageKey.ANALYTICS_TOKEN);
 
-    const publicPaths = ["/auth/login", "/auth/signup", "/auth/forgot-password"];
+    const publicPaths = ["/", "/auth/login", "/auth/signup", "/auth/forgot-password"];
     const isPublic = publicPaths.includes(location.pathname);
-
-
 
     if (!authed && !isPublic) {
       navigate("/auth/login");
       return;
     }
 
-    if (authed && isPublic) {
+    // Only redirect to / if we are on a public path OTHER THAN the landing page
+    if (authed && isPublic && location.pathname !== "/") {
       navigate("/");
       return;
     }

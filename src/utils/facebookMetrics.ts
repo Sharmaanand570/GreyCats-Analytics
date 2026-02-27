@@ -42,6 +42,8 @@ export const FACEBOOK_DAILY_METRICS = [
 
     // Instagram Core (daily aggregated)
     'meta.instagram.reach',
+    'meta.instagram.reelCount',
+    'meta.instagram.postCount',
 
     // Instagram Media Aggregated (historical engagement)
     'meta.instagram.media.aggregated.likes',
