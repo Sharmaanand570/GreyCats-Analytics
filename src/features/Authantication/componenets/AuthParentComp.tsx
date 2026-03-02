@@ -9,6 +9,22 @@ function AuthParentComp(): React.JSX.Element | null {
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const { hash, pathname, search, origin } = window.location;
+      const hasHashRoute = Boolean(hash);
+      const isRootPath = pathname === "/";
+
+      if (!hasHashRoute && !isRootPath) {
+        window.location.replace(`${origin}/#${pathname}${search}`);
+        return;
+      }
+
+      if (hasHashRoute && !isRootPath) {
+        window.location.replace(`${origin}/${hash}`);
+        return;
+      }
+    }
+
     const authed = isAuthenticated(StorageKey.ANALYTICS_TOKEN);
 
     const publicPaths = ["/", "/auth/login", "/auth/signup", "/auth/forgot-password"];
@@ -19,9 +35,9 @@ function AuthParentComp(): React.JSX.Element | null {
       return;
     }
 
-    // Only redirect to / if we are on a public path OTHER THAN the landing page
+    // Only redirect to dashboard if we are on a public path OTHER THAN the landing page
     if (authed && isPublic && location.pathname !== "/") {
-      navigate("/");
+      navigate("/clients");
       return;
     }
 

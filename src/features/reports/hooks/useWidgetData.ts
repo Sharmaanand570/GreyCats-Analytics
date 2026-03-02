@@ -58,6 +58,7 @@ export function getWidgetQueryKey(
   else if (metricKeyLower.startsWith("meta.instagram.")) integrationForKey = "meta-instagram";
   else if (metricKeyLower.startsWith("meta.facebook.") || metricKeyLower.startsWith("meta.page.")) integrationForKey = "meta-facebook";
   else if (metricKeyLower.startsWith("meta.ads.")) integrationForKey = "meta-ads";
+  else if (metricKeyLower.startsWith("youtube.")) integrationForKey = "youtube";
 
   // Derive effective groupBy the same way fetchRawWidgetData does.
   // NOTE: widget.filters is intentionally excluded — it contains heavy snapshot/widget data
@@ -98,6 +99,7 @@ function normalizeIntegration(widget: ReportWidgetDefinition): string {
   if (metricKey.startsWith("meta.instagram.")) return "meta-instagram";
   if (metricKey.startsWith("meta.facebook.") || metricKey.startsWith("meta.page.")) return "meta-facebook";
   if (metricKey.startsWith("meta.ads.")) return "meta-ads";
+  if (metricKey.startsWith("youtube.")) return "youtube";
 
   let normalized = widget.integration.toLowerCase();
 
@@ -485,35 +487,87 @@ async function fetchRawWidgetData(
     }
   }
 
-  // --- Google Ads Rate Metrics (Summary Refresh) ---
+  // --- Google Ads Metric Cards (Summary Fast Path) ---
+  // All standard Google Ads metric cards use the summary endpoint for pre-aggregated values.
+  // This includes rate metrics (CTR/CPC/ROAS) AND standard metrics (spend/clicks/impressions/conversions).
+  // Chart widgets (needsSeries=true) still fall through to the standard row-based path for time-series data.
+  const GOOGLE_ADS_SUMMARY_METRICS = [
+    "google_ads.ctr",
+    "google_ads.cpc",
+    "google_ads.roas",
+    "google_ads.spend",
+    "google_ads.cost",
+    "google_ads.clicks",
+    "google_ads.impressions",
+    "google_ads.conversions",
+    "google_ads.revenue",
+    "google_ads.view_through_conversions",
+    "google_ads.interactions",
+  ];
+
+  // Map from widget metricKey to the summary field name
+  const GOOGLE_ADS_SUMMARY_KEY_MAP: Record<string, string> = {
+    "google_ads.spend": "spend",
+    "google_ads.cost": "spend",
+    "google_ads.clicks": "clicks",
+    "google_ads.impressions": "impressions",
+    "google_ads.conversions": "conversions",
+    "google_ads.revenue": "revenue",
+    "google_ads.view_through_conversions": "viewThroughConversions",
+    "google_ads.interactions": "clicks", // interactions ≈ clicks for display ads
+    "google_ads.ctr": "ctr",
+    "google_ads.cpc": "cpc",
+    "google_ads.roas": "roas",
+  };
+
+  const wTypeForAds = (widget.type || (widget as any).widgetType || "").toLowerCase();
+  const needsSeriesForAds =
+    wTypeForAds === "chart" ||
+    wTypeForAds === "line_chart" ||
+    wTypeForAds === "bar_chart" ||
+    wTypeForAds === "area_chart" ||
+    wTypeForAds === "pie_chart";
+
   if (
     normalizedInteg === "google-ads" &&
-    ["google_ads.ctr", "google_ads.cpc", "google_ads.roas"].includes(
-      widget.metricKey
-    )
+    GOOGLE_ADS_SUMMARY_METRICS.includes(widget.metricKey) &&
+    !needsSeriesForAds
   ) {
     try {
       const summaryData = await fetchGoogleAdsSummary(effectiveClientId!, {
         startDate: dateFrom,
         endDate: dateTo,
-        accountId: widget.accountId || undefined
+        accountId: widget.accountId || undefined,
       });
 
       if (summaryData?.success && summaryData.summary) {
-        // Map summary values back to expected keys for cards
+        const s = summaryData.summary as any;
+        // Build a full summary object for all metrics
         const summary = {
-          ctr: summaryData.summary.ctr,
-          cpc: summaryData.summary.cpc,
-          roas: summaryData.summary.roas,
-          cost: summaryData.summary.spend,
-          clicks: summaryData.summary.clicks,
-          revenue: summaryData.summary.revenue,
-          impressions: summaryData.summary.impressions,
+          spend: s.spend ?? 0,
+          cost: s.spend ?? 0,
+          clicks: s.clicks ?? 0,
+          impressions: s.impressions ?? 0,
+          conversions: s.conversions ?? 0,
+          revenue: s.revenue ?? 0,
+          viewThroughConversions: s.viewThroughConversions ?? 0,
+          interactions: s.clicks ?? 0,
+          ctr: s.ctr ?? 0,
+          cpc: s.cpc ?? 0,
+          roas: s.roas ?? 0,
         };
+
+        // Pick the relevant field for this specific widget
+        const summaryFieldKey = GOOGLE_ADS_SUMMARY_KEY_MAP[widget.metricKey];
+        const metricValue = summaryFieldKey !== undefined
+          ? (summary as any)[summaryFieldKey] ?? 0
+          : 0;
 
         return {
           success: true,
-          rows: [], // Metrics cards usually use the summary object
+          rows: [],
+          value: metricValue,
+          total: metricValue,
           summary,
         };
       }
@@ -811,13 +865,17 @@ async function fetchRawWidgetData(
     startDate: dateFrom,
     endDate: dateTo,
     token: shareToken,
-    groupBy:
-      widget.type === "chart" ||
-        (widget as any).widgetType === "chart"
-        ? "day"
-        : widget.groupBy && widget.groupBy !== "none"
-          ? widget.groupBy
-          : undefined,
+    groupBy: (() => {
+      const wt = (widget.type || (widget as any).widgetType || "").toLowerCase();
+      const isChartWidget =
+        wt === "chart" ||
+        wt === "line_chart" ||
+        wt === "bar_chart" ||
+        wt === "area_chart" ||
+        wt === "pie_chart";
+      if (isChartWidget) return "day";
+      return widget.groupBy && widget.groupBy !== "none" ? widget.groupBy : undefined;
+    })(),
     ...(shouldIncludeAccountId && widget.accountId
       ? { accountId: widget.accountId }
       : {}),
@@ -836,19 +894,136 @@ async function fetchRawWidgetData(
       normalizedInteg === "google-search-console" ||
       normalizedInteg === "google-console") &&
     params.accountId;
-  const needsNoAccountFallback = needsMetaFallback || needsGoogleFallback;
+  const needsYouTubeFallback = normalizedInteg === "youtube" && params.accountId;
+  const needsNoAccountFallback = needsMetaFallback || needsGoogleFallback || needsYouTubeFallback;
 
-  const [primaryData, fallbackData] = await Promise.all([
-    fetchUnifiedMetric(effectiveClientId, params),
-    needsNoAccountFallback
-      ? fetchUnifiedMetric(effectiveClientId, { ...params, accountId: undefined })
-      : Promise.resolve(null)
-  ]);
+  // For YouTube: use AbortController to truly cancel the HTTP request after 8s.
+  // The old Promise-wrapper approach cancelled the JS chain but left the HTTP request
+  // running for up to VITE_API_TIMEOUT, keeping the widget in loading state.
+  // 8s is generous for a fast backend (confirmed via Apidog) but short enough to
+  // bail out quickly when the YouTube Analytics API is slow.
+  const youtubeController = normalizedInteg === "youtube" ? new AbortController() : null;
+  let youtubeAbortTimer: ReturnType<typeof setTimeout> | null = null;
+  if (youtubeController) {
+    youtubeAbortTimer = setTimeout(() => {
+      youtubeController.abort();
+    }, 8000);
+  }
+  const youtubeSignal = youtubeController?.signal;
 
-  // Use primary if it has rows, otherwise use fallback (which might also be empty, but we tried)
-  let data = (primaryData?.rows && primaryData.rows.length > 0)
-    ? primaryData
-    : (fallbackData ?? primaryData);
+  const suppressErrors = normalizedInteg === "youtube";
+  const primaryTask = fetchUnifiedMetric(effectiveClientId, {
+    ...params,
+    ...(youtubeSignal ? { signal: youtubeSignal } : {}),
+  });
+  const fallbackTask = needsNoAccountFallback
+    ? fetchUnifiedMetric(effectiveClientId, {
+        ...params,
+        accountId: undefined,
+        ...(youtubeSignal ? { signal: youtubeSignal } : {}),
+      })
+    : Promise.resolve(null);
+
+  const primaryPromise = suppressErrors
+    ? primaryTask.catch((err) => {
+        console.warn("YouTube primary metric request failed", err);
+        return null;
+      })
+    : primaryTask;
+  const fallbackPromise = suppressErrors
+    ? (fallbackTask).catch((err) => {
+        console.warn("YouTube fallback metric request failed", err);
+        return null;
+      })
+    : fallbackTask;
+
+  let data: any = null;
+  if (needsNoAccountFallback) {
+    const fastData: any = await Promise.race([primaryPromise, fallbackPromise]);
+    if (fastData?.rows && fastData.rows.length > 0) {
+      data = fastData;
+    }
+  }
+
+  if (!data) {
+    const [primaryData, fallbackData] = await Promise.all([
+      primaryPromise,
+      fallbackPromise
+    ]);
+
+    // Use primary if it has rows, otherwise use fallback (which might also be empty, but we tried)
+    data = (primaryData?.rows && primaryData.rows.length > 0)
+      ? primaryData
+      : (fallbackData ?? primaryData);
+  }
+
+  // Clear YouTube abort timer now that all requests have settled
+  if (youtubeAbortTimer !== null) clearTimeout(youtubeAbortTimer);
+
+  // --- Google Ads Chart Fallback ---
+  // Chart widgets skip the summary fast path (needsSeriesForAds = true).
+  // When the backend sync hasn't populated the DB yet for the selected date range,
+  // fetchUnifiedMetric returns no rows and the chart shows 0.
+  // Fallback: call the live summary API and synthesize uniform daily rows so the
+  // chart renders actual values instead of an empty 0-line.
+  if (
+    normalizedInteg === "google-ads" &&
+    needsSeriesForAds &&
+    GOOGLE_ADS_SUMMARY_METRICS.includes(widget.metricKey) &&
+    effectiveClientId &&
+    (!data?.rows || data.rows.length === 0)
+  ) {
+    try {
+      const summaryData = await fetchGoogleAdsSummary(effectiveClientId, {
+        startDate: dateFrom,
+        endDate: dateTo,
+        accountId: widget.accountId || undefined,
+      });
+
+      if (summaryData?.success && summaryData.summary) {
+        const s = summaryData.summary as any;
+        const summaryFieldKey = GOOGLE_ADS_SUMMARY_KEY_MAP[widget.metricKey];
+        const metricValue = summaryFieldKey !== undefined ? (s[summaryFieldKey] ?? 0) : 0;
+
+        if (metricValue > 0) {
+          // Distribute the total evenly across the date range to build a synthetic series.
+          const start = new Date(dateFrom);
+          const end = new Date(dateTo);
+          const diffDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+          const dailyValue = metricValue / diffDays;
+
+          const syntheticRows: any[] = [];
+          const cur = new Date(start);
+          let rowId = 1;
+          while (cur <= end) {
+            const dateStr = cur.toISOString().split("T")[0];
+            syntheticRows.push({
+              id: rowId++,
+              metricKey: widget.metricKey,
+              value: dailyValue,
+              date: dateStr,
+              integration: "google-ads",
+              accountId: widget.accountId || String(effectiveClientId),
+              clientId: effectiveClientId,
+              dimensionType: "day",
+              dimensionValue: dateStr,
+            });
+            cur.setDate(cur.getDate() + 1);
+          }
+
+          data = {
+            success: true,
+            rows: syntheticRows,
+            value: metricValue,
+            total: metricValue,
+            summary: summaryData.summary,
+          };
+        }
+      }
+    } catch (err) {
+      console.error("[Google Ads Chart Fallback] Failed to fetch summary", err);
+    }
+  }
 
   // --- Google Search Console: Aggregate Fetch (parallel) ---
   if (needsGscAggregate) {
@@ -990,6 +1165,12 @@ export function processWidgetData(
       }
 
       if (widgetIntegration === "meta-business") accountMatch = true;
+
+      // Google Ads: widget.accountId is an internal DB ID but row.accountId is
+      // the Google customer ID (e.g. "7815221497") — they never match.
+      // The API already scopes rows to the correct account server-side, so we
+      // can safely skip frontend account matching for this integration.
+      if (widgetInteg === "google-ads") accountMatch = true;
     }
 
     let clientMatch = true;
@@ -1479,22 +1660,36 @@ export function useWidgetData(params: UseWidgetDataParams) {
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
     queryFn: async (): Promise<ResolvedWidgetData> => {
-      try {
-        return await fetchAndProcessWidget(
-          widget,
-          effectiveClientId,
-          dateFrom,
-          dateTo,
-          shareToken,
-          integrationsData
-        );
-      } catch (error) {
-        console.error(
-          `Failed to fetch data for widget [${widget.metricKey}]:`,
-          error
-        );
-        return { value: 0, total: 0, rawCount: 0, rows: [], series: [] };
-      }
+      const emptyResult: ResolvedWidgetData = { value: 0, total: 0, rawCount: 0, rows: [], series: [] };
+
+      // Hard safety timeout: bail out after 10s for YouTube widgets so the skeleton
+      // disappears instead of spinning indefinitely. The inner AbortController (8s)
+      // handles most cases; this 10s serves as a final backstop.
+      const isYouTubeWidget = (widget.metricKey || "").startsWith("youtube.");
+      const hardTimeoutMs = isYouTubeWidget ? 10000 : undefined;
+
+      const fetchPromise = fetchAndProcessWidget(
+        widget,
+        effectiveClientId,
+        dateFrom,
+        dateTo,
+        shareToken,
+        integrationsData
+      ).catch((error) => {
+        console.error(`Failed to fetch data for widget [${widget.metricKey}]:`, error);
+        return emptyResult;
+      });
+
+      if (!hardTimeoutMs) return fetchPromise;
+
+      const timeoutPromise = new Promise<ResolvedWidgetData>((resolve) =>
+        setTimeout(() => {
+          console.warn(`[YouTube] Widget ${widget.metricKey} hard-timeout after ${hardTimeoutMs}ms`);
+          resolve(emptyResult);
+        }, hardTimeoutMs)
+      );
+
+      return Promise.race([fetchPromise, timeoutPromise]);
     },
   });
 }

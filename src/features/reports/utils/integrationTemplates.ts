@@ -675,6 +675,20 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
     ]
   },
 
+  // YOUTUBE
+  'youtube': {
+    widgets: [
+      // Row 1: 4 metric cards
+      { type: 'metric', metricKey: 'youtube.views', x: 0, y: 0, w: 3, h: 3, displayName: 'Views' },
+      { type: 'metric', metricKey: 'youtube.likes', x: 3, y: 0, w: 3, h: 3, displayName: 'Likes' },
+      { type: 'metric', metricKey: 'youtube.comments', x: 6, y: 0, w: 3, h: 3, displayName: 'Comments' },
+      { type: 'metric', metricKey: 'youtube.subscribersGained', x: 9, y: 0, w: 3, h: 3, displayName: 'Subscribers Gained' },
+
+      // Row 2: Views trend chart (full width)
+      { type: 'line_chart', metricKey: 'youtube.views', x: 0, y: 3, w: 12, h: 5, displayName: 'Views Over Time' },
+    ]
+  },
+
   // GOOGLE ANALYTICS
   'google-analytics': {
     widgets: [
@@ -829,6 +843,11 @@ INTEGRATION_TEMPLATES['googleanalytics'] = INTEGRATION_TEMPLATES['google-analyti
 INTEGRATION_TEMPLATES['ga'] = INTEGRATION_TEMPLATES['google-analytics'];
 
 
+// YouTube aliases
+INTEGRATION_TEMPLATES['youtube_analytics'] = INTEGRATION_TEMPLATES['youtube'];
+INTEGRATION_TEMPLATES['youtubeanalytics'] = INTEGRATION_TEMPLATES['youtube'];
+INTEGRATION_TEMPLATES['yt'] = INTEGRATION_TEMPLATES['youtube'];
+
 // COMPREHENSIVE ALIASES - Force fixed templates for all naming variations
 (function () {
   const aliases: Record<string, string> = {
@@ -837,7 +856,8 @@ INTEGRATION_TEMPLATES['ga'] = INTEGRATION_TEMPLATES['google-analytics'];
     'mb': 'meta-business', 'metabusiness': 'meta-business', 'meta_business': 'meta-business', 'meta-social': 'meta-business',
     'google': 'google-analytics', 'ga': 'google-analytics', 'googleanalytics': 'google-analytics',
     'gsc': 'google-search-console', 'googlesearchconsole': 'google-search-console',
-    'ads': 'meta-ads', 'metaads': 'meta-ads', 'meta_ads': 'meta-ads'
+    'ads': 'meta-ads', 'metaads': 'meta-ads', 'meta_ads': 'meta-ads',
+    'yt': 'youtube', 'youtube_analytics': 'youtube', 'youtubeanalytics': 'youtube'
   };
 
   Object.entries(aliases).forEach(([alias, target]) => {

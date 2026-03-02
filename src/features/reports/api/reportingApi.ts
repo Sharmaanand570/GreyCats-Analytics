@@ -496,6 +496,7 @@ export const fetchUnifiedMetric = (
     token?: string;
     groupBy?: string;
     accountId?: string;
+    signal?: AbortSignal;
   }
 ) =>
   handleRequest(async () => {
@@ -534,6 +535,7 @@ export const fetchUnifiedMetric = (
     const response = await api.get(`/unified-metrics`, {
       params: requestParams,
       skipAuthRedirect: !!params.token,
+      signal: params.signal,
     } as any);
     return response.data;
   });

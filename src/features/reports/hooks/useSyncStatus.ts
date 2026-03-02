@@ -92,8 +92,18 @@ export const useSyncStatus = (clientId: number | null) => {
         let syncedAccounts = 0;
 
         activeIntegrations.forEach(integration => {
-            totalAccounts += integration.accounts.length;
-            syncedAccounts += integration.accounts.filter(a => a.initialSyncComplete).length;
+            const accounts = integration.accounts ?? [];
+
+            if (accounts.length === 0) {
+                totalAccounts += 1;
+                if (integration.allSynced) {
+                    syncedAccounts += 1;
+                }
+                return;
+            }
+
+            totalAccounts += accounts.length;
+            syncedAccounts += accounts.filter(a => a.initialSyncComplete).length;
         });
 
         const pending = totalAccounts - syncedAccounts;

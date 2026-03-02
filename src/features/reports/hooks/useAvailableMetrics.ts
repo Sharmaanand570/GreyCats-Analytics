@@ -63,6 +63,9 @@ export const useAvailableMetrics = (clientId: number | null, options?: { enabled
     queryKey: ["available-metrics", clientId, options?.integrationVersion],
 
     staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     enabled: !!clientId && (options?.enabled ?? true),
     queryFn: async () => {
       if (!clientId) throw new Error("Client ID is required");
@@ -70,25 +73,38 @@ export const useAvailableMetrics = (clientId: number | null, options?: { enabled
       try {
         console.log("🔍 Fetching available metrics from /unified-metrics...");
 
-        let allRows: DebugMetric[] = [];
-        let page = 1;
-        let totalPages = 1;
+        const pageSize = 1000;
+        const firstPage = await fetchUnifiedMetricsList(clientId!, {
+          limit: pageSize,
+          page: 1
+        });
 
-        // Recursive fetching loop
-        do {
-          const response = await fetchUnifiedMetricsList(clientId!, {
-            limit: 1000, // Fetch in large chunks
-            page
-          });
+        const allRows: DebugMetric[] = [];
+        if (firstPage.rows?.length) {
+          allRows.push(...firstPage.rows);
+        }
 
-          if (response.rows) {
-            allRows = [...allRows, ...response.rows];
+        const totalPages = firstPage.pagination?.totalPages || 1;
+        const maxConcurrent = 4;
+
+        for (let start = 2; start <= totalPages; start += maxConcurrent) {
+          const batch: Array<ReturnType<typeof fetchUnifiedMetricsList>> = [];
+          for (let page = start; page < start + maxConcurrent && page <= totalPages; page++) {
+            batch.push(
+              fetchUnifiedMetricsList(clientId!, {
+                limit: pageSize,
+                page
+              })
+            );
           }
 
-          totalPages = response.pagination?.totalPages || 1;
-          page++;
-
-        } while (page <= totalPages);
+          const responses = await Promise.all(batch);
+          responses.forEach((response) => {
+            if (response.rows?.length) {
+              allRows.push(...response.rows);
+            }
+          });
+        }
 
         console.log(`📡 Fetched total ${allRows.length} metrics from ${totalPages} pages`);
 

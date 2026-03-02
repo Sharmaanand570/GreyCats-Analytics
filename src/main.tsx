@@ -11,8 +11,19 @@ import { ClientProvider } from "./context/ClientContext.tsx";
 
 // Initialize security monitoring
 if (typeof window !== 'undefined') {
-  initCSPReporting();
-  initIntegrityMonitoring();
+  const { hash, pathname, search, origin } = window.location;
+  const needsHashRedirect =
+    !hash &&
+    pathname.startsWith("/integrations/") &&
+    pathname.includes("/connect");
+
+  if (needsHashRedirect) {
+    const nextHash = `#${pathname}${search}`;
+    window.location.replace(`${origin}/${nextHash}`);
+  } else {
+    initCSPReporting();
+    initIntegrityMonitoring();
+  }
 }
 
 const queryClient = new QueryClient({

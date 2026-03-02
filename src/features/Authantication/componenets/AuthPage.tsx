@@ -192,7 +192,7 @@ export default function AuthPage() {
         if (response.user.role === "ADMIN" || response.user.role === "SUPER_ADMIN") {
           navigate("/admin/dashboard");
         } else {
-          navigate("/");
+          navigate("/clients");
         }
       } else {
         // --- SIGNUP FLOW ---

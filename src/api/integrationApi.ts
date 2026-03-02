@@ -163,6 +163,20 @@ export const removeAccountFromClient = async (
         return await disconnectShopify(clientId);
       }
       case 'youtube': {
+        if (accountId !== undefined && accountId !== null) {
+          try {
+            const response = await api.delete(
+              `/clients/${clientId}/accounts/youtube/${accountId}`
+            );
+            return response.data;
+          } catch (error) {
+            console.warn(
+              `[removeAccountFromClient] DELETE /clients/${clientId}/accounts/youtube/${accountId} failed, falling back to /clients/${clientId}/youtube/disconnect`,
+              error
+            );
+          }
+        }
+
         const { disconnectYouTube } = await import('../features/YouTube/API/youtubeApi');
         return await disconnectYouTube(clientId);
       }

@@ -192,6 +192,15 @@ const AutoWidthGrid = WidthProvider(GridLayout);
 // Re-export for backward compatibility (used by ReportElements.tsx)
 export type { WidgetFormState } from "@/features/reports/types";
 
+const useDebouncedValue = <T,>(value: T, delayMs: number): T => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedValue(value), delayMs);
+    return () => clearTimeout(handle);
+  }, [value, delayMs]);
+  return debouncedValue;
+};
+
 
 
 
@@ -583,17 +592,21 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   // If we are in 'shared' mode, we might not have clientId initially,
   // but once template loads, effectiveClientId will be set.
   // Force refresh of metrics when integrations change (e.g. newly connected)
-  const integrationVersion = integrationsData?.integrations
-    ?.map((i) => `${i.id}-${i.platform}`)
-    .sort()
-    .join(",") || "";
+  const integrationVersion = useMemo(() => {
+    const integrations = integrationsData?.integrations;
+    if (!integrations) return undefined;
+    return integrations
+      .map((i) => `${i.id}-${i.platform}`)
+      .sort()
+      .join(",");
+  }, [integrationsData?.integrations]);
 
   const {
     groupedMetrics,
     isLoading: isLoadingAvailableMetrics,
     error: availableMetricsError,
   } = useAvailableMetrics(effectiveClientId, {
-    enabled: !readOnly,
+    enabled: !readOnly && integrationVersion !== undefined,
     integrationVersion
   });
 
@@ -606,6 +619,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     } | null>(null);
   const [integrationSearch, setIntegrationSearch] = useState("");
   const [metricsSearch, setMetricsSearch] = useState("");
+  const debouncedIntegrationSearch = useDebouncedValue(integrationSearch, 300);
+  const debouncedMetricsSearch = useDebouncedValue(metricsSearch, 300);
   const [selectedMetricWidgetType, setSelectedMetricWidgetType] =
     useState<ReportWidgetType>("metric");
   const [gscDimensionType, setGscDimensionType] = useState<string>("query");
@@ -700,6 +715,354 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     },
     staleTime: 60 * 1000,
   });
+
+  const filteredIntegrations = useMemo(() => {
+    const search = debouncedIntegrationSearch.trim().toLowerCase();
+    const integrations = integrationsData?.integrations ?? [];
+    if (!search) return integrations;
+    return integrations.filter((integration) => {
+      const platformConfig = getPlatformConfig(integration.platform);
+      const label =
+        platformConfig?.name ||
+        `${integration.platform} ${integration.accountName}`;
+      return label.toLowerCase().includes(search);
+    });
+  }, [integrationsData?.integrations, debouncedIntegrationSearch]);
+
+  const selectedIntegrationMeta = useMemo(() => {
+    if (!selectedIntegrationForMetrics) return null;
+    const { platform, accountId, accountName } = selectedIntegrationForMetrics;
+    const normalizedPlatform = platform.toLowerCase().replace(/_/g, "-");
+    const isGoogleConsole =
+      normalizedPlatform === "google-console" ||
+      normalizedPlatform === "google-search-console";
+    const isGoogleAnalytics = normalizedPlatform === "google-analytics";
+
+    const aliasPlatform =
+      platform === "google-console" || normalizedPlatform === "google-console"
+        ? "google-search-console"
+        : (platform === "woocommerce" || normalizedPlatform === "woocommerce")
+          ? "woo"
+          : (platform === "meta-ads" || normalizedPlatform === "meta-ads")
+            ? "meta_ads"
+            : (platform === "google-analytics" || normalizedPlatform === "google-analytics")
+              ? "google_analytics"
+              : (platform === "meta-business" || normalizedPlatform === "meta-business")
+                ? "meta_business"
+                : undefined;
+
+    return {
+      platform,
+      accountId,
+      accountName,
+      platformConfig: getPlatformConfig(platform),
+      normalizedPlatform,
+      isGoogleConsole,
+      isGoogleAnalytics,
+      aliasPlatform,
+    };
+  }, [selectedIntegrationForMetrics]);
+
+  const metricsForAccount = useMemo(() => {
+    if (!selectedIntegrationMeta) return [];
+
+    const {
+      platform,
+      accountId,
+      normalizedPlatform,
+      isGoogleConsole,
+      isGoogleAnalytics,
+      aliasPlatform,
+    } = selectedIntegrationMeta;
+
+    const directMetrics = groupedMetrics[platform] ?? {};
+    const normalizedMetrics = groupedMetrics[normalizedPlatform] ?? {};
+    const aliasMetrics = aliasPlatform ? groupedMetrics[aliasPlatform] ?? {} : {};
+
+    const metricsByAccount =
+      Object.keys(directMetrics).length > 0
+        ? directMetrics
+        : Object.keys(normalizedMetrics).length > 0
+          ? normalizedMetrics
+          : Object.keys(aliasMetrics).length > 0
+            ? aliasMetrics
+            : {};
+
+    if (platform === "meta-business" || normalizedPlatform === "meta-business") {
+      const fbMetrics = groupedMetrics["meta-facebook"] || groupedMetrics["meta_facebook"] || {};
+      const igMetrics = groupedMetrics["meta-instagram"] || groupedMetrics["meta_instagram"] || {};
+
+      const allAccounts = new Set([
+        ...Object.keys(metricsByAccount),
+        ...Object.keys(fbMetrics),
+        ...Object.keys(igMetrics),
+      ]);
+
+      const allFbMetrics: any[] = [];
+      Object.values(fbMetrics).forEach((list: any) => allFbMetrics.push(...list));
+
+      const allIgMetrics: any[] = [];
+      Object.values(igMetrics).forEach((list: any) => allIgMetrics.push(...list));
+
+      allAccounts.forEach((accId) => {
+        const existing = (metricsByAccount[accId] || []) as any[];
+        const uniqueMetrics = new Map<string, any>();
+
+        const addMetrics = (list: any[], prefix: string) => {
+          list.forEach((m) => {
+            const displayName = m.displayName || m.metricKey;
+            const hasPrefix =
+              displayName.startsWith("Facebook - ") ||
+              displayName.startsWith("Instagram - ");
+            const finalName = hasPrefix ? displayName : `${prefix} - ${displayName}`;
+
+            uniqueMetrics.set(m.metricKey, {
+              ...m,
+              displayName: finalName,
+              integration: "meta-business",
+            });
+          });
+        };
+
+        addMetrics(existing, "General");
+        addMetrics(allFbMetrics, "Facebook");
+        addMetrics(allIgMetrics, "Instagram");
+
+        if (uniqueMetrics.size > 0) {
+          metricsByAccount[accId] = Array.from(uniqueMetrics.values());
+        }
+      });
+    }
+
+    if ((isGoogleConsole || isGoogleAnalytics) && gscMetricsQuery.data?.rows?.length) {
+      const gaLabelMap: Record<string, string> = {
+        "google.sessions": "Sessions",
+        "google.activeUsers": "Active Users",
+        "google.pageViews": "Page Views",
+        "google.bounceRate": "Bounce Rate",
+      };
+      const gscLabelMap: Record<string, string> = {
+        "google_seo.clicks": "Clicks",
+        "google_seo.impressions": "Impressions",
+        "google_seo.ctr": "CTR",
+        "google_seo.position": "Position",
+      };
+
+      const liveMetrics = gscMetricsQuery.data.rows
+        .map((row) => {
+          const metricKey =
+            row.metricKey ||
+            (isGoogleAnalytics ? "google.sessions" : "google_seo.clicks");
+          const integrationValue = isGoogleAnalytics
+            ? "google-analytics"
+            : "google-search-console";
+
+          const allowed = isGoogleAnalytics
+            ? gaLabelMap[metricKey]
+            : gscLabelMap[metricKey];
+          if (!allowed) return null;
+
+          return {
+            metricKey,
+            integration: integrationValue,
+            accountId: row.accountId || accountId,
+            displayName: isGoogleAnalytics
+              ? gaLabelMap[metricKey] || metricKey
+              : gscLabelMap[metricKey] || metricKey,
+            category: "metric",
+            filters: undefined,
+            value: row.value,
+          };
+        })
+        .filter(Boolean)
+        .reduce<Record<string, (typeof metricsByAccount)[string][number]>>(
+          (acc, item) => {
+            if (!item) return acc;
+            if (!acc[item.metricKey]) {
+              acc[item.metricKey] = item;
+            }
+            return acc;
+          },
+          {}
+        );
+
+      metricsByAccount[accountId] = Object.values(liveMetrics);
+    }
+
+    let metricsForAccount = metricsByAccount[accountId] ?? [];
+    if (!metricsForAccount.length) {
+      metricsForAccount = Object.values(metricsByAccount).flat();
+    }
+
+    if (!metricsForAccount.length) {
+      const defaults =
+        CURATED_DEFAULTS[platform] ||
+        CURATED_DEFAULTS[normalizedPlatform] ||
+        (aliasPlatform ? CURATED_DEFAULTS[aliasPlatform] : undefined);
+
+      if (defaults) {
+        metricsForAccount = defaults.map((metricKey) => {
+          const parts = metricKey.split(".");
+          const name = parts[parts.length - 1]
+            .replace(/([A-Z])/g, " $1")
+            .replace(/[._-]/g, " ")
+            .trim();
+          const displayName = name.charAt(0).toUpperCase() + name.slice(1);
+
+          return {
+            metricKey,
+            integration: platform,
+            accountId,
+            displayName,
+            category: "General",
+            value: 0,
+          };
+        });
+      }
+    }
+
+    if (normalizedPlatform === "meta-facebook" || normalizedPlatform === "meta-business" || normalizedPlatform === "meta") {
+      const recentPostsKey = "meta.facebook.recent_posts";
+      const recentMediaKey = "meta.instagram.recent_media";
+
+      const hasRecentPosts = metricsForAccount.some((m) => m.metricKey === recentPostsKey);
+      const hasRecentMedia = metricsForAccount.some((m) => m.metricKey === recentMediaKey);
+
+      if (!hasRecentPosts) {
+        metricsForAccount.unshift({
+          metricKey: recentPostsKey,
+          integration: platform,
+          accountId,
+          displayName: "Facebook - Recent Posts",
+          category: "Posts",
+          value: 0,
+        });
+      }
+
+      if (!hasRecentMedia) {
+        metricsForAccount.unshift({
+          metricKey: recentMediaKey,
+          integration: platform,
+          accountId,
+          displayName: "Instagram - Recent Media",
+          category: "Media",
+          value: 0,
+        });
+      }
+
+      const demographicMetrics = [
+        { metricKey: "meta.instagram.followers.age", displayName: "Instagram - Age Distribution", category: "Demographics" },
+        { metricKey: "meta.instagram.followers.gender", displayName: "Instagram - Gender Distribution", category: "Demographics" },
+        { metricKey: "meta.instagram.followers.country", displayName: "Instagram - Top Countries", category: "Demographics" },
+        { metricKey: "meta.instagram.followers.city", displayName: "Instagram - Top Cities", category: "Demographics" },
+      ];
+      demographicMetrics.forEach((dm) => {
+        if (!metricsForAccount.some((m) => m.metricKey === dm.metricKey)) {
+          metricsForAccount.push({
+            metricKey: dm.metricKey,
+            integration: platform,
+            accountId,
+            displayName: dm.displayName,
+            category: dm.category,
+            value: 0,
+          });
+        }
+      });
+    }
+
+    if (normalizedPlatform === "meta-ads" || normalizedPlatform === "metaads") {
+      const campaignKey = "meta.ads.campaign_performance";
+      if (!metricsForAccount.some((m) => m.metricKey === campaignKey)) {
+        metricsForAccount.push({
+          metricKey: campaignKey,
+          integration: platform,
+          accountId,
+          displayName: "Campaign Name",
+          category: "Campaigns",
+          value: 0,
+        });
+      }
+    }
+
+    if (platform === "meta-business" || normalizedPlatform === "meta-business") {
+      metricsForAccount = metricsForAccount.map((metric) => {
+        if (metric.displayName?.startsWith("Facebook - ") || metric.displayName?.startsWith("Instagram - ")) {
+          return metric;
+        }
+
+        const isFacebook =
+          metric.metricKey.includes("facebook") || metric.metricKey.startsWith("meta.page.");
+        const isInstagram = metric.metricKey.includes("instagram");
+
+        if (isFacebook) {
+          return { ...metric, displayName: `Facebook - ${metric.displayName || "Metric"}` };
+        }
+        if (isInstagram) {
+          return { ...metric, displayName: `Instagram - ${metric.displayName || "Metric"}` };
+        }
+        return metric;
+      });
+    }
+
+    if (isGoogleAnalytics) {
+      const allowedGaKeys = new Set([
+        "google.activeUsers",
+        "google.bounceRate",
+        "google.pageViews",
+        "google.sessions",
+      ]);
+      metricsForAccount = metricsForAccount.filter((metric) =>
+        allowedGaKeys.has(metric.metricKey)
+      );
+    } else if (isGoogleConsole) {
+      const allowedGscKeys = new Set([
+        "google_seo.clicks",
+        "google_seo.impressions",
+        "google_seo.ctr",
+        "google_seo.position",
+      ]);
+      metricsForAccount = metricsForAccount.filter((metric) =>
+        allowedGscKeys.has(metric.metricKey)
+      );
+    }
+
+    const seenKeys = new Set<string>();
+    metricsForAccount = metricsForAccount.filter((m) => {
+      if (seenKeys.has(m.metricKey)) return false;
+      seenKeys.add(m.metricKey);
+      return true;
+    });
+
+    return metricsForAccount;
+  }, [selectedIntegrationMeta, groupedMetrics, gscMetricsQuery.data]);
+
+  const filteredMetrics = useMemo(() => {
+    const search = debouncedMetricsSearch.trim().toLowerCase();
+    if (!search) return metricsForAccount;
+    return metricsForAccount.filter((metric) => {
+      return (
+        metric.displayName.toLowerCase().includes(search) ||
+        metric.category.toLowerCase().includes(search) ||
+        metric.metricKey.toLowerCase().includes(search)
+      );
+    });
+  }, [metricsForAccount, debouncedMetricsSearch]);
+
+  const viewableMetrics = useMemo(() => {
+    return filteredMetrics.filter((metric) => {
+      const isListMetric =
+        metric.metricKey === "meta.facebook.recent_posts" ||
+        metric.metricKey === "meta.instagram.recent_media" ||
+        metric.metricKey === "meta.ads.campaign_performance" ||
+        metric.metricKey === "meta.instagram.followers.country" ||
+        metric.metricKey === "meta.instagram.followers.city";
+
+      if (selectedMetricWidgetType === "table") {
+        return isListMetric;
+      }
+      return !isListMetric;
+    });
+  }, [filteredMetrics, selectedMetricWidgetType]);
 
 
 
@@ -811,6 +1174,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     if (metricKey.startsWith("meta.instagram.")) return "meta-instagram";
     if (metricKey.startsWith("meta.facebook.") || metricKey.startsWith("meta.page.")) return "meta-facebook";
     if (metricKey.startsWith("meta.ads.")) return "meta-ads";
+    if (metricKey.startsWith("youtube.")) return "youtube";
 
     const integration = String(widget?.metricConfig?.integration || widget?.integration || "")
       .toLowerCase()
@@ -823,6 +1187,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     if (integration.includes("meta-instagram") || integration === "instagram") return "meta-instagram";
     if (integration.includes("meta-facebook") || integration === "facebook") return "meta-facebook";
     if (integration.includes("meta-ads")) return "meta-ads";
+    if (integration.includes("youtube")) return "youtube";
     if (integration.includes("meta-business") || integration === "metabusiness") return "meta-facebook";
 
     return null;
@@ -855,6 +1220,9 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       }
       if (inferredKey === "meta-ads") {
         return platform.includes("meta-ads");
+      }
+      if (inferredKey === "youtube") {
+        return platform.includes("youtube");
       }
       if (inferredKey === "meta-instagram" || inferredKey === "meta-facebook") {
         return (
@@ -2016,6 +2384,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       if (m.startsWith("meta.instagram.")) return "meta-instagram";
       if (m.startsWith("meta.facebook.") || m.startsWith("meta.page.")) return "meta-facebook";
       if (m.startsWith("meta.ads.")) return "meta-ads";
+      if (m.startsWith("youtube.")) return "youtube";
 
       const p = (platform || "").toLowerCase().replace(/[_ ]/g, "-");
       if (p.includes("google-search-console") || p.includes("google-console")) return "google-search-console";
@@ -2027,6 +2396,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       if (p.includes("meta-instagram") || p.includes("instagram")) return "meta-instagram";
       if (p.includes("meta-facebook") || p.includes("facebook")) return "meta-facebook";
       if (p.includes("meta-ads")) return "meta-ads";
+      if (p.includes("youtube")) return "youtube";
 
       return null;
     };
@@ -4170,18 +4540,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   const rightPanelContent = useMemo(() => {
     if (rightPanelTitle === "Integrations") {
       // If no integration is selected yet, show the integrations list (step 1)
-      if (!selectedIntegrationForMetrics) {
-        const search = integrationSearch.trim().toLowerCase();
-        const integrations = integrationsData?.integrations ?? [];
-
-        const filteredIntegrations = integrations.filter((integration) => {
-          if (!search) return true;
-          const platformConfig = getPlatformConfig(integration.platform);
-          const label =
-            platformConfig?.name ||
-            `${integration.platform} ${integration.accountName}`;
-          return label.toLowerCase().includes(search);
-        });
+      if (!selectedIntegrationMeta) {
 
         return (
           <div className="w-full h-full flex flex-col overflow-y-auto">
@@ -4258,352 +4617,9 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       }
 
       // Step 2: metrics list for the selected integration
-      const { platform, accountId, accountName } = selectedIntegrationForMetrics;
-      const platformConfig = getPlatformConfig(platform);
-      const normalizedPlatform = platform.toLowerCase().replace(/_/g, "-");
-      const isGoogleConsole =
-        normalizedPlatform === "google-console" ||
-        normalizedPlatform === "google-search-console";
-      const isGoogleAnalytics = normalizedPlatform === "google-analytics";
+      const { platform, accountId, accountName, platformConfig, isGoogleConsole, isGoogleAnalytics } =
+        selectedIntegrationMeta;
 
-      // Handle platform aliases (e.g., UI may store "google-console" but metrics come as "google-search-console")
-      // Also handle underscore vs hyphen mismatches for other platforms
-      const aliasPlatform =
-        platform === "google-console" || normalizedPlatform === "google-console"
-          ? "google-search-console"
-          : (platform === "woocommerce" || normalizedPlatform === "woocommerce")
-            ? "woo"
-            : (platform === "meta-ads" || normalizedPlatform === "meta-ads")
-              ? "meta_ads"
-              : (platform === "google-analytics" || normalizedPlatform === "google-analytics")
-                ? "google_analytics"
-                : (platform === "meta-business" || normalizedPlatform === "meta-business")
-                  ? "meta_business" // Or verify if it's meta_facebook/meta_instagram? Usually unified is separate.
-                  : undefined;
-
-      // Try direct, normalized, alias, and fallback matches into groupedMetrics
-      const directMetrics = groupedMetrics[platform] ?? {};
-      const normalizedMetrics = groupedMetrics[normalizedPlatform] ?? {};
-      const aliasMetrics = aliasPlatform ? groupedMetrics[aliasPlatform] ?? {} : {};
-
-      // DEBUG: Log sidebar lookup attempts
-      console.log('Ã°Å¸â€Â Sidebar Metric Lookup:', {
-        integration: platform,
-        normalized: normalizedPlatform,
-        alias: aliasPlatform,
-        keysInGroupedMetrics: Object.keys(groupedMetrics),
-        foundDirect: Object.keys(directMetrics).length > 0,
-        foundNormalized: Object.keys(normalizedMetrics).length > 0,
-        foundAlias: Object.keys(aliasMetrics).length > 0,
-      });
-
-      const metricsByAccount =
-        Object.keys(directMetrics).length > 0
-          ? directMetrics
-          : Object.keys(normalizedMetrics).length > 0
-            ? normalizedMetrics
-            : Object.keys(aliasMetrics).length > 0
-              ? aliasMetrics
-              : {};
-
-      // Special handling for Meta Business: merge Facebook and Instagram metrics
-      // We do this even if metrics were found directly, to ensure we have BOTH platforms
-      if (platform === "meta-business" || normalizedPlatform === "meta-business") {
-        const fbMetrics = groupedMetrics["meta-facebook"] || groupedMetrics["meta_facebook"] || {};
-        const igMetrics = groupedMetrics["meta-instagram"] || groupedMetrics["meta_instagram"] || {};
-
-        // Merge accounts from all sources
-        const allAccounts = new Set([
-          ...Object.keys(metricsByAccount),
-          ...Object.keys(fbMetrics),
-          ...Object.keys(igMetrics)
-        ]);
-
-        // Flatten ALL FB and IG metrics to ensure cross-account visibility
-        // This solves the issue where FB Page ID != IG Account ID, causing them to be separated
-        const allFbMetrics: any[] = [];
-        Object.values(fbMetrics).forEach((list: any) => allFbMetrics.push(...list));
-
-        const allIgMetrics: any[] = [];
-        Object.values(igMetrics).forEach((list: any) => allIgMetrics.push(...list));
-
-        allAccounts.forEach(accId => {
-          const existing = (metricsByAccount[accId] || []) as any[];
-
-          // Create a map to deduplicate by metricKey
-          const uniqueMetrics = new Map<string, any>();
-
-          // Helper to add metrics
-          const addMetrics = (list: any[], prefix: string) => {
-            list.forEach(m => {
-              // Check if we need to add a prefix prefix
-              const displayName = m.displayName || m.metricKey;
-              const hasPrefix = displayName.startsWith('Facebook - ') || displayName.startsWith('Instagram - ');
-              const finalName = hasPrefix ? displayName : `${prefix} - ${displayName}`;
-
-              uniqueMetrics.set(m.metricKey, {
-                ...m,
-                displayName: finalName,
-                integration: "meta-business"
-              });
-            });
-          };
-
-          // Add existing first (giving priority)
-          addMetrics(existing, "General");
-
-          // Add ALL Facebook metrics (from any account)
-          addMetrics(allFbMetrics, "Facebook");
-
-          // Add ALL Instagram metrics (from any account)
-          addMetrics(allIgMetrics, "Instagram");
-
-          if (uniqueMetrics.size > 0) {
-            metricsByAccount[accId] = Array.from(uniqueMetrics.values());
-          }
-        });
-      }
-
-      // If Google Search Console or Google Analytics and we have live unified-metrics rows, map them to metric options
-      if ((isGoogleConsole || isGoogleAnalytics) && gscMetricsQuery.data?.rows?.length) {
-        const gaLabelMap: Record<string, string> = {
-          "google.sessions": "Sessions",
-          "google.activeUsers": "Active Users",
-          "google.pageViews": "Page Views",
-          "google.bounceRate": "Bounce Rate",
-        };
-        const gscLabelMap: Record<string, string> = {
-          "google_seo.clicks": "Clicks",
-          "google_seo.impressions": "Impressions",
-          "google_seo.ctr": "CTR",
-          "google_seo.position": "Position",
-        };
-
-        // For GA/GSC: drop dimension filters for GA; for GSC keep pure metrics only
-        const liveMetrics = gscMetricsQuery.data.rows
-          .map((row) => {
-            const metricKey =
-              row.metricKey ||
-              (isGoogleAnalytics ? "google.sessions" : "google_seo.clicks");
-            const integrationValue = isGoogleAnalytics
-              ? "google-analytics"
-              : "google-search-console";
-
-            const allowed = isGoogleAnalytics
-              ? gaLabelMap[metricKey]
-              : gscLabelMap[metricKey];
-            if (!allowed) return null;
-
-            return {
-              metricKey,
-              integration: integrationValue,
-              accountId: row.accountId || accountId,
-              displayName: isGoogleAnalytics
-                ? gaLabelMap[metricKey] || metricKey
-                : gscLabelMap[metricKey] || metricKey,
-              category: "metric",
-              // For GA/GSC, do NOT include dimension filters to avoid duplicates
-              filters: undefined,
-              value: row.value,
-            };
-          })
-          .filter(Boolean)
-          // Deduplicate GA metrics by metricKey to avoid dimension variants
-          .reduce<Record<string, (typeof metricsByAccount)[string][number]>>(
-            (acc, item) => {
-              if (!item) return acc;
-              if (!acc[item.metricKey]) {
-                acc[item.metricKey] = item;
-              }
-              return acc;
-            },
-            {}
-          );
-
-        metricsByAccount[accountId] = Object.values(liveMetrics);
-      }
-
-      let metricsForAccount = metricsByAccount[accountId] ?? [];
-      if (!metricsForAccount.length) {
-        // Fallback 1: flatten all account metrics for this integration
-        metricsForAccount = Object.values(metricsByAccount).flat();
-      }
-
-      // Fallback 2: If still empty, use CURATED_DEFAULTS for this platform
-      // This handles cases where the API returns no metrics (e.g. Meta Ads/Business in some clients)
-      // but we want to allow the user to select them anyway.
-      if (!metricsForAccount.length) {
-        const defaults = CURATED_DEFAULTS[platform] ||
-          CURATED_DEFAULTS[normalizedPlatform] ||
-          (aliasPlatform ? CURATED_DEFAULTS[aliasPlatform] : undefined);
-
-        if (defaults) {
-          // console.log('Ã¢Å¡Â Ã¯Â¸Â Sidebar: Using CURATED_DEFAULTS fallback for', platform);
-          metricsForAccount = defaults.map(metricKey => {
-            // Generate a friendly name like "Meta Instagram Followers"
-            const parts = metricKey.split('.');
-            const name = parts[parts.length - 1]
-              .replace(/([A-Z])/g, ' $1')
-              .replace(/[._-]/g, ' ')
-              .trim();
-            const displayName = name.charAt(0).toUpperCase() + name.slice(1);
-
-            return {
-              metricKey,
-              integration: platform,
-              accountId: accountId,
-              displayName: displayName,
-              category: "General",
-              value: 0
-            };
-          });
-        }
-      }
-
-      // INJECT SYNTHETIC METRICS (e.g. Recent Posts Table)
-      // These are frontend-only widgets that don't come from the backend metrics API.
-      // We explicitly add them so they are selectable.
-      if (normalizedPlatform === 'meta-facebook' || normalizedPlatform === 'meta-business' || normalizedPlatform === 'meta') {
-        const recentPostsKey = 'meta.facebook.recent_posts';
-        const recentMediaKey = 'meta.instagram.recent_media';
-
-        // Check if already present to avoid duplicates
-        const hasRecentPosts = metricsForAccount.some(m => m.metricKey === recentPostsKey);
-        const hasRecentMedia = metricsForAccount.some(m => m.metricKey === recentMediaKey);
-
-        if (!hasRecentPosts) {
-          metricsForAccount.unshift({
-            metricKey: recentPostsKey,
-            integration: platform, // Use current platform context
-            accountId: accountId,
-            displayName: "Facebook - Recent Posts",
-            category: "Posts",
-            value: 0
-          });
-        }
-
-        if (!hasRecentMedia) {
-          metricsForAccount.unshift({
-            metricKey: recentMediaKey,
-            integration: platform, // Use current platform context
-            accountId: accountId,
-            displayName: "Instagram - Recent Media",
-            category: "Media",
-            value: 0
-          });
-        }
-
-        // Inject Instagram Demographic metrics (Age, Gender, Top Countries, Top Cities)
-        const demographicMetrics = [
-          { metricKey: 'meta.instagram.followers.age', displayName: 'Instagram - Age Distribution', category: 'Demographics' },
-          { metricKey: 'meta.instagram.followers.gender', displayName: 'Instagram - Gender Distribution', category: 'Demographics' },
-          { metricKey: 'meta.instagram.followers.country', displayName: 'Instagram - Top Countries', category: 'Demographics' },
-          { metricKey: 'meta.instagram.followers.city', displayName: 'Instagram - Top Cities', category: 'Demographics' },
-        ];
-        demographicMetrics.forEach(dm => {
-          if (!metricsForAccount.some(m => m.metricKey === dm.metricKey)) {
-            metricsForAccount.push({
-              metricKey: dm.metricKey,
-              integration: platform,
-              accountId: accountId,
-              displayName: dm.displayName,
-              category: dm.category,
-              value: 0
-            });
-          }
-        });
-      }
-
-      // Inject Campaign Performance table for Meta Ads
-      if (normalizedPlatform === 'meta-ads' || normalizedPlatform === 'metaads') {
-        const campaignKey = 'meta.ads.campaign_performance';
-        if (!metricsForAccount.some(m => m.metricKey === campaignKey)) {
-          metricsForAccount.push({
-            metricKey: campaignKey,
-            integration: platform,
-            accountId: accountId,
-            displayName: 'Campaign Name',
-            category: 'Campaigns',
-            value: 0
-          });
-        }
-      }
-
-      // Enforce distinct naming for Meta Business metrics (Facebook vs Instagram)
-      if (platform === "meta-business" || normalizedPlatform === "meta-business") {
-        metricsForAccount = metricsForAccount.map(metric => {
-          // If already prefixed, leave it
-          if (metric.displayName?.startsWith("Facebook - ") || metric.displayName?.startsWith("Instagram - ")) {
-            return metric;
-          }
-
-          const isFacebook = metric.metricKey.includes("facebook") || metric.metricKey.startsWith("meta.page.");
-          const isInstagram = metric.metricKey.includes("instagram");
-
-          if (isFacebook) {
-            return { ...metric, displayName: `Facebook - ${metric.displayName || "Metric"}` };
-          }
-          if (isInstagram) {
-            return { ...metric, displayName: `Instagram - ${metric.displayName || "Metric"}` };
-          }
-          return metric;
-        });
-      }
-
-      // Restrict GA/GSC metrics to curated sets
-      if (isGoogleAnalytics) {
-        const allowedGaKeys = new Set([
-          "google.activeUsers",
-          "google.bounceRate",
-          "google.pageViews",
-          "google.sessions",
-        ]);
-        metricsForAccount = metricsForAccount.filter((metric) =>
-          allowedGaKeys.has(metric.metricKey)
-        );
-      } else if (isGoogleConsole) {
-        const allowedGscKeys = new Set([
-          "google_seo.clicks",
-          "google_seo.impressions",
-          "google_seo.ctr",
-          "google_seo.position",
-        ]);
-        metricsForAccount = metricsForAccount.filter((metric) =>
-          allowedGscKeys.has(metric.metricKey)
-        );
-      }
-
-      // Deduplicate by metricKey after filtering (avoids dimension-based repeats)
-      const seenKeys = new Set<string>();
-      metricsForAccount = metricsForAccount.filter((m) => {
-        if (seenKeys.has(m.metricKey)) return false;
-        seenKeys.add(m.metricKey);
-        return true;
-      });
-
-      const search = metricsSearch.trim().toLowerCase();
-      const filteredMetrics = metricsForAccount.filter((metric) => {
-        if (!search) return true;
-        return (
-          metric.displayName.toLowerCase().includes(search) ||
-          metric.category.toLowerCase().includes(search) ||
-          metric.metricKey.toLowerCase().includes(search)
-        );
-      });
-
-      // Filter based on supported visualization types
-      const viewableMetrics = filteredMetrics.filter(metric => {
-        const isListMetric = metric.metricKey === 'meta.facebook.recent_posts' || metric.metricKey === 'meta.instagram.recent_media' || metric.metricKey === 'meta.ads.campaign_performance' || metric.metricKey === 'meta.instagram.followers.country' || metric.metricKey === 'meta.instagram.followers.city';
-
-        if (selectedMetricWidgetType === 'table') {
-          // Table mode: ONLY show list metrics (Recent Posts/Media)
-          // User request: "table should work for only data that is can be showen in table"
-          return isListMetric;
-        } else {
-          // Chart/Metric modes: Hide list metrics (they can't be scalars)
-          return !isListMetric;
-        }
-      });
       const metricTypeOptions: Array<{ type: ReportWidgetType; label: string }> =
         [
           { type: "metric", label: "#" },
@@ -4896,14 +4912,19 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   }, [
     rightPanelTitle,
     handleDragStart,
-    integrationsData,
-    groupedMetrics,
+    updateWidgetsForAccount,
+    filteredIntegrations,
     isLoadingAvailableMetrics,
     availableMetricsError,
-    selectedIntegrationForMetrics,
+    selectedIntegrationMeta,
     integrationSearch,
     metricsSearch,
     selectedMetricWidgetType,
+    filteredMetrics,
+    viewableMetrics,
+    gscDimensionType,
+    gscStartDate,
+    gscEndDate,
   ]);
 
   const [activeSlideId, setActiveSlideId] = useState<number | null>(null);

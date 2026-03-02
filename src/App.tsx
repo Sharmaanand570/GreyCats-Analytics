@@ -40,6 +40,7 @@ const InstagramInsightsPage = lazy(
   () => import("./pages/InstagramInsightsPage")
 );
 const GoogleAdsDetailPage = lazy(() => import("./pages/GoogleAdsDetailPage"));
+const GoogleAdsConnectPage = lazy(() => import("./pages/GoogleAdsConnectPage"));
 const ReportsLandingPage = lazy(() => import("./pages/ReportsLandingPage"));
 
 const Reports = lazy(() => import("./components/Reports"));
@@ -154,6 +155,7 @@ function App() {
 
               <Route path="integrations">
                 <Route index element={<Integrations />} />
+                <Route path="google-ads/connect" element={<GoogleAdsConnectPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
 
