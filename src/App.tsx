@@ -6,6 +6,8 @@ import ShopifyCallbackHandler from "./features/shopify/componenets/ShopifyCallba
 import MetaCallbackHandler from "./features/meta/components/MetaCallbackHandler";
 import ScrollToTop from "./components/ScrollToTop";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { UpgradeModal } from "./components/subscription/UpgradeModal";
+import { useUpgradeModalStore } from "./store/useUpgradeModalStore";
 
 // Lazy load components
 // Dashboard removed from App.tsx as it is now only used in ClientDetailPage
@@ -73,6 +75,8 @@ const TermsOfServicePage = lazy(() => import("./pages/TermsOfServicePage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));
 const CookiePolicyPage = lazy(() => import("./pages/CookiePolicyPage"));
 const LandingPage = lazy(() => import("./pages/LandingPage"));
+const PricingPage = lazy(() => import("./pages/pricing/PricingPage"));
+const BillingPage = lazy(() => import("./pages/billing/BillingPage"));
 
 // Admin Pages
 const AdminLayout = lazy(() => import("./components/AdminLayout"));
@@ -95,11 +99,18 @@ const LoadingFallback = () => (
   </div>
 );
 
+/** Reads from the global Zustand store — auto-shown on any 403 upgradeRequired */
+function GlobalUpgradeModal() {
+  const { isOpen, reason, close } = useUpgradeModalStore();
+  return <UpgradeModal isOpen={isOpen} onClose={close} reason={reason} />;
+}
+
 function App() {
   return (
     <ErrorBoundary>
       <Suspense fallback={<LoadingFallback />}>
         <ScrollToTop />
+        <GlobalUpgradeModal />
         <Routes>
           <Route path="/" element={<AuthParentComp />}>
             <Route index element={<LandingPage />} />
@@ -194,6 +205,10 @@ function App() {
                 <Route path="*" element={<Navigate to="dashboard" replace />} />
               </Route>
             </Route>
+
+            {/* Pricing & Billing — full-page, no sidebar */}
+            <Route path="pricing" element={<PricingPage />} />
+            <Route path="billing" element={<BillingPage />} />
 
             {/* OAuth callback routes */}
             <Route path="youtube/callback" element={<YouTubeCallbackHandler />} />

@@ -38,11 +38,24 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      // Skip redirect for shared endpoints or if explicitly disabled
+    const status = error.response?.status;
+    const data = error.response?.data as any;
+
+    // ── 403 upgradeRequired ─────────────────────────────────────────────────
+    if (status === 403 && data?.upgradeRequired === true) {
+      // Lazy import to avoid circular dependency at module load time
+      import("@/store/useUpgradeModalStore").then(({ useUpgradeModalStore }) => {
+        useUpgradeModalStore.getState().open(
+          data.message ?? "Upgrade your plan to continue."
+        );
+      });
+      return Promise.reject(error);
+    }
+
+    // ── 401 session expired ─────────────────────────────────────────────────
+    if (status === 401) {
       const isSharedEndpoint = error.config?.url?.includes("/shared/");
       const skipRedirect = (error.config as any)?.skipAuthRedirect;
-
       const isLoginEndpoint = error.config?.url?.includes("/auth/login");
 
       if (!isSharedEndpoint && !isLoginEndpoint && !skipRedirect) {

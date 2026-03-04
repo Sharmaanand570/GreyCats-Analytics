@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import logoBlack from "../assets/images/greycats-black-logo.png";
 import { isAuthenticated, StorageKey } from "@/utils/storage";
+import ParticleBackground from "@/components/ParticleBackground";
 import { 
   BarChart3, 
   Database, 
@@ -235,6 +236,9 @@ const LandingPage = () => {
   return (
     <div className="min-h-screen bg-white text-[#111] font-sans selection:bg-[#4285F4] selection:text-white overflow-x-hidden relative">
       
+      {/* Dynamic Mouse Particle Background */}
+      <ParticleBackground />
+
       {/* Dynamic Background Spotlight element */}
       <div 
         ref={spotlightRef}
@@ -326,6 +330,7 @@ const LandingPage = () => {
           </div>
 
           <div className="hidden md:flex items-center gap-8">
+            <Link to="/pricing" className="text-sm font-semibold text-[#666] hover:text-[#111] transition-colors">Plans</Link>
             <Link to="/contact" className="text-sm font-semibold text-[#666] hover:text-[#111] transition-colors">Support</Link>
             <div className="flex items-center gap-2">
               {authed ? (
@@ -335,7 +340,7 @@ const LandingPage = () => {
               ) : (
                 <>
                   <Link to="/auth/login" className="px-4 py-2 text-sm font-semibold text-[#111] hover:text-[#4285F4] transition-colors">Sign in</Link>
-                  <Link to="/auth/signup">
+                  <Link to="/pricing">
                     <Button className="px-5 py-2.5 text-sm font-semibold bg-[#4285F4] hover:bg-[#3367D6] text-white border-none shadow-md shadow-blue-500/10">Start Free Trial</Button>
                   </Link>
                 </>
@@ -352,6 +357,7 @@ const LandingPage = () => {
       {/* Mobile Nav Overlay */}
       {isMenuOpen && (
         <div className="fixed inset-0 z-40 bg-white/95 backdrop-blur-md pt-24 px-6 flex flex-col gap-6">
+          <Link to="/pricing" onClick={() => setIsMenuOpen(false)} className="text-2xl font-bold text-[#111]">Plans</Link>
           <Link to="/contact" onClick={() => setIsMenuOpen(false)} className="text-2xl font-bold text-[#111]">Support</Link>
           <div className="h-px w-full bg-[#e5e5e5] my-4" />
           {authed ? (
@@ -361,7 +367,7 @@ const LandingPage = () => {
           ) : (
             <div className="flex flex-col gap-4">
               <Link to="/auth/login"><Button variant="secondary" onClick={() => setIsMenuOpen(false)} className="w-full py-4 text-lg">Sign in</Button></Link>
-              <Link to="/auth/signup"><Button onClick={() => setIsMenuOpen(false)} className="w-full py-4 text-lg bg-[#4285F4] text-white hover:bg-[#3367D6]">Start Free Trial</Button></Link>
+              <Link to="/pricing"><Button onClick={() => setIsMenuOpen(false)} className="w-full py-4 text-lg bg-[#4285F4] text-white hover:bg-[#3367D6]">Start Free Trial</Button></Link>
             </div>
           )}
         </div>
@@ -420,25 +426,27 @@ const LandingPage = () => {
           </p>
           
           <div className="flex justify-center w-full sm:w-auto">
-            <Link to={authed ? "/clients" : "/auth/signup"} className="w-full sm:w-auto">
+            <Link to={authed ? "/clients" : "/pricing"} className="w-full sm:w-auto">
               <Button className="w-full px-12 py-6 text-xl font-semibold bg-[#4285F4] hover:bg-[#3367D6] text-white border-none shadow-2xl shadow-blue-500/30">
                 {authed ? "Go to Dashboard" : "Start Free Trial"}
               </Button>
             </Link>
           </div>
-          <div className="mt-8">
-            <Link to="/auth/login" className="text-[#666] hover:text-[#111] transition-colors text-sm font-medium">Already have an account? <span className="text-[#4285F4] underline">Sign in</span></Link>
-          </div>
+          {!authed && (
+            <div className="mt-8">
+              <Link to="/auth/login" className="text-[#666] hover:text-[#111] transition-colors text-sm font-medium">Already have an account? <span className="text-[#4285F4] underline">Sign in</span></Link>
+            </div>
+          )}
         </div>
       </section>
 
       {/* Endless Marquee Integrations */}
-      <section id="integrations" className="py-32 border-y border-[#e5e5e5] bg-[#fafafa] relative z-10 overflow-hidden">
+      <section id="integrations" className="py-32 border-y border-[#e5e5e5] bg-transparent relative z-10 overflow-hidden">
         {/* Subtitle Background Glass Orb */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-blue-50/50 rounded-full blur-[120px] pointer-events-none" />
         
-        <div className="absolute left-0 top-0 bottom-0 w-48 bg-gradient-to-r from-[#fafafa] to-transparent z-10" />
-        <div className="absolute right-0 top-0 bottom-0 w-48 bg-gradient-to-l from-[#fafafa] to-transparent z-10" />
+        <div className="absolute left-0 top-0 bottom-0 w-48 bg-gradient-to-r from-transparent to-transparent z-10" />
+        <div className="absolute right-0 top-0 bottom-0 w-48 bg-gradient-to-l from-transparent to-transparent z-10" />
         
         <div className="text-center mb-12 md:mb-20 relative z-20 px-6">
           <p className="text-[10px] font-bold text-[#4285F4] uppercase tracking-[0.4em] mb-4">Unified Connectivity</p>
@@ -484,7 +492,7 @@ const LandingPage = () => {
       </section>
 
       {/* Who It’s For - Enhanced Grid Section */}
-      <section className="py-32 px-6 relative z-10 bg-white border-t border-[#e5e5e5]">
+      <section className="py-32 px-6 relative z-10 bg-transparent border-t border-[#e5e5e5]">
         <div className="max-w-7xl mx-auto">
           <div className="text-center max-w-3xl mx-auto mb-20 reveal-on-scroll">
             <h2 className="text-3xl sm:text-5xl md:text-6xl font-medium tracking-tighter mb-8 text-[#111]">
@@ -544,7 +552,7 @@ const LandingPage = () => {
       </section>
 
       {/* How It Works - Minimalist Grid */}
-      <section id="how-it-works" className="py-20 px-6 relative z-10 bg-[#fafafa] border-y border-[#e5e5e5]">
+      <section id="how-it-works" className="py-20 px-6 relative z-10 bg-transparent border-y border-[#e5e5e5]">
         <div className="max-w-7xl mx-auto">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-medium tracking-tighter text-center mb-16 reveal-on-scroll">How it works</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-[#e5e5e5] border border-[#e5e5e5] rounded-[2rem] overflow-hidden reveal-on-scroll shadow-[0_20px_60px_rgba(0,0,0,0.02)]">
@@ -602,7 +610,7 @@ const LandingPage = () => {
       </section>
 
       {/* Data Transparency & Security - Redesigned Card Layout */}
-      <section className="py-32 px-6 bg-white relative z-10">
+      <section className="py-32 px-6 bg-transparent relative z-10">
         <div className="max-w-7xl mx-auto">
           
           {/* Transparency Section */}
@@ -678,7 +686,7 @@ const LandingPage = () => {
               </div>
             </div>
 
-            <div className="text-center p-8 bg-[#fafafa] rounded-[2rem] border border-[#e5e5e5] max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="text-center p-8 bg-white/50 backdrop-blur-md rounded-[2rem] border border-[#e5e5e5] max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
               <p className="text-[#111] font-medium text-lg">Manage or disconnect your integrations at any time.</p>
               <div className="flex gap-4">
                 <Link to="/privacy-policy" className="text-xs font-bold uppercase tracking-widest text-[#4285F4] hover:underline">Privacy Policy</Link>
@@ -709,7 +717,7 @@ const LandingPage = () => {
                   { title: "Role-Based Access", desc: "Granular control over team permissions.", icon: BarChart3, color: "#111" },
                   { title: "Regular Audits", desc: "Consistent security checks and logging.", icon: CheckCircle2, color: "#111" }
                 ].map((item, idx) => (
-                  <div key={idx} className="p-8 bg-[#fafafa] rounded-[2.5rem] border border-[#e5e5e5] hover:border-[#111] transition-all group">
+                  <div key={idx} className="p-8 bg-white/50 backdrop-blur-md rounded-[2.5rem] border border-[#e5e5e5] hover:border-[#111] transition-all group">
                     <div className="w-12 h-12 rounded-2xl bg-white border border-[#e5e5e5] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                       <item.icon className="w-5 h-5" style={{ color: item.color }} />
                     </div>
@@ -725,7 +733,7 @@ const LandingPage = () => {
       </section>
 
       {/* Massive CTA */}
-      <section className="py-20 px-6 relative z-10 bg-[#fafafa] border-t border-[#e5e5e5]">
+      <section className="py-20 px-6 relative z-10 bg-transparent border-t border-[#e5e5e5]">
         <div className="max-w-7xl mx-auto">
           <div className="bg-[#111] rounded-[3rem] p-12 md:p-24 text-center relative overflow-hidden text-reveal reveal-on-scroll flex flex-col items-center">
             <h4 className="text-xs font-bold text-white uppercase tracking-[0.3em] mb-8">Built for teams that manage multi-channel marketing</h4>
@@ -737,7 +745,7 @@ const LandingPage = () => {
             </p>
             
             <div className="flex justify-center relative z-10 mt-8">
-               <Link to={authed ? "/clients" : "/auth/signup"} className="w-full sm:w-auto">
+               <Link to={authed ? "/clients" : "/pricing"} className="w-full sm:w-auto">
                 <Button variant="secondary" className="w-full px-16 py-6 text-xl font-semibold hover:bg-gray-100 hover:scale-105 shadow-2xl border-none">
                   {authed ? "Go to Dashboard" : "Start Free Trial"}
                 </Button>
@@ -748,15 +756,12 @@ const LandingPage = () => {
       </section>
 
       {/* Footer */}
-      <footer className="py-20 px-6 bg-white text-sm relative z-10">
+      <footer className="py-20 px-6 bg-transparent text-sm relative z-10">
         <div className="max-w-7xl mx-auto">
           <div className="grid md:grid-cols-4 gap-12 mb-20">
             <div className="col-span-2">
-              <div className="flex items-center gap-2 mb-6">
-                <div className="w-8 h-8 rounded-full bg-[#111] flex items-center justify-center">
-                  <BarChart3 className="text-white w-4 h-4" />
-                </div>
-                <span className="font-bold tracking-tight text-[#111] text-lg">GreyCats Analytics</span>
+              <div className="flex items-center gap-3 mb-6">
+                <img src={logoBlack} alt="GreyCats Analytics" className="h-8 w-auto" />
               </div>
               <p className="text-[#666] mb-2 font-medium">Operated by Greycats Tech LLP</p>
               <a href="mailto:info@greycats.tech" className="text-[#4285F4] font-semibold hover:underline">info@greycats.tech</a>
@@ -765,6 +770,7 @@ const LandingPage = () => {
             <div>
               <h4 className="font-bold text-[#111] mb-6 uppercase tracking-widest text-xs">Legal & Support</h4>
               <ul className="space-y-4 text-[#666] font-medium">
+                <li><Link to="/pricing" className="hover:text-[#111] transition-colors">Plans & Pricing</Link></li>
                 <li><Link to="/privacy-policy" className="hover:text-[#111] transition-colors">Privacy Policy</Link></li>
                 <li><Link to="/terms-of-service" className="hover:text-[#111] transition-colors">Terms of Service</Link></li>
                 <li><Link to="/contact" className="hover:text-[#111] transition-colors">Support</Link></li>

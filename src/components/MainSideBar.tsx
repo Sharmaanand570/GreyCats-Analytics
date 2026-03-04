@@ -23,6 +23,7 @@ import {
   CircleChevronRight,
   LogOut,
   ShieldAlert,
+  CreditCard,
 } from "lucide-react";
 import { FiMenu } from "react-icons/fi";
 import { useEffect, useState } from "react";
@@ -36,6 +37,9 @@ import { getProfileImageUrl } from "@/utils/imageUtils";
 
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { GlobalOAuthHandler } from "@/components/GlobalOAuthHandler";
+import { TrialExpiryBanner } from "@/components/subscription/TrialExpiryBanner";
+import { PlanBadge } from "@/components/subscription/PlanBadge";
+import { useSubscriptionQuery } from "@/hooks/subscription/useSubscriptionQuery";
 import { useQueryClient } from "@tanstack/react-query";
 import { useClientContext } from "@/context/ClientContext";
 
@@ -47,6 +51,9 @@ function MainSideBar(): React.JSX.Element {
   const { user, fetchProfile, logout } = useUserStore();
   const queryClient = useQueryClient();
   const { setClients, setCurrentClient } = useClientContext();
+  const { data: subscriptionData } = useSubscriptionQuery();
+  const currentPlanName = subscriptionData?.plan?.planName;
+  const currentPlanDisplay = subscriptionData?.plan?.displayName;
   console.log("MainSideBar render user:", user, "role:", user?.role);
 
   useEffect(() => {
@@ -161,6 +168,7 @@ function MainSideBar(): React.JSX.Element {
           ? [{ label: "Admin Panel", path: "/admin/dashboard", icon: <ShieldAlert /> }]
           : []),
         { label: "Account Setup", path: "/account-setup", icon: <Settings /> },
+        { label: "Billing", path: "/billing", icon: <CreditCard /> },
         { label: "Logout", path: "logout", icon: <LogOut /> },
       ],
     },
@@ -271,12 +279,23 @@ function MainSideBar(): React.JSX.Element {
                   onClick={() => handleChangeURL("/account-setup")}
                   className="flex items-center gap-3 rounded-md px-2 py-3 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800/50 cursor-pointer"
                 >
-                  <Avatar className="h-9 w-9 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:scale-110">
-                    <AvatarImage src={getProfileImageUrl(user?.profilePicture)} alt={user?.fullName} />
-                    <AvatarFallback className="bg-zinc-700 text-xs font-medium text-zinc-100">
-                      {userInitials}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div className="relative flex-shrink-0">
+                    <Avatar className="h-9 w-9 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:scale-110">
+                      <AvatarImage src={getProfileImageUrl(user?.profilePicture)} alt={user?.fullName} />
+                      <AvatarFallback className="bg-zinc-700 text-xs font-medium text-zinc-100">
+                        {userInitials}
+                      </AvatarFallback>
+                    </Avatar>
+                    {/* Plan badge pill shown in collapsed mode below avatar */}
+                    {collabsState && currentPlanName && (
+                      <span
+                        onClick={(e) => { e.stopPropagation(); handleChangeURL("/billing"); }}
+                        className="absolute -bottom-1 -right-1 cursor-pointer"
+                      >
+                        <PlanBadge planName={currentPlanName} size="sm" className="text-[9px] px-1 py-px" />
+                      </span>
+                    )}
+                  </div>
                   {!collabsState && (
                     <div
                       className={`min-w-0 md:hidden lg:block transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${collabsState
@@ -290,6 +309,16 @@ function MainSideBar(): React.JSX.Element {
                       <div className="text-xs text-zinc-400 leading-tight transition-colors duration-300">
                         {user?.jobTitle || "Viewer"}
                       </div>
+                      {currentPlanName && (
+                        <div className="mt-1">
+                          <PlanBadge
+                            planName={currentPlanName}
+                            displayName={currentPlanDisplay}
+                            size="sm"
+                            className="cursor-pointer hover:opacity-80"
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -394,6 +423,7 @@ function MainSideBar(): React.JSX.Element {
 
       {/* ---------- PAGE CONTENT ---------- */}
       <main className="flex-1 bg-[#F9FAFB] overflow-y-auto transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]">
+        <TrialExpiryBanner />
         <ImpersonationBanner />
         <GlobalOAuthHandler />
         <Outlet />

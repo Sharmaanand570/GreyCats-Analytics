@@ -1078,10 +1078,24 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       accountName: string;
       originalIndex: number; // Important for mapping back to integrations array
       subSlideIndex: number; // 0 for main slide, 1 for second slide (e.g. IG), etc.
+      stableId: string; // Deterministic integration+platform key for dedupe
+      platformKey: string; // Normalized sub-platform key (facebook/instagram/etc)
       slideTitle: string; // Ã°Å¸â€Â§ FIX: Slide-specific title from template
     }>();
 
     let currentSlideId = 0;
+    const stableKeyToSlideId = new Map<string, number>();
+
+    const getOrCreateSlideId = (stableKey: string) => {
+      const existingId = stableKeyToSlideId.get(stableKey);
+      if (existingId !== undefined) return existingId;
+      const nextId = currentSlideId++;
+      stableKeyToSlideId.set(stableKey, nextId);
+      return nextId;
+    };
+
+    const normalizeKey = (value: string) =>
+      value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
     // Iterate through integrations array by index
     integrationsData?.integrations?.forEach((integ, index) => {
@@ -1098,6 +1112,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         ) : undefined;
 
         const slideCount = template?.slides?.length || 1;
+        const integrationKey = String(integ.id ?? integ.accountId ?? index);
 
         // Ã°Å¸â€Â DIAGNOSTIC LOG: Track Instagram slide creation
         if (integ.platform?.toLowerCase().includes('instagram')) {
@@ -1115,17 +1130,33 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
         for (let i = 0; i < slideCount; i++) {
           // Ã°Å¸â€Â§ FIX: Get slide-specific title from template
-          const slideTitle = template?.slides?.[i]?.name || integ.platform;
+          const slideTitle = String(template?.slides?.[i]?.name || integ.platform || "");
+          const slideTitleKey = normalizeKey(slideTitle);
+          let platformKey = slideTitleKey;
 
-          map.set(currentSlideId, {
+          if (normalizedPlatform === "meta-business") {
+            if (slideTitleKey.includes("instagram") || i === 1) {
+              platformKey = "instagram";
+            } else {
+              platformKey = "facebook";
+            }
+          } else if (!platformKey) {
+            platformKey = normalizedPlatform || `slide-${i}`;
+          }
+
+          const stableId = `${integrationKey}-${platformKey}`;
+          const slideId = getOrCreateSlideId(stableId);
+
+          map.set(slideId, {
             platform: integ.platform,
             accountId: integ.accountId,
             accountName: integ.accountName,
             originalIndex: index,
             subSlideIndex: i,
-            slideTitle: slideTitle // Store slide-specific title
+            slideTitle: slideTitle, // Store slide-specific title
+            stableId,
+            platformKey
           });
-          currentSlideId++;
         }
       }
     });
@@ -1913,6 +1944,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     // Ã°Å¸â€Â§ CRITICAL FIX: Deduplicate based on Integration Index ONLY. Title is mutable.
     // This prevents "Ghost" duplicates when a user renames an integration slide (e.g. "Facebook" -> "FB")
     const claimedSlots = new Set<string>();
+    const claimedStableIds = new Set<string>();
     const getSlotKey = (idx: number) => `${idx}`;
 
     finalMeta.forEach(m => {
@@ -1932,6 +1964,10 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       }
 
       const hasExplicitIndex = typeof m.metadata?.integrationIndex === 'number' || (typeof m.integrationIndex === 'number' && m.integrationIndex >= 0);
+      const isIntegrationSlide =
+        m.source === 'integration' ||
+        typeof m.metadata?.integrationIndex === 'number' ||
+        (typeof m.integrationIndex === 'number' && m.integrationIndex >= 0);
 
       // --- 2. Rescue Logic (Legacy Custom -> Integration) ---
       // Only rescue if no explicit index is set. If explicit index exists, trust it!
@@ -2049,16 +2085,31 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       }
 
       // Final Dedup Check for Integration Slides
-      if (integrationIdxFromMeta !== undefined) {
-        const key = getSlotKey(integrationIdxFromMeta);
-        if (claimedSlots.has(key)) {
-          console.warn(`Ã°Å¸â€”â€˜Ã¯Â¸Â [Hydration-Dedup] Skipping duplicate integration slide ID ${m.id} for slot ${key}`);
-          seenIds.add(m.id);
-          return;
-        }
+      if (isIntegrationSlide) {
+        const metaId = Number(m.id);
+        const metaLayout = map.get(metaId) ?? map.get(resolveFrontendSlideId(metaId));
+        const inferred = getIntegrationInfoForSlideIdOrWidgets(metaId, metaLayout, m.title);
+        const stableId = inferred?.info?.stableId;
 
-        claimedSlots.add(key);
+        if (stableId) {
+          if (claimedStableIds.has(stableId)) {
+            console.warn(`[Hydration-Dedup] Skipping duplicate integration slide ID ${m.id} for stableId ${stableId}`);
+            seenIds.add(m.id);
+            return;
+          }
+          claimedStableIds.add(stableId);
+        } else if (integrationIdxFromMeta !== undefined) {
+          const key = getSlotKey(integrationIdxFromMeta);
+          if (claimedSlots.has(key)) {
+            console.warn(`[Hydration-Dedup] Skipping duplicate integration slide ID ${m.id} for slot ${key}`);
+            seenIds.add(m.id);
+            return;
+          }
+          claimedSlots.add(key);
+        }
       }
+
+
 
       // ... push logic ...
       if (slideInfo) {
@@ -3673,6 +3724,10 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     setDeletedSlideIds((prev) => {
       const updated = new Set(prev);
       updated.add(slideId);
+      const backendId = backendIdMap.current.get(slideId);
+      if (backendId != null) {
+        updated.add(backendId);
+      }
       console.log(`Ã°Å¸â€”â€˜Ã¯Â¸Â [Delete] Updated deletedSlideIds:`, Array.from(updated));
       return updated;
     });
@@ -3788,10 +3843,14 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
     // 2.5. Remove from deletedSlideIds if it was previously deleted
     setDeletedSlideIds((prev) => {
-      if (prev.has(availableSlideId)) {
-        const updated = new Set(prev);
-        updated.delete(availableSlideId);
-        console.log(`Ã¢Å“â€¦ [Add Integration] Removed slide ${availableSlideId} from deletedSlideIds`);
+      const updated = new Set(prev);
+      const backendId = backendIdMap.current.get(availableSlideId);
+      const hadFrontend = updated.delete(availableSlideId);
+      const hadBackend = backendId != null ? updated.delete(backendId) : false;
+      const backendLabel = backendId != null ? ` (backend ${backendId})` : "";
+
+      if (hadFrontend || hadBackend) {
+        console.log(`[Add Integration] Removed slide ${availableSlideId}${backendLabel} from deletedSlideIds`);
         return updated;
       }
       return prev;

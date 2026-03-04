@@ -480,7 +480,6 @@ export const fetchUnifiedMetricsList = (
         params: { ...requestParams, clientId },
       }
     );
-    console.log("response fetchUnifiedMetricsList", response.data);
     return response.data;
   });
 

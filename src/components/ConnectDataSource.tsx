@@ -39,6 +39,23 @@ import {
 } from "@/components/ui/alert-dialog";
 
 
+class IconErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
+}
+
 type ConnectDataSourceType = {
   children: React.ReactNode;
   clientId?: number;
@@ -66,28 +83,22 @@ const dataSourceOptions: DataSourceOption[] = [
     color: getPlatformConfig("google")?.color,
   },
   {
-    id: "youtube",
-    name: "YouTube",
-    icon: SiYoutube,
-    color: getPlatformConfig("youtube")?.color,
-  },
-  {
     id: "google-console",
-    name: "Google Search Console ",
+    name: "Google Search Console",
     icon: SiGooglesearchconsole,
     color: getPlatformConfig("google-console")?.color,
   },
   {
-    id: "woocommerce",
-    name: "WooCommerce",
-    icon: SiWoocommerce,
-    color: getPlatformConfig("woo")?.color,
+    id: "google-ads",
+    name: "Google Ads",
+    icon: SiGoogleads,
+    color: getPlatformConfig("google-ads")?.color,
   },
   {
-    id: "shopify",
-    name: "Shopify",
-    icon: SiShopify,
-    color: getPlatformConfig("shopify")?.color,
+    id: "youtube",
+    name: "YouTube",
+    icon: SiYoutube,
+    color: getPlatformConfig("youtube")?.color,
   },
   {
     id: "meta-ads",
@@ -102,12 +113,17 @@ const dataSourceOptions: DataSourceOption[] = [
     color: getPlatformConfig("meta-business")?.color,
   },
   {
-    id: "google-ads",
-    name: "Google Ads",
-    icon: SiGoogleads,
-    color: getPlatformConfig("google-ads")?.color,
+    id: "shopify",
+    name: "Shopify",
+    icon: SiShopify,
+    color: getPlatformConfig("shopify")?.color,
   },
-
+  {
+    id: "woocommerce",
+    name: "WooCommerce",
+    icon: SiWoocommerce,
+    color: getPlatformConfig("woo")?.color,
+  },
 ];
 
 function ConnectDataSource({
@@ -221,7 +237,7 @@ function ConnectDataSource({
     <div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>{children}</DialogTrigger>
-        <DialogContent className="w-full max-w-2xl max-h-[90vh] mx-4">
+        <DialogContent className="w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-4">
           <DialogHeader>
             <DialogTitle className="text-base sm:text-lg md:text-xl lg:text-2xl">Select a Data Source</DialogTitle>
             <DialogDescription className="text-xs sm:text-sm md:text-base">
@@ -242,7 +258,7 @@ function ConnectDataSource({
               </div>
 
               {/* Integrations List */}
-              <div className="mt-4 max-h-[50vh] overflow-y-auto border rounded-lg">
+              <div className="mt-4 border rounded-lg">
                 {filteredDataSources.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-gray-500">
                     <p className="text-sm sm:text-base">No integrations found</p>
@@ -273,10 +289,14 @@ function ConnectDataSource({
 
                         {/* Icon and Name */}
                         <div className="flex items-center gap-3 flex-1">
-                          <option.icon
-                            className="h-6 w-6 flex-shrink-0"
-                            style={option.color ? { color: option.color } : undefined}
-                          />
+                          {option.icon && typeof option.icon !== "string" && (
+                            <IconErrorBoundary>
+                              <option.icon
+                                className="h-6 w-6 flex-shrink-0"
+                                style={option.color ? { color: option.color } : undefined}
+                              />
+                            </IconErrorBoundary>
+                          )}
                           <div className="flex items-center gap-2">
                             <span className="text-base font-medium">{option.name}</span>
                             {option.name === "Meta Business" && <span className="text-xs text-gray-400 font-light">(facebook & instagram)</span>}
