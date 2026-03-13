@@ -9,7 +9,6 @@ import type {
   CreateTemplatePayload,
   CreateTemplateResponse,
   Dashboard,
-  DebugMetricsResponse,
   GeneratePdfPayload,
   GeneratePdfResponse,
   GetDashboardsResponse,
@@ -32,6 +31,7 @@ import type {
   GoogleAdsCampaignPerformanceResponse,
 } from "./types";
 import { buildApiError, type AxiosApiError } from "./types";
+import type { MetricDataResponse } from "@/services/unifiedMetrics.api";
 import { prettifyMetricLabel } from "@/utils/labelUtils";
 
 // New API function for Stored Posts
@@ -48,10 +48,19 @@ export const fetchMetaStoredPosts = (
     if (startDate) params.startDate = startDate;
     if (endDate) params.endDate = endDate;
 
+    console.log(`[Widget API] GET /api/metabusiness/facebook/stored-posts/${accountId}`, {
+      integration: "meta_facebook",
+      metricKey: "meta.facebook.recent_posts",
+      dateFrom: startDate ?? "",
+      dateTo: endDate ?? "",
+      params,
+    });
+
     const response = await api.get<MetaStoredPostsResponse>(
       `/metabusiness/facebook/stored-posts/${accountId}`,
       { params }
     );
+    console.log(`[Widget API] Response /api/metabusiness/facebook/stored-posts/${accountId}`, response.data);
     return response.data;
   });
 
@@ -67,10 +76,19 @@ export const fetchInstagramStoredMedia = (
     if (startDate) params.startDate = startDate;
     if (endDate) params.endDate = endDate;
 
+    console.log(`[Widget API] GET /api/metabusiness/instagram/stored-media/${accountId}`, {
+      integration: "meta_instagram",
+      metricKey: "meta.instagram.recent_media",
+      dateFrom: startDate ?? "",
+      dateTo: endDate ?? "",
+      params,
+    });
+
     const response = await api.get<InstagramMediaResponse>(
       `/metabusiness/instagram/stored-media/${accountId}`,
       { params }
     );
+    console.log(`[Widget API] Response /api/metabusiness/instagram/stored-media/${accountId}`, response.data);
     return response.data;
   });
 
@@ -86,10 +104,19 @@ export const fetchMetaAdsCampaignPerformance = (
     if (startDate) params.startDate = startDate;
     if (endDate) params.endDate = endDate;
 
+    console.log(`[Widget API] GET /api/unified-metrics/meta-ads/campaign-performance`, {
+      integration: "meta_ads",
+      metricKey: "meta.ads.campaign_performance",
+      dateFrom: startDate ?? "",
+      dateTo: endDate ?? "",
+      params,
+    });
+
     const response = await api.get<MetaAdsCampaignPerformanceResponse>(
       `/unified-metrics/meta-ads/campaign-performance`,
       { params }
     );
+    console.log(`[Widget API] Response /api/unified-metrics/meta-ads/campaign-performance`, response.data);
     return response.data;
   });
 
@@ -102,12 +129,20 @@ export const fetchGoogleAdsCampaignPerformance = (
 ) =>
   handleRequest<GoogleAdsCampaignPerformanceResponse>(async () => {
     const { getGoogleAdsCampaigns } = await import('@/features/googleAds/API/googleAdsApi');
+    console.log(`[Widget API] GET /api/google-ads/${clientId}/campaigns`, {
+      integration: "google_ads",
+      metricKey: "google_ads.campaign_performance",
+      dateFrom: startDate ?? "",
+      dateTo: endDate ?? "",
+      params: { startDate, endDate, accountId },
+    });
     const response = await getGoogleAdsCampaigns(clientId, {
       startDate,
       endDate,
       accountId
     });
 
+    console.log(`[Widget API] Response /api/google-ads/${clientId}/campaigns`, response);
     return {
       success: true,
       rows: response.campaigns as any[],
@@ -120,7 +155,16 @@ export const fetchGoogleAdsSummary = (
 ) =>
   handleRequest<any>(async () => {
     const { getGoogleAdsSummary } = await import('@/features/googleAds/API/googleAdsApi');
-    return await getGoogleAdsSummary(clientId, params);
+    console.log(`[Widget API] GET /api/google-ads/${clientId}/summary`, {
+      integration: "google_ads",
+      metricKey: "google_ads.summary",
+      dateFrom: params?.startDate ?? "",
+      dateTo: params?.endDate ?? "",
+      params,
+    });
+    const response = await getGoogleAdsSummary(clientId, params);
+    console.log(`[Widget API] Response /api/google-ads/${clientId}/summary`, response);
+    return response;
   });
 
 /**
@@ -135,6 +179,7 @@ export const fetchUnifiedAggregate = (params: {
   startDate: string;
   endDate: string;
   accountId?: string;
+  clientId?: number;
 }) =>
   handleRequest<{
     success: boolean;
@@ -143,17 +188,29 @@ export const fetchUnifiedAggregate = (params: {
     numerator?: number;
     denominator?: number;
     rowCount?: number;
+    isRatioMetric?: boolean;
+    aggregation?: string;
   }>(async () => {
-    // Only send the 4 documented params. Client is scoped by JWT Bearer — no clientId needed.
     const queryParams: Record<string, string> = {
       metricKey: params.metricKey,
       integration: params.integration,
       startDate: params.startDate,
       endDate: params.endDate,
     };
-    if (params.accountId) queryParams.accountId = params.accountId;
+    const META_NO_ACCOUNT_ID = new Set(["meta_ads", "meta_instagram", "meta_facebook"]);
+    if (params.accountId && !META_NO_ACCOUNT_ID.has(params.integration)) queryParams.accountId = params.accountId;
+    if (params.clientId) queryParams.clientId = String(params.clientId);
+
+    console.log(`[Widget API] GET /api/unified-metrics/aggregate`, {
+      integration: params.integration,
+      metricKey: params.metricKey,
+      dateFrom: params.startDate,
+      dateTo: params.endDate,
+      params: queryParams,
+    });
 
     const response = await api.get('/unified-metrics/aggregate', { params: queryParams });
+    console.log(`[Widget API] Response /api/unified-metrics/aggregate`, response.data);
     return response.data;
   });
 
@@ -465,79 +522,151 @@ export const fetchUnifiedMetricsList = (
   }
 ) =>
   handleRequest(async () => {
-    // Filter params to only keep allowed keys: integration, metricKey, startDate, endDate
-    const requestParams: Record<string, any> = {};
-    if (params?.integration) requestParams.integration = params.integration;
-    if (params?.metricKey) requestParams.metricKey = params.metricKey;
-    if (params?.startDate) requestParams.startDate = params.startDate;
-    if (params?.endDate) requestParams.endDate = params.endDate;
-    if (params?.page) requestParams.page = params.page;
-    if (params?.limit) requestParams.limit = params.limit;
+    if (!params?.integration || !params?.metricKey) {
+      return {
+        success: true,
+        pagination: { page: 1, limit: 0, total: 0, totalPages: 1 },
+        rows: [],
+      };
+    }
 
-    const response = await api.get<DebugMetricsResponse>(
-      `/unified-metrics`,
-      {
-        params: { ...requestParams, clientId },
-      }
-    );
-    return response.data;
+    const dateFrom = params.startDate || "";
+    const dateTo = params.endDate || "";
+    const requestParams: Record<string, any> = {
+      integration: params.integration,
+      metricKey: params.metricKey,
+      dateFrom,
+      dateTo,
+      ...(params.accountId ? { accountId: params.accountId } : {}),
+    };
+
+    if (clientId && params.integration === "google-search-console") {
+      requestParams.clientId = clientId;
+    }
+
+    const response = await api.get<MetricDataResponse>(`/unified-metrics/data`, {
+      params: requestParams,
+    });
+
+    const series = response.data?.data?.series ?? [];
+    const rows = series.map((point, index) => ({
+      id: index,
+      metricKey: params.metricKey!,
+      integration: params.integration!,
+      accountId: params.accountId || "",
+      value: point.y,
+      date: point.x,
+      dimensionType: "day",
+      dimensionValue: point.x,
+      userId: 0,
+      clientId,
+      recordedAt: point.x,
+    }));
+
+    return {
+      success: response.data?.success ?? true,
+      pagination: { page: 1, limit: rows.length, total: rows.length, totalPages: 1 },
+      rows,
+    };
   });
 
-// Fetch individual metric data with optional dimensional breakdown
-// Removed accountId and dimensionType from params - backend handles filtering
+// Fetch individual metric data using the correct /unified-metrics/data endpoint.
+// Auth: JWT Bearer token — client is identified from the token, NOT from clientId.
+// Param names match the API spec: dateFrom / dateTo (not startDate / endDate).
 export const fetchUnifiedMetric = (
   clientId: number | null | undefined,
   params: {
     integration: string;
     metricKey: string;
-    startDate: string;
-    endDate: string;
+    startDate?: string;
+    endDate?: string;
+    // Preferred names (spec-compliant)
+    dateFrom?: string;
+    dateTo?: string;
     token?: string;
     groupBy?: string;
     accountId?: string;
+    aggregation?: string;
     signal?: AbortSignal;
   }
 ) =>
   handleRequest(async () => {
-    // Map frontend integration names to backend format
-    // Most integrations (meta-instagram, google-analytics) require underscores
-    // Exception: google-search-console requires hyphens
+    // Normalise integration name (underscores except google-search-console)
     let integrationName = params.integration;
     if (params.integration !== 'google-search-console') {
       integrationName = params.integration.replace(/-/g, '_');
     }
+    if (integrationName === 'woocommerce') integrationName = 'woo';
 
-    // WooCommerce special case: backend expects "woo"
-    if (integrationName === 'woocommerce') {
-      integrationName = 'woo';
-    }
-
-    if (integrationName !== params.integration) {
-      console.log(`🔄 Normalized integration for API: ${params.integration} -> ${integrationName}`);
-    }
+    // Accept both old startDate/endDate and new dateFrom/dateTo naming
+    const dateFrom = params.dateFrom || params.startDate || '';
+    const dateTo = params.dateTo || params.endDate || '';
 
     const requestParams: Record<string, string> = {
       integration: integrationName,
       metricKey: params.metricKey,
-      startDate: params.startDate,
-      endDate: params.endDate,
-      ...(params.token ? { token: params.token } : {}),
-      ...(params.groupBy ? { groupBy: params.groupBy } : {}),
-      ...(params.accountId ? { accountId: params.accountId } : {}),
+      dateFrom,
+      dateTo,
     };
 
-    if (clientId) {
-      requestParams.clientId = String(clientId);
-      requestParams.client_id = String(clientId);
-    }
+    if (params.token) requestParams.token = params.token;
+    if (params.groupBy && params.groupBy !== 'none') requestParams.groupBy = params.groupBy;
+    if (params.aggregation) requestParams.aggregation = params.aggregation;
+    const META_NO_ACCOUNT_ID_FETCH = new Set(["meta_ads", "meta_instagram", "meta_facebook"]);
+    if (params.accountId && !META_NO_ACCOUNT_ID_FETCH.has(integrationName)) requestParams.accountId = params.accountId;
+    // GSC and other integrations that scope by clientId need it as an explicit query param
+    // (JWT token identifies the user but clientId scopes to the specific client account)
+    if (clientId && integrationName === 'google-search-console') requestParams.clientId = String(clientId);
 
-    const response = await api.get(`/unified-metrics`, {
+    console.log(`[fetchUnifiedMetric] → /unified-metrics/data`, requestParams);
+
+    const response = await api.get<MetricDataResponse>(`/unified-metrics/data`, {
       params: requestParams,
       skipAuthRedirect: !!params.token,
       signal: params.signal,
     } as any);
-    return response.data;
+
+    console.log(`[fetchUnifiedMetric] Response /unified-metrics/data`, response.data);
+
+    const series = response.data?.data?.series ?? [];
+    const apiTotal = response.data?.data?.total;
+    const total =
+      typeof apiTotal === 'number'
+        ? apiTotal
+        : series.reduce((acc: number, pt: { x: string; y: number }) => acc + (pt.y ?? 0), 0);
+
+    console.log(`[fetchUnifiedMetric] ← ${params.metricKey}: total=${total}, series=${series.length} pts`);
+
+    // Map {x, y} series to the legacy 'row' shape expected by processWidgetData
+    const mappedRows = series.map((pt: { x: string; y: number }, index: number) => ({
+      id: index, // Synthetic ID
+      date: pt.x,
+      value: pt.y,
+      metricKey: params.metricKey,
+      integration: integrationName, // Provide normalized integration
+      accountId: params.accountId || '',
+      dimensionType: 'day',
+      dimensionValue: pt.x,
+    }));
+
+    // Return shape compatible with both /unified-metrics/data consumers and
+    // any legacy caller that reads .rows (maps series → rows for backward compat)
+    return {
+      success: response.data?.success ?? true,
+      data: {
+        series,
+        total,
+        value: total,
+        rawCount: response.data?.data?.rawCount ?? series.length,
+      },
+      // Legacy compat: expose mapped series as rows so callers reading .rows still work
+      rows: mappedRows,
+      total,
+      value: total,
+    };
   });
+
+
 
 export const createReportTemplate = (
   clientId: number,

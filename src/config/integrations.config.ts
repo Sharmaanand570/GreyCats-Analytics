@@ -81,7 +81,7 @@ export const INTEGRATION_CONFIG: Record<IntegrationType, IntegrationConfig> = {
     oauthUrl: '/google/connect',
     availableAccountsUrl: '/api/integrations/google-analytics/available-accounts',
     displayNameField: 'platform',
-    identifierField: 'id',
+    identifierField: 'id',   
   },
   'google-ads': {
     name: 'Google Ads',

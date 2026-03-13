@@ -154,11 +154,49 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
           const identifierKey = `${integration.type}-identifier-${integration.identifier || integration.name}`;
           if (integration.identifier && processedIds.has(identifierKey)) return;
 
+          // Resolve platform identifier from legacy arrays when backend omits it
+          let resolvedIdentifier = integration.identifier || 'unknown';
+          if (resolvedIdentifier === 'unknown') {
+            const id = integration.id; // platform account DB id
+            switch (integration.type) {
+              case 'meta-business': {
+                const match = client.metaBusinessAccounts?.find((a: any) => a.metaAccountId === id || a.metaAccount?.id === id);
+                resolvedIdentifier = match?.metaAccount?.pageId || match?.pageId || resolvedIdentifier;
+                break;
+              }
+              case 'meta-ads': {
+                const match = client.metaAdAccounts?.find((a: any) => a.adAccountId === id || a.adAccount?.id === id);
+                resolvedIdentifier = match?.adAccount?.accountId || match?.accountId || resolvedIdentifier;
+                break;
+              }
+              case 'google-search-console': {
+                const match = client.googleSearchConsoleProperties?.find((a: any) => a.propertyId === id || a.property?.id === id);
+                resolvedIdentifier = match?.property?.siteUrl || match?.siteUrl || resolvedIdentifier;
+                break;
+              }
+              case 'google-analytics': {
+                const match = client.googleAnalyticsProperties?.find((a: any) => a.gaPropertyId === id || a.gaProperty?.id === id);
+                resolvedIdentifier = match?.gaProperty?.propertyId || match?.propertyId || resolvedIdentifier;
+                break;
+              }
+              case 'youtube': {
+                const match = client.youtubeAccounts?.find((a: any) => a.youtubeAccountId === id || a.youtubeAccount?.id === id);
+                resolvedIdentifier = match?.youtubeAccount?.channelId || match?.channelId || resolvedIdentifier;
+                break;
+              }
+              case 'shopify': {
+                const match = client.shopifyAccounts?.find((a: any) => a.shopifyAccountId === id || a.shopifyAccount?.id === id);
+                resolvedIdentifier = match?.shopifyAccount?.shopDomain || match?.shopDomain || resolvedIdentifier;
+                break;
+              }
+            }
+          }
+
           integrations.push({
             integrationType: integration.type,
             accountId: integration.assignmentId,
             accountName: integration.name,
-            accountIdentifier: integration.identifier || 'unknown',
+            accountIdentifier: resolvedIdentifier,
             connectedAt: integration.connectedAt || new Date().toISOString(),
           });
           processedIds.add(uniqueKey);

@@ -54,7 +54,7 @@ const LandingPage = () => {
       });
     }, { threshold: 0.1, rootMargin: "0px 0px -100px 0px" });
 
-    document.querySelectorAll(".reveal-on-scroll").forEach(el => observer.observe(el));
+    document.querySelectorAll(".reveal-on-scroll, .reveal-from-left, .reveal-from-right, .reveal-scale").forEach(el => observer.observe(el));
 
     // Mouse Move Spotlight Animation
     const handleMouseMove = (e: MouseEvent) => {
@@ -62,7 +62,7 @@ const LandingPage = () => {
         const x = e.clientX;
         const y = e.clientY;
         // Soft Google-blue spotlight
-        spotlightRef.current.style.background = `radial-gradient(600px circle at ${x}px ${y}px, rgba(66, 133, 244, 0.05), transparent 40%)`;
+        spotlightRef.current.style.background = `radial-gradient(600px circle at ${x}px ${y}px, rgba(66, 133, 244, 0.15), transparent 40%)`;
       }
     };
     window.addEventListener("mousemove", handleMouseMove);
@@ -233,6 +233,46 @@ const LandingPage = () => {
     return <span className="typewriter-cursor">{displayText}</span>;
   };
 
+  const AnimatedText = ({ text, delayMultiplier = 0.04 }: { text: string, delayMultiplier?: number }) => {
+    const containerRef = useRef<HTMLSpanElement>(null);
+    
+    useEffect(() => {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const chars = entry.target.querySelectorAll('.char');
+            chars.forEach((char, index) => {
+              const isEven = index % 2 === 0;
+              const el = char as HTMLElement;
+              el.style.animation = `char-reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards`;
+              el.style.animationDelay = `${index * delayMultiplier}s`;
+              el.style.setProperty('--x-start', isEven ? '-30px' : '30px');
+              el.style.setProperty('--y-start', '30px');
+            });
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: "0px 0px -100px 0px" });
+  
+      if (containerRef.current) observer.observe(containerRef.current);
+      return () => observer.disconnect();
+    }, [text]);
+  
+    return (
+      <span ref={containerRef} className="inline-block">
+        {text.split(" ").map((word, wordIndex) => (
+          <span key={wordIndex} className="inline-block mr-[0.25em]">
+            {word.split("").map((char, charIndex) => (
+              <span key={`${wordIndex}-${charIndex}`} className="char inline-block opacity-0">
+                {char}
+              </span>
+            ))}
+          </span>
+        ))}
+      </span>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-white text-[#111] font-sans selection:bg-[#4285F4] selection:text-white overflow-x-hidden relative">
       
@@ -282,6 +322,66 @@ const LandingPage = () => {
         .reveal-on-scroll.is-revealed {
           opacity: 1;
           transform: translateY(0);
+        }
+
+        .reveal-from-left {
+          opacity: 0;
+          transform: translate(-60px, 40px);
+          transition: all 1s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .reveal-from-left.is-revealed {
+          opacity: 1;
+          transform: translate(0, 0);
+        }
+        
+        .reveal-from-right {
+          opacity: 0;
+          transform: translate(60px, 40px);
+          transition: all 1s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .reveal-from-right.is-revealed {
+          opacity: 1;
+          transform: translate(0, 0);
+        }
+
+        /* Scale Reveal Width Only */
+        /* Using a separate background element inside reveal-scale so the observer sees the parent box */
+        .reveal-scale .bg-scale {
+          position: absolute;
+          inset: 0;
+          background-color: #111;
+          border-radius: 3rem;
+          transform: scaleX(0);
+          transition: transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+          transform-origin: center;
+          z-index: 0;
+        }
+        .reveal-scale.is-revealed .bg-scale {
+          transform: scaleX(1);
+        }
+        
+        /* Content Delay & Fade-in */
+        .reveal-scale .content-delay {
+          position: relative;
+          z-index: 10;
+          opacity: 0;
+          transform: scale(0.95);
+          transition: opacity 0.8s ease 0.6s, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.6s;
+        }
+        .reveal-scale.is-revealed .content-delay {
+          opacity: 1;
+          transform: scale(1);
+        }
+
+        @keyframes char-reveal {
+          0% {
+            opacity: 0;
+            transform: translate(var(--x-start, -30px), var(--y-start, 30px));
+          }
+          100% {
+            opacity: 1;
+            transform: translate(0, 0);
+          }
         }
 
         /* Marquee */
@@ -378,7 +478,7 @@ const LandingPage = () => {
         <div className="absolute inset-0 bg-grid-dots opacity-50 pointer-events-none mask-image-[linear-gradient(to_bottom,white,transparent)]" style={{ WebkitMaskImage: 'linear-gradient(to bottom, black, transparent)' }} />
 
         {/* Floating Abstract UI Elements (The Antigravity effect) */}
-        <div className="absolute inset-0 pointer-events-none flex items-center justify-center max-w-7xl mx-auto hidden md:flex">
+        <div className="absolute inset-0 pointer-events-none items-center justify-center max-w-7xl mx-auto hidden md:flex">
           <div className="absolute left-[5%] top-[15%] w-48 p-4 bg-white border border-[#e5e5e5] rounded-2xl float-1 shadow-[0_20px_40px_rgba(0,0,0,0.04)] opacity-60 hover:opacity-100 transition-opacity duration-500">
              <div className="w-8 h-8 rounded-full bg-[#EA4335]/10 flex items-center justify-center mb-3">
                <PieChart className="w-4 h-4 text-[#EA4335]" />
@@ -475,16 +575,16 @@ const LandingPage = () => {
 
       {/* What We Do - Editorial Split */}
       <section id="product" className="py-32 px-6 relative z-10">
-        <div className="max-w-7xl mx-auto reveal-on-scroll">
+        <div className="max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
-            <div>
+            <div className="reveal-from-left">
               <h2 className="text-3xl sm:text-5xl md:text-7xl font-medium tracking-tighter mb-8 text-[#111]">
-                What GreyCats Analytics does.
+                <AnimatedText text="What GreyCats Analytics does." />
               </h2>
             </div>
-            <div>
+            <div className="reveal-from-right">
               <p className="text-lg md:text-xl text-[#666] font-light leading-relaxed max-w-2xl">
-                GreyCats Analytics securely pulls authorized data from your connected platforms, standardizes it, and presents it in dashboards and reports your team can act on. You can compare trends, monitor campaign performance, and share results with clients or stakeholders from one place.
+                <AnimatedText delayMultiplier={0.015} text="GreyCats Analytics securely pulls authorized data from your connected platforms, standardizes it, and presents it in dashboards and reports your team can act on. You can compare trends, monitor campaign performance, and share results with clients or stakeholders from one place." />
               </p>
             </div>
           </div>
@@ -735,21 +835,26 @@ const LandingPage = () => {
       {/* Massive CTA */}
       <section className="py-20 px-6 relative z-10 bg-transparent border-t border-[#e5e5e5]">
         <div className="max-w-7xl mx-auto">
-          <div className="bg-[#111] rounded-[3rem] p-12 md:p-24 text-center relative overflow-hidden text-reveal reveal-on-scroll flex flex-col items-center">
-            <h4 className="text-xs font-bold text-white uppercase tracking-[0.3em] mb-8">Built for teams that manage multi-channel marketing</h4>
-            <h2 className="text-3xl sm:text-5xl md:text-7xl font-medium tracking-tighter mb-8 text-white max-w-4xl leading-[1.1]">
-              Ready to simplify your reporting workflow?
-            </h2>
-            <p className="text-xl text-white/60 mb-12 max-w-3xl font-light leading-relaxed">
-              Ideal for marketing agencies, in-house growth teams, performance marketers, and analysts who need reliable reporting across multiple platforms, accounts, and clients.
-            </p>
+          <div className="rounded-[3rem] p-12 md:p-24 text-center relative overflow-hidden reveal-scale flex flex-col items-center origin-center">
+            {/* Background Layer for Animation */}
+            <div className="bg-scale"></div>
             
-            <div className="flex justify-center relative z-10 mt-8">
-               <Link to={authed ? "/clients" : "/pricing"} className="w-full sm:w-auto">
-                <Button variant="secondary" className="w-full px-16 py-6 text-xl font-semibold hover:bg-gray-100 hover:scale-105 shadow-2xl border-none">
-                  {authed ? "Go to Dashboard" : "Start Free Trial"}
-                </Button>
-               </Link>
+            <div className="content-delay flex flex-col items-center w-full">
+              <h4 className="text-xs font-bold text-white uppercase tracking-[0.3em] mb-8">Built for teams that manage multi-channel marketing</h4>
+              <h2 className="text-3xl sm:text-5xl md:text-7xl font-medium tracking-tighter mb-8 text-white max-w-4xl leading-[1.1]">
+                Ready to simplify your reporting workflow?
+              </h2>
+              <p className="text-xl text-white/60 mb-12 max-w-3xl font-light leading-relaxed">
+                Ideal for marketing agencies, in-house growth teams, performance marketers, and analysts who need reliable reporting across multiple platforms, accounts, and clients.
+              </p>
+              
+              <div className="flex justify-center relative z-10 mt-8">
+                 <Link to={authed ? "/clients" : "/pricing"} className="w-full sm:w-auto">
+                  <Button variant="secondary" className="w-full px-16 py-6 text-xl font-semibold hover:bg-gray-100 hover:scale-105 shadow-2xl border-none">
+                    {authed ? "Go to Dashboard" : "Start Free Trial"}
+                  </Button>
+                 </Link>
+              </div>
             </div>
           </div>
         </div>

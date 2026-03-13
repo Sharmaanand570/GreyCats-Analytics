@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchUnifiedMetricsList } from "../api/reportingApi";
 import type { DebugMetric } from "../api/types";
 import { useMemo } from "react";
 import { FACEBOOK_DAILY_METRICS, FACEBOOK_CUMULATIVE_METRICS } from "../../../utils/facebookMetrics";
+import { normalizeIntegrationId } from "@/services/unifiedMetrics.api";
 
 export interface AvailableMetric {
   metricKey: string;
@@ -22,6 +22,17 @@ export interface MetricsByIntegration {
 
 // Helper function to extract display name from metricKey
 const getMetricDisplayName = (metricKey: string): string => {
+  const overrides: Record<string, string> = {
+    "meta.facebook.page.page_follows": "Page follows",
+    "meta.facebook.page.page_posts_impressions_unique": "Unique page post impressions",
+    "meta.facebook.page.page_consumptions": "Page views",
+    "meta.facebook.post.count": "Posts (total)",
+    "meta.facebook.page.page_media_view": "Page media views",
+    "meta.facebook.page.page_post_engagements": "Post engagement",
+    "meta.facebook.page.page_video_views": "Video views",
+  };
+  if (overrides[metricKey]) return overrides[metricKey];
+
   // Special handling for aggregated metrics
   if (metricKey.includes('aggregated')) {
     const parts = metricKey.split('.');
@@ -58,7 +69,97 @@ const getMetricCategory = (metricKey: string): string => {
   return 'General';
 };
 
-export const useAvailableMetrics = (clientId: number | null, options?: { enabled?: boolean; integrationVersion?: string }) => {
+// Static metric definitions for each integration — injected even when the backend API
+// returns no rows for that integration (e.g. first sync, API error, empty DB).
+const GOOGLE_ADS_STATIC_METRICS: Array<{ metricKey: string; displayName: string; category: string }> = [
+  { metricKey: 'google_ads.clicks',       displayName: 'Clicks',       category: 'Performance' },
+  { metricKey: 'google_ads.impressions',  displayName: 'Impressions',  category: 'Performance' },
+  { metricKey: 'google_ads.cost',         displayName: 'Spend',        category: 'Performance' },
+  { metricKey: 'google_ads.ctr',          displayName: 'CTR',          category: 'Performance' },
+  { metricKey: 'google_ads.average_cpc',  displayName: 'Avg. CPC',     category: 'Performance' },
+  { metricKey: 'google_ads.conversions',  displayName: 'Conversions',  category: 'Conversions' },
+  { metricKey: 'google_ads.conv_rate',    displayName: 'Conv. Rate',   category: 'Conversions' },
+  { metricKey: 'google_ads.campaign_performance', displayName: 'Campaign Performance (Table)', category: 'Tables' },
+];
+
+const GSC_STATIC_METRICS: Array<{ metricKey: string; displayName: string; category: string }> = [
+  { metricKey: 'google_seo.clicks',      displayName: 'Clicks',       category: 'Overview' },
+  { metricKey: 'google_seo.impressions', displayName: 'Impressions',  category: 'Overview' },
+  { metricKey: 'google_seo.ctr',         displayName: 'CTR',          category: 'Overview' },
+  { metricKey: 'google_seo.position',    displayName: 'Avg. Position',category: 'Overview' },
+  { metricKey: 'google_seo.top_pages',   displayName: 'Top Pages (Table)',   category: 'Tables' },
+  { metricKey: 'google_seo.top_queries', displayName: 'Top Queries (Table)', category: 'Tables' },
+];
+
+const YOUTUBE_STATIC_METRICS: Array<{ metricKey: string; displayName: string; category: string }> = [
+  { metricKey: 'youtube.views',                    displayName: 'Views',               category: 'Overview' },
+  { metricKey: 'youtube.estimatedMinutesWatched',  displayName: 'Watch Time (min)',    category: 'Overview' },
+  { metricKey: 'youtube.subscribersGained',        displayName: 'Subscribers Gained',  category: 'Overview' },
+  { metricKey: 'youtube.likes',                    displayName: 'Likes',               category: 'Engagement' },
+];
+
+const META_ADS_STATIC_METRICS: Array<{ metricKey: string; displayName: string; category: string }> = [
+  { metricKey: 'meta.ads.spend',       displayName: 'Spend',       category: 'Performance' },
+  { metricKey: 'meta.ads.impressions', displayName: 'Impressions', category: 'Performance' },
+  { metricKey: 'meta.ads.clicks',      displayName: 'Clicks',      category: 'Performance' },
+  { metricKey: 'meta.ads.ctr',         displayName: 'CTR',         category: 'Performance' },
+  { metricKey: 'meta.ads.cpc',         displayName: 'CPC',         category: 'Performance' },
+];
+
+const SHOPIFY_STATIC_METRICS: Array<{ metricKey: string; displayName: string; category: string }> = [
+  { metricKey: 'shopify.revenue',       displayName: 'Total Revenue',      category: 'Sales' },
+  { metricKey: 'shopify.orders',        displayName: 'Total Orders',        category: 'Sales' },
+  { metricKey: 'shopify.avgOrderValue', displayName: 'Avg. Order Value',    category: 'Sales' },
+];
+
+const WOO_STATIC_METRICS: Array<{ metricKey: string; displayName: string; category: string }> = [
+  { metricKey: 'woo.revenue',    displayName: 'Total Revenue', category: 'Sales' },
+  { metricKey: 'woo.orders',     displayName: 'Total Orders',  category: 'Sales' },
+  { metricKey: 'woo.itemsSold',  displayName: 'Items Sold',    category: 'Sales' },
+];
+
+// Map from normalised integration platform → static metrics + canonical integration key
+const STATIC_METRIC_MAP: Record<string, { integration: string; metrics: Array<{ metricKey: string; displayName: string; category: string }> }> = {
+  'google-ads':           { integration: 'google_ads',             metrics: GOOGLE_ADS_STATIC_METRICS },
+  'google_ads':           { integration: 'google_ads',             metrics: GOOGLE_ADS_STATIC_METRICS },
+  'google-search-console':{ integration: 'google-search-console',  metrics: GSC_STATIC_METRICS },
+  'google_search_console':{ integration: 'google-search-console',  metrics: GSC_STATIC_METRICS },
+  'meta-ads':             { integration: 'meta_ads',               metrics: META_ADS_STATIC_METRICS },
+  'meta_ads':             { integration: 'meta_ads',               metrics: META_ADS_STATIC_METRICS },
+  'youtube':              { integration: 'youtube',                 metrics: YOUTUBE_STATIC_METRICS },
+  'shopify':              { integration: 'shopify',                 metrics: SHOPIFY_STATIC_METRICS },
+  'woocommerce':          { integration: 'woo',                     metrics: WOO_STATIC_METRICS },
+  'woo':                  { integration: 'woo',                     metrics: WOO_STATIC_METRICS },
+};
+
+function injectStaticMetrics(
+  grouped: MetricsByIntegration,
+  integrationKey: string,
+  accountId: string,
+  staticMetrics: Array<{ metricKey: string; displayName: string; category: string }>
+) {
+  if (!grouped[integrationKey]) grouped[integrationKey] = {};
+  if (!grouped[integrationKey][accountId]) grouped[integrationKey][accountId] = [];
+  const existing = grouped[integrationKey][accountId];
+  staticMetrics.forEach(({ metricKey, displayName, category }) => {
+    if (!existing.some(m => m.metricKey === metricKey)) {
+      existing.push({ metricKey, integration: integrationKey, accountId, displayName, category });
+    }
+  });
+}
+
+export interface ConnectedIntegration {
+  platform: string;
+  accountId?: string;
+  accountName?: string;
+}
+
+export const useAvailableMetrics = (clientId: number | null, options?: {
+  enabled?: boolean;
+  integrationVersion?: string;
+  /** Connected integrations — used to inject static metrics even when API returns no rows */
+  connectedIntegrations?: ConnectedIntegration[];
+}) => {
   const { data, isLoading, error } = useQuery({
     queryKey: ["available-metrics", clientId, options?.integrationVersion],
 
@@ -69,72 +170,26 @@ export const useAvailableMetrics = (clientId: number | null, options?: { enabled
     enabled: !!clientId && (options?.enabled ?? true),
     queryFn: async () => {
       if (!clientId) throw new Error("Client ID is required");
-
-      try {
-        console.log("🔍 Fetching available metrics from /unified-metrics...");
-
-        const pageSize = 1000;
-        const firstPage = await fetchUnifiedMetricsList(clientId!, {
-          limit: pageSize,
-          page: 1
-        });
-
-        const allRows: DebugMetric[] = [];
-        if (firstPage.rows?.length) {
-          allRows.push(...firstPage.rows);
-        }
-
-        const totalPages = firstPage.pagination?.totalPages || 1;
-        const maxConcurrent = 4;
-
-        for (let start = 2; start <= totalPages; start += maxConcurrent) {
-          const batch: Array<ReturnType<typeof fetchUnifiedMetricsList>> = [];
-          for (let page = start; page < start + maxConcurrent && page <= totalPages; page++) {
-            batch.push(
-              fetchUnifiedMetricsList(clientId!, {
-                limit: pageSize,
-                page
-              })
-            );
-          }
-
-          const responses = await Promise.all(batch);
-          responses.forEach((response) => {
-            if (response.rows?.length) {
-              allRows.push(...response.rows);
-            }
-          });
-        }
-
-        console.log(`📡 Fetched total ${allRows.length} metrics from ${totalPages} pages`);
-
-        return {
-          success: true,
-          rows: allRows,
-          pagination: {
-            page: 1,
-            limit: allRows.length,
-            total: allRows.length,
-            totalPages: 1
-          }
-        };
-      } catch (err) {
-        console.error("Failed to fetch available metrics:", err);
-        throw new Error("Failed to fetch available metrics from /unified-metrics");
-      }
+      // /unified-metrics is deprecated; rely on static + connected integration
+      // injection and fetch data via /unified-metrics/data at render time.
+      return {
+        success: true,
+        rows: [] as DebugMetric[],
+        pagination: { page: 1, limit: 0, total: 0, totalPages: 1 },
+      };
     },
   });
 
+  const connectedIntegrations = options?.connectedIntegrations;
+
   // Group metrics by integration and accountId, and deduplicate
   const groupedMetrics = useMemo<MetricsByIntegration>(() => {
-    if (!data?.rows) {
-      return {};
-    }
+    const rows = data?.rows ?? [];
 
     const grouped: MetricsByIntegration = {};
     const seen = new Set<string>(); // To deduplicate by integration+accountId+metricKey
 
-    data.rows.forEach((metric: DebugMetric) => {
+    rows.forEach((metric: DebugMetric) => {
       const key = `${metric.integration}:${metric.accountId}:${metric.metricKey}`;
 
       // Skip duplicates
@@ -160,6 +215,36 @@ export const useAvailableMetrics = (clientId: number | null, options?: { enabled
         category: getMetricCategory(metric.metricKey),
       });
     });
+
+    if (connectedIntegrations?.length) {
+      const normalizedToKey = new Map<string, string>();
+      Object.keys(grouped).forEach((integrationKey) => {
+        normalizedToKey.set(
+          integrationKey.toLowerCase().replace(/_/g, "-"),
+          integrationKey
+        );
+      });
+
+      connectedIntegrations.forEach(({ platform, accountId = "default" }) => {
+        const normalizedPlatform = platform.toLowerCase().replace(/_/g, "-");
+        const normalizedKey = normalizeIntegrationId(normalizedPlatform);
+        const normalizedKeyAlias = normalizedKey.toLowerCase().replace(/_/g, "-");
+        const existingKey =
+          normalizedToKey.get(normalizedPlatform) ??
+          normalizedToKey.get(normalizedKeyAlias);
+        const integrationKey = existingKey ?? normalizedKey;
+
+        if (!grouped[integrationKey]) {
+          grouped[integrationKey] = {};
+          normalizedToKey.set(normalizedPlatform, integrationKey);
+          normalizedToKey.set(normalizedKeyAlias, integrationKey);
+        }
+
+        if (!grouped[integrationKey][accountId]) {
+          grouped[integrationKey][accountId] = [];
+        }
+      });
+    }
 
     // Manually inject 'Recent Media/Posts' table metrics if they are missing
     // identifying accounts based on the presence of other metrics
@@ -251,7 +336,7 @@ export const useAvailableMetrics = (clientId: number | null, options?: { enabled
 
     // --- Google Analytics: Inject dimensional table metric keys ---
     // These are frontend-only metric keys that drive the dimensional table widgets.
-    // The /unified-metrics API doesn't return them as individual rows, so we inject them.
+    // The /unified-metrics/data endpoint doesn't return them as individual rows, so we inject them.
     const GA_TABLE_METRICS: Array<{ metricKey: string; displayName: string; category: string }> = [
       { metricKey: 'google.channel_traffic', displayName: 'Monthly All Channel Traffic', category: 'Channel' },
       { metricKey: 'google.browser_used', displayName: 'Technology: Browser Used', category: 'Technology' },
@@ -299,6 +384,27 @@ export const useAvailableMetrics = (clientId: number | null, options?: { enabled
       }
     });
 
+    // --- Static injection for Google Ads, GSC, YouTube, Shopify, WooCommerce ---
+    // Step 1: inject for any of these integrations already present in grouped (from API)
+    Object.keys(grouped).forEach((integration) => {
+      const normalizedInt = integration.toLowerCase().replace(/_/g, '-');
+      const staticDef = STATIC_METRIC_MAP[normalizedInt] ?? STATIC_METRIC_MAP[integration];
+      if (!staticDef) return;
+      Object.keys(grouped[integration]).forEach((accountId) => {
+        injectStaticMetrics(grouped, integration, accountId, staticDef.metrics);
+      });
+    });
+
+    // Step 2: inject for connected integrations that returned NO rows from the API
+    if (connectedIntegrations?.length) {
+      connectedIntegrations.forEach(({ platform, accountId = 'default' }) => {
+        const normalizedPlatform = platform.toLowerCase().replace(/_/g, '-');
+        const staticDef = STATIC_METRIC_MAP[normalizedPlatform] ?? STATIC_METRIC_MAP[platform];
+        if (!staticDef) return;
+        injectStaticMetrics(grouped, staticDef.integration, accountId, staticDef.metrics);
+      });
+    }
+
     // Sort metrics within each account by display name
     Object.values(grouped).forEach((accounts) => {
       Object.values(accounts).forEach((metrics) => {
@@ -309,7 +415,7 @@ export const useAvailableMetrics = (clientId: number | null, options?: { enabled
     });
 
     console.log('📊 useAvailableMetrics debug:', {
-      totalRows: data?.rows?.length,
+      totalRows: rows.length,
       integrations: Object.keys(grouped),
       youtubeAccounts: grouped['youtube'] ? Object.keys(grouped['youtube']) : 'none',
       shopifyAccounts: grouped['shopify'] ? Object.keys(grouped['shopify']) : 'none',
@@ -320,7 +426,8 @@ export const useAvailableMetrics = (clientId: number | null, options?: { enabled
     }
 
     return grouped;
-  }, [data]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, connectedIntegrations]);
 
   return {
     groupedMetrics,

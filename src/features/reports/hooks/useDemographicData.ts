@@ -1,3 +1,14 @@
+/**
+ * @deprecated SUPERSEDED — do not use.
+ *
+ * Replaced by: src/hooks/metrics/useBatchDemographicsData.ts
+ * New data source: GET /api/metabusiness/demographics/:accountId
+ * Context: src/features/reports/context/BatchMetricsContext (demographicById)
+ *
+ * This file remains to avoid breaking imports during incremental cleanup.
+ * It is NOT imported by any active production code path.
+ * Safe to delete once all imports have been verified removed.
+ */
 import { useQuery } from "@tanstack/react-query";
 import type { DashboardLayout } from "@/features/reports/api/types";
 import { fetchUnifiedMetric, fetchUnifiedMetricsList } from "@/features/reports/api/reportingApi";

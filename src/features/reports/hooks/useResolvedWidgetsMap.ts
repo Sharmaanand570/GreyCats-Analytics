@@ -1,3 +1,13 @@
+/**
+ * @deprecated SUPERSEDED — do not use.
+ *
+ * Replaced by: useBatchDashboardData (src/hooks/metrics/useBatchDashboardData.ts)
+ * The aggregated result is now provided via BatchMetricsContext.byId.
+ *
+ * This file remains to avoid breaking imports during incremental cleanup.
+ * It is NOT imported by any active production code path.
+ * Safe to delete once all imports have been verified removed.
+ */
 import { useMemo } from "react";
 import { useQueries } from "@tanstack/react-query";
 import type {

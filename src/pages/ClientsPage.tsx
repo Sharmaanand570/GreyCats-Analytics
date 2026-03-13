@@ -112,7 +112,7 @@ const ClientsPage: React.FC = () => {
                 <div className="w-full h-full flex flex-col">
                     {/* Header */}
                     <div className="w-full h-[4.8em] border-b flex justify-between items-center px-5 bg-white/50 backdrop-blur-sm sticky top-0 z-10 box-border">
-                        <span className="font-medium text-xl text-zinc-800">Clients</span>
+                        <span className="font-medium text-base text-zinc-800 tracking-wide">Clients</span>
                         <div className="flex items-center gap-4">
 
                             {/* Control Bar - Filters & Sort */}
@@ -219,7 +219,7 @@ const ClientsPage: React.FC = () => {
                                             key={client.id}
                                             onClick={() => handleClientClick(client.id)}
                                             className={cn(
-                                                "group relative flex flex-col justify-between p-5 h-56 border rounded-xl transition-all duration-300 cursor-pointer overflow-hidden",
+                                                "group relative flex flex-col justify-between p-5 h-52 border rounded-xl transition-all duration-300 cursor-pointer overflow-hidden",
                                                 // Status Tints
                                                 status === 'healthy' ? "bg-white hover:border-zinc-300" :
                                                     status === 'warning' ? "bg-amber-50/30 border-amber-100 hover:border-amber-200" :
@@ -303,9 +303,14 @@ const ClientsPage: React.FC = () => {
                                                 </div>
 
 
-                                                <h3 className="font-bold text-lg text-zinc-900 leading-tight line-clamp-1 text-left w-full group-hover:text-black transition-colors">
+                                                <h3 className="font-semibold text-base text-zinc-900 leading-snug line-clamp-1 text-left w-full group-hover:text-black transition-colors tracking-normal">
                                                     {client.name}
                                                 </h3>
+                                                {client.description && (
+                                                    <p className="text-xs text-zinc-400 leading-relaxed line-clamp-2 mt-1 tracking-normal">
+                                                        {client.description}
+                                                    </p>
+                                                )}
 
                                             </div>
 

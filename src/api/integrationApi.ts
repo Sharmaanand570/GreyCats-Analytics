@@ -187,9 +187,9 @@ export const removeAccountFromClient = async (
         return response.data;
       }
       case 'google-search-console': {
-        // DELETE /api/integrations/google_search_console
-        console.log(`[removeAccountFromClient] DELETE /integrations/google_search_console`);
-        const response = await api.delete('/integrations/google_search_console');
+        // Updated contract: DELETE /api/integrations/google_search_console/client/{clientId}
+        console.log(`[removeAccountFromClient] DELETE /integrations/google_search_console/client/${clientId}`);
+        const response = await api.delete(`/integrations/google_search_console/client/${clientId}`);
         return response.data;
       }
       default: {

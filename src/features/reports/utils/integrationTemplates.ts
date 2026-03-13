@@ -3,15 +3,8 @@ import { type ReportWidgetType } from "@/components/reportTypes";
 // Curated default metrics per integration platform
 export const CURATED_DEFAULTS: Record<string, string[]> = {
   "google-analytics": [
-    // Base daily metrics (metric cards)
-    "google.sessions",
     "google.activeUsers",
     "google.newUsers",
-    "google.pageViews",
-    "google.bounceRate",
-    "google.engagementRate",
-    "google.avgSessionDuration",
-    "google.eventCount",
     // Dimensional table widgets
     "google.channel_traffic",
     "google.browser_used",
@@ -21,14 +14,8 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
     "google.top_pages",
   ],
   "google": [                 // Alias for Google Analytics
-    "google.sessions",
     "google.activeUsers",
     "google.newUsers",
-    "google.pageViews",
-    "google.bounceRate",
-    "google.engagementRate",
-    "google.avgSessionDuration",
-    "google.eventCount",
     "google.channel_traffic",
     "google.browser_used",
     "google.device_category",
@@ -49,16 +36,18 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
   ],
   "meta": [
     "meta.facebook.page.page_follows",
-    "meta.facebook.post.count",
+    "meta.facebook.postsCount",
     "meta.facebook.page.page_post_engagements",
     "meta.instagram.followers",
   ],
   "meta-facebook": [
     "meta.facebook.page.page_follows",
+    "meta.facebook.page.page_posts_impressions_unique",
     "meta.facebook.page.page_impressions_unique",
-    "meta.facebook.page.page_posts_impressions",
-    "meta.facebook.post.count",
-    "meta.facebook.page.page_media_view",
+    "meta.page.views",
+    "meta.page.postImpressions",
+    "meta.facebook.postsCount",
+    "meta.facebook.mediaViews",
     "meta.facebook.page.page_post_engagements",
     "meta.facebook.post.reactions",
     "meta.facebook.post.likes",
@@ -66,14 +55,21 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
   ],
   "meta-instagram": [
     "meta.instagram.reach",
-    "meta.instagram.media.aggregated.reach",
+    "meta.instagram.media.impressions",
     "meta.instagram.mediaCount",
     "meta.instagram.reelCount",
     "meta.instagram.postCount",
     "meta.instagram.media.aggregated.likes",
-    "meta.instagram.followers",
     "meta.instagram.media.aggregated.shares",
+    "meta.instagram.media.aggregated.comments",
     "meta.instagram.media.aggregated.saves",
+    "meta.instagram.media.aggregated.reach",
+    "meta.instagram.replies",
+    "meta.instagram.profileViews",
+    "meta.instagram.followers",
+    "meta.instagram.profileLinkTaps",
+    "meta.instagram.emailContacts",
+    "meta.instagram.accountsEngaged",
     "meta.instagram.recent_media",
     // Instagram Demographics
     "meta.instagram.followers.age",
@@ -83,14 +79,21 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
   ],
   "metabusinessinstagram": [
     "meta.instagram.reach",
-    "meta.instagram.media.aggregated.reach",
+    "meta.instagram.media.impressions",
     "meta.instagram.mediaCount",
     "meta.instagram.reelCount",
     "meta.instagram.postCount",
     "meta.instagram.media.aggregated.likes",
-    "meta.instagram.followers",
     "meta.instagram.media.aggregated.shares",
+    "meta.instagram.media.aggregated.comments",
     "meta.instagram.media.aggregated.saves",
+    "meta.instagram.media.aggregated.reach",
+    "meta.instagram.replies",
+    "meta.instagram.profileViews",
+    "meta.instagram.followers",
+    "meta.instagram.profileLinkTaps",
+    "meta.instagram.emailContacts",
+    "meta.instagram.accountsEngaged",
     "meta.instagram.recent_media",
     // Instagram Demographics
     "meta.instagram.followers.age",
@@ -101,24 +104,33 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
   "meta-business": [
     // Facebook metrics
     "meta.facebook.page.page_follows",
+    "meta.facebook.page.page_posts_impressions_unique",
     "meta.facebook.page.page_impressions_unique",
-    "meta.facebook.page.page_posts_impressions",
-    "meta.facebook.post.count",
-    "meta.facebook.page.page_media_view",
+    "meta.page.views",
+    "meta.page.postImpressions",
+    "meta.facebook.postsCount",
+    "meta.facebook.mediaViews",
     "meta.facebook.page.page_post_engagements",
     "meta.facebook.post.reactions",
     "meta.facebook.post.likes",
     "meta.facebook.recent_posts",
     // Instagram metrics
     "meta.instagram.reach",
-    "meta.instagram.media.aggregated.reach",
+    "meta.instagram.media.impressions",
     "meta.instagram.mediaCount",
     "meta.instagram.reelCount",
     "meta.instagram.postCount",
     "meta.instagram.media.aggregated.likes",
-    "meta.instagram.followers",
     "meta.instagram.media.aggregated.shares",
+    "meta.instagram.media.aggregated.comments",
     "meta.instagram.media.aggregated.saves",
+    "meta.instagram.media.aggregated.reach",
+    "meta.instagram.replies",
+    "meta.instagram.profileViews",
+    "meta.instagram.followers",
+    "meta.instagram.profileLinkTaps",
+    "meta.instagram.emailContacts",
+    "meta.instagram.accountsEngaged",
     "meta.instagram.recent_media",
     // Instagram Demographics
     "meta.instagram.followers.age",
@@ -128,24 +140,33 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
   ],
   "metabusiness": [
     "meta.facebook.page.page_follows",
+    "meta.facebook.page.page_posts_impressions_unique",
     "meta.facebook.page.page_impressions_unique",
-    "meta.facebook.page.page_posts_impressions",
-    "meta.facebook.post.count",
-    "meta.facebook.page.page_media_view",
+    "meta.page.views",
+    "meta.page.postImpressions",
+    "meta.facebook.postsCount",
+    "meta.facebook.mediaViews",
     "meta.facebook.page.page_post_engagements",
     "meta.facebook.post.reactions",
     "meta.facebook.post.likes",
     "meta.facebook.recent_posts",
     // Instagram metrics
     "meta.instagram.reach",
-    "meta.instagram.media.aggregated.reach",
+    "meta.instagram.media.impressions",
     "meta.instagram.mediaCount",
     "meta.instagram.reelCount",
     "meta.instagram.postCount",
     "meta.instagram.media.aggregated.likes",
-    "meta.instagram.followers",
     "meta.instagram.media.aggregated.shares",
+    "meta.instagram.media.aggregated.comments",
     "meta.instagram.media.aggregated.saves",
+    "meta.instagram.media.aggregated.reach",
+    "meta.instagram.replies",
+    "meta.instagram.profileViews",
+    "meta.instagram.followers",
+    "meta.instagram.profileLinkTaps",
+    "meta.instagram.emailContacts",
+    "meta.instagram.accountsEngaged",
     "meta.instagram.recent_media",
     // Instagram Demographics
     "meta.instagram.followers.age",
@@ -174,6 +195,7 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
     "youtube.likes",
     "youtube.comments",
     "youtube.subscribersGained",
+    "youtube.estimatedMinutesWatched",
   ],
   "shopify": [
     "shopify.revenue",
@@ -195,14 +217,17 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
     "google_ads.clicks",
     "google_ads.cost",
     "google_ads.conversions",
-    "google_ads.revenue",
-    "google_ads.roas",
+    "google_ads.conv_rate",
+    "google_ads.average_cpc",
   ],
   "google_ads": [
     "google_ads.impressions",
     "google_ads.clicks",
     "google_ads.cost",
-    "google_ads.roas",
+    "google_ads.ctr",
+    "google_ads.average_cpc",
+    "google_ads.conversions",
+    "google_ads.conv_rate",
   ],
 };
 
@@ -242,17 +267,19 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
       {
         name: 'Facebook',
         widgets: [
-          // Row 1: 4 metric cards
-          { type: 'metric', metricKey: 'meta.facebook.page.page_follows', x: 0, y: 0, w: 3, h: 3, displayName: 'Page follows' },
-          { type: 'metric', metricKey: 'meta.facebook.page.page_posts_impressions_unique', x: 3, y: 0, w: 3, h: 3, displayName: 'Unique page post impressions' },
-          { type: 'metric', metricKey: 'meta.facebook.page.page_media_view', x: 6, y: 0, w: 3, h: 3, displayName: 'Page views' },
-          { type: 'metric', metricKey: 'meta.facebook.post.count', x: 9, y: 0, w: 3, h: 3, displayName: 'Posts (total)' },
+          // Row 1: 5 metric cards
+          { type: 'metric', metricKey: 'meta.facebook.page.page_follows', x: 0, y: 0, w: 2.4, h: 3, displayName: 'Page follows' },
+          { type: 'metric', metricKey: 'meta.facebook.page.page_posts_impressions_unique', x: 2.4, y: 0, w: 2.4, h: 3, displayName: 'Unique page post impressions' },
+          { type: 'metric', metricKey: 'meta.page.views', x: 4.8, y: 0, w: 2.4, h: 3, displayName: 'Page views' },
+          { type: 'metric', metricKey: 'meta.facebook.postsCount', x: 7.2, y: 0, w: 2.4, h: 3, displayName: 'Posts (total)' },
+          { type: 'metric', metricKey: 'meta.facebook.page.page_impressions_unique', x: 9.6, y: 0, w: 2.4, h: 3, displayName: 'Impressions (Unique)' },
 
-          // Row 2: 4 metric cards
-          { type: 'metric', metricKey: 'meta.facebook.page.page_media_view', x: 0, y: 3, w: 3, h: 3, displayName: 'Page media views' },
-          { type: 'metric', metricKey: 'meta.facebook.page.page_post_engagements', x: 3, y: 3, w: 3, h: 3, displayName: 'Post engagement' },
-          { type: 'metric', metricKey: 'meta.facebook.page.page_daily_follows', x: 6, y: 3, w: 3, h: 3, displayName: 'Page follow growth' },
-          { type: 'metric', metricKey: 'meta.facebook.mediaViews', x: 9, y: 3, w: 3, h: 3, displayName: 'Video views' },
+          // Row 2: 5 metric cards
+          { type: 'metric', metricKey: 'meta.facebook.mediaViews', x: 0, y: 3, w: 2.4, h: 3, displayName: 'Page media views' },
+          { type: 'metric', metricKey: 'meta.facebook.page.page_post_engagements', x: 2.4, y: 3, w: 2.4, h: 3, displayName: 'Post engagement' },
+          { type: 'metric', metricKey: 'meta.page.postImpressions', x: 4.8, y: 3, w: 2.4, h: 3, displayName: 'Post impressions' },
+          { type: 'metric', metricKey: 'meta.facebook.post.reactions', x: 7.2, y: 3, w: 2.4, h: 3, displayName: 'Reactions' },
+          { type: 'metric', metricKey: 'meta.facebook.post.likes', x: 9.6, y: 3, w: 2.4, h: 3, displayName: 'Likes' },
 
           // Row 3: Recent Posts Table
           {
@@ -277,27 +304,35 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
         ]
       },
       // SLIDE 2: INSTAGRAM
-      {
-        name: 'Instagram',
-        widgets: [
-          // Row 1: 4 metric cards
-          { type: 'metric', metricKey: 'meta.instagram.mediaCount', x: 0, y: 0, w: 3, h: 3, displayName: 'Posted content' },
-          { type: 'metric', metricKey: 'meta.instagram.reach', x: 3, y: 0, w: 3, h: 3, displayName: 'Reach' },
-          { type: 'metric', metricKey: 'meta.instagram.reelCount', x: 6, y: 0, w: 3, h: 3, displayName: 'Reels' },
-          { type: 'metric', metricKey: 'meta.instagram.postCount', x: 9, y: 0, w: 3, h: 3, displayName: 'Posts' },
+        {
+          name: 'Instagram',
+          widgets: [
+            // Row 1: 4 metric cards
+            { type: 'metric', metricKey: 'meta.instagram.mediaCount', x: 0, y: 0, w: 3, h: 3, displayName: 'Posted content' },
+            { type: 'metric', metricKey: 'meta.instagram.reach', x: 3, y: 0, w: 3, h: 3, displayName: 'Reach' },
+            { type: 'metric', metricKey: 'meta.instagram.reelCount', x: 6, y: 0, w: 3, h: 3, displayName: 'Reels' },
+            { type: 'metric', metricKey: 'meta.instagram.postCount', x: 9, y: 0, w: 3, h: 3, displayName: 'Posts' },
 
-          // Row 2: 4 metric cards
-          { type: 'metric', metricKey: 'meta.instagram.media.aggregated.reach', x: 0, y: 3, w: 3, h: 3, displayName: 'Engagement' },
-          { type: 'metric', metricKey: 'meta.instagram.followers', x: 3, y: 3, w: 3, h: 3, displayName: 'Followers' },
-          { type: 'metric', metricKey: 'meta.instagram.media.aggregated.shares', x: 6, y: 3, w: 3, h: 3, displayName: 'Shares' },
-          { type: 'metric', metricKey: 'meta.instagram.media.aggregated.likes', x: 9, y: 3, w: 3, h: 3, displayName: 'Likes' },
+            // Row 2: 5 metric cards
+            { type: 'metric', metricKey: 'meta.instagram.media.impressions', x: 0, y: 3, w: 2.4, h: 3, displayName: 'Impressions' },
+            { type: 'metric', metricKey: 'meta.instagram.followers', x: 2.4, y: 3, w: 2.4, h: 3, displayName: 'Followers' },
+            { type: 'metric', metricKey: 'meta.instagram.media.aggregated.likes', x: 4.8, y: 3, w: 2.4, h: 3, displayName: 'Likes' },
+            { type: 'metric', metricKey: 'meta.instagram.media.aggregated.shares', x: 7.2, y: 3, w: 2.4, h: 3, displayName: 'Shares' },
+            { type: 'metric', metricKey: 'meta.instagram.accountsEngaged', x: 9.6, y: 3, w: 2.4, h: 3, displayName: 'Accounts Engaged' },
 
-          // Row 3: Recent Posts Table
-          {
-            type: 'table',
-            metricKey: 'meta.instagram.recent_media',
+            // Row 3: 5 metric cards
+            { type: 'metric', metricKey: 'meta.instagram.media.aggregated.comments', x: 0, y: 6, w: 2.4, h: 3, displayName: 'Comments' },
+            { type: 'metric', metricKey: 'meta.instagram.media.aggregated.saves', x: 2.4, y: 6, w: 2.4, h: 3, displayName: 'Saves' },
+            { type: 'metric', metricKey: 'meta.instagram.media.aggregated.reach', x: 4.8, y: 6, w: 2.4, h: 3, displayName: 'Media Reach' },
+            { type: 'metric', metricKey: 'meta.instagram.replies', x: 7.2, y: 6, w: 2.4, h: 3, displayName: 'Replies' },
+            { type: 'metric', metricKey: 'meta.instagram.profileLinkTaps', x: 9.6, y: 6, w: 2.4, h: 3, displayName: 'Website Clicks' },
+
+            // Row 4: Recent Posts Table
+            {
+              type: 'table',
+              metricKey: 'meta.instagram.recent_media',
             x: 0,
-            y: 6,
+            y: 9,
             w: 12,
             h: 7,
             displayName: 'Instagram – Posts Table',
@@ -314,13 +349,13 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
             }
           },
 
-          // Row 4: Demographics Section
+          // Row 5: Demographics Section
           // Age Distribution Chart
           {
             type: 'chart',
             metricKey: 'meta.instagram.followers.age',
             x: 0,
-            y: 13,
+            y: 16,
             w: 6,
             h: 6,
             displayName: 'Age Distribution',
@@ -346,7 +381,7 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
             type: 'chart',
             metricKey: 'meta.instagram.followers.gender',
             x: 6,
-            y: 13,
+            y: 16,
             w: 6,
             h: 6,
             displayName: 'Gender Distribution',
@@ -363,13 +398,13 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
             }
           },
 
-          // Row 5: Geographic Demographics
+          // Row 6: Geographic Demographics
           // Top Countries Table
           {
             type: 'table',
             metricKey: 'meta.instagram.followers.country',
             x: 0,
-            y: 19,
+            y: 22,
             w: 6,
             h: 6,
             displayName: 'Top Countries',
@@ -390,7 +425,7 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
             type: 'table',
             metricKey: 'meta.instagram.followers.city',
             x: 6,
-            y: 19,
+            y: 22,
             w: 6,
             h: 6,
             displayName: 'Top Cities',
@@ -419,18 +454,26 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
       { type: 'metric', metricKey: 'meta.instagram.reelCount', x: 6, y: 0, w: 3, h: 3, displayName: 'Reels' },
       { type: 'metric', metricKey: 'meta.instagram.postCount', x: 9, y: 0, w: 3, h: 3, displayName: 'Posts' },
 
-      // Row 2: 4 metric cards
-      { type: 'metric', metricKey: 'meta.instagram.media.aggregated.reach', x: 0, y: 3, w: 3, h: 3, displayName: 'Engagement' },
-      { type: 'metric', metricKey: 'meta.instagram.followers', x: 3, y: 3, w: 3, h: 3, displayName: 'Followers' },
-      { type: 'metric', metricKey: 'meta.instagram.media.aggregated.shares', x: 6, y: 3, w: 3, h: 3, displayName: 'Shares' },
-      { type: 'metric', metricKey: 'meta.instagram.media.aggregated.likes', x: 9, y: 3, w: 3, h: 3, displayName: 'Likes' },
+        // Row 2: 5 metric cards
+        { type: 'metric', metricKey: 'meta.instagram.media.impressions', x: 0, y: 3, w: 2.4, h: 3, displayName: 'Impressions' },
+        { type: 'metric', metricKey: 'meta.instagram.followers', x: 2.4, y: 3, w: 2.4, h: 3, displayName: 'Followers' },
+        { type: 'metric', metricKey: 'meta.instagram.media.aggregated.likes', x: 4.8, y: 3, w: 2.4, h: 3, displayName: 'Likes' },
+        { type: 'metric', metricKey: 'meta.instagram.media.aggregated.shares', x: 7.2, y: 3, w: 2.4, h: 3, displayName: 'Shares' },
+        { type: 'metric', metricKey: 'meta.instagram.accountsEngaged', x: 9.6, y: 3, w: 2.4, h: 3, displayName: 'Accounts Engaged' },
 
-      // Row 3: Recent Media Table
+      // Row 3: 5 metric cards
+      { type: 'metric', metricKey: 'meta.instagram.media.aggregated.comments', x: 0, y: 6, w: 2.4, h: 3, displayName: 'Comments' },
+      { type: 'metric', metricKey: 'meta.instagram.media.aggregated.saves', x: 2.4, y: 6, w: 2.4, h: 3, displayName: 'Saves' },
+      { type: 'metric', metricKey: 'meta.instagram.media.aggregated.reach', x: 4.8, y: 6, w: 2.4, h: 3, displayName: 'Media Reach' },
+      { type: 'metric', metricKey: 'meta.instagram.replies', x: 7.2, y: 6, w: 2.4, h: 3, displayName: 'Replies' },
+      { type: 'metric', metricKey: 'meta.instagram.profileLinkTaps', x: 9.6, y: 6, w: 2.4, h: 3, displayName: 'Website Clicks' },
+
+      // Row 4: Recent Media Table
       {
         type: 'table',
         metricKey: 'meta.instagram.recent_media',
         x: 0,
-        y: 6,
+        y: 9,
         w: 12,
         h: 7,
         displayName: 'Instagram – Posts Table',
@@ -447,13 +490,13 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
         }
       },
 
-      // Row 4: Demographics Section
+      // Row 5: Demographics Section
       // Age Distribution Chart (Bar/Column Chart)
       {
         type: 'chart',
         metricKey: 'meta.instagram.followers.age',
         x: 0,
-        y: 12,
+        y: 15,
         w: 6,
         h: 6,
         displayName: 'Age Distribution',
@@ -479,7 +522,7 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
         type: 'chart',
         metricKey: 'meta.instagram.followers.gender',
         x: 6,
-        y: 12,
+        y: 15,
         w: 6,
         h: 6,
         displayName: 'Gender Distribution',
@@ -496,13 +539,13 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
         }
       },
 
-      // Row 5: Geographic Demographics
+      // Row 6: Geographic Demographics
       // Top Countries Table
       {
         type: 'table',
         metricKey: 'meta.instagram.followers.country',
         x: 0,
-        y: 18,
+        y: 21,
         w: 6,
         h: 6,
         displayName: 'Top Countries',
@@ -523,7 +566,7 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
         type: 'table',
         metricKey: 'meta.instagram.followers.city',
         x: 6,
-        y: 18,
+        y: 21,
         w: 6,
         h: 6,
         displayName: 'Top Cities',
@@ -593,8 +636,8 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
       { type: 'metric', metricKey: 'google_ads.impressions', x: 2, y: 5, w: 2, h: 3, displayName: 'Impressions' },
       { type: 'metric', metricKey: 'google_ads.clicks', x: 4, y: 5, w: 2, h: 3, displayName: 'Clicks' },
       { type: 'metric', metricKey: 'google_ads.ctr', x: 6, y: 5, w: 2, h: 3, displayName: 'CTR' },
-      { type: 'metric', metricKey: 'google_ads.cpc', x: 8, y: 5, w: 2, h: 3, displayName: 'Avg. CPC' },
-      { type: 'metric', metricKey: 'google_ads.roas', x: 10, y: 5, w: 2, h: 3, displayName: 'ROAS' },
+      { type: 'metric', metricKey: 'google_ads.average_cpc', x: 8, y: 5, w: 2, h: 3, displayName: 'Avg. CPC' },
+      { type: 'metric', metricKey: 'google_ads.conversions', x: 10, y: 5, w: 2, h: 3, displayName: 'Conversions' },
 
       // Row 3: Campaign performance table
       {
@@ -684,35 +727,30 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
       { type: 'metric', metricKey: 'youtube.comments', x: 6, y: 0, w: 3, h: 3, displayName: 'Comments' },
       { type: 'metric', metricKey: 'youtube.subscribersGained', x: 9, y: 0, w: 3, h: 3, displayName: 'Subscribers Gained' },
 
-      // Row 2: Views trend chart (full width)
-      { type: 'line_chart', metricKey: 'youtube.views', x: 0, y: 3, w: 12, h: 5, displayName: 'Views Over Time' },
+      // Row 2: Watch Time + Views trend chart side by side
+      { type: 'metric', metricKey: 'youtube.estimatedMinutesWatched', x: 0, y: 3, w: 4, h: 3, displayName: 'Watch Time (min)' },
+
+      // Row 3: Views trend chart (full width)
+      { type: 'line_chart', metricKey: 'youtube.views', x: 0, y: 6, w: 12, h: 5, displayName: 'Views Over Time' },
     ]
   },
 
   // GOOGLE ANALYTICS
   'google-analytics': {
     widgets: [
-      // ── Row 1: 4 metric cards (sessions, activeUsers, newUsers, pageViews)
-      { type: 'metric', metricKey: 'google.sessions', x: 0, y: 0, w: 3, h: 3, displayName: 'Sessions' },
-      { type: 'metric', metricKey: 'google.activeUsers', x: 3, y: 0, w: 3, h: 3, displayName: 'Active Users' },
-      { type: 'metric', metricKey: 'google.newUsers', x: 6, y: 0, w: 3, h: 3, displayName: 'New Users' },
-      { type: 'metric', metricKey: 'google.pageViews', x: 9, y: 0, w: 3, h: 3, displayName: 'Page Views' },
+      // ── Row 1: Active Users + New Users metric cards
+      { type: 'metric', metricKey: 'google.activeUsers', x: 0, y: 0, w: 6, h: 3, displayName: 'Active Users' },
+      { type: 'metric', metricKey: 'google.newUsers', x: 6, y: 0, w: 6, h: 3, displayName: 'New Users' },
 
-      // ── Row 2: 4 metric cards (bounceRate, engagementRate, avgSessionDuration, eventCount)
-      { type: 'metric', metricKey: 'google.bounceRate', x: 0, y: 3, w: 3, h: 3, displayName: 'Bounce Rate' },
-      { type: 'metric', metricKey: 'google.engagementRate', x: 3, y: 3, w: 3, h: 3, displayName: 'Engagement Rate' },
-      { type: 'metric', metricKey: 'google.avgSessionDuration', x: 6, y: 3, w: 3, h: 3, displayName: 'Avg. Session Duration' },
-      { type: 'metric', metricKey: 'google.eventCount', x: 9, y: 3, w: 3, h: 3, displayName: 'Event Count' },
+      // ── Row 2: Active Users trend + New Users trend
+      { type: 'line_chart', metricKey: 'google.activeUsers', x: 0, y: 3, w: 6, h: 5, displayName: 'Active Users Trend' },
+      { type: 'line_chart', metricKey: 'google.newUsers', x: 6, y: 3, w: 6, h: 5, displayName: 'New Users Trend' },
 
-      // ── Row 3: Sessions trend + Active Users trend
-      { type: 'line_chart', metricKey: 'google.sessions', x: 0, y: 6, w: 6, h: 5, displayName: 'Sessions Trend' },
-      { type: 'line_chart', metricKey: 'google.activeUsers', x: 6, y: 6, w: 6, h: 5, displayName: 'Active Users Trend' },
-
-      // ── Row 4: Monthly All Channel Traffic table
+      // ── Row 3: Monthly All Channel Traffic table
       {
         type: 'table',
         metricKey: 'google.channel_traffic',
-        x: 0, y: 11, w: 12, h: 8,
+        x: 0, y: 8, w: 12, h: 8,
         displayName: 'Monthly All Channel Traffic',
         customConfig: {
           columns: [
@@ -726,11 +764,11 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
         }
       },
 
-      // ── Row 5: Browser + Device side by side
+      // ── Row 4: Browser + Device side by side
       {
         type: 'table',
         metricKey: 'google.browser_used',
-        x: 0, y: 19, w: 6, h: 8,
+        x: 0, y: 16, w: 6, h: 8,
         displayName: 'Technology: Browser Used',
         customConfig: {
           columns: [
@@ -745,7 +783,7 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
       {
         type: 'table',
         metricKey: 'google.device_category',
-        x: 6, y: 19, w: 6, h: 8,
+        x: 6, y: 16, w: 6, h: 8,
         displayName: 'Technology: Device Category',
         customConfig: {
           columns: [
@@ -758,11 +796,11 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
         }
       },
 
-      // ── Row 6: Geo Country + City side by side
+      // ── Row 5: Geo Country + City side by side
       {
         type: 'table',
         metricKey: 'google.geo_country',
-        x: 0, y: 27, w: 6, h: 8,
+        x: 0, y: 24, w: 6, h: 8,
         displayName: 'Geo Location: Country',
         customConfig: {
           columns: [
@@ -777,7 +815,7 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
       {
         type: 'table',
         metricKey: 'google.geo_city',
-        x: 6, y: 27, w: 6, h: 8,
+        x: 6, y: 24, w: 6, h: 8,
         displayName: 'Geo Location: City',
         customConfig: {
           columns: [
@@ -790,16 +828,16 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
         }
       },
 
-      // ── Row 7: Top Landing Pages (full width)
+      // ── Row 6: Top Landing Pages (full width)
       {
         type: 'table',
         metricKey: 'google.top_pages',
-        x: 0, y: 35, w: 12, h: 8,
+        x: 0, y: 32, w: 12, h: 8,
         displayName: 'Top Landing Pages',
         customConfig: {
           columns: [
             { name: 'Page Path', width: '30%', dataKey: 'dimensionValue' },
-            { name: 'Views', width: '14%', dataKey: 'pageViews' },
+            { name: 'Sessions', width: '14%', dataKey: 'sessions' },
             { name: 'Active Users', width: '14%', dataKey: 'activeUsers' },
             { name: 'Avg. Session Duration', width: '21%', dataKey: 'avgSessionDuration' },
             { name: 'Event Count', width: '21%', dataKey: 'eventCount' },

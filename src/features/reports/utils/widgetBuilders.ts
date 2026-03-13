@@ -272,7 +272,7 @@ export function buildWidgetsFromTemplate(
       else if (m.startsWith('google.')) integration = 'google-analytics';
       else if (m.startsWith('meta.instagram.')) integration = 'meta-instagram';
       else if (m.startsWith('meta.facebook.') || m.startsWith('meta.page.')) integration = 'meta-facebook';
-      else if (m.startsWith('meta.ads.')) integration = 'meta-ads';
+      else if (m.startsWith('meta.ads.')) integration = 'meta_ads';
       else if (m.startsWith('youtube.')) integration = 'youtube';
       else if (m.startsWith('shopify.')) integration = 'shopify';
       else if (m.startsWith('woo.')) integration = 'woo';
@@ -291,7 +291,7 @@ export function buildWidgetsFromTemplate(
         console.log(`[WidgetBuilder] Meta-business widget: subSlideIndex=${subSlideIndex} -> integration=${integration}, metricKey=${widgetTemplate.metricKey}`);
       } else if (p.includes('meta-instagram') || p.includes('instagram')) integration = 'meta-instagram';
       else if (p.includes('meta-facebook') || p.includes('facebook')) integration = 'meta-facebook';
-      else if (p.includes('meta-ads')) integration = 'meta-ads';
+      else if (p.includes('meta-ads')) integration = 'meta_ads';
       else if (p.includes('meta')) integration = 'meta';
     }
 

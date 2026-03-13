@@ -93,13 +93,14 @@ import {
   getReportTemplate,
   updateReportTemplate,
   listReportSchedules,
+  fetchUnifiedAggregate,
   type UnifiedMetricRow,
 } from "@/features/reports/api/reportingApi";
 
 import { prettifyMetricLabel } from "@/utils/labelUtils";
 import { CreateScheduleModal } from "../components/CreateScheduleModal";
 
-import { getGoogleConsoleUnifiedMetrics } from "@/features/YouTube/API/googleConsoleapi";
+import { getMetricData } from "@/services/unifiedMetrics.api";
 import type {
   ApiError,
   CreateTemplatePayload,
@@ -142,8 +143,10 @@ import {
   buildDefaultWidgetsForIntegration,
 } from "@/features/reports/utils/widgetBuilders";
 import { type WidgetFormState, type ReportBuilderProps } from "@/features/reports/types";
-import { useDemographicData } from "@/features/reports/hooks/useDemographicData";
 import { WidgetDataWrapper } from "@/features/reports/components/WidgetDataWrapper";
+import { BatchMetricsProvider } from "@/features/reports/context/BatchMetricsContext";
+import { useBatchDashboardData } from "@/hooks/metrics/useBatchDashboardData";
+import { useBatchDemographicsData } from "@/hooks/metrics/useBatchDemographicsData";
 import { renderWidgetContent } from "@/features/reports/components/WidgetContentRenderer";
 import { useSyncStatus } from "@/features/reports/hooks/useSyncStatus";
 import { Loader2 } from "lucide-react";
@@ -171,7 +174,6 @@ import {
 import { useReportStore } from "@/features/reports/store/useReportStore";
 import { useSlideVisibility } from "@/features/reports/hooks/useSlideVisibility";
 import { getWidgetQueryKey, fetchAndProcessWidget } from "@/features/reports/hooks/useWidgetData";
-import { useResolvedWidgetsMap } from "@/features/reports/hooks/useResolvedWidgetsMap";
 
 // DashboardLayout and DashboardMap types removed (imported from @/features/reports/api/types)
 
@@ -199,6 +201,65 @@ const useDebouncedValue = <T,>(value: T, delayMs: number): T => {
     return () => clearTimeout(handle);
   }, [value, delayMs]);
   return debouncedValue;
+};
+
+type CoreMetricPreview = {
+  metricKey: string;
+  accountId?: string;
+  total?: number;
+  rawCount?: number;
+  series: Array<{ x: string; y: number }>;
+};
+
+type CoreMetricPreviewResponse = {
+  success: boolean;
+  metrics: CoreMetricPreview[];
+};
+
+const GA_METRIC_LABELS: Record<string, string> = {
+  "google.sessions": "Sessions",
+  "google.activeUsers": "Active Users",
+  "google.pageViews": "Page Views",
+  "google.bounceRate": "Bounce Rate",
+};
+
+const GSC_METRIC_LABELS: Record<string, string> = {
+  "google_seo.clicks": "Clicks",
+  "google_seo.impressions": "Impressions",
+  "google_seo.ctr": "CTR",
+  "google_seo.position": "Position",
+};
+
+const METRIC_AGGREGATION_BY_KEY: Record<
+  string,
+  "sum" | "avg" | "min" | "max" | "last"
+> = {
+  "google.bounceRate": "avg",
+  "google_seo.ctr": "avg",
+  "google_seo.position": "avg",
+};
+
+const aggregateSeries = (
+  series: Array<{ x: string; y: number }>,
+  aggregation: "sum" | "avg" | "min" | "max" | "last"
+) => {
+  if (!series.length) return 0;
+  const values = series.map((point) => point.y ?? 0);
+  const sum = values.reduce((acc, val) => acc + val, 0);
+
+  switch (aggregation) {
+    case "avg":
+      return sum / values.length;
+    case "min":
+      return Math.min(...values);
+    case "max":
+      return Math.max(...values);
+    case "last":
+      return values[values.length - 1] ?? 0;
+    case "sum":
+    default:
+      return sum;
+  }
 };
 
 
@@ -485,19 +546,17 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   // Date Preset State (e.g. "Last 30 Days") to allow dynamic recalculation in Shared Reports
   const [_datePreset, setDatePreset] = useState<string | undefined>();
 
-  // Collect all widgets for demographic data fetching
-  const allWidgets = useMemo(() => Array.from(dashboards.values()).flat(), [dashboards]);
-  const currentStartDate = dateRange?.from ? formatApiDate(new Date(dateRange.from)) : formatApiDate(subDays(new Date(), 89));
-  const currentEndDate = dateRange?.to ? formatApiDate(new Date(dateRange.to)) : formatApiDate(new Date());
-
-  const { data: demographicDataMap } = useDemographicData(
-    allWidgets,
-    parsedClientId || 0,
-    {
-      startDate: currentStartDate,
-      endDate: currentEndDate
-    }
-  );
+  // Demographics — one GET /api/metabusiness/demographics/:accountId per unique account.
+  // React Query deduplicates so N widgets sharing an account → 1 network request.
+  // Date params are forwarded so the endpoint returns data for the selected date range.
+  const {
+    data: demographicById,
+    isLoading: demoIsLoading,
+    isFetching: demoIsFetching,
+  } = useBatchDemographicsData(dashboards, {
+    startDate: dateRange?.from ? formatApiDate(dateRange.from) : undefined,
+    endDate: dateRange?.to ? formatApiDate(dateRange.to) : undefined,
+  });
 
   const [isNameDialogOpen, setIsNameDialogOpen] = useState(false);
   const [newReportName, setNewReportName] = useState("");
@@ -607,7 +666,11 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     error: availableMetricsError,
   } = useAvailableMetrics(effectiveClientId, {
     enabled: !readOnly && integrationVersion !== undefined,
-    integrationVersion
+    integrationVersion,
+    connectedIntegrations: integrationsData?.integrations?.map((i: any) => ({
+      platform: i.platform,
+      accountId: i.accountId ?? i.account_id ?? 'default',
+    })),
   });
 
   // UI state for the AgencyAnalytics-style "Choose your Metrics" panel
@@ -679,12 +742,13 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     });
   }, [isGscSelected, isGaSelected, gscStartDate, gscEndDate, setDateRange]);
 
-  const gscMetricsQuery = useQuery({
+  const gscMetricsQuery = useQuery<CoreMetricPreviewResponse>({
     queryKey: [
       "report-builder",
       "integration-metrics",
       selectedIntegrationForMetrics?.platform,
       selectedIntegrationForMetrics?.accountId,
+      selectedMetricWidgetType,
       gscDimensionType,
       gscStartDate,
       gscEndDate,
@@ -698,20 +762,78 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           .toLowerCase()
           .replace(/_/g, "-") === "google-analytics") &&
       !readOnly,
-    queryFn: () => {
-      const normalized = selectedIntegrationForMetrics!.platform
+    queryFn: async () => {
+      if (!selectedIntegrationForMetrics || !gscStartDate || !gscEndDate) {
+        return { success: true, metrics: [] };
+      }
+
+      const normalized = selectedIntegrationForMetrics.platform
         .toLowerCase()
         .replace(/_/g, "-");
-      const integrationKey =
-        normalized === "google-console" ? "google-search-console" : normalized;
-      return getGoogleConsoleUnifiedMetrics(parsedClientId!, {
-        integration: integrationKey,
-        metricKey: integrationKey === "google-analytics" ? undefined : "google_seo.clicks",
-        dimensionType: isGscSelected ? [gscDimensionType] : undefined,
-        startDate: gscStartDate,
-        endDate: gscEndDate,
-        accountId: selectedIntegrationForMetrics?.accountId,
-      });
+      const isGoogleAnalytics = normalized === "google-analytics";
+
+      const metricKeys = isGoogleAnalytics
+        ? Object.keys(GA_METRIC_LABELS)
+        : Object.keys(GSC_METRIC_LABELS);
+      const integrationKey = isGoogleAnalytics
+        ? "google_analytics"
+        : "google-search-console";
+      const wantsSeries =
+        selectedMetricWidgetType === "line_chart" ||
+        selectedMetricWidgetType === "bar_chart";
+
+      const metrics = await Promise.all(
+        metricKeys.map(async (metricKey) => {
+          const aggregation = METRIC_AGGREGATION_BY_KEY[metricKey] ?? "sum";
+          if (!isGoogleAnalytics && !wantsSeries) {
+            const aggregateResult = await fetchUnifiedAggregate({
+              metricKey,
+              integration: "google-search-console",
+              startDate: gscStartDate,
+              endDate: gscEndDate,
+              clientId: parsedClientId ?? undefined,
+            });
+
+            if (aggregateResult?.success && typeof aggregateResult.value === "number") {
+              return {
+                metricKey,
+                accountId: selectedIntegrationForMetrics.accountId,
+                total: aggregateResult.value,
+                rawCount: aggregateResult.rowCount ?? 0,
+                series: [],
+              };
+            }
+          }
+
+          const response = await getMetricData({
+            integration: integrationKey,
+            metricKey,
+            accountId: selectedIntegrationForMetrics.accountId,
+            dateFrom: gscStartDate,
+            dateTo: gscEndDate,
+            groupBy: wantsSeries ? "day" : undefined,
+            aggregation,
+            clientId: parsedClientId ?? undefined,
+          });
+
+          const series = response.data?.series ?? [];
+          const apiTotal = response.data?.total;
+          const total =
+            typeof apiTotal === "number"
+              ? apiTotal
+              : aggregateSeries(series, aggregation);
+
+          return {
+            metricKey,
+            accountId: selectedIntegrationForMetrics.accountId,
+            total,
+            rawCount: response.data?.rawCount ?? series.length,
+            series,
+          };
+        })
+      );
+
+      return { success: true, metrics };
     },
     staleTime: 60 * 1000,
   });
@@ -834,44 +956,31 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       });
     }
 
-    if ((isGoogleConsole || isGoogleAnalytics) && gscMetricsQuery.data?.rows?.length) {
-      const gaLabelMap: Record<string, string> = {
-        "google.sessions": "Sessions",
-        "google.activeUsers": "Active Users",
-        "google.pageViews": "Page Views",
-        "google.bounceRate": "Bounce Rate",
-      };
-      const gscLabelMap: Record<string, string> = {
-        "google_seo.clicks": "Clicks",
-        "google_seo.impressions": "Impressions",
-        "google_seo.ctr": "CTR",
-        "google_seo.position": "Position",
-      };
-
-      const liveMetrics = gscMetricsQuery.data.rows
-        .map((row) => {
+    if ((isGoogleConsole || isGoogleAnalytics) && gscMetricsQuery.data?.metrics?.length) {
+      const liveMetrics = gscMetricsQuery.data.metrics
+        .map((metric) => {
           const metricKey =
-            row.metricKey ||
+            metric.metricKey ||
             (isGoogleAnalytics ? "google.sessions" : "google_seo.clicks");
           const integrationValue = isGoogleAnalytics
             ? "google-analytics"
             : "google-search-console";
 
           const allowed = isGoogleAnalytics
-            ? gaLabelMap[metricKey]
-            : gscLabelMap[metricKey];
+            ? GA_METRIC_LABELS[metricKey]
+            : GSC_METRIC_LABELS[metricKey];
           if (!allowed) return null;
 
           return {
             metricKey,
             integration: integrationValue,
-            accountId: row.accountId || accountId,
+            accountId: metric.accountId || accountId,
             displayName: isGoogleAnalytics
-              ? gaLabelMap[metricKey] || metricKey
-              : gscLabelMap[metricKey] || metricKey,
+              ? GA_METRIC_LABELS[metricKey] || metricKey
+              : GSC_METRIC_LABELS[metricKey] || metricKey,
             category: "metric",
             filters: undefined,
-            value: row.value,
+            value: metric.total ?? 0,
           };
         })
         .filter(Boolean)
@@ -1204,7 +1313,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     if (metricKey.startsWith("google.")) return "google-analytics";
     if (metricKey.startsWith("meta.instagram.")) return "meta-instagram";
     if (metricKey.startsWith("meta.facebook.") || metricKey.startsWith("meta.page.")) return "meta-facebook";
-    if (metricKey.startsWith("meta.ads.")) return "meta-ads";
+    if (metricKey.startsWith("meta.ads.")) return "meta_ads";
     if (metricKey.startsWith("youtube.")) return "youtube";
 
     const integration = String(widget?.metricConfig?.integration || widget?.integration || "")
@@ -1217,7 +1326,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     if (integration === "google-ads" || integration === "googleads") return "google-ads";
     if (integration.includes("meta-instagram") || integration === "instagram") return "meta-instagram";
     if (integration.includes("meta-facebook") || integration === "facebook") return "meta-facebook";
-    if (integration.includes("meta-ads")) return "meta-ads";
+    if (integration.includes("meta-ads")) return "meta_ads";
     if (integration.includes("youtube")) return "youtube";
     if (integration.includes("meta-business") || integration === "metabusiness") return "meta-facebook";
 
@@ -2434,7 +2543,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       if (m.startsWith("google.")) return "google-analytics";
       if (m.startsWith("meta.instagram.")) return "meta-instagram";
       if (m.startsWith("meta.facebook.") || m.startsWith("meta.page.")) return "meta-facebook";
-      if (m.startsWith("meta.ads.")) return "meta-ads";
+      if (m.startsWith("meta.ads.")) return "meta_ads";
       if (m.startsWith("youtube.")) return "youtube";
 
       const p = (platform || "").toLowerCase().replace(/[_ ]/g, "-");
@@ -2446,7 +2555,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       }
       if (p.includes("meta-instagram") || p.includes("instagram")) return "meta-instagram";
       if (p.includes("meta-facebook") || p.includes("facebook")) return "meta-facebook";
-      if (p.includes("meta-ads")) return "meta-ads";
+      if (p.includes("meta-ads")) return "meta_ads";
       if (p.includes("youtube")) return "youtube";
 
       return null;
@@ -2519,27 +2628,34 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           let existing = updated.get(id);
 
           // Self-heal old/cold-start widgets that were created with wrong integration
-          // (e.g. GA metric keys accidentally tagged as meta).
+          // or missing accountId (e.g. GA metric keys tagged as meta, or empty accountId).
           if (existing && integrationInfo) {
             let healedAny = false;
             const healed = existing.map((w) => {
               const metricKey = w.metricConfig?.metricKey;
+              if (!w.metricConfig) return w;
+
               const expected = inferIntegrationForWidget(
                 metricKey,
                 integrationInfo.platform,
                 integrationInfo.subSlideIndex
               );
-              if (!expected || !w.metricConfig) return w;
 
-              const current = (w.metricConfig.integration || "").toLowerCase().replace(/_/g, "-");
-              if (current === expected) return w;
+              const current = (w.metricConfig.integration || "").toLowerCase();
+              const expectedNormalized = (expected || "").toLowerCase();
+              // Treat meta_ads and meta-ads as equivalent for comparison
+              const normalize = (s: string) => s.replace(/-/g, "_");
+              const integrationWrong = !!expected && normalize(current) !== normalize(expectedNormalized);
+              const accountIdMissing = !w.metricConfig.accountId && !!integrationInfo.accountId;
+
+              if (!integrationWrong && !accountIdMissing) return w;
 
               healedAny = true;
               return {
                 ...w,
                 metricConfig: {
                   ...w.metricConfig,
-                  integration: expected,
+                  ...(integrationWrong ? { integration: expected } : {}),
                   accountId: w.metricConfig.accountId || integrationInfo.accountId,
                 },
               };
@@ -2564,10 +2680,17 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             existing.every(w => w.i.includes('auto')) &&
             !hasAnyGaTableWidget;
 
+          // Detect slides saved in old format: metric/chart/table widgets missing metricConfig
+          const METRIC_WIDGET_TYPES = ['metric', 'line_chart', 'bar_chart', 'area_chart', 'pie_chart', 'chart', 'table'];
+          const hasMetricWidgetsWithoutConfig = !!existing?.some(
+            w => METRIC_WIDGET_TYPES.includes(w.widgetType || '') && !w.metricConfig?.metricKey
+          );
+
           const isBrokenState = existing && (
             (existing.length === 4 && existing.every(w => w.i.includes('auto'))) ||
             (existing.length < 5 && isMeta) ||
-            isLegacyGaAutoState
+            isLegacyGaAutoState ||
+            hasMetricWidgetsWithoutConfig
           );
 
 
@@ -2638,19 +2761,39 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   const dateFrom = useMemo(() => dateRange?.from ? formatApiDate(dateRange.from) : "", [dateRange?.from]);
   const dateTo = useMemo(() => dateRange?.to ? formatApiDate(dateRange.to) : "", [dateRange?.to]);
 
-  // --- Per-widget lazy loading replaces the old monolithic reportDataQuery ---
-  // Each widget now fetches its own data via useWidgetData (called inside WidgetDataWrapper).
-  // useResolvedWidgetsMap aggregates all per-widget cache entries for consumers like buildTemplatePayloadFromDashboards.
-  const resolvedWidgets = useResolvedWidgetsMap(dashboards, dateFrom, dateTo, shareToken);
+  // ── Unified batch data loading ──────────────────────────────────────────────
+  // Parallel GET /api/unified-metrics/data per unique widget instead of N
+  // individual per-widget requests. Special widgets (recent_posts, campaign
+  // tables) are excluded and continue using per-widget useWidgetData.
+  const {
+    byId: batchById,
+    isLoading: batchIsLoading,
+    isFetching: batchIsFetching,
+  } = useBatchDashboardData(dashboards, dateFrom, dateTo, {
+    clientId: effectiveClientId ?? undefined,
+    enabled: isDashboardsInitialized && !!dateFrom && !!dateTo,
+  });
 
-  // Prefetch all widget data (e.g. before PDF export) to ensure off-screen slides have data
+  // resolvedWidgets: merged view used by buildTemplatePayloadFromDashboards for
+  // self-healing and snapshot data. Batch results take priority; per-widget
+  // cache entries fill in special widgets still resolved by useWidgetData.
+  const resolvedWidgets: Record<string, any> = batchById;
+
+  // prefetchAllWidgets: with the batch resolver all data is already loaded in
+  // a single request. Special widgets still use per-widget prefetch via the
+  // existing queryClient cache.
   const prefetchAllWidgets = useCallback(async () => {
-    const promises: Promise<void>[] = [];
+    const specialPromises: Promise<void>[] = [];
     dashboards.forEach((layout) => {
       layout.forEach((widget) => {
         const metricConfig = widget.metricConfig;
         if (!metricConfig?.metricKey) return;
-        promises.push(
+        // Only prefetch widgets NOT handled by the batch resolver
+        const isSpecial =
+          metricConfig.metricKey === "meta.facebook.recent_posts" ||
+          metricConfig.metricKey === "meta.instagram.recent_media";
+        if (!isSpecial) return;
+        specialPromises.push(
           queryClient.prefetchQuery({
             queryKey: getWidgetQueryKey(metricConfig, dateFrom, dateTo, shareToken),
             queryFn: () =>
@@ -2667,13 +2810,13 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         );
       });
     });
-    await Promise.all(promises);
+    await Promise.all(specialPromises);
   }, [dashboards, dateFrom, dateTo, shareToken, effectiveClientId, integrationsData, queryClient]);
 
   // LEGACY COMPAT: stub reportDataQuery shape for any remaining references
   const reportDataQuery = {
     data: resolvedWidgets,
-    isFetching: false,
+    isFetching: batchIsFetching,
     isError: false,
     error: null,
     status: Object.keys(resolvedWidgets).length > 0 ? "success" as const : "pending" as const,
@@ -3157,7 +3300,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       customPages,
       integrationsData,
       pageOrder,
-      resolvedWidgets,
+      batchById, // batch resolver results (Record<widgetId, ResolvedWidgetResult>)
       dateRange,
       slideIntegrationMap,
       processedSlidesMeta,
@@ -5487,7 +5630,18 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                   </div>
                 </div>
               ) : (
-                effectivePageOrder.map((id) => {
+                // BatchMetricsProvider supplies the single batch resolver result
+                // and demographics data to every WidgetDataWrapper in the tree.
+                // This avoids N per-widget API calls — one POST replaces them all.
+                <BatchMetricsProvider
+                  byId={batchById}
+                  demographicById={demographicById}
+                  isLoading={batchIsLoading}
+                  isFetching={batchIsFetching}
+                  demoIsLoading={demoIsLoading}
+                  demoIsFetching={demoIsFetching}
+                >
+                {effectivePageOrder.map((id) => {
                   // Resolve backend slide IDs to frontend integration slots when possible.
                   // Backend integration IDs can be >1000, so numeric thresholds are unreliable.
                   const frontendId = resolveFrontendSlideId(id);
@@ -5715,7 +5869,6 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                                   integrationsData={integrationsData}
                                   isLoadingIntegrations={isLoadingIntegrations}
                                   isSlideVisible={isSlideVisibleWithBackend(id)}
-                                  demographicDataMap={demographicDataMap}
                                 >
                                   {({ resolvedData: finalResolvedData, isLoading, isFetching }) => {
                                     // Check if GSC table with no data
@@ -5758,7 +5911,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                       )}
                     </SlideContainer>
                   );
-                })
+                })}
+              </BatchMetricsProvider>
               )}
 
             </div>

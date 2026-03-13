@@ -509,10 +509,18 @@ export const getShopifyTrends = async (
     if (!clientId) {
       throw new Error("Client ID is required for direct Shopify API calls");
     }
+    console.log(`[Widget API] GET /api/clients/${clientId}/shopify/trends`, {
+      integration: "shopify",
+      metricKey: "shopify.trends",
+      dateFrom: params?.startDate ?? "",
+      dateTo: params?.endDate ?? "",
+      params,
+    });
     const response = await api.get<ShopifyTrendsResponse>(
       `/clients/${clientId}/shopify/trends`,
       { params }
     );
+    console.log(`[Widget API] Response /api/clients/${clientId}/shopify/trends`, response.data);
     return response.data;
   } catch (error) {
     return handleApiError(error, "Failed to fetch Shopify trends");
@@ -573,6 +581,5 @@ export const forceSyncProducts = async (clientId: number): Promise<ShopifySyncRe
     return handleApiError(error, "Failed to force sync Shopify products");
   }
 };
-
 
 

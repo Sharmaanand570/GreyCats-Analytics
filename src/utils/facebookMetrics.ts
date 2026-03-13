@@ -31,6 +31,8 @@ export const FACEBOOK_DAILY_METRICS = [
     'meta.facebook.page.page_post_engagements',
     'meta.facebook.page.page_posts_impressions',
     'meta.facebook.page.page_posts_impressions_unique',
+    'meta.facebook.page.page_consumptions',
+    'meta.facebook.page.page_video_views',
 
     // Facebook Post (daily aggregated)
     'meta.facebook.post.count',

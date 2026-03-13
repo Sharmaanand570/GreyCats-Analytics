@@ -25,6 +25,24 @@ import { toast } from "sonner";
 import { Badge } from "./ui/badge";
 import { useParams } from "react-router-dom";
 import { BarChart3, LayoutGrid, LineChart } from "lucide-react";
+import { useIntegrations } from "@/features/DataSources/hooks/useIntegrations";
+
+const TABLE_METRIC_KEYS = new Set([
+  "meta.facebook.recent_posts",
+  "meta.instagram.recent_media",
+  "meta.ads.campaign_performance",
+  "google_ads.campaign_performance",
+  "google_seo.top_pages",
+  "google_seo.top_queries",
+  "google.channel_traffic",
+  "google.browser_used",
+  "google.device_category",
+  "google.geo_country",
+  "google.geo_city",
+  "google.top_pages",
+]);
+
+const isTableMetric = (metricKey: string) => TABLE_METRIC_KEYS.has(metricKey);
 
 // Helper to create initial default widgets for a newly added integration
 const createDefaultWidgetsForIntegration = (
@@ -37,33 +55,47 @@ const createDefaultWidgetsForIntegration = (
 
   if (metrics.length === 0) return [];
 
-  // 1. Main Chart (First metric)
-  widgets.push({
-    id: `dw${widgetId++}`,
-    metricKey: metrics[0].metricKey,
-    integration,
-    accountId,
-    groupBy: "day",
-    aggregation: "sum",
-    type: "line_chart",
+  const seen = new Set<string>();
+  const uniqueMetrics = metrics.filter((metric) => {
+    if (seen.has(metric.metricKey)) return false;
+    seen.add(metric.metricKey);
+    return true;
   });
 
-  // 2. Metric Cards (Next 8 distinct metrics)
-  // const cardMetrics = metrics.slice(0, 8); 
-  // Let's just add the first 5 unique metrics as cards for a good start.
-  const uniqueMetrics = Array.from(new Set(metrics.map(m => m.metricKey))).slice(0, 5);
+  uniqueMetrics.forEach((metric) => {
+    if (isTableMetric(metric.metricKey)) {
+      widgets.push({
+        id: `dw${widgetId++}`,
+        metricKey: metric.metricKey,
+        integration,
+        accountId,
+        groupBy: "day",
+        aggregation: "sum",
+        type: "table",
+      });
+      return;
+    }
 
-  for (const mKey of uniqueMetrics) {
     widgets.push({
       id: `dw${widgetId++}`,
-      metricKey: mKey,
+      metricKey: metric.metricKey,
+      integration,
+      accountId,
+      groupBy: "day",
+      aggregation: "sum",
+      type: "line_chart",
+    });
+
+    widgets.push({
+      id: `dw${widgetId++}`,
+      metricKey: metric.metricKey,
       integration,
       accountId,
       groupBy: "day",
       aggregation: "sum",
       type: "metric_card",
     });
-  }
+  });
 
   return widgets;
 };
@@ -139,13 +171,14 @@ const WidgetEditCard = memo(({
             <SelectTrigger className="h-8 w-[140px] text-xs text-zinc-500 border-zinc-100 bg-zinc-50/50">
               <SelectValue placeholder="Type" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="metric_card">Card</SelectItem>
-              <SelectItem value="line_chart">Line Chart</SelectItem>
-              <SelectItem value="bar_chart">Bar Chart</SelectItem>
-              <SelectItem value="area_chart">Area Chart</SelectItem>
-            </SelectContent>
-          </Select>
+          <SelectContent>
+            <SelectItem value="metric_card">Card</SelectItem>
+            <SelectItem value="line_chart">Line Chart</SelectItem>
+            <SelectItem value="bar_chart">Bar Chart</SelectItem>
+            <SelectItem value="area_chart">Area Chart</SelectItem>
+            <SelectItem value="table">Table</SelectItem>
+          </SelectContent>
+        </Select>
         </div>
       </div>
 
@@ -228,8 +261,35 @@ function EditDashboard() {
   const params = useParams<{ clientId?: string }>();
   const clientId = params.clientId ? parseInt(params.clientId, 10) : null;
 
+  const { data: integrationsData } = useIntegrations(clientId, {
+    enabled: !!clientId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const integrationVersion = useMemo(() => {
+    const integrations = integrationsData?.integrations;
+    if (!integrations) return undefined;
+    return integrations
+      .map((integration) => `${integration.id}-${integration.platform}`)
+      .sort()
+      .join(",");
+  }, [integrationsData?.integrations]);
+
+  const connectedIntegrations = useMemo(() => {
+    const integrations = integrationsData?.integrations;
+    if (!integrations) return [];
+    return integrations.map((integration) => ({
+      platform: integration.platform,
+      accountId: integration.accountId || "default",
+    }));
+  }, [integrationsData?.integrations]);
+
   // Metrics hook
-  const { groupedMetrics } = useAvailableMetrics(clientId);
+  const { groupedMetrics } = useAvailableMetrics(clientId, {
+    enabled: integrationVersion !== undefined,
+    integrationVersion,
+    connectedIntegrations,
+  });
 
   // Fetch Dashboard
   const dashboardsQuery = useQuery<Dashboard[], ApiError>({

@@ -17,6 +17,9 @@ import {
   fetchUnifiedMetric,
   fetchGoogleAdsSummary,
   fetchGoogleAdsCampaignPerformance,
+  fetchMetaAdsCampaignPerformance,
+  fetchMetaStoredPosts,
+  fetchInstagramStoredMedia,
   fetchUnifiedAggregate,
 } from "@/features/reports/api/reportingApi";
 import type {
@@ -32,6 +35,25 @@ import { getMetricAggregation } from '@/utils/facebookMetrics';
 import { useClients } from "@/hooks/useClients";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "./ui/skeleton";
+import {
+  getMetaDemographics,
+  getGoogleAnalyticsTable,
+  getMetricData,
+  resolveDashboardMetrics,
+  type BatchWidgetRequest,
+} from "@/services/unifiedMetrics.api";
+import {
+  getGoogleConsoleTopPages,
+  getGoogleConsoleTopQueries,
+} from "@/features/YouTube/API/googleConsoleapi";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
 
 /* DEFAULT_DASHBOARD_WIDGETS and helper functions removed */
 
@@ -56,6 +78,18 @@ const nameCorrection = (name: string): string => {
   return name
 }
 
+const getDisplayIntegration = (integration: string, metricKey?: string): string => {
+  const normalized = (integration || "").toLowerCase().replace(/_/g, "-");
+  if (normalized === "meta-business" || normalized === "meta") {
+    const key = (metricKey || "").toLowerCase();
+    if (key.startsWith("meta.instagram")) return "meta-instagram";
+    if (key.startsWith("meta.facebook") || key.startsWith("meta.page"))
+      return "meta-facebook";
+    if (key.startsWith("meta.ads")) return "meta-ads";
+  }
+  return normalized;
+};
+
 
 const formatApiDate = (value: Date) => format(value, "yyyy-MM-dd");
 
@@ -65,6 +99,318 @@ const formatNumber = (value?: number) => {
     notation: "compact",
     maximumFractionDigits: 1,
   }).format(value);
+};
+
+const TABLE_INTERNAL_KEYS = new Set([
+  "id",
+  "metricKey",
+  "integration",
+  "accountId",
+  "dimensionType",
+  "dimensionValue",
+  "date",
+  "recordedAt",
+  "userId",
+  "clientId",
+]);
+
+const formatColumnLabel = (key: string) =>
+  key
+    .replace(/_/g, " ")
+    .replace(/([A-Z])/g, " $1")
+    .trim();
+
+const buildTableColumns = (
+  rows: Array<Record<string, any>>,
+  columns?: Array<{ name?: string; dataKey?: string }>
+) => {
+  if (columns?.length) {
+    return columns
+      .map((col) => ({
+        key: col.dataKey || col.name || "",
+        label: col.name || col.dataKey || "",
+      }))
+      .filter((col) => col.key);
+  }
+
+  const firstRow = rows[0];
+  if (!firstRow) return [];
+
+  const keys = Object.keys(firstRow).filter((key) => !TABLE_INTERNAL_KEYS.has(key));
+  if (firstRow.dimensionValue && !keys.includes("dimensionValue")) {
+    keys.unshift("dimensionValue");
+  }
+  if (firstRow.value != null && !keys.includes("value")) {
+    keys.push("value");
+  }
+
+  return keys.map((key) => ({ key, label: formatColumnLabel(key) || key }));
+};
+
+const buildSeriesFromRows = (
+  rows: Array<Record<string, any>>,
+  isRateMetric: boolean
+) => {
+  const seriesMap = new Map<string, { sum: number; count: number }>();
+  rows.forEach((row) => {
+    const dateKey = row.date || row.dimensionValue || "";
+    if (!dateKey) return;
+    const current = seriesMap.get(dateKey) || { sum: 0, count: 0 };
+    seriesMap.set(dateKey, {
+      sum: current.sum + (Number(row.value) || 0),
+      count: current.count + 1,
+    });
+  });
+
+  return Array.from(seriesMap.entries())
+    .map(([x, { sum, count }]) => ({
+      x,
+      y: isRateMetric ? sum / count : sum,
+    }))
+    .sort((a, b) => {
+      const dateA = new Date(a.x).getTime();
+      const dateB = new Date(b.x).getTime();
+      if (!Number.isNaN(dateA) && !Number.isNaN(dateB)) {
+        return dateA - dateB;
+      }
+      return 0;
+    });
+};
+
+const DASHBOARD_GA_DIMENSIONAL_TABLES: Record<
+  string,
+  {
+    dimensionType: string;
+    metricKeys: string[];
+    columns: { name: string; width?: string; dataKey: string }[];
+  }
+> = {
+  "google.channel_traffic": {
+    dimensionType: "channel",
+    metricKeys: [
+      "google.sessions",
+      "google.engagedSessions",
+      "google.engagementRate",
+      "google.avgSessionDuration",
+      "google.eventCount",
+    ],
+    columns: [
+      { name: "Channel", width: "20%", dataKey: "dimensionValue" },
+      { name: "Sessions", width: "13%", dataKey: "sessions" },
+      { name: "Engaged Sessions", width: "13%", dataKey: "engagedSessions" },
+      { name: "Engagement Rate", width: "13%", dataKey: "engagementRate" },
+      { name: "Avg. Session Duration", width: "13%", dataKey: "avgSessionDuration" },
+      { name: "Event Count", width: "13%", dataKey: "eventCount" },
+    ],
+  },
+  "google.browser_used": {
+    dimensionType: "browser",
+    metricKeys: [
+      "google.activeUsers",
+      "google.newUsers",
+      "google.engagedSessions",
+      "google.engagementRate",
+      "google.eventCount",
+    ],
+    columns: [
+      { name: "Browser", width: "30%", dataKey: "dimensionValue" },
+      { name: "Active Users", width: "17%", dataKey: "activeUsers" },
+      { name: "New Users", width: "17%", dataKey: "newUsers" },
+      { name: "Engaged Sessions", width: "18%", dataKey: "engagedSessions" },
+      { name: "Event Count", width: "18%", dataKey: "eventCount" },
+    ],
+  },
+  "google.device_category": {
+    dimensionType: "device",
+    metricKeys: [
+      "google.activeUsers",
+      "google.newUsers",
+      "google.engagedSessions",
+      "google.engagementRate",
+      "google.eventCount",
+    ],
+    columns: [
+      { name: "Device", width: "30%", dataKey: "dimensionValue" },
+      { name: "Active Users", width: "17%", dataKey: "activeUsers" },
+      { name: "New Users", width: "17%", dataKey: "newUsers" },
+      { name: "Engaged Sessions", width: "18%", dataKey: "engagedSessions" },
+      { name: "Event Count", width: "18%", dataKey: "eventCount" },
+    ],
+  },
+  "google.geo_country": {
+    dimensionType: "country",
+    metricKeys: [
+      "google.activeUsers",
+      "google.newUsers",
+      "google.engagedSessions",
+      "google.engagementRate",
+      "google.eventCount",
+    ],
+    columns: [
+      { name: "Country", width: "30%", dataKey: "dimensionValue" },
+      { name: "Active Users", width: "17%", dataKey: "activeUsers" },
+      { name: "New Users", width: "17%", dataKey: "newUsers" },
+      { name: "Engaged Sessions", width: "18%", dataKey: "engagedSessions" },
+      { name: "Event Count", width: "18%", dataKey: "eventCount" },
+    ],
+  },
+  "google.geo_city": {
+    dimensionType: "city",
+    metricKeys: [
+      "google.activeUsers",
+      "google.newUsers",
+      "google.engagedSessions",
+      "google.engagementRate",
+      "google.eventCount",
+    ],
+    columns: [
+      { name: "City", width: "30%", dataKey: "dimensionValue" },
+      { name: "Active Users", width: "17%", dataKey: "activeUsers" },
+      { name: "New Users", width: "17%", dataKey: "newUsers" },
+      { name: "Engaged Sessions", width: "18%", dataKey: "engagedSessions" },
+      { name: "Event Count", width: "18%", dataKey: "eventCount" },
+    ],
+  },
+  "google.top_pages": {
+    dimensionType: "page",
+    metricKeys: [
+      "google.sessions",
+      "google.activeUsers",
+      "google.avgSessionDuration",
+      "google.eventCount",
+    ],
+    columns: [
+      { name: "Page Path", width: "30%", dataKey: "dimensionValue" },
+      { name: "Sessions", width: "14%", dataKey: "sessions" },
+      { name: "Active Users", width: "14%", dataKey: "activeUsers" },
+      { name: "Avg. Session Duration", width: "21%", dataKey: "avgSessionDuration" },
+      { name: "Event Count", width: "21%", dataKey: "eventCount" },
+    ],
+  },
+  "google_seo.top_pages": {
+    dimensionType: "page",
+    metricKeys: [
+      "google_seo.clicks",
+      "google_seo.impressions",
+      "google_seo.ctr",
+      "google_seo.position",
+    ],
+    columns: [
+      { name: "Page", width: "50%", dataKey: "dimensionValue" },
+      { name: "Clicks", width: "15%", dataKey: "clicks" },
+      { name: "Impressions", width: "15%", dataKey: "impressions" },
+      { name: "CTR", width: "10%", dataKey: "ctr" },
+      { name: "Position", width: "10%", dataKey: "position" },
+    ],
+  },
+  "google_seo.top_queries": {
+    dimensionType: "query",
+    metricKeys: [
+      "google_seo.clicks",
+      "google_seo.impressions",
+      "google_seo.ctr",
+      "google_seo.position",
+    ],
+    columns: [
+      { name: "Query", width: "50%", dataKey: "dimensionValue" },
+      { name: "Clicks", width: "15%", dataKey: "clicks" },
+      { name: "Impressions", width: "15%", dataKey: "impressions" },
+      { name: "CTR", width: "10%", dataKey: "ctr" },
+      { name: "Position", width: "10%", dataKey: "position" },
+    ],
+  },
+};
+
+const DASHBOARD_SPECIAL_METRIC_KEYS = new Set([
+  "meta.facebook.recent_posts",
+  "meta.instagram.recent_media",
+  "meta.ads.campaign_performance",
+  "google_ads.campaign_performance",
+  "google_seo.clicks",
+  "google_seo.impressions",
+  "google_seo.ctr",
+  "google_seo.position",
+  "google_seo.top_pages",
+  "google_seo.top_queries",
+  "google.channel_traffic",
+  "google.browser_used",
+  "google.device_category",
+  "google.geo_country",
+  "google.geo_city",
+  "google.top_pages",
+]);
+
+const isDashboardRateMetric = (metricKey?: string) => {
+  const key = (metricKey || "").toLowerCase();
+  return (
+    key.includes("cpc") ||
+    key.includes("ctr") ||
+    key.includes("cpm") ||
+    key.includes("bouncerate") ||
+    key.includes("average") ||
+    key.includes("avg") ||
+    key.includes("rate") ||
+    key.includes("duration") ||
+    key.includes("perview")
+  );
+};
+
+const isDashboardSpecialWidget = (widget: DashboardWidget) => {
+  const metricKey = widget.metricKey || "";
+  if (DASHBOARD_SPECIAL_METRIC_KEYS.has(metricKey)) return true;
+
+  const normalizedIntegration = (widget.integration || "")
+    .toLowerCase()
+    .replace(/_/g, "-");
+
+  if (metricKey.startsWith("meta.instagram.followers.")) {
+    return true;
+  }
+
+  if (metricKey.startsWith("google.") || metricKey.startsWith("ga4.")) {
+    return true;
+  }
+
+  if (normalizedIntegration === "meta-ads" || normalizedIntegration === "meta_ads") {
+    return true;
+  }
+
+  if (
+    (normalizedIntegration === "meta-ads" || normalizedIntegration === "meta_ads") &&
+    (metricKey === "meta.ads.cpc" || metricKey === "meta.ads.ctr")
+  ) {
+    return true;
+  }
+
+  if (
+    (normalizedIntegration === "google-ads" || normalizedIntegration === "google_ads") &&
+    isDashboardRateMetric(metricKey)
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
+const parseMetaDemographicMetric = (metricKey: string) => {
+  const prefix = "meta.instagram.followers.";
+  if (!metricKey.startsWith(prefix)) return null;
+  const suffix = metricKey.slice(prefix.length);
+
+  const parse = (type: "age" | "gender" | "country" | "city", value?: string) => ({
+    type,
+    value: value || "",
+  });
+
+  if (suffix.startsWith("age.")) return parse("age", suffix.slice(4));
+  if (suffix.startsWith("gender.")) return parse("gender", suffix.slice(7));
+  if (suffix.startsWith("country.")) return parse("country", suffix.slice(8));
+  if (suffix.startsWith("city.")) return parse("city", suffix.slice(5));
+  if (suffix === "age") return parse("age");
+  if (suffix === "gender") return parse("gender");
+  if (suffix === "country") return parse("country");
+  if (suffix === "city") return parse("city");
+  return null;
 };
 
 // Helper to determine status based on integrations (Simulated logic for demo)
@@ -167,7 +513,11 @@ function Dashboard({
 
   // Create widget signature and date range key for query caching
   const widgetSignature = useMemo(() => {
-    return dashboardWidgets.map(w => w.id).join("|");
+    return dashboardWidgets
+      .map((w) =>
+        [w.id, w.metricKey, w.type, w.groupBy, w.accountId].join(":")
+      )
+      .join("|");
   }, [dashboardWidgets]);
 
   const dateRangeKey = useMemo(() => {
@@ -175,7 +525,7 @@ function Dashboard({
     return `${formatApiDate(dateRange.from)}_${formatApiDate(dateRange.to)}`;
   }, [dateRange]);
 
-  // Fetch widget data using GET /unified-metrics (same pattern as ReportBuilder)
+  // Fetch widget data using the batch resolver with a fallback for special widgets
   const widgetDataQuery = useQuery<Record<string, ResolvedWidgetData>>({
     queryKey: ["dashboard-widget-data", clientId, widgetSignature, dateRangeKey],
     enabled: !!clientId && dashboardWidgets.length > 0 && !!dateRange?.from && !!dateRange?.to,
@@ -194,9 +544,11 @@ function Dashboard({
         return {};
       }
 
-      // Fetch data for each widget using GET /unified-metrics
-      const promises = widgetsWithMetrics.map(async (widget: DashboardWidget) => {
-        try {
+      const specialWidgets = widgetsWithMetrics.filter(isDashboardSpecialWidget);
+      const batchWidgets = widgetsWithMetrics.filter((widget) => !isDashboardSpecialWidget(widget));
+
+        const fetchSpecialWidgetData = async (widget: DashboardWidget) => {
+          try {
           // Normalize integration key to match backend schema
           let normalizedIntegration = widget.integration?.toLowerCase() || "";
 
@@ -209,6 +561,15 @@ function Dashboard({
             normalizedIntegration = "google-analytics";
           } else if (normalizedIntegration === "woocommerce") {
             normalizedIntegration = "woo";
+          } else if (normalizedIntegration === "meta-business" || normalizedIntegration === "meta_business") {
+            const metricKey = widget.metricKey?.toLowerCase() || "";
+            if (metricKey.includes("facebook") || metricKey.startsWith("meta.page") || metricKey.startsWith("meta.facebook")) {
+              normalizedIntegration = "meta-facebook";
+            } else if (metricKey.includes("instagram") || metricKey.startsWith("meta.instagram")) {
+              normalizedIntegration = "meta-instagram";
+            } else if (metricKey.includes("ads") || metricKey.startsWith("meta.ads")) {
+              normalizedIntegration = "meta_ads";
+            }
           }
 
           // Validate integration key (accept both underscore and hyphen variants for Meta integrations)
@@ -217,6 +578,8 @@ function Dashboard({
             'google-search-console',
             'google-console',
             'meta',
+            'meta-business',
+            'meta_business',
             'meta-facebook',
             'meta-instagram',
             'meta-ads',
@@ -273,13 +636,398 @@ function Dashboard({
 
           const shouldIncludeAccountId = !['meta-facebook', 'meta-instagram', 'meta-ads', 'meta_ads', 'google_ads', 'google-ads'].includes(normalizedIntegration) || !isRateMetric;
 
-          const params: Record<string, string> = {
-            integration: normalizedIntegration,
-            metricKey: widget.metricKey!,
-            startDate: effectiveDateFrom,
-            endDate: dateTo,
-            ...(shouldIncludeAccountId && widget.accountId ? { accountId: widget.accountId } : {}),
-          };
+            const params: Record<string, string> = {
+              integration: normalizedIntegration,
+              metricKey: widget.metricKey!,
+              startDate: effectiveDateFrom,
+              endDate: dateTo,
+              ...(shouldIncludeAccountId && widget.accountId ? { accountId: widget.accountId } : {}),
+            };
+
+            const gaDimTable = widget.metricKey
+              ? DASHBOARD_GA_DIMENSIONAL_TABLES[widget.metricKey]
+              : undefined;
+            if (gaDimTable && clientId) {
+              const isGscTable = widget.metricKey?.startsWith("google_seo.");
+              if (isGscTable) {
+                const fetchFn =
+                  widget.metricKey === "google_seo.top_pages"
+                    ? getGoogleConsoleTopPages
+                    : getGoogleConsoleTopQueries;
+                const gscResp = await fetchFn(clientId, {
+                  startDate: effectiveDateFrom,
+                  endDate: dateTo,
+                });
+                const rawRows =
+                  (gscResp as any).topPages || (gscResp as any).topQueries || [];
+                const rows = rawRows.map((row: any, idx: number) => ({
+                  id: idx,
+                  metricKey: widget.metricKey!,
+                  integration: normalizedIntegration,
+                  accountId: widget.accountId || "",
+                  dimensionValue: row.page || row.query || "(not set)",
+                  clicks: Number(row.clicks ?? 0),
+                  impressions: Number(row.impressions ?? 0),
+                  ctr: Number(row.ctr ?? 0),
+                  position: Number(row.position ?? 0),
+                  value: Number(row.clicks ?? row.impressions ?? 0),
+                }));
+
+                return {
+                  id: widget.id,
+                  widget,
+                  data: {
+                    success: true,
+                    rows,
+                    columns: gaDimTable.columns,
+                    pagination: {
+                      page: 1,
+                      limit: rows.length,
+                      total: rows.length,
+                      totalPages: 1,
+                    },
+                  },
+                };
+              }
+
+              const gaTable = await getGoogleAnalyticsTable({
+                dimensionType: gaDimTable.dimensionType,
+                metricKeys: gaDimTable.metricKeys,
+                dateFrom: effectiveDateFrom,
+                dateTo,
+                clientId,
+              });
+              const mappedRows = (gaTable.rows || []).map((row: any, idx: number) => {
+                const dimensionValue = row.dimension || row.dimensionValue || "(not set)";
+                const sessions = Number(row["google.sessions"] ?? row.sessions ?? 0);
+                const activeUsers = Number(row["google.activeUsers"] ?? row.activeUsers ?? 0);
+                const newUsers = Number(row["google.newUsers"] ?? row.newUsers ?? 0);
+                const engagedSessions = Number(
+                  row["google.engagedSessions"] ?? row.engagedSessions ?? 0
+                );
+                const engagementRate = Number(
+                  row["google.engagementRate"] ?? row.engagementRate ?? 0
+                );
+                const avgSessionDuration = Number(
+                  row["google.avgSessionDuration"] ?? row.avgSessionDuration ?? 0
+                );
+                const eventCount = Number(row["google.eventCount"] ?? row.eventCount ?? 0);
+                const pageViews = Number(row["google.pageViews"] ?? row.pageViews ?? 0);
+                const primaryValue = sessions || activeUsers || pageViews;
+
+                return {
+                  id: idx,
+                  metricKey: widget.metricKey!,
+                  integration: "google_analytics",
+                  accountId: widget.accountId || "",
+                  dimensionValue,
+                  sessions,
+                  activeUsers,
+                  newUsers,
+                  engagedSessions,
+                  engagementRate: parseFloat((engagementRate * 100).toFixed(2)),
+                  avgSessionDuration: parseFloat(avgSessionDuration.toFixed(1)),
+                  eventCount,
+                  pageViews,
+                  value: primaryValue,
+                };
+              });
+
+              return {
+                id: widget.id,
+                widget,
+                data: {
+                  success: true,
+                  rows: mappedRows,
+                  columns: gaDimTable.columns,
+                  pagination: {
+                    page: 1,
+                    limit: mappedRows.length,
+                    total: mappedRows.length,
+                    totalPages: 1,
+                  },
+                },
+              };
+            }
+
+            const demoMetric = widget.metricKey ? parseMetaDemographicMetric(widget.metricKey) : null;
+            if (demoMetric && widget.accountId) {
+              const response = await getMetaDemographics(widget.accountId, {
+                startDate: effectiveDateFrom,
+                endDate: dateTo,
+            });
+            const payload = response.data ?? response;
+            const ageGender: Record<string, number> = (payload as any).ageGender ?? {};
+            const fansByCountry: Record<string, number> =
+              (payload as any).fansByCountry ?? (payload as any).country ?? {};
+            const fansByCity: Record<string, number> =
+              (payload as any).fansByCity ?? (payload as any).city ?? {};
+
+            let value = 0;
+            if (demoMetric.type === "age") {
+              if (demoMetric.value) {
+                const suffix = `.${demoMetric.value}`;
+                value = Object.entries(ageGender).reduce(
+                  (sum, [key, val]) => (key.endsWith(suffix) ? sum + val : sum),
+                  0
+                );
+              } else {
+                value = Object.values(ageGender).reduce((sum, val) => sum + val, 0);
+              }
+            } else if (demoMetric.type === "gender") {
+              if (demoMetric.value) {
+                const prefix = `${demoMetric.value}.`;
+                value = Object.entries(ageGender).reduce(
+                  (sum, [key, val]) => (key.startsWith(prefix) ? sum + val : sum),
+                  0
+                );
+              } else {
+                value = Object.values(ageGender).reduce((sum, val) => sum + val, 0);
+              }
+            } else if (demoMetric.type === "country") {
+              if (demoMetric.value) {
+                value = Number(fansByCountry[demoMetric.value] ?? 0);
+              } else {
+                value = Object.values(fansByCountry).reduce((sum, val) => sum + val, 0);
+              }
+            } else if (demoMetric.type === "city") {
+              if (demoMetric.value) {
+                value = Number(fansByCity[demoMetric.value] ?? 0);
+              } else {
+                value = Object.values(fansByCity).reduce((sum, val) => sum + val, 0);
+              }
+            }
+
+            return {
+              id: widget.id,
+              widget,
+              data: {
+                rows: [
+                  {
+                    id: 0,
+                    metricKey: widget.metricKey!,
+                    integration: widget.integration,
+                    accountId: widget.accountId || "",
+                    value,
+                    date: dateTo,
+                  },
+                ],
+                value,
+                total: value,
+              },
+              };
+            }
+
+            if (widget.metricKey === "meta.facebook.recent_posts") {
+              const targetAccountId = widget.accountId
+                ? String(widget.accountId)
+                : "";
+              if (targetAccountId) {
+                const postsData = await fetchMetaStoredPosts(
+                  targetAccountId,
+                  25,
+                  "createdTime",
+                  "desc",
+                  effectiveDateFrom,
+                  dateTo
+                );
+
+                if (postsData?.success && Array.isArray(postsData.posts)) {
+                  const rows = postsData.posts.map((post: any) => ({
+                    id: post.id,
+                    metricKey: widget.metricKey!,
+                    integration: normalizedIntegration,
+                    accountId: targetAccountId,
+                    date: post.createdTime
+                      ? new Date(post.createdTime).toLocaleDateString()
+                      : "",
+                    value: post.likes || 0,
+                    post: post.message || "(No caption)",
+                    impressions: post.impressions || 0,
+                    clicks: post.clicks || 0,
+                    likes: post.likes || 0,
+                    comments: post.comments || 0,
+                    shares: post.shares || 0,
+                    reactions: post.reactions || 0,
+                    fullPicture: post.fullPicture,
+                    permalinkUrl: post.permalinkUrl,
+                  }));
+
+                  return {
+                    id: widget.id,
+                    widget,
+                    data: {
+                      success: true,
+                      rows,
+                      pagination: {
+                        page: 1,
+                        limit: rows.length,
+                        total: rows.length,
+                        totalPages: 1,
+                      },
+                      columns: [
+                        { name: "Date", width: "15%", dataKey: "date" },
+                        { name: "Post", width: "40%", dataKey: "post" },
+                        { name: "Impressions", dataKey: "impressions" },
+                        { name: "Clicks", dataKey: "clicks" },
+                        { name: "Likes", dataKey: "likes" },
+                        { name: "Comments", dataKey: "comments" },
+                        { name: "Shares", dataKey: "shares" },
+                        { name: "Reactions", dataKey: "reactions" },
+                      ],
+                    },
+                  };
+                }
+              }
+            }
+
+            if (widget.metricKey === "meta.instagram.recent_media") {
+              const targetAccountId = widget.accountId
+                ? String(widget.accountId)
+                : "";
+              if (targetAccountId) {
+                const mediaData = await fetchInstagramStoredMedia(
+                  targetAccountId,
+                  25,
+                  effectiveDateFrom,
+                  dateTo
+                );
+
+                if (mediaData?.success && Array.isArray(mediaData.media)) {
+                  const rows = mediaData.media.map((media: any, idx: number) => ({
+                    id: media.id || `media-${idx}`,
+                    metricKey: widget.metricKey!,
+                    integration: normalizedIntegration,
+                    accountId: targetAccountId,
+                    date: media.createdTime
+                      ? new Date(media.createdTime).toLocaleDateString()
+                      : "",
+                    value: media.views || 0,
+                    post: media.caption || "(No caption)",
+                    impressions: media.views || 0,
+                    clicks: 0,
+                    likes: media.likeCount || 0,
+                    comments: media.comments || 0,
+                    shares: media.shares || 0,
+                    fullPicture: media.mediaUrl || media.fullPicture,
+                    permalinkUrl: media.permalinkUrl,
+                  }));
+
+                  return {
+                    id: widget.id,
+                    widget,
+                    data: {
+                      success: true,
+                      rows,
+                      pagination: {
+                        page: 1,
+                        limit: rows.length,
+                        total: rows.length,
+                        totalPages: 1,
+                      },
+                      columns: [
+                        { name: "Date", width: "15%", dataKey: "date" },
+                        { name: "Full Picture", dataKey: "fullPicture" },
+                        { name: "Post Message", width: "35%", dataKey: "post" },
+                        { name: "Impressions", dataKey: "impressions" },
+                        { name: "Clicks", dataKey: "clicks" },
+                        { name: "Likes", dataKey: "likes" },
+                        { name: "Shares", dataKey: "shares" },
+                      ],
+                    },
+                  };
+                }
+              }
+            }
+
+            if (widget.metricKey === "meta.ads.campaign_performance") {
+              if (clientId) {
+                const campaignData = await fetchMetaAdsCampaignPerformance(
+                  clientId,
+                  effectiveDateFrom,
+                  dateTo
+                );
+
+                if (campaignData?.success && Array.isArray(campaignData.rows)) {
+                  const rows = campaignData.rows.map((row: any, idx: number) => ({
+                    id: `campaign-${idx}`,
+                    metricKey: widget.metricKey!,
+                    integration: "meta_ads",
+                    accountId: widget.accountId || "",
+                    campaignName: row.campaignName,
+                    adName: row.adName,
+                    adsetName: row.adsetName,
+                    clicks: row.clicks,
+                    impressions: row.impressions,
+                    cpc: row.cpc,
+                    ctr: row.ctr,
+                  }));
+
+                  return {
+                    id: widget.id,
+                    widget,
+                    data: {
+                      success: true,
+                      rows,
+                      pagination: {
+                        page: 1,
+                        limit: rows.length,
+                        total: rows.length,
+                        totalPages: 1,
+                      },
+                      columns: [
+                        { name: "Campaign", width: "20%", dataKey: "campaignName" },
+                        { name: "Ad", width: "20%", dataKey: "adName" },
+                        { name: "Ad Set", width: "15%", dataKey: "adsetName" },
+                        { name: "Clicks", width: "10%", dataKey: "clicks" },
+                        { name: "Impressions", width: "12%", dataKey: "impressions" },
+                        { name: "Average CPC", width: "12%", dataKey: "cpc" },
+                        { name: "CTR", width: "11%", dataKey: "ctr" },
+                      ],
+                    },
+                  };
+                }
+              }
+            }
+
+            if (widget.metricKey?.startsWith("google.") || widget.metricKey?.startsWith("ga4.")) {
+              const groupBy = ['line_chart', 'area_chart', 'bar_chart'].includes(widget.type || "")
+                ? "day"
+              : undefined;
+              const gaResult = await getMetricData({
+                integration: "google_analytics",
+                metricKey: widget.metricKey!,
+                dateFrom: effectiveDateFrom,
+                dateTo: dateTo,
+                groupBy: groupBy as any,
+                clientId,
+              });
+              const series = gaResult?.data?.series ?? [];
+              const rows = series.map((point, index) => ({
+                id: index,
+                metricKey: widget.metricKey!,
+                integration: "google_analytics",
+                accountId: widget.accountId || "",
+                value: point.y,
+                date: point.x,
+                dimensionType: "day",
+                dimensionValue: point.x,
+                userId: 0,
+                clientId,
+                recordedAt: point.x,
+              }));
+              return {
+                id: widget.id,
+                widget,
+                data: {
+                  rows,
+                  series,
+                  data: gaResult.data,
+                  total: gaResult.data?.total,
+                  value: gaResult.data?.total,
+                },
+              };
+            }
 
           // --- START GOOGLE ADS MULTI-FETCH ---
           if ((normalizedIntegration === 'google-ads' || normalizedIntegration === 'google_ads')) {
@@ -374,10 +1122,10 @@ function Dashboard({
                     value: aggregateResult.value,
                     total: aggregateResult.value,
                     summary: {
-                      ...trendData?.summary,
+                      ...(trendData as any)?.summary,
                       [metricSuffix]: aggregateResult.value,
-                      cpc: metricSuffix === "cpc" ? aggregateResult.value : trendData?.summary?.cpc,
-                      ctr: metricSuffix === "ctr" ? aggregateResult.value : trendData?.summary?.ctr,
+                      cpc: metricSuffix === "cpc" ? aggregateResult.value : (trendData as any)?.summary?.cpc,
+                      ctr: metricSuffix === "ctr" ? aggregateResult.value : (trendData as any)?.summary?.ctr,
                     },
                   },
                 };
@@ -437,7 +1185,7 @@ function Dashboard({
                     total: aggregateResult.value,
                     rowCount: aggregateResult.rowCount,
                     summary: {
-                      ...trendData?.summary,
+                      ...(trendData as any)?.summary,
                       [metricSuffix]: aggregateResult.value,
                     },
                   },
@@ -454,6 +1202,23 @@ function Dashboard({
           }
           // --- END GOOGLE SEARCH CONSOLE AGGREGATE FETCH ---
 
+          const shouldTryMetaFallback =
+            normalizedIntegration.startsWith("meta") && widget.accountId;
+          if (shouldTryMetaFallback) {
+            const [primaryData, fallbackData] = await Promise.all([
+              fetchUnifiedMetric(clientId, params as any),
+              fetchUnifiedMetric(clientId, {
+                ...params,
+                accountId: undefined,
+              } as any),
+            ]);
+            const data =
+              primaryData?.rows && primaryData.rows.length > 0
+                ? primaryData
+                : fallbackData ?? primaryData;
+            return { id: widget.id, widget, data };
+          }
+
           const data = await fetchUnifiedMetric(clientId, params as {
             integration: string;
             metricKey: string;
@@ -466,14 +1231,74 @@ function Dashboard({
           console.error(`❌ [Dashboard] Failed to fetch data for widget ${widget.id} (${widget.metricKey}):`, error);
           return { id: widget.id, widget, data: null };
         }
-      });
+      };
 
-      const results = await Promise.all(promises);
+        const batchPayload: BatchWidgetRequest[] = batchWidgets.map((widget) => ({
+          id: widget.id,
+          metricKey: widget.metricKey!,
+          integration: widget.integration,
+          accountId: widget.accountId,
+          groupBy:
+            widget.groupBy ||
+            (["line_chart", "bar_chart", "area_chart"].includes(widget.type || "")
+              ? "day"
+              : undefined),
+          aggregation: widget.aggregation,
+          filters: widget.filters,
+        }));
+
+      const batchResult = batchPayload.length
+        ? await resolveDashboardMetrics({
+            widgets: batchPayload,
+            dateFrom,
+            dateTo,
+            clientId,
+          })
+        : null;
+
+      const specialResults = specialWidgets.length
+        ? await Promise.all(specialWidgets.map(fetchSpecialWidgetData))
+        : [];
 
       // Process and format data for each widget type
       const merged: Record<string, ResolvedWidgetData> = {};
 
-      results.forEach(({ id, widget, data }) => {
+        if (batchResult?.byId) {
+          batchWidgets.forEach((widget) => {
+            const resolved = batchResult.byId[widget.id];
+            if (!resolved) return;
+            const isChartType = ["line_chart", "bar_chart", "area_chart"].includes(
+              widget.type || ""
+            );
+            const hasDateRows =
+              Array.isArray(resolved.rows) &&
+              resolved.rows.some(
+                (row: any) =>
+                  row?.date || row?.dimensionType === "day" || row?.dimensionValue
+              );
+            const shouldBuildSeries =
+              isChartType &&
+              (!resolved.series || resolved.series.length === 0) &&
+              hasDateRows;
+            const series = shouldBuildSeries
+              ? buildSeriesFromRows(
+                  resolved.rows as Array<Record<string, any>>,
+                  isDashboardRateMetric(widget.metricKey)
+                )
+              : resolved.series ?? [];
+
+            merged[widget.id] = {
+              value: resolved.value ?? resolved.total ?? 0,
+              total: resolved.total ?? resolved.value ?? 0,
+              rawCount: resolved.rawCount ?? resolved.rows?.length ?? resolved.series?.length ?? 0,
+              rows: resolved.rows ?? [],
+              series,
+              columns: resolved.columns ?? [],
+            };
+          });
+        }
+
+      specialResults.forEach(({ id, widget, data }) => {
         // Check for different response structures
         if (!data) {
 
@@ -681,43 +1506,22 @@ function Dashboard({
 
         }
 
-        // Create time-series data for charts
-        // For YouTube and other integrations with dimensional data, aggregate by date
-        const seriesMap = new Map<string, { sum: number; count: number }>();
-        filteredRows.forEach((row: any) => {
-          const dateKey = row.date || row.dimensionValue || '';
-          if (dateKey) {
-            const current = seriesMap.get(dateKey) || { sum: 0, count: 0 };
-            seriesMap.set(dateKey, {
-              sum: current.sum + (row.value || 0),
-              count: current.count + 1
-            });
-          }
-        });
-
-        const series = Array.from(seriesMap.entries())
-          .map(([x, { sum, count }]) => {
-            // If the WIDGET metric is a rate, the daily value is likely already an average for that day.
-            // However, if we have multiple rows for the same day (e.g. from multiple accounts),
-            // we should average them for that day too if it's a rate metric.
-            const value = isRateMetric ? (sum / count) : sum;
-            return { x, y: value };
-          })
-          .sort((a, b) => {
-            // Sort by date if x is a date string, otherwise keep original order
-            const dateA = new Date(a.x).getTime();
-            const dateB = new Date(b.x).getTime();
-            if (!isNaN(dateA) && !isNaN(dateB)) {
-              return dateA - dateB;
-            }
-            return 0;
-          });
+          const rawSeries = Array.isArray((data as any).series)
+            ? (data as any).series
+            : Array.isArray((data as any).data?.series)
+              ? (data as any).data.series
+              : [];
+          const series =
+            rawSeries.length > 0
+              ? rawSeries
+              : buildSeriesFromRows(filteredRows, isRateMetric);
 
         // Format based on widget type
         if (widget.type === 'table') {
           merged[id] = {
             rows: filteredRows,
             rawCount: filteredRows.length,
+            columns: (data as any).columns,
           };
         } else if (widget.type === 'line_chart' || widget.type === 'bar_chart' || widget.type === 'area_chart') {
           merged[id] = {
@@ -736,6 +1540,12 @@ function Dashboard({
             rows: filteredRows,
             series: series,
           };
+        }
+      });
+
+      widgetsWithMetrics.forEach((widget) => {
+        if (!merged[widget.id]) {
+          merged[widget.id] = { value: 0, total: 0, rawCount: 0, rows: [], series: [] };
         }
       });
 
@@ -760,8 +1570,9 @@ function Dashboard({
 
 
 
-  const getIntegrationIcon = (integration: string, className?: string) => {
-    const platformConfig = getPlatformConfig(integration);
+  const getIntegrationIcon = (integration: string, className?: string, metricKey?: string) => {
+    const displayIntegration = getDisplayIntegration(integration, metricKey);
+    const platformConfig = getPlatformConfig(displayIntegration);
     const Icon = platformConfig?.icon || LayoutGrid; // Default fallback if not found
     return <Icon className={className} />;
   };
@@ -971,8 +1782,10 @@ function Dashboard({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 animate-in fade-in duration-500">
             {dashboardWidgets.map((widget) => {
               const data = resolvedWidgets[widget.id];
-              const brandColor = getBrandColor(widget.integration || '');
+              const displayIntegration = getDisplayIntegration(widget.integration || '', widget.metricKey);
+              const brandColor = getBrandColor(displayIntegration);
               const isHero = ['line_chart', 'area_chart', 'bar_chart'].includes(widget.type || '');
+              const isTable = widget.type === 'table';
 
               // Determine if this specific widget is loading (if we had granular loading)
               // For now, we rely on the main queries. 
@@ -984,7 +1797,7 @@ function Dashboard({
                     key={widget.id}
                     className={cn(
                       "bg-white rounded-3xl border border-zinc-100/60 p-6 shadow-sm flex flex-col gap-4",
-                      isHero ? "col-span-1 md:col-span-2 lg:col-span-2 row-span-2 h-[380px]" : "h-40"
+                      isHero || isTable ? "col-span-1 md:col-span-2 lg:col-span-2 row-span-2 h-[380px]" : "h-40"
                     )}
                   >
                     <div className="flex justify-between items-start">
@@ -1008,6 +1821,61 @@ function Dashboard({
               const value = (typeof data?.total === "number" ? data.total : undefined) ??
                 (typeof data?.value === "number" ? data.value : undefined);
 
+              if (isTable) {
+                const rows = (data?.rows as Array<Record<string, any>>) || [];
+                const columns = buildTableColumns(rows, (data as any)?.columns);
+                return (
+                  <div
+                    key={widget.id}
+                    className="col-span-1 md:col-span-2 lg:col-span-2 row-span-2 bg-white rounded-3xl border border-zinc-100/60 p-6 shadow-sm flex flex-col gap-4 h-[380px]"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="p-1.5 rounded-md bg-zinc-50/50"
+                          style={{ color: brandColor, backgroundColor: `${brandColor}10` }}
+                        >
+                          {getIntegrationIcon(widget.integration || '', "w-4 h-4", widget.metricKey)}
+                        </div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                          {nameCorrection(widget.integration || '')} • {widget.metricKey.split('.').pop()?.replace(/_/g, ' ')}
+                        </h3>
+                      </div>
+                    </div>
+                    <div className="flex-1 overflow-auto rounded-xl border border-zinc-100/80">
+                      {rows.length === 0 ? (
+                        <div className="flex items-center justify-center h-full text-sm text-zinc-400">
+                          No data available
+                        </div>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              {columns.map((col) => (
+                                <TableHead key={col.key} className="text-xs text-zinc-500">
+                                  {col.label}
+                                </TableHead>
+                              ))}
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {rows.map((row, idx) => (
+                              <TableRow key={row.id ?? idx}>
+                                {columns.map((col) => (
+                                  <TableCell key={col.key} className="text-xs">
+                                    {row[col.key] ?? "--"}
+                                  </TableCell>
+                                ))}
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
               if (isHero) {
                 // Render Large Chart
                 return (
@@ -1022,7 +1890,7 @@ function Dashboard({
                             className="p-1.5 rounded-md bg-zinc-50/50"
                             style={{ color: brandColor, backgroundColor: `${brandColor}10` }}
                           >
-                            {getIntegrationIcon(widget.integration || '', "w-4 h-4")}
+                          {getIntegrationIcon(widget.integration || '', "w-4 h-4", widget.metricKey)}
                           </div>
                           <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
                             {nameCorrection(widget.integration || '')} • {widget.metricKey.split('.').pop()?.replace(/_/g, ' ')}
@@ -1059,7 +1927,7 @@ function Dashboard({
                   series={(data?.series as any) || []}
                   brandColor={brandColor}
                   className="col-span-1 h-[180px]"
-                  icon={getIntegrationIcon(widget.integration || '', "w-4 h-4")}
+                  icon={getIntegrationIcon(widget.integration || '', "w-4 h-4", widget.metricKey)}
                   chartType="line"
                 />
               );

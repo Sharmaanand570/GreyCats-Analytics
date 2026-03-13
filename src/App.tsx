@@ -1,4 +1,6 @@
 import { lazy, Suspense } from "react";
+import { usePageTracking } from "./hooks/usePageTracking";
+import CookieConsentBanner from "./components/CookieConsentBanner";
 import { Routes, Route, Navigate } from "react-router-dom";
 import MainSideBar from "./components/MainSideBar";
 import AuthParentComp from "./features/Authantication/componenets/AuthParentComp";
@@ -106,11 +108,13 @@ function GlobalUpgradeModal() {
 }
 
 function App() {
+  usePageTracking();
   return (
     <ErrorBoundary>
       <Suspense fallback={<LoadingFallback />}>
         <ScrollToTop />
         <GlobalUpgradeModal />
+        <CookieConsentBanner />
         <Routes>
           <Route path="/" element={<AuthParentComp />}>
             <Route index element={<LandingPage />} />

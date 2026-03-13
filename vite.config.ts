@@ -14,9 +14,11 @@ export default defineConfig({
     // Note: console.log removal will be handled by logger utility
   },
   server: {
+    port: 5173,
+    strictPort: true,
     proxy: {
       "/api": {
-        target: "https://api.analytics.greycats.tech",
+        target: "http://192.168.5.100:5000",
         changeOrigin: true,
         secure: false, // Bypass SSL verification for development
         rewrite: (path) => path.replace(/^\/api/, "/api"), // Keep /api prefix

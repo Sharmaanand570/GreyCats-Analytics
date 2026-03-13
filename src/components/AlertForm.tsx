@@ -112,10 +112,46 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, clientName, clie
         onSubmit(payload);
     };
 
-    // Derived lists
-    const integrations = Object.keys(groupedMetrics || {});
-    const accounts = integration ? Object.keys(groupedMetrics?.[integration] || {}) : [];
+    // Normalize integration type (hyphenated from client) to underscore format used by metrics API
+    // Exception: google-search-console keeps its hyphen
+    const toMetricIntegrationId = (integrationType: string): string => {
+        if (integrationType === 'google-search-console') return 'google-search-console';
+        return integrationType.replace(/-/g, '_');
+    };
+
+    const INTEGRATION_DISPLAY_NAMES: Record<string, string> = {
+        meta_business: 'Meta Business',
+        meta_ads: 'Meta Ads',
+        meta_insights: 'Meta Insights',
+        youtube: 'YouTube',
+        shopify: 'Shopify',
+        woocommerce: 'WooCommerce',
+        'google-search-console': 'Google Search Console',
+        google_analytics: 'Google Analytics',
+        google_ads: 'Google Ads',
+    };
+
+    // Derived lists — prefer client.integrations for integration/account lists (more reliable than metrics API)
+    const integrations = client?.integrations?.length
+        ? [...new Set(client.integrations.map(i => toMetricIntegrationId(i.integrationType)))]
+        : Object.keys(groupedMetrics || {});
+
+    const accounts = integration && client?.integrations?.length
+        ? client.integrations
+            .filter(i => toMetricIntegrationId(i.integrationType) === integration)
+            .map(i => ({
+                value: (i.accountIdentifier && i.accountIdentifier !== 'unknown')
+                    ? i.accountIdentifier
+                    : i.accountId.toString(),
+                label: i.accountName || i.accountIdentifier || i.accountId.toString(),
+            }))
+        : integration
+            ? Object.keys(groupedMetrics?.[integration] || {}).map(acc => ({ value: acc, label: getAccountName(acc) }))
+            : [];
+
     const metrics = (integration && accountId) ? groupedMetrics?.[integration]?.[accountId] || [] : [];
+
+    console.log('🔔 AlertForm state:', { integration, accountId, availableAccounts: accounts.map(a => a.value), availableIntegrations: integrations });
 
     // Auto-fill metric label/name if editing
     useEffect(() => {
@@ -166,7 +202,9 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, clientName, clie
                         </SelectTrigger>
                         <SelectContent>
                             {integrations.map(int => (
-                                <SelectItem key={int} value={int}>{int.charAt(0).toUpperCase() + int.slice(1)}</SelectItem>
+                                <SelectItem key={int} value={int}>
+                                    {INTEGRATION_DISPLAY_NAMES[int] || (int.charAt(0).toUpperCase() + int.slice(1).replace(/[_-]/g, ' '))}
+                                </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
@@ -181,7 +219,7 @@ export const AlertForm: React.FC<AlertFormProps> = ({ clientId, clientName, clie
                         </SelectTrigger>
                         <SelectContent>
                             {accounts.map(acc => (
-                                <SelectItem key={acc} value={acc}>{getAccountName(acc)}</SelectItem>
+                                <SelectItem key={acc.value} value={acc.value}>{acc.label}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
