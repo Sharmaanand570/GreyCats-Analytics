@@ -3,7 +3,7 @@ import { ChartLineMultiple } from "./ChartLineMultiple";
 import { Link, useNavigate } from "react-router-dom";
 import { DateRangePicker } from "./DateRangePicker";
 import { type DateRange } from "react-day-picker";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 // Icons
 import { FiSearch, FiBell } from "react-icons/fi";
 import { LayoutGrid, Building2, Activity } from "lucide-react";
@@ -39,8 +39,6 @@ import {
   getMetaDemographics,
   getGoogleAnalyticsTable,
   getMetricData,
-  resolveDashboardMetrics,
-  type BatchWidgetRequest,
 } from "@/services/unifiedMetrics.api";
 import {
   getGoogleConsoleTopPages,
@@ -452,7 +450,23 @@ function Dashboard({
   dateRange: externalDateRange,
   onDateRangeChange
 }: DashboardProps) {
-  const [internalDateRange, setInternalDateRange] = useState(getDefaultDateRange());
+  // Restore saved date range from localStorage (survives refresh)
+  const [internalDateRange, setInternalDateRange] = useState<DateRange>(() => {
+    if (clientId) {
+      try {
+        const saved = localStorage.getItem(`dashboard-daterange-${clientId}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          const from = new Date(parsed.from);
+          const to = new Date(parsed.to);
+          if (!isNaN(from.getTime()) && !isNaN(to.getTime())) {
+            return { from, to };
+          }
+        }
+      } catch { /* ignore corrupt data */ }
+    }
+    return getDefaultDateRange();
+  });
   const navigate = useNavigate();
 
   const dateRange = externalDateRange || internalDateRange;
@@ -485,6 +499,15 @@ function Dashboard({
 
   const dashboards = dashboardsQuery.data ?? [];
   const activeDashboard = dashboards[0];
+
+  // Save date range to localStorage + backend whenever user changes it
+  const handleDateRangeChange = useCallback((range: DateRange | undefined) => {
+    if (range) setDateRange(range);
+    if (range?.from && range?.to && clientId) {
+      const payload = { from: formatApiDate(range.from), to: formatApiDate(range.to) };
+      localStorage.setItem(`dashboard-daterange-${clientId}`, JSON.stringify(payload));
+    }
+  }, [setDateRange, clientId]);
 
   const dashboardWidgets = useMemo<DashboardWidget[]>(() => {
 
@@ -1233,70 +1256,57 @@ function Dashboard({
         }
       };
 
-        const batchPayload: BatchWidgetRequest[] = batchWidgets.map((widget) => ({
-          id: widget.id,
-          metricKey: widget.metricKey!,
-          integration: widget.integration,
-          accountId: widget.accountId,
-          groupBy:
-            widget.groupBy ||
-            (["line_chart", "bar_chart", "area_chart"].includes(widget.type || "")
-              ? "day"
-              : undefined),
-          aggregation: widget.aggregation,
-          filters: widget.filters,
-        }));
-
-      const batchResult = batchPayload.length
-        ? await resolveDashboardMetrics({
-            widgets: batchPayload,
+      // Fetch batch widgets using GET /api/unified-metrics/data (same as Report Builder)
+      const batchFetches = batchWidgets.map(async (widget) => {
+        const isChartType = ["line_chart", "bar_chart", "area_chart"].includes(widget.type || "");
+        const groupBy = widget.groupBy || (isChartType ? "day" : undefined);
+        try {
+          const response = await getMetricData({
+            integration: widget.integration,
+            metricKey: widget.metricKey!,
+            accountId: widget.accountId,
             dateFrom,
             dateTo,
+            groupBy: groupBy as any,
+            aggregation: widget.aggregation as any,
             clientId,
-          })
-        : null;
+          });
+          return { widget, response };
+        } catch (error) {
+          console.error(`❌ [Dashboard] Batch fetch failed for ${widget.metricKey}:`, error);
+          return { widget, response: null };
+        }
+      });
 
-      const specialResults = specialWidgets.length
-        ? await Promise.all(specialWidgets.map(fetchSpecialWidgetData))
-        : [];
+      const [batchResults, specialResults] = await Promise.all([
+        batchFetches.length ? Promise.all(batchFetches) : Promise.resolve([]),
+        specialWidgets.length ? Promise.all(specialWidgets.map(fetchSpecialWidgetData)) : Promise.resolve([]),
+      ]);
 
       // Process and format data for each widget type
       const merged: Record<string, ResolvedWidgetData> = {};
 
-        if (batchResult?.byId) {
-          batchWidgets.forEach((widget) => {
-            const resolved = batchResult.byId[widget.id];
-            if (!resolved) return;
-            const isChartType = ["line_chart", "bar_chart", "area_chart"].includes(
-              widget.type || ""
-            );
-            const hasDateRows =
-              Array.isArray(resolved.rows) &&
-              resolved.rows.some(
-                (row: any) =>
-                  row?.date || row?.dimensionType === "day" || row?.dimensionValue
-              );
-            const shouldBuildSeries =
-              isChartType &&
-              (!resolved.series || resolved.series.length === 0) &&
-              hasDateRows;
-            const series = shouldBuildSeries
-              ? buildSeriesFromRows(
-                  resolved.rows as Array<Record<string, any>>,
-                  isDashboardRateMetric(widget.metricKey)
-                )
-              : resolved.series ?? [];
+        batchResults.forEach(({ widget, response }) => {
+          if (!response) return;
+          const payload = (response as any).data ?? response;
+          const series = payload.series ?? [];
+          const apiTotal = payload.total;
+          const total =
+            typeof apiTotal === "number"
+              ? apiTotal
+              : series.length > 0
+                ? series.reduce((acc: number, pt: { x: string; y: number }) => acc + (pt.y ?? 0), 0)
+                : 0;
 
-            merged[widget.id] = {
-              value: resolved.value ?? resolved.total ?? 0,
-              total: resolved.total ?? resolved.value ?? 0,
-              rawCount: resolved.rawCount ?? resolved.rows?.length ?? resolved.series?.length ?? 0,
-              rows: resolved.rows ?? [],
-              series,
-              columns: resolved.columns ?? [],
-            };
-          });
-        }
+          merged[widget.id] = {
+            value: total,
+            total,
+            rawCount: payload.rawCount ?? series.length,
+            rows: [],
+            series,
+            columns: [],
+          };
+        });
 
       specialResults.forEach(({ id, widget, data }) => {
         // Check for different response structures
@@ -1614,7 +1624,7 @@ function Dashboard({
               <DateRangePicker
                 value={dateRange}
                 // @ts-ignore
-                onChange={setDateRange}
+                onChange={handleDateRangeChange}
               />
             )}
           </div>
@@ -1960,7 +1970,7 @@ function Dashboard({
               <DateRangePicker
                 value={dateRange}
                 // @ts-ignore
-                onChange={setDateRange}
+                onChange={handleDateRangeChange}
               />
             )}
             {!clientId ? (

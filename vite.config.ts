@@ -1,9 +1,28 @@
 import path from "path";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
-export default defineConfig({
-  plugins: [react()],
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  // Extract origin (scheme + host + port) from the API base URL
+  const apiOrigin = env.VITE_API_BASE_URL
+    ? new URL(env.VITE_API_BASE_URL).origin
+    : 'http://localhost:5000';
+  const ngrokOrigin = env.VITE_NGROK_URL
+    ? new URL(env.VITE_NGROK_URL).origin
+    : '';
+
+  return {
+  plugins: [
+    react(),
+    {
+      name: 'csp-api-origin',
+      transformIndexHtml(html) {
+        const origins = [apiOrigin, ngrokOrigin].filter(Boolean).join(' ');
+        return html.replace(/__CSP_API_ORIGIN__/g, origins);
+      },
+    },
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -18,7 +37,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       "/api": {
-        target: "http://192.168.5.100:5000",
+        target: apiOrigin,
         changeOrigin: true,
         secure: false, // Bypass SSL verification for development
         rewrite: (path) => path.replace(/^\/api/, "/api"), // Keep /api prefix
@@ -36,4 +55,5 @@ export default defineConfig({
       },
     },
   },
+};
 });

@@ -181,7 +181,7 @@ export async function getMetricData(
 
   // Some integrations scope data by clientId — sending accountId causes 0 rows
   // because the stored account ID format may differ from what the frontend holds.
-  const NO_ACCOUNT_ID_INTEGRATIONS = new Set(["meta_ads", "meta_instagram", "meta_facebook", "google-search-console"]);
+  const NO_ACCOUNT_ID_INTEGRATIONS = new Set(["meta_ads", "meta_instagram", "meta_facebook", "google-search-console", "woo", "shopify", "youtube"]);
   if (params.accountId && !NO_ACCOUNT_ID_INTEGRATIONS.has(integration)) queryParams.accountId = params.accountId;
   if (params.groupBy && params.groupBy !== "none")
     queryParams.groupBy = params.groupBy;
@@ -248,10 +248,16 @@ export async function getMetricData(
 export async function resolveDashboardMetrics(
   payload: BatchResolvePayload
 ): Promise<BatchResolveResponse> {
-  const normalizedWidgets = payload.widgets.map((w) => ({
-    ...w,
-    integration: inferIntegrationFromMetricKey(w.metricKey, w.integration),
-  }));
+  const NO_ACCOUNT_ID_INTEGRATIONS = new Set(["meta_ads", "meta_instagram", "meta_facebook", "google-search-console", "woo", "shopify", "youtube"]);
+  const normalizedWidgets = payload.widgets.map((w) => {
+    const integration = inferIntegrationFromMetricKey(w.metricKey, w.integration);
+    return {
+      ...w,
+      integration,
+      // Strip accountId for integrations that scope by clientId only
+      accountId: NO_ACCOUNT_ID_INTEGRATIONS.has(integration) ? undefined : w.accountId,
+    };
+  });
 
   const body = {
     widgets: normalizedWidgets,

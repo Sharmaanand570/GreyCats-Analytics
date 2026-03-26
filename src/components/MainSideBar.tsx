@@ -24,6 +24,8 @@ import {
   LogOut,
   ShieldAlert,
   CreditCard,
+  ChevronDown,
+  CalendarDays,
 } from "lucide-react";
 import { FiMenu } from "react-icons/fi";
 import { useEffect, useState } from "react";
@@ -87,6 +89,15 @@ function MainSideBar(): React.JSX.Element {
     getInitialCollapseState()
   );
 
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    Analytics: true,
+    Settings: false,
+  });
+
+  const toggleGroup = (label: string) => {
+    setOpenGroups((prev) => ({ ...prev, [label]: !prev[label] }));
+  };
+
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -144,25 +155,24 @@ function MainSideBar(): React.JSX.Element {
 
   const menuGroups = [
     {
-      label: "Main",
+      label: "Analytics",
+      isCollapsible: true,
       items: [
         { label: "Clients", path: "/clients", icon: <Layers /> },
-      ],
-    },
-    {
-      label: "Work",
-      items: [
         { label: "Alerts", path: "/alerts", icon: <Bell /> },
-      ],
-    },
-    {
-      label: "Data",
-      items: [
         { label: "Reports", path: "/reports", icon: <FileText /> },
       ],
     },
     {
+      label: "Social Media",
+      isCollapsible: true,
+      items: [
+        { label: "Scheduler", path: "/social-media/scheduler", icon: <CalendarDays /> },
+      ],
+    },
+    {
       label: "Settings",
+      isCollapsible: true,
       items: [
         ...(user?.role === "ADMIN" || user?.role === "SUPER_ADMIN"
           ? [{ label: "Admin Panel", path: "/admin/dashboard", icon: <ShieldAlert /> }]
@@ -224,19 +234,35 @@ function MainSideBar(): React.JSX.Element {
               </div>
 
               {/* Menu Groups */}
-              {menuGroups.map((group) => (
+              {menuGroups.map((group) => {
+                const isOpen = openGroups[group.label] !== false;
+                return (
                 <SidebarGroup key={group.label}>
                   {!collabsState && (
-                    <SidebarGroupLabel
-                      className={`text-xs mb-2 uppercase tracking-wider text-zinc-400 px-2 pt-6 pb-2 transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${collabsState
-                        ? "opacity-0 max-h-0 overflow-hidden"
-                        : "opacity-100 max-h-20"
-                        }`}
+                    <div
+                      role="button"
+                      onClick={() => group.isCollapsible && toggleGroup(group.label)}
+                      className={`flex items-center justify-between w-full h-10 px-3 mt-1 mb-1 rounded-md transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                        group.isCollapsible ? "cursor-pointer bg-zinc-800/40 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/50 shadow-sm" : "text-zinc-500 font-semibold uppercase text-xs"
+                      } ${
+                        collabsState ? "opacity-0 max-h-0 overflow-hidden hidden" : "opacity-100 max-h-20 flex"
+                      }`}
                     >
-                      {group.label}
-                    </SidebarGroupLabel>
+                      {group.isCollapsible ? (
+                        <span className="text-[15px] font-medium tracking-wide">
+                          {group.label}
+                        </span>
+                      ) : (
+                        <span className="text-xs tracking-wider uppercase">
+                          {group.label}
+                        </span>
+                      )}
+                      {group.isCollapsible && (
+                        <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
+                      )}
+                    </div>
                   )}
-                  <SidebarGroupContent>
+                  <SidebarGroupContent className={`transition-all duration-300 ease-in-out overflow-hidden ${group.isCollapsible && !isOpen && !collabsState ? "max-h-0 opacity-0" : "max-h-[1000px] opacity-100"}`}>
                     <SidebarMenu>
                       {group.items.map((item, index) => (
                         <SidebarMenuItem key={item.path}>
@@ -271,7 +297,7 @@ function MainSideBar(): React.JSX.Element {
                     </SidebarMenu>
                   </SidebarGroupContent>
                 </SidebarGroup>
-              ))}
+              )})}
 
               {/* Footer */}
               <SidebarFooter className="mt-auto border-t border-zinc-700 pt-4">
@@ -354,7 +380,9 @@ function MainSideBar(): React.JSX.Element {
 
               {/* Menu Groups */}
               <nav className="flex flex-col space-y-6 grow">
-                {menuGroups.map((group, groupIndex) => (
+                {menuGroups.map((group, groupIndex) => {
+                  const isOpen = openGroups[group.label] !== false;
+                  return (
                   <div
                     key={group.label}
                     className="transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]"
@@ -364,10 +392,26 @@ function MainSideBar(): React.JSX.Element {
                       transform: "translateX(0)",
                     }}
                   >
-                    <h3 className="text-xs uppercase tracking-wider text-zinc-400 mb-2 px-1 transition-colors duration-300">
-                      {group.label}
-                    </h3>
-                    <div className="flex flex-col space-y-2">
+                    <div 
+                      className={`flex items-center justify-between w-full h-11 px-3 mb-2 rounded-md transition-all duration-300 ${
+                        group.isCollapsible ? "cursor-pointer bg-zinc-800/40 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/50 shadow-sm" : "text-zinc-500 uppercase text-xs font-semibold"
+                      }`}
+                      onClick={() => group.isCollapsible && toggleGroup(group.label)}
+                    >
+                      {group.isCollapsible ? (
+                        <span className="text-[15px] font-medium tracking-wide">
+                          {group.label}
+                        </span>
+                      ) : (
+                        <h3 className="tracking-wider m-0">
+                          {group.label}
+                        </h3>
+                      )}
+                      {group.isCollapsible && (
+                        <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
+                      )}
+                    </div>
+                    <div className={`flex flex-col space-y-2 overflow-hidden transition-all duration-300 ${group.isCollapsible && !isOpen ? "max-h-0 opacity-0" : "max-h-[500px] opacity-100"}`}>
                       {group.items.map((item, itemIndex) => (
                         <button
                           key={item.path}
@@ -391,7 +435,7 @@ function MainSideBar(): React.JSX.Element {
                       ))}
                     </div>
                   </div>
-                ))}
+                )})}
               </nav>
 
               {/* Footer */}

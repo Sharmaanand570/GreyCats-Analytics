@@ -197,7 +197,7 @@ export const fetchUnifiedAggregate = (params: {
       startDate: params.startDate,
       endDate: params.endDate,
     };
-    const META_NO_ACCOUNT_ID = new Set(["meta_ads", "meta_instagram", "meta_facebook"]);
+    const META_NO_ACCOUNT_ID = new Set(["meta_ads", "meta_instagram", "meta_facebook", "google-search-console", "woo", "shopify", "youtube"]);
     if (params.accountId && !META_NO_ACCOUNT_ID.has(params.integration)) queryParams.accountId = params.accountId;
     if (params.clientId) queryParams.clientId = String(params.clientId);
 
@@ -612,7 +612,7 @@ export const fetchUnifiedMetric = (
     if (params.token) requestParams.token = params.token;
     if (params.groupBy && params.groupBy !== 'none') requestParams.groupBy = params.groupBy;
     if (params.aggregation) requestParams.aggregation = params.aggregation;
-    const META_NO_ACCOUNT_ID_FETCH = new Set(["meta_ads", "meta_instagram", "meta_facebook"]);
+    const META_NO_ACCOUNT_ID_FETCH = new Set(["meta_ads", "meta_instagram", "meta_facebook", "google-search-console", "woo", "shopify", "youtube"]);
     if (params.accountId && !META_NO_ACCOUNT_ID_FETCH.has(integrationName)) requestParams.accountId = params.accountId;
     // GSC and other integrations that scope by clientId need it as an explicit query param
     // (JWT token identifies the user but clientId scopes to the specific client account)

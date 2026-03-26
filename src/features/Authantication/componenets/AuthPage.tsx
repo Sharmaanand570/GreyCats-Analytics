@@ -55,6 +55,9 @@ const SignupDetailsSchema = z.object({
   email: z.string().min(1, "Email is required").email("Enter a valid email address"),
   fullName: nameValidation,
   password: passwordValidation,
+  termsAccepted: z.boolean().refine((val) => val === true, {
+    message: "You must accept the Terms of Service and Privacy Policy to continue",
+  }),
 });
 
 const SignupOtpSchema = z.object({
@@ -114,6 +117,7 @@ export default function AuthPage() {
       password: "",
       fullName: "",
       otp: "",
+      termsAccepted: false,
     } as any,
     shouldUnregister: true, // Unregister fields not in DOM
   });
@@ -365,6 +369,45 @@ export default function AuthPage() {
                     </p>
                   )}
                 </div>
+
+                {/* Terms & Conditions checkbox — signup only, shown once */}
+                {!isLogin && (
+                  <div className="space-y-1">
+                    <div className="flex items-start gap-2">
+                      <input
+                        id="termsAccepted"
+                        type="checkbox"
+                        {...register("termsAccepted" as any)}
+                        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-foreground"
+                      />
+                      <label htmlFor="termsAccepted" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
+                        I agree to the{" "}
+                        <Link
+                          to="/terms-of-service"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline underline-offset-2 hover:text-foreground"
+                        >
+                          Terms of Service
+                        </Link>{" "}
+                        and{" "}
+                        <Link
+                          to="/privacy-policy"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline underline-offset-2 hover:text-foreground"
+                        >
+                          Privacy Policy
+                        </Link>
+                      </label>
+                    </div>
+                    {errors.termsAccepted && (
+                      <p className="text-xs text-red-500">
+                        {errors.termsAccepted.message as string}
+                      </p>
+                    )}
+                  </div>
+                )}
               </>
             )}
 
@@ -483,28 +526,30 @@ export default function AuthPage() {
             </p>
           )}
 
-          {/* Policies */}
-          <p className="px-4 text-center text-xs text-muted-foreground">
-            By continuing, you agree to our{" "}
-            <Link
-              to="/terms-of-service"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2 hover:text-foreground"
-            >
-              Terms of Service
-            </Link>{" "}
-            and{" "}
-            <Link
-              to="/privacy-policy"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2 hover:text-foreground"
-            >
-              Privacy Policy
-            </Link>
-            .
-          </p>
+          {/* Policies — only shown on login; signup uses the checkbox above */}
+          {isLogin && (
+            <p className="px-4 text-center text-xs text-muted-foreground">
+              By continuing, you agree to our{" "}
+              <Link
+                to="/terms-of-service"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link
+                to="/privacy-policy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                Privacy Policy
+              </Link>
+              .
+            </p>
+          )}
         </div>
       </div>
 

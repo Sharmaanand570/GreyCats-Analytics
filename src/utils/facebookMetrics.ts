@@ -26,7 +26,6 @@ export const FACEBOOK_DAILY_METRICS = [
     'meta.facebook.page.page_daily_follows',
     'meta.facebook.page.page_daily_follows_unique',
     'meta.facebook.page.page_daily_unfollows_unique',
-    'meta.facebook.page.page_impressions_unique',
     'meta.facebook.page.page_media_view',
     'meta.facebook.page.page_post_engagements',
     'meta.facebook.page.page_posts_impressions',

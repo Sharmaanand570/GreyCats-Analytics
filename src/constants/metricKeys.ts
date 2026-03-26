@@ -130,7 +130,7 @@ export const GOOGLE_SEO_METRICS = [
 // ── YouTube ───────────────────────────────────────────────────────────────────
 export const YOUTUBE_VIEWS = "youtube.views" as const;
 export const YOUTUBE_ESTIMATED_MINUTES_WATCHED =
-  "youtube.estimatedMinutesWatched" as const;
+  "youtube.watchTimeSec" as const;
 export const YOUTUBE_SUBSCRIBERS_GAINED =
   "youtube.subscribersGained" as const;
 export const YOUTUBE_LIKES = "youtube.likes" as const;

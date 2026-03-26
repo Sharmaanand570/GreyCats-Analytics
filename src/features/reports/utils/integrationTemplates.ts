@@ -43,7 +43,6 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
   "meta-facebook": [
     "meta.facebook.page.page_follows",
     "meta.facebook.page.page_posts_impressions_unique",
-    "meta.facebook.page.page_impressions_unique",
     "meta.page.views",
     "meta.page.postImpressions",
     "meta.facebook.postsCount",
@@ -105,7 +104,6 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
     // Facebook metrics
     "meta.facebook.page.page_follows",
     "meta.facebook.page.page_posts_impressions_unique",
-    "meta.facebook.page.page_impressions_unique",
     "meta.page.views",
     "meta.page.postImpressions",
     "meta.facebook.postsCount",
@@ -141,7 +139,6 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
   "metabusiness": [
     "meta.facebook.page.page_follows",
     "meta.facebook.page.page_posts_impressions_unique",
-    "meta.facebook.page.page_impressions_unique",
     "meta.page.views",
     "meta.page.postImpressions",
     "meta.facebook.postsCount",
@@ -195,7 +192,7 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
     "youtube.likes",
     "youtube.comments",
     "youtube.subscribersGained",
-    "youtube.estimatedMinutesWatched",
+    "youtube.watchTimeSec",
   ],
   "shopify": [
     "shopify.revenue",
@@ -267,12 +264,11 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
       {
         name: 'Facebook',
         widgets: [
-          // Row 1: 5 metric cards
-          { type: 'metric', metricKey: 'meta.facebook.page.page_follows', x: 0, y: 0, w: 2.4, h: 3, displayName: 'Page follows' },
-          { type: 'metric', metricKey: 'meta.facebook.page.page_posts_impressions_unique', x: 2.4, y: 0, w: 2.4, h: 3, displayName: 'Unique page post impressions' },
-          { type: 'metric', metricKey: 'meta.page.views', x: 4.8, y: 0, w: 2.4, h: 3, displayName: 'Page views' },
-          { type: 'metric', metricKey: 'meta.facebook.postsCount', x: 7.2, y: 0, w: 2.4, h: 3, displayName: 'Posts (total)' },
-          { type: 'metric', metricKey: 'meta.facebook.page.page_impressions_unique', x: 9.6, y: 0, w: 2.4, h: 3, displayName: 'Impressions (Unique)' },
+          // Row 1: 4 metric cards (full width)
+          { type: 'metric', metricKey: 'meta.facebook.page.page_follows', x: 0, y: 0, w: 3, h: 3, displayName: 'Page follows' },
+          { type: 'metric', metricKey: 'meta.facebook.page.page_posts_impressions_unique', x: 3, y: 0, w: 3, h: 3, displayName: 'Unique page post impressions' },
+          { type: 'metric', metricKey: 'meta.page.views', x: 6, y: 0, w: 3, h: 3, displayName: 'Page views' },
+          { type: 'metric', metricKey: 'meta.facebook.postsCount', x: 9, y: 0, w: 3, h: 3, displayName: 'Posts (total)' },
 
           // Row 2: 5 metric cards
           { type: 'metric', metricKey: 'meta.facebook.mediaViews', x: 0, y: 3, w: 2.4, h: 3, displayName: 'Page media views' },
@@ -308,7 +304,7 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
           name: 'Instagram',
           widgets: [
             // Row 1: 4 metric cards
-            { type: 'metric', metricKey: 'meta.instagram.mediaCount', x: 0, y: 0, w: 3, h: 3, displayName: 'Posted content' },
+            { type: 'metric', metricKey: 'meta.instagram.postedContent', x: 0, y: 0, w: 3, h: 3, displayName: 'Posted content' },
             { type: 'metric', metricKey: 'meta.instagram.reach', x: 3, y: 0, w: 3, h: 3, displayName: 'Reach' },
             { type: 'metric', metricKey: 'meta.instagram.reelCount', x: 6, y: 0, w: 3, h: 3, displayName: 'Reels' },
             { type: 'metric', metricKey: 'meta.instagram.postCount', x: 9, y: 0, w: 3, h: 3, displayName: 'Posts' },
@@ -449,7 +445,7 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
   'meta-instagram': {
     widgets: [
       // Row 1: 4 metric cards
-      { type: 'metric', metricKey: 'meta.instagram.mediaCount', x: 0, y: 0, w: 3, h: 3, displayName: 'Posted content' },
+      { type: 'metric', metricKey: 'meta.instagram.postedContent', x: 0, y: 0, w: 3, h: 3, displayName: 'Posted content' },
       { type: 'metric', metricKey: 'meta.instagram.reach', x: 3, y: 0, w: 3, h: 3, displayName: 'Reach' },
       { type: 'metric', metricKey: 'meta.instagram.reelCount', x: 6, y: 0, w: 3, h: 3, displayName: 'Reels' },
       { type: 'metric', metricKey: 'meta.instagram.postCount', x: 9, y: 0, w: 3, h: 3, displayName: 'Posts' },
@@ -721,17 +717,15 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
   // YOUTUBE
   'youtube': {
     widgets: [
-      // Row 1: 4 metric cards
-      { type: 'metric', metricKey: 'youtube.views', x: 0, y: 0, w: 3, h: 3, displayName: 'Views' },
-      { type: 'metric', metricKey: 'youtube.likes', x: 3, y: 0, w: 3, h: 3, displayName: 'Likes' },
-      { type: 'metric', metricKey: 'youtube.comments', x: 6, y: 0, w: 3, h: 3, displayName: 'Comments' },
-      { type: 'metric', metricKey: 'youtube.subscribersGained', x: 9, y: 0, w: 3, h: 3, displayName: 'Subscribers Gained' },
+      // Row 1: 5 metric cards (evenly spaced)
+      { type: 'metric', metricKey: 'youtube.views', x: 0, y: 0, w: 2.4, h: 3, displayName: 'Views' },
+      { type: 'metric', metricKey: 'youtube.likes', x: 2.4, y: 0, w: 2.4, h: 3, displayName: 'Likes' },
+      { type: 'metric', metricKey: 'youtube.comments', x: 4.8, y: 0, w: 2.4, h: 3, displayName: 'Comments' },
+      { type: 'metric', metricKey: 'youtube.subscribersGained', x: 7.2, y: 0, w: 2.4, h: 3, displayName: 'Subscribers Gained' },
+      { type: 'metric', metricKey: 'youtube.watchTimeSec', x: 9.6, y: 0, w: 2.4, h: 3, displayName: 'Watch Time' },
 
-      // Row 2: Watch Time + Views trend chart side by side
-      { type: 'metric', metricKey: 'youtube.estimatedMinutesWatched', x: 0, y: 3, w: 4, h: 3, displayName: 'Watch Time (min)' },
-
-      // Row 3: Views trend chart (full width)
-      { type: 'line_chart', metricKey: 'youtube.views', x: 0, y: 6, w: 12, h: 5, displayName: 'Views Over Time' },
+      // Row 2: Views trend chart (full width)
+      { type: 'line_chart', metricKey: 'youtube.views', x: 0, y: 3, w: 12, h: 5, displayName: 'Views Over Time' },
     ]
   },
 

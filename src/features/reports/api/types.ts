@@ -393,6 +393,8 @@ export interface Dashboard {
   clientId?: number;
   name: string;
   widgets: Record<string, DashboardWidget>;
+  /** Persisted date range (ISO strings) so the dashboard remembers the last selection */
+  dateRange?: { from: string; to: string };
   createdAt?: string;
   updatedAt?: string;
 }
@@ -400,6 +402,7 @@ export interface Dashboard {
 export interface CreateDashboardPayload {
   name: string;
   widgets: Record<string, DashboardWidget>;
+  dateRange?: { from: string; to: string };
 }
 
 export type CreateDashboardResponse = ApiSuccessResponse<{

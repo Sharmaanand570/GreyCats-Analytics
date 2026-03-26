@@ -48,6 +48,29 @@ import type {
   CustomWidgetData,
 } from "@/components/widgetTypes";
 
+/**
+ * Format large numbers into compact human-readable strings.
+ * e.g. 1234 → "1.23K", 1500000 → "1.5M", 45 → "45"
+ */
+function formatCompactNumber(value: number): string {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+
+  if (abs >= 1_000_000_000) {
+    const n = abs / 1_000_000_000;
+    return sign + (n % 1 === 0 ? n.toFixed(0) : n.toFixed(2).replace(/\.?0+$/, "")) + "B";
+  }
+  if (abs >= 1_000_000) {
+    const n = abs / 1_000_000;
+    return sign + (n % 1 === 0 ? n.toFixed(0) : n.toFixed(2).replace(/\.?0+$/, "")) + "M";
+  }
+  if (abs >= 1_000) {
+    const n = abs / 1_000;
+    return sign + (n % 1 === 0 ? n.toFixed(0) : n.toFixed(2).replace(/\.?0+$/, "")) + "K";
+  }
+  return value % 1 !== 0 ? value.toFixed(2) : String(value);
+}
+
 export const renderWidgetEmptyState = (
   onConnectIntegration?: () => void,
   message = "No data yet"
@@ -787,14 +810,27 @@ export const renderWidgetContent = (
                     { name: "Shares", dataKey: "shares" }
                   ]
                   : [
-                    { name: "Date", width: "15%", dataKey: "date" },
-                    { name: "Post", width: "40%", dataKey: "post" },
-                    { name: "Impressions", dataKey: "impressions" },
+                    { name: "Date", width: "10%" },
+                    { name: "Image", dataKey: "fullPicture" },
+                    { name: "Post", width: "35%", dataKey: "post" },
                     { name: "Clicks", dataKey: "clicks" },
                     { name: "Likes", dataKey: "likes" },
                     { name: "Comments", dataKey: "comments" },
                     { name: "Shares", dataKey: "shares" }
                   ];
+              }
+
+              // Force fresh column schema for Facebook posts (removes saved "Post impressions", adds Image)
+              if (metricConfig?.metricKey === 'meta.facebook.recent_posts') {
+                return [
+                  { name: "Date", width: "10%" },
+                  { name: "Image", dataKey: "fullPicture" },
+                  { name: "Post", width: "35%", dataKey: "post" },
+                  { name: "Clicks", dataKey: "clicks" },
+                  { name: "Likes", dataKey: "likes" },
+                  { name: "Comments", dataKey: "comments" },
+                  { name: "Shares", dataKey: "shares" },
+                ];
               }
 
               // Otherwise use existing columns if present
@@ -839,9 +875,9 @@ export const renderWidgetContent = (
                   { name: "Shares", dataKey: "shares" }
                 ]
                 : [
-                  { name: "Date", width: "15%", dataKey: "date" },
-                  { name: "Post", width: "40%", dataKey: "post" },
-                  { name: "Impressions", dataKey: "impressions" },
+                  { name: "Date", width: "10%" },
+                  { name: "Image", dataKey: "fullPicture" },
+                  { name: "Post", width: "35%", dataKey: "post" },
                   { name: "Clicks", dataKey: "clicks" },
                   { name: "Likes", dataKey: "likes" },
                   { name: "Comments", dataKey: "comments" },
@@ -1041,18 +1077,19 @@ export const renderWidgetContent = (
                         // Special rendering for image thumbnail column (dataKey is fullPicture)
                         if (col.dataKey === "fullPicture" && (cellValue || (row as any).fullPicture)) {
                           const imgSrc = String(cellValue || (row as any).fullPicture);
+                          const permalinkUrl = (row as any).permalinkUrl as string | undefined;
                           return (
                             <TableCell key={colIndex} className="px-2 md:px-4 py-2">
                               <div className="w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded overflow-hidden border">
                                 <img
                                   src={imgSrc}
                                   alt="Media"
-                                  className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                  className={`w-full h-full object-cover transition-opacity ${permalinkUrl ? 'cursor-pointer hover:opacity-80' : ''}`}
                                   onError={(e) => {
                                     e.currentTarget.style.display = 'none';
                                     e.currentTarget.parentElement!.innerHTML = '<span class="text-xs text-gray-400">No image</span>';
                                   }}
-                                  onClick={() => window.open(imgSrc, '_blank')}
+                                  onClick={() => permalinkUrl && window.open(permalinkUrl, '_blank')}
                                 />
                               </div>
                             </TableCell>
@@ -1082,18 +1119,19 @@ export const renderWidgetContent = (
 
                         // Special rendering for "Full Picture" column - show image thumbnail
                         if (col.name === "Full Picture" && cellValue) {
+                          const permalinkUrl = (row as any).permalinkUrl as string | undefined;
                           return (
                             <TableCell key={colIndex} className="px-2 md:px-4 py-2">
                               <div className="w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded overflow-hidden border">
                                 <img
                                   src={String(cellValue)}
                                   alt="Media"
-                                  className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                  className={`w-full h-full object-cover transition-opacity ${permalinkUrl ? 'cursor-pointer hover:opacity-80' : ''}`}
                                   onError={(e) => {
                                     e.currentTarget.style.display = 'none';
                                     e.currentTarget.parentElement!.innerHTML = '<span class="text-xs text-gray-400">No image</span>';
                                   }}
-                                  onClick={() => window.open(String(cellValue), '_blank')}
+                                  onClick={() => permalinkUrl && window.open(permalinkUrl, '_blank')}
                                 />
                               </div>
                             </TableCell>
@@ -1220,7 +1258,7 @@ export const renderWidgetContent = (
 
       const finalValue = resolvedValue ?? metricData?.value ?? 0;
       const formattedValue = typeof finalValue === "number"
-        ? (finalValue % 1 !== 0 ? Number(finalValue.toFixed(2)) : finalValue)
+        ? formatCompactNumber(finalValue)
         : finalValue;
 
       // Fallback unit if not specified in config

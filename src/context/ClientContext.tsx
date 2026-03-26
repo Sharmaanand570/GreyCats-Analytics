@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
-import type { Client } from '../types/client.types';
+import type { Client, ClientWithIntegrations } from '../types/client.types';
 
 interface ClientContextType {
-    currentClient: Client | null;
-    setCurrentClient: (client: Client | null) => void;
-    clients: Client[];
-    setClients: (clients: Client[]) => void;
+    currentClient: ClientWithIntegrations | null;
+    setCurrentClient: (client: ClientWithIntegrations | null) => void;
+    clients: ClientWithIntegrations[];
+    setClients: (clients: ClientWithIntegrations[]) => void;
     isLoading: boolean;
     setIsLoading: (loading: boolean) => void;
 }
@@ -18,8 +18,8 @@ interface ClientProviderProps {
 }
 
 export const ClientProvider: React.FC<ClientProviderProps> = ({ children }) => {
-    const [currentClient, setCurrentClient] = useState<Client | null>(null);
-    const [clients, setClients] = useState<Client[]>([]);
+    const [currentClient, setCurrentClient] = useState<ClientWithIntegrations | null>(null);
+    const [clients, setClients] = useState<ClientWithIntegrations[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const { clientId } = useParams<{ clientId: string }>();
 

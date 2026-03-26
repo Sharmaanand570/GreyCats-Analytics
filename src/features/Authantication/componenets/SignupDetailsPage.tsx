@@ -115,7 +115,7 @@ export default function SignupDetailsPage() {
                 companyPIN: data.pin,
             });
             toast.success("All set!");
-            navigate("/pricing"); // New users land on pricing page to choose their plan
+            navigate("/clients"); // New users land on pricing page to choose their plan
         } catch (error) {
             toast.error("Failed to save address details.");
         } finally {
@@ -125,7 +125,7 @@ export default function SignupDetailsPage() {
 
     const handleSkip = () => {
         if (step === 2) setStep(3);
-        else if (step === 3) navigate("/pricing");
+        else if (step === 3) navigate("/clients");
     };
 
     // ---------------------------

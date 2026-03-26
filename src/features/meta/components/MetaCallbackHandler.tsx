@@ -30,6 +30,7 @@ function MetaCallbackHandler() {
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [clientId, setClientId] = useState<number | null>(null);
   const [integrationType, setIntegrationType] = useState<IntegrationType | null>(null);
+  const [returnPath, setReturnPath] = useState<string | null>(null);
 
   useEffect(() => {
     const processCallback = async () => {
@@ -49,8 +50,14 @@ function MetaCallbackHandler() {
 
         toast.error(errorMessage);
         setIsProcessing(false);
+        const returnPath = localStorage.getItem('pending_oauth_return');
         setTimeout(() => {
-          navigate("/data-sources");
+          if (returnPath) {
+            localStorage.removeItem('pending_oauth_return');
+            navigate(returnPath);
+          } else {
+            navigate("/data-sources");
+          }
         }, 3000);
         return;
       }
@@ -60,6 +67,8 @@ function MetaCallbackHandler() {
         // ✅ AUTH SUCCESS
         const storedClientId = localStorage.getItem('pending_oauth_client_id');
         const storedIntegration = localStorage.getItem('pending_oauth_integration');
+        const storedReturn = localStorage.getItem('pending_oauth_return');
+        if (storedReturn) setReturnPath(storedReturn);
 
         if (storedClientId && storedIntegration) {
           setClientId(parseInt(storedClientId));
@@ -78,8 +87,14 @@ function MetaCallbackHandler() {
       console.warn("Missing or invalid callback parameters", params);
       toast.error("Invalid callback parameters. Please try connecting again.");
       setIsProcessing(false);
+      const returnPath = localStorage.getItem('pending_oauth_return');
       setTimeout(() => {
-        navigate("/data-sources");
+        if (returnPath) {
+          localStorage.removeItem('pending_oauth_return');
+          navigate(returnPath);
+        } else {
+          navigate("/data-sources");
+        }
       }, 3000);
     };
 
@@ -91,26 +106,30 @@ function MetaCallbackHandler() {
     return () => clearTimeout(timeoutId);
   }, [searchParams, navigate]);
 
+  const cleanupStorage = () => {
+    localStorage.removeItem('pending_oauth_client_id');
+    localStorage.removeItem('pending_oauth_integration');
+    localStorage.removeItem('pending_oauth_return');
+  };
+
   const handleAccountSelectionSuccess = () => {
     setShowAccountModal(false);
     setShowSuccessDialog(true);
-
-    // Cleanup storage now
-    localStorage.removeItem('pending_oauth_client_id');
-    localStorage.removeItem('pending_oauth_integration');
+    cleanupStorage();
   };
 
   const handleAccountSelectionCancel = () => {
     setShowAccountModal(false);
     toast.info("Account connection cancelled");
-    // Cleanup storage
-    localStorage.removeItem('pending_oauth_client_id');
-    localStorage.removeItem('pending_oauth_integration');
+    cleanupStorage();
     handleContinue();
   };
 
   const handleContinue = () => {
-    if (clientId) {
+    cleanupStorage();
+    if (returnPath) {
+      navigate(returnPath);
+    } else if (clientId) {
       navigate(`/clients/${clientId}`);
     } else {
       navigate('/data-sources');

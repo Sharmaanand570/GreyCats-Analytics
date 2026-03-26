@@ -274,33 +274,18 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   // removed duplicate dateRange declaration here, using existing one or defining it once
 
 
-  // Detect if we're on tablet (using window width)
-  const [isTablet, setIsTablet] = useState(false);
+  // Detect if we're on tablet/mobile using INITIAL window width only.
+  // We intentionally do NOT listen to "resize" so that opening DevTools
+  // (or the browser inspector) does not change the grid layout.
+  const [isTablet] = useState(() => {
+    const width = window.innerWidth;
+    return width >= 768 && width < 1024;
+  });
 
-  useEffect(() => {
-    const checkTablet = () => {
-      const width = window.innerWidth;
-      setIsTablet(width >= 768 && width < 1024);
-    };
-
-    checkTablet();
-    window.addEventListener("resize", checkTablet);
-    return () => window.removeEventListener("resize", checkTablet);
-  }, []);
-
-  // Detect if we're on mobile (using window width)
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      const width = window.innerWidth;
-      setIsMobile(width < 768);
-    };
-
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+  const [isMobile] = useState(() => {
+    const width = window.innerWidth;
+    return width < 768;
+  });
 
 
   // Detect if we should use overlay layout (Mobile + Tablet + Small Desktop < 1280px)
@@ -4460,8 +4445,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     (slideId: number, currentLayout: DashboardLayout[]) =>
       (newLayout: Layout[]) => {
         // Ã°Å¸â€ºÂ¡Ã¯Â¸Â CRITICAL: Ignore layout changes when in mobile view
-        if (isMobile) {
-          console.log('[ReportBuilder] Ignoring layout change in mobile view');
+        if (isMobile || isTablet) {
+          console.log('[ReportBuilder] Ignoring layout change in mobile/tablet view');
           return;
         }
 
@@ -4497,7 +4482,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           modifiedSlideIds.current.add(slideId);
         }
       },
-    [isMobile] // Removed updateDashboard dependency
+    [isMobile, isTablet] // Removed updateDashboard dependency
   );
 
 

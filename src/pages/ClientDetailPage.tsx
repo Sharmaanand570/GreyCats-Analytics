@@ -32,7 +32,29 @@ const ClientDetailPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
     const [accountModalOpen, setAccountModalOpen] = useState(false);
     const [pendingIntegration, setPendingIntegration] = useState<IntegrationType | null>(null);
-    const [dateRange, setDateRange] = useState<DateRange | undefined>(getDefaultDateRange());
+    const [dateRange, setDateRangeRaw] = useState<DateRange | undefined>(() => {
+        if (parsedClientId) {
+            try {
+                const saved = localStorage.getItem(`dashboard-daterange-${parsedClientId}`);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    const from = new Date(parsed.from);
+                    const to = new Date(parsed.to);
+                    if (!isNaN(from.getTime()) && !isNaN(to.getTime())) {
+                        return { from, to };
+                    }
+                }
+            } catch { /* ignore */ }
+        }
+        return getDefaultDateRange();
+    });
+    const setDateRange = React.useCallback((range: DateRange | undefined) => {
+        setDateRangeRaw(range);
+        if (range?.from && range?.to && parsedClientId) {
+            const fmt = (d: Date) => d.toISOString().slice(0, 10);
+            localStorage.setItem(`dashboard-daterange-${parsedClientId}`, JSON.stringify({ from: fmt(range.from), to: fmt(range.to) }));
+        }
+    }, [parsedClientId]);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [hasPendingOAuthForClient, setHasPendingOAuthForClient] = useState(false);
     const queryClient = useQueryClient();

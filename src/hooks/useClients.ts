@@ -132,9 +132,12 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
     }
 
     processedIds.add(uniqueKey);
+    // Prioritize metaAccountId if it exists (for join records), otherwise fallback to id
+    const internalId = account.metaAccountId || account.adAccountId || account.id;
+
     return {
       integrationType: type,
-      accountId: account.id, // Internal DB ID
+      accountId: internalId, // Internal DB ID (MetaBusinessAccount.id or similar)
       accountName: name,
       accountIdentifier: identifier,
       connectedAt: account.createdAt || new Date().toISOString(),
@@ -194,7 +197,8 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
 
           integrations.push({
             integrationType: integration.type,
-            accountId: integration.assignmentId,
+            // Use integration.id (PK of platform account) instead of assignmentId (PK of join table)
+            accountId: integration.id || integration.metaAccountId || integration.assignmentId,
             accountName: integration.name,
             accountIdentifier: resolvedIdentifier,
             connectedAt: integration.connectedAt || new Date().toISOString(),
@@ -435,8 +439,8 @@ export const useCreateClient = () => {
     onSuccess: (newClient) => {
       // Invalidate and refetch clients list
       queryClient.invalidateQueries({ queryKey: clientKeys.lists() });
-      // Set as current client
-      setCurrentClient(newClient);
+      // Set as current client (add empty integrations array to satisfy ClientWithIntegrations type)
+      setCurrentClient({ ...newClient, integrations: [] });
       toast.success(`Client "${newClient.name}" created successfully`);
     },
     onError: (error: any) => {

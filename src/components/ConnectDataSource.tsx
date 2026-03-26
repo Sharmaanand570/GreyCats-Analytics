@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { IconType } from "react-icons";
-import { SiGoogleanalytics, SiGooglesearchconsole, SiYoutube, SiWoocommerce, SiShopify, SiMeta, SiGoogleads } from "react-icons/si";
+import { SiGoogleanalytics, SiGooglesearchconsole, SiYoutube, SiWoocommerce, SiMeta, SiGoogleads } from "react-icons/si";
 import React from "react";
 import { useYouTubeConnect } from "@/features/YouTube/hooks/useYouTubeConnect";
 import { toast } from "sonner";
@@ -19,7 +19,6 @@ import { useGoogleConnect } from "@/features/YouTube/hooks/google/useGoogleConne
 import { useGoogleConsoleConnect } from "@/features/YouTube/hooks/google/useGoogleConsoleConnect";
 
 import { useWooCommerceConnect } from "@/features/woocommerce/hooks/useWooCommerce";
-import { useShopifyConnect } from "@/features/shopify/hooks/useShopify";
 import { useMetaConnect } from "@/features/meta/hooks/useMetaConnect";
 import { useMetaBusinessConnect } from "@/features/meta/hooks/useMetaBusinessData";
 import { useGoogleAdsConnect } from "@/features/googleAds/hooks/useGoogleAds";
@@ -113,12 +112,6 @@ const dataSourceOptions: DataSourceOption[] = [
     color: getPlatformConfig("meta-business")?.color,
   },
   {
-    id: "shopify",
-    name: "Shopify",
-    icon: SiShopify,
-    color: getPlatformConfig("shopify")?.color,
-  },
-  {
     id: "woocommerce",
     name: "WooCommerce",
     icon: SiWoocommerce,
@@ -138,8 +131,7 @@ function ConnectDataSource({
     consumerKey: "",
     consumerSecret: "",
   });
-  const [shopifyShopUrl, setShopifyShopUrl] = React.useState("");
-  const [SelectedSource, setSelectedSource] = React.useState<DataSourceOption>({
+const [SelectedSource, setSelectedSource] = React.useState<DataSourceOption>({
     id: 0,
     name: "",
     icon: "",
@@ -159,8 +151,7 @@ function ConnectDataSource({
     google: useGoogleConnect(),
     googleConsole: useGoogleConsoleConnect(),
     woocommerce: useWooCommerceConnect(),
-    shopify: useShopifyConnect(),
-    meta: useMetaConnect(),
+meta: useMetaConnect(),
     metaBusiness: useMetaBusinessConnect(),
     googleAds: useGoogleAdsConnect(),
   };
@@ -169,8 +160,7 @@ function ConnectDataSource({
   const connectGoogle = mutations.google.mutateAsync;
   const connectGoogleConsole = mutations.googleConsole.mutateAsync;
   const connectWooCommerce = mutations.woocommerce.mutateAsync;
-  const connectShopify = mutations.shopify.mutateAsync;
-  const connectMeta = mutations.meta.mutateAsync;
+const connectMeta = mutations.meta.mutateAsync;
   const connectMetaBusiness = mutations.metaBusiness.mutateAsync;
   const connectGoogleAds = mutations.googleAds.mutateAsync;
 
@@ -179,8 +169,7 @@ function ConnectDataSource({
     mutations.google.isPending ||
     mutations.googleConsole.isPending ||
     mutations.woocommerce.isPending ||
-    mutations.shopify.isPending ||
-    mutations.meta.isPending ||
+mutations.meta.isPending ||
     mutations.metaBusiness.isPending ||
     mutations.googleAds.isPending;
 
@@ -268,7 +257,6 @@ function ConnectDataSource({
                     {filteredDataSources.map((option) => (
                       <div
                         onClick={() => setSelectedSource(option)}
-                        id={String(option.id)}
                         key={String(option.id)}
                         className={`flex items-center gap-3 p-4 hover:bg-slate-50 cursor-pointer transition-colors ${String(SelectedSource.id) === String(option.id)
                           ? "bg-slate-100"
@@ -377,9 +365,6 @@ function ConnectDataSource({
                             : "Failed to connect Google Console";
                         toast.error(errorMessage);
                       }
-                    } else if (SelectedSource.id === "shopify") {
-                      // For Shopify, go to next step to collect shop URL
-                      setNext(SelectedSource.id as string);
                     } else if (SelectedSource.id === "meta-ads") {
                       // For Meta Ads, initiate OAuth flow
                       try {
@@ -562,100 +547,6 @@ function ConnectDataSource({
                   }}
                   className="flex-1 sm:flex-none w-full sm:w-auto text-sm sm:text-base md:text-base"
                   type="submit"
-                >
-                  Connect
-                </Button>
-              </DialogFooter>
-            </div>
-          ) : Next === "shopify" ? (
-            <div>
-              <div>
-                <div className="w-full flex justify-center flex-col items-center">
-                  <div className="flex items-center gap-1.5 sm:gap-2 md:gap-2.5 py-3 sm:py-4 md:py-5 lg:py-6">
-                    {SelectedSource.icon &&
-                      typeof SelectedSource.icon !== "string" && (
-                        <SelectedSource.icon
-                          className="text-3xl sm:text-3xl md:text-4xl lg:text-5xl"
-                          style={SelectedSource.color ? { color: SelectedSource.color } : undefined}
-                        />
-                      )}
-                    <span className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-medium">{SelectedSource.name}</span>
-                  </div>
-
-                  <div className="w-full h-[200px] sm:h-[240px] md:h-[280px] lg:h-[300px] overflow-y-auto">
-                    <form onSubmit={(e) => e.preventDefault()}>
-                      <div className="px-2 sm:px-3 md:px-4 lg:px-6 space-y-2 sm:space-y-2.5 md:space-y-3">
-                        <div className="flex flex-col justify-start">
-                          <span className="text-xs sm:text-sm md:text-base font-medium mb-1.5 sm:mb-2 md:mb-2.5">
-                            Shop URL*
-                          </span>
-                          <Input
-                            className="w-full rounded-lg sm:rounded-md md:rounded-[0.5rem] p-3 sm:p-3.5 md:p-4 py-2.5 sm:py-3 md:py-4 lg:py-5 mb-2.5 sm:mb-3 md:mb-4 text-sm sm:text-base md:text-base"
-                            type="text"
-                            placeholder="your-shop.myshopify.com"
-                            onChange={(e) => setShopifyShopUrl(e.target.value)}
-                            value={shopifyShopUrl}
-                          />
-                        </div>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <DialogFooter className="mt-3 sm:mt-3 md:mt-4 flex flex-col sm:flex-row justify-between w-full gap-2 sm:gap-2 md:gap-0">
-                <Button
-                  onClick={() => setNext(null)}
-                  variant="outline"
-                  className="w-full sm:w-auto text-sm sm:text-base md:text-base"
-                >
-                  Back
-                </Button>
-
-                <Button
-                  isLoading={isConnecting}
-                  disabled={shopifyShopUrl === "" || isConnecting}
-                  onClick={async () => {
-                    try {
-                      // Pass object with url and clientId
-                      const response = await connectShopify({
-                        storeUrl: shopifyShopUrl,
-                        clientId
-                      });
-
-                      const targetUrl = response.oauthUrl || response.url;
-
-                      if (response.success && targetUrl) {
-                        if (clientId) {
-                          localStorage.setItem("pending_oauth_client_id", clientId.toString());
-                          localStorage.setItem("pending_oauth_integration", "shopify");
-                        }
-                        window.location.href = targetUrl;
-                      }
-
-                      queryClient.invalidateQueries({ queryKey: ["integrations"] });
-                      if (clientId) {
-                        queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
-                      }
-                      // toast.success("Shopify connected successfully");
-                      setShowSuccessDialog(true);
-                      setOpen(false);
-                      setNext(null);
-
-
-
-                    } catch (error) {
-
-                      const errorMessage =
-                        error instanceof Error
-                          ? error.message
-                          : "Failed to connect Shopify";
-                      toast.error(errorMessage);
-                    }
-                  }}
-                  className="flex-1 sm:flex-none w-full sm:w-auto text-sm sm:text-base md:text-base"
-                  type="button"
                 >
                   Connect
                 </Button>

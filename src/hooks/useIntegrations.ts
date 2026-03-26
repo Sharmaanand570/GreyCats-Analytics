@@ -24,7 +24,7 @@ export const useAvailableAccounts = (integrationType: IntegrationType | null) =>
     queryFn: async (): Promise<AvailableAccount[]> => {
       try {
         const response = await api.get<AvailableAccountsResponse>(
-          `/api/integrations/${integrationType}/available-accounts`
+          `/integrations/${integrationType}/available-accounts`
         );
         return response.data.accounts || [];
       } catch (error: any) {
@@ -55,7 +55,7 @@ export const useAssignAccount = () => {
     }): Promise<AssignAccountResponse> => {
       try {
         const response = await api.post<AssignAccountResponse>(
-          `/api/clients/${clientId}/accounts`,
+          `/clients/${clientId}/accounts`,
           data
         );
         return response.data;

@@ -93,9 +93,10 @@ const GSC_STATIC_METRICS: Array<{ metricKey: string; displayName: string; catego
 
 const YOUTUBE_STATIC_METRICS: Array<{ metricKey: string; displayName: string; category: string }> = [
   { metricKey: 'youtube.views',                    displayName: 'Views',               category: 'Overview' },
-  { metricKey: 'youtube.estimatedMinutesWatched',  displayName: 'Watch Time (min)',    category: 'Overview' },
-  { metricKey: 'youtube.subscribersGained',        displayName: 'Subscribers Gained',  category: 'Overview' },
   { metricKey: 'youtube.likes',                    displayName: 'Likes',               category: 'Engagement' },
+  { metricKey: 'youtube.comments',                 displayName: 'Comments',            category: 'Engagement' },
+  { metricKey: 'youtube.subscribersGained',        displayName: 'Subscribers Gained',  category: 'Overview' },
+  { metricKey: 'youtube.watchTimeSec',             displayName: 'Watch Time',          category: 'Overview' },
 ];
 
 const META_ADS_STATIC_METRICS: Array<{ metricKey: string; displayName: string; category: string }> = [

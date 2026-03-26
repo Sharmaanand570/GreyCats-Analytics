@@ -67,6 +67,8 @@ const GoogleAdsCallbackHandler = lazy(
 );
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
+const SocialMediaSchedulerPage = lazy(() => import("./pages/SocialMediaSchedulerPage"));
+
 // Multi-Client Pages
 const ClientsPage = lazy(() => import("./pages/ClientsPage"));
 const ClientDetailPage = lazy(() => import("./pages/ClientDetailPage"));
@@ -181,13 +183,11 @@ function App() {
               <Route path="alerts" element={<AlertsPage />} />
               <Route path="tasks" element={<TasksPage />} />
               <Route path="account-setup" element={<SettingsPage />} />
-
-              {/* Dedicated 404 route */}
-              <Route path="404" element={<NotFoundPage />} />
-
-              {/* Catch-all for invalid routes within protected area */}
-              <Route path="*" element={<NotFoundPage />} />
+              <Route path="social-media/scheduler" element={<SocialMediaSchedulerPage />} />
             </Route>
+
+            {/* 404 catch-all for protected area — outside sidebar */}
+            <Route path="404" element={<NotFoundPage />} />
 
             {/* Admin Routes */}
             <Route element={<RoleGuard allowedRoles={["ADMIN", "SUPER_ADMIN"]} />}>
@@ -249,7 +249,7 @@ function App() {
           {/* Dedicated 404 route (accessible from anywhere) */}
           <Route path="/404" element={<NotFoundPage />} />
 
-          {/* Global catch-all for any unmatched routes */}
+          {/* Global catch-all for any unmatched routes — no sidebar */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>

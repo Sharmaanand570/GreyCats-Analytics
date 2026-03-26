@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useUserStore } from "@/utils/useUserStore";
 import { getProfileImageUrl } from "@/utils/imageUtils";
+import greycatsLogo from "@/assets/images/greycats-black-logo.png";
 
 type SlideContainerProps = {
   title: string;
@@ -48,7 +49,7 @@ export default function SlideContainer({ title, containerRef, children, id, date
       {/* Greycats Footer (Bottom Left) */}
       <div className="absolute bottom-4 left-6 flex items-center gap-2 opacity-50 pointer-events-none">
         <img
-          src="/src/assets/images/greycats-black-logo.png"
+          src={greycatsLogo}
           alt="GreyCats Analytics"
           className="h-6 object-contain"
         />

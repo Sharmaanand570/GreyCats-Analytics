@@ -250,6 +250,10 @@ async function fetchRawWidgetData(
         );
 
         if (postsData?.success && Array.isArray(postsData.posts)) {
+          if (postsData.posts.length > 0) {
+            console.log('[recent_posts] sample post fields:', Object.keys(postsData.posts[0]));
+            console.log('[recent_posts] sample fullPicture:', postsData.posts[0].fullPicture, '| full_picture:', (postsData.posts[0] as any).full_picture);
+          }
           const rows = postsData.posts.map((p: any) => ({
             id: p.id,
             metricKey: widget.metricKey,
@@ -266,8 +270,8 @@ async function fetchRawWidgetData(
             comments: p.comments,
             shares: p.shares,
             reactions: p.reactions,
-            fullPicture: p.fullPicture,
-            permalinkUrl: p.permalinkUrl,
+            fullPicture: p.fullPicture || p.full_picture || null,
+            permalinkUrl: p.permalinkUrl || p.permalink_url || null,
           }));
 
           return {
@@ -280,14 +284,13 @@ async function fetchRawWidgetData(
               totalPages: 1,
             },
             columns: [
-              { name: "Date", width: "15%" },
-              { name: "Post", width: "40%" },
-              { name: "Impressions" },
-              { name: "Clicks" },
-              { name: "Likes" },
-              { name: "Comments" },
-              { name: "Shares" },
-              { name: "Reactions" },
+              { name: "Date", width: "10%" },
+              { name: "Image", dataKey: "fullPicture" },
+              { name: "Post", width: "35%", dataKey: "post" },
+              { name: "Clicks", dataKey: "clicks" },
+              { name: "Likes", dataKey: "likes" },
+              { name: "Comments", dataKey: "comments" },
+              { name: "Shares", dataKey: "shares" },
             ],
           };
         }
@@ -357,7 +360,7 @@ async function fetchRawWidgetData(
             clicks: 0,
             likes: m.likeCount,
             shares: m.shares,
-            fullPicture: m.mediaUrl,
+            fullPicture: (m as any).thumbnailUrl || m.mediaUrl,
             permalinkUrl: m.permalinkUrl,
           }));
 

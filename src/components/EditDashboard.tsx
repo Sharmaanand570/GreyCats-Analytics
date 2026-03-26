@@ -44,61 +44,6 @@ const TABLE_METRIC_KEYS = new Set([
 
 const isTableMetric = (metricKey: string) => TABLE_METRIC_KEYS.has(metricKey);
 
-// Helper to create initial default widgets for a newly added integration
-const createDefaultWidgetsForIntegration = (
-  integration: string,
-  accountId: string,
-  metrics: Array<{ metricKey: string; displayName: string }>
-): DashboardWidget[] => {
-  const widgets: DashboardWidget[] = [];
-  let widgetId = Date.now();
-
-  if (metrics.length === 0) return [];
-
-  const seen = new Set<string>();
-  const uniqueMetrics = metrics.filter((metric) => {
-    if (seen.has(metric.metricKey)) return false;
-    seen.add(metric.metricKey);
-    return true;
-  });
-
-  uniqueMetrics.forEach((metric) => {
-    if (isTableMetric(metric.metricKey)) {
-      widgets.push({
-        id: `dw${widgetId++}`,
-        metricKey: metric.metricKey,
-        integration,
-        accountId,
-        groupBy: "day",
-        aggregation: "sum",
-        type: "table",
-      });
-      return;
-    }
-
-    widgets.push({
-      id: `dw${widgetId++}`,
-      metricKey: metric.metricKey,
-      integration,
-      accountId,
-      groupBy: "day",
-      aggregation: "sum",
-      type: "line_chart",
-    });
-
-    widgets.push({
-      id: `dw${widgetId++}`,
-      metricKey: metric.metricKey,
-      integration,
-      accountId,
-      groupBy: "day",
-      aggregation: "sum",
-      type: "metric_card",
-    });
-  });
-
-  return widgets;
-};
 
 const getIntegrationIcon = (integration: string, className?: string) => {
   const norm = integration.toLowerCase();
@@ -204,46 +149,108 @@ WidgetEditCard.displayName = "WidgetEditCard";
 const SidebarAddIntegration = memo(
   ({
     availableIntegrations,
-    onAdd,
+    groupedMetrics,
+    onAddMetric,
   }: {
     availableIntegrations: Array<{
       integration: string;
       accountId: string;
       metricsCount: number;
     }>;
-    onAdd: (integration: string, accountId: string) => void;
+    groupedMetrics: Record<string, Record<string, Array<{ metricKey: string; displayName: string }>>>;
+    onAddMetric: (integration: string, accountId: string, metricKey: string, displayName: string, type: string) => void;
   }) => {
+    const [expandedKey, setExpandedKey] = useState<string | null>(null);
+
     return (
-      <div className="w-full sm:w-[15rem] md:w-[16rem] border-r flex flex-col sticky top-[4.8em] h-[calc(100vh-8.3em)] bg-white overflow-hidden z-20">
+      <div className="w-full sm:w-[17rem] md:w-[19rem] border-r flex flex-col sticky top-[4.8em] h-[calc(100vh-8.3em)] bg-white overflow-hidden z-20">
         <div className="p-4 border-b bg-gray-50/80">
           <h3 className="text-sm font-semibold text-gray-900">Add Data Source</h3>
           <p className="text-xs text-gray-500 mt-1">
-            Add widgets from your connected sources.
+            Select a source, then add metrics one by one.
           </p>
         </div>
-        <div className="flex-1 overflow-y-auto p-2 space-y-2">
+        <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {availableIntegrations.length === 0 ? (
             <div className="px-4 py-8 text-center bg-gray-50 rounded-lg border border-dashed mx-2 mt-4">
               <p className="text-xs text-gray-500">No sources available.</p>
             </div>
           ) : (
-            availableIntegrations.map((item) => (
-              <button
-                key={`${item.integration}-${item.accountId}`}
-                onClick={() => onAdd(item.integration, item.accountId)}
-                className="w-full flex items-center justify-between p-3 bg-white border rounded-lg hover:border-primary hover:shadow-sm hover:bg-blue-50/10 transition-all group text-left"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-gray-800 capitalize truncate">
-                    {item.integration.replace(/-/g, " ")}
-                  </div>
-                  <div className="text-xs text-gray-500 truncate">
-                    {item.accountId}
-                  </div>
+            availableIntegrations.map((item) => {
+              const key = `${item.integration}-${item.accountId}`;
+              const isExpanded = expandedKey === key;
+              const metrics = groupedMetrics[item.integration]?.[item.accountId] ?? [];
+
+              return (
+                <div key={key}>
+                  {/* Integration header */}
+                  <button
+                    onClick={() => setExpandedKey(isExpanded ? null : key)}
+                    className={`w-full flex items-center justify-between p-3 rounded-lg transition-all text-left ${
+                      isExpanded
+                        ? "bg-primary/5 border border-primary/20"
+                        : "bg-white border border-transparent hover:border-zinc-200 hover:bg-zinc-50"
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-800 capitalize truncate">
+                        {item.integration.replace(/[-_]/g, " ")}
+                      </div>
+                      <div className="text-[11px] text-gray-400 truncate">
+                        {metrics.length} metrics
+                      </div>
+                    </div>
+                    <svg
+                      className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                      fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {/* Expanded metrics list */}
+                  {isExpanded && (
+                    <div className="ml-2 mr-1 mt-1 mb-2 space-y-0.5 max-h-[50vh] overflow-y-auto">
+                      {metrics.map((metric) => (
+                        <div
+                          key={metric.metricKey}
+                          className="group flex items-center justify-between gap-1 px-2.5 py-2 rounded-md hover:bg-zinc-50 transition-colors"
+                        >
+                          <span className="text-xs text-gray-700 truncate flex-1" title={metric.metricKey}>
+                            {metric.displayName}
+                          </span>
+                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                            <button
+                              onClick={() => onAddMetric(item.integration, item.accountId, metric.metricKey, metric.displayName, "metric_card")}
+                              className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-zinc-100 hover:bg-primary hover:text-white transition-colors"
+                              title="Add as Card"
+                            >
+                              Card
+                            </button>
+                            <button
+                              onClick={() => onAddMetric(item.integration, item.accountId, metric.metricKey, metric.displayName, "line_chart")}
+                              className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-zinc-100 hover:bg-primary hover:text-white transition-colors"
+                              title="Add as Chart"
+                            >
+                              Chart
+                            </button>
+                            {isTableMetric(metric.metricKey) && (
+                              <button
+                                onClick={() => onAddMetric(item.integration, item.accountId, metric.metricKey, metric.displayName, "table")}
+                                className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-zinc-100 hover:bg-primary hover:text-white transition-colors"
+                                title="Add as Table"
+                              >
+                                Table
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <FiPlus className="text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-              </button>
-            ))
+              );
+            })
           )}
         </div>
       </div>
@@ -362,17 +369,25 @@ function EditDashboard() {
 
   // --- Actions ---
 
-  const handleAddIntegration = useCallback((integration: string, accountId: string) => {
-    const metricsForAccount = groupedMetrics[integration]?.[accountId] || [];
-    if (metricsForAccount.length === 0) {
-      toast.error("No metrics found for this integration");
-      return;
-    }
-
-    const newWidgets = createDefaultWidgetsForIntegration(integration, accountId, metricsForAccount);
-    setWidgets(prev => [...prev, ...newWidgets]);
-    toast.success(`Widgets added for ${integration}`);
-  }, [groupedMetrics]);
+  const handleAddMetric = useCallback((
+    integration: string,
+    accountId: string,
+    metricKey: string,
+    displayName: string,
+    type: string
+  ) => {
+    const newWidget: DashboardWidget = {
+      id: `dw${Date.now()}`,
+      metricKey,
+      integration,
+      accountId,
+      groupBy: "day",
+      aggregation: "sum",
+      type: type as any,
+    };
+    setWidgets(prev => [...prev, newWidget]);
+    toast.success(`Added ${displayName} as ${type.replace(/_/g, " ")}`);
+  }, []);
 
   const handleRemoveWidget = useCallback((id: string) => {
     setWidgets(prev => prev.filter(w => w.id !== id));
@@ -511,7 +526,8 @@ function EditDashboard() {
         {/* Left Sidebar - Add Data Sources */}
         <SidebarAddIntegration
           availableIntegrations={availableIntegrations}
-          onAdd={handleAddIntegration}
+          groupedMetrics={groupedMetrics}
+          onAddMetric={handleAddMetric}
         />
 
         {/* Main Canvas - List */}
