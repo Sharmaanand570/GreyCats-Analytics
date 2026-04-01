@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AccountSelectionModal } from "@/components/clients/AccountSelectionModal";
 import type { IntegrationType } from "@/types/client.types";
+import { showConnectionResultToast } from "@/utils/connectionToasts";
 
 function GoogleCallbackHandler() {
   const [searchParams] = useSearchParams();
@@ -33,8 +34,11 @@ function GoogleCallbackHandler() {
       const status = searchParams.get("status");
       const code = searchParams.get("code");
       const state = searchParams.get("state");
+      const warning = searchParams.get("warning");
+      console.log("[Google callback] params:", Object.fromEntries(searchParams.entries()));
 
       if (status === "success") {
+        showConnectionResultToast({ warning });
         const storedClientId = localStorage.getItem('pending_oauth_client_id');
         const storedIntegration = localStorage.getItem('pending_oauth_integration');
 
@@ -63,6 +67,7 @@ function GoogleCallbackHandler() {
 
       try {
         const response = await handleCallback({ code, state });
+        console.log("[Google callback] response:", response);
         if (response.success) {
           const storedClientId = localStorage.getItem('pending_oauth_client_id');
           const storedIntegration = localStorage.getItem('pending_oauth_integration');
@@ -77,9 +82,10 @@ function GoogleCallbackHandler() {
             setShowSuccessDialog(true);
           }
 
-          if (response.message) {
-            toast.success(response.message);
-          }
+          showConnectionResultToast({
+            warning: response.warning,
+            successMessage: response.message || "Account connected successfully!",
+          });
         }
       } catch (error) {
         const errorMessage =
@@ -212,5 +218,3 @@ function GoogleCallbackHandler() {
 }
 
 export default GoogleCallbackHandler;
-
-

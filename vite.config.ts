@@ -4,13 +4,18 @@ import { defineConfig, loadEnv } from "vite";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  // Extract origin (scheme + host + port) from the API base URL
-  const apiOrigin = env.VITE_API_BASE_URL
-    ? new URL(env.VITE_API_BASE_URL).origin
-    : 'http://localhost:5000';
-  const ngrokOrigin = env.VITE_NGROK_URL
-    ? new URL(env.VITE_NGROK_URL).origin
-    : '';
+  const getOrigin = (url: string | undefined, fallback: string) => {
+    try {
+      return url ? new URL(url).origin : fallback;
+    } catch (e) {
+      console.warn(`Invalid URL configuration: ${url}. Falling back to ${fallback}`);
+      return fallback;
+    }
+  };
+
+  const apiOrigin = getOrigin(env.VITE_API_BASE_URL, 'http://localhost:5000');
+  const ngrokOrigin = getOrigin(env.VITE_NGROK_URL, '');
+
 
   return {
   plugins: [

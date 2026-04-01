@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AccountSelectionModal } from "@/components/clients/AccountSelectionModal";
 import type { IntegrationType } from "@/types/client.types";
+import { showConnectionResultToast } from "@/utils/connectionToasts";
 
 function YouTubeCallbackHandler() {
   const [searchParams] = useSearchParams();
@@ -34,6 +35,8 @@ function YouTubeCallbackHandler() {
       const reason = searchParams.get("reason");
       const code = searchParams.get("code");
       const state = searchParams.get("state");
+      const warning = searchParams.get("warning");
+      console.log("[YouTube callback] params:", Object.fromEntries(searchParams.entries()));
 
       // Handle error callback (e.g., status=error&reason=oauth_save_failed)
       if (status === "error") {
@@ -53,6 +56,7 @@ function YouTubeCallbackHandler() {
       // If status is "success", we assume the backend handled the exchange or it's a confirmation redirect.
       // If code & state are present, we process them.
       if (status === "success") {
+        showConnectionResultToast({ warning });
         const storedClientId = localStorage.getItem('pending_oauth_client_id');
         const storedIntegration = localStorage.getItem('pending_oauth_integration');
 
@@ -81,7 +85,7 @@ function YouTubeCallbackHandler() {
 
       try {
         const response = await handleCallback({ code, state });
-        console.log("response", response);
+        console.log("[YouTube callback] response:", response);
 
         if (response.success) {
           const storedClientId = localStorage.getItem('pending_oauth_client_id');
@@ -97,9 +101,13 @@ function YouTubeCallbackHandler() {
             setShowSuccessDialog(true);
           }
 
-          if (response.channel) {
-            toast.success(`Connected to ${response.channel.channelTitle}!`);
-          }
+          const successMessage = response.channel
+            ? `Connected to ${response.channel.channelTitle}!`
+            : "Account connected successfully!";
+          showConnectionResultToast({
+            warning: response.warning,
+            successMessage,
+          });
         }
       } catch (error) {
         const errorMessage =
@@ -232,4 +240,3 @@ function YouTubeCallbackHandler() {
 }
 
 export default YouTubeCallbackHandler;
-

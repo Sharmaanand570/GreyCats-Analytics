@@ -416,20 +416,31 @@ function MetaBusinessPage() {
                         </div>
                       ) : instagramMedia?.data?.length ? (
                         <div className="grid grid-cols-3 gap-2">
-                          {instagramMedia.data.slice(0, 6).map((media) => (
-                            <div key={media.id} className="aspect-square relative group">
-                              <img
-                                src={media.media_url}
-                                alt="Instagram Media"
-                                className="w-full h-full object-cover rounded-md"
-                              />
+                          {instagramMedia.data.slice(0, 6).map((media) => {
+                            const previewUrl = media.media_type === "VIDEO"
+                              ? (media.thumbnail_url || media.media_url)
+                              : media.media_url;
+                            return (
+                              <div key={media.id} className="aspect-square relative group">
+                                {previewUrl ? (
+                                  <img
+                                    src={previewUrl}
+                                    alt="Instagram Media"
+                                    className="w-full h-full object-cover rounded-md"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full rounded-md bg-muted flex items-center justify-center">
+                                    <Instagram className="w-5 h-5 text-muted-foreground/40" />
+                                  </div>
+                                )}
                               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-md">
                                 <span className="text-white text-xs font-medium capitalize">
                                   {media.media_type.toLowerCase().replace("_", " ")}
                                 </span>
                               </div>
-                            </div>
-                          ))}
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : (
                         <div className="text-sm text-muted-foreground">No recent media found.</div>

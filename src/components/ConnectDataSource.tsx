@@ -27,6 +27,7 @@ import { getPlatformConfig } from "@/utils/platformMapping";
 import { assignAccountToClient } from "@/api/integrationApi";
 import { clientKeys } from "@/hooks/useClients";
 import { Loader2 } from "lucide-react";
+import { showConnectionResultToast } from "@/utils/connectionToasts";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -195,11 +196,23 @@ mutations.meta.isPending ||
           consumerSecret: payload.consumerSecret,
         }
       });
+      console.log("[WooCommerce connect] response:", response);
 
       if (response.success && response.account) {
         // Now assign it to the client
         await assignAccountToClient(clientId, 'woocommerce', response.account.id);
-        // toast.success("WooCommerce connected successfully");
+        const storeLabel = response.account?.storeUrl || payload.storeUrl;
+        const successMessage = storeLabel
+          ? `Store ${storeLabel} connected successfully`
+          : "Store connected successfully";
+        const warningMessage = storeLabel
+          ? `Store ${storeLabel} connected successfully. However, we noticed there are currently no products or orders. Your dashboard will update as activity occurs.`
+          : "Store connected successfully. However, we noticed there are currently no products or orders. Your dashboard will update as activity occurs.";
+        showConnectionResultToast({
+          warning: response.warning,
+          successMessage,
+          warningMessage,
+        });
         setNext(null);
         setOpen(false);
         setShowSuccessDialog(true);

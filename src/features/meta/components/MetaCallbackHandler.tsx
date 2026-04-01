@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AccountSelectionModal } from "@/components/clients/AccountSelectionModal";
 import type { IntegrationType } from "@/types/client.types";
+import { showConnectionResultToast } from "@/utils/connectionToasts";
 
 function MetaCallbackHandler() {
   const [searchParams] = useSearchParams();
@@ -37,10 +38,12 @@ function MetaCallbackHandler() {
       // Extract parameters from URL
       const status = searchParams.get("status");
       const reason = searchParams.get("reason");
+      const warning = searchParams.get("warning");
 
       console.log("Full URL:", window.location.href);
       const params = Object.fromEntries(searchParams.entries());
       console.log("Search Params:", params);
+      console.log("[Meta callback] params:", params);
 
       // Check for error status
       if (status === "error") {
@@ -64,6 +67,7 @@ function MetaCallbackHandler() {
 
       // Check for success status (allow case-insensitive)
       if (status?.toLowerCase() === "success") {
+        showConnectionResultToast({ warning });
         // ✅ AUTH SUCCESS
         const storedClientId = localStorage.getItem('pending_oauth_client_id');
         const storedIntegration = localStorage.getItem('pending_oauth_integration');

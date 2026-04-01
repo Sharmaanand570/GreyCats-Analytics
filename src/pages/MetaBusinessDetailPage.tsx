@@ -709,7 +709,11 @@ function MetaBusinessDetailPage() {
                                                         </div>
                                                     ) : (
                                                         <div className="grid grid-cols-3 gap-1 p-1">
-                                                            {igMedia.map((item: any) => (
+                                                            {igMedia.map((item: any) => {
+                                                                const previewUrl = item.media_type === "VIDEO"
+                                                                    ? (item.thumbnail_url || item.media_url)
+                                                                    : item.media_url;
+                                                                return (
                                                                 <div
                                                                     key={item.id}
                                                                     onClick={() => setSelectedIgMediaId(item.id)}
@@ -718,8 +722,8 @@ function MetaBusinessDetailPage() {
                                                                         selectedIgMediaId === item.id ? "ring-2 ring-pink-500 z-10" : ""
                                                                     )}
                                                                 >
-                                                                    {item.media_url ? (
-                                                                        <img src={item.media_url} alt="IG Media" className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-500" />
+                                                                    {previewUrl ? (
+                                                                        <img src={previewUrl} alt="IG Media" className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-500" />
                                                                     ) : (
                                                                         <div className="w-full h-full bg-muted flex items-center justify-center">
                                                                             <SiInstagram className="text-muted-foreground/30 w-8 h-8" />
@@ -732,7 +736,8 @@ function MetaBusinessDetailPage() {
                                                                     )}
                                                                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                                                                 </div>
-                                                            ))}
+                                                            );
+                                                            })}
                                                         </div>
                                                     )}
                                                 </div>

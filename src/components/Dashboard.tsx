@@ -91,8 +91,20 @@ const getDisplayIntegration = (integration: string, metricKey?: string): string 
 
 const formatApiDate = (value: Date) => format(value, "yyyy-MM-dd");
 
-const formatNumber = (value?: number) => {
+const isCurrencyMetric = (metricKey?: string) => {
+  if (!metricKey) return false;
+  return metricKey.includes(".cpc") || metricKey.includes(".cost") || metricKey.includes(".spend") || metricKey.endsWith(".avgOrderValue") || metricKey.endsWith(".revenue");
+};
+
+const formatNumber = (value?: number, metricKey?: string) => {
   if (value === undefined || Number.isNaN(value)) return "--";
+  if (isCurrencyMetric(metricKey)) {
+    const prefix = "₹";
+    const formatted = value % 1 !== 0
+      ? value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : value.toLocaleString("en-IN");
+    return `${prefix}${formatted}`;
+  }
   return new Intl.NumberFormat("en-US", {
     notation: "compact",
     maximumFractionDigits: 1,
@@ -1907,7 +1919,7 @@ function Dashboard({
                           </h3>
                         </div>
                         <span className="text-4xl font-bold text-zinc-900 tracking-tighter">
-                          {formatNumber(value)}
+                          {formatNumber(value, widget.metricKey)}
                         </span>
                       </div>
                     </div>
@@ -1933,7 +1945,7 @@ function Dashboard({
                 <MetricCard
                   key={widget.id}
                   title={widget.metricKey.split('.').pop()?.replace(/_/g, ' ') || ''}
-                  value={formatNumber(value ?? 0)}
+                  value={formatNumber(value ?? 0, widget.metricKey)}
                   series={(data?.series as any) || []}
                   brandColor={brandColor}
                   className="col-span-1 h-[180px]"

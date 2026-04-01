@@ -38,6 +38,7 @@ export type GoogleAdsConnectResponse = {
     success: boolean;
     message: string;
     accountId: number;
+    warning?: string;
 };
 
 /** Step E: DELETE /api/google-ads/:clientId/disconnect */

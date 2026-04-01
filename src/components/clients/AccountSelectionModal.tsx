@@ -15,6 +15,7 @@ import { getAvailableAccounts, assignAccountToClient } from "@/api/integrationAp
 import type { IntegrationType, AvailableAccount } from "@/types/integration.types";
 import { getPlatformConfig } from "@/utils/platformMapping";
 import { useQueryClient } from "@tanstack/react-query";
+import { showConnectionResultToast } from "@/utils/connectionToasts";
 
 interface AccountSelectionModalProps {
     open: boolean;
@@ -69,11 +70,12 @@ export function AccountSelectionModal({
 
         setAssigning(true);
         try {
-            await assignAccountToClient(
+            const response = await assignAccountToClient(
                 clientId,
                 integration,
                 selectedAccount.id
             );
+            console.log("[Assign account] response:", response);
 
             // Invalidate queries to refresh integration list and progress
             queryClient.invalidateQueries({ queryKey: ["clients", "detail", clientId] });
@@ -81,7 +83,11 @@ export function AccountSelectionModal({
             queryClient.invalidateQueries({ queryKey: ["integrations", clientId] });
             queryClient.invalidateQueries({ queryKey: ["available-metrics", clientId] });
 
-            toast.success(`Successfully connected ${selectedAccount.name}`);
+            showConnectionResultToast({
+                warning: response.warning,
+                successMessage: `Successfully connected ${selectedAccount.name}`,
+                warningMessage: `Successfully connected ${selectedAccount.name}. However, we noticed there is currently no data in this account. Your dashboard will update as soon as new activity occurs.`,
+            });
             onSuccess();
             onOpenChange(false);
         } catch (error: any) {

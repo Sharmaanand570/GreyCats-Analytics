@@ -19,6 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { showConnectionResultToast } from "@/utils/connectionToasts";
 
 export default function ShopifyCallbackHandler() {
   const [searchParams] = useSearchParams();
@@ -33,14 +34,24 @@ export default function ShopifyCallbackHandler() {
     const status = searchParams.get("status");
     const shop = searchParams.get("shop");
     const reason = searchParams.get("reason");
+    const warning = searchParams.get("warning");
 
     if (hasRun.current) return;
     hasRun.current = true;
+    console.log("[Shopify callback] params:", { status, shop, reason, warning });
 
     console.log("📥 Shopify Callback Params:", { status, shop, reason });
 
     const handleSuccess = async () => {
       if (!shop) return;
+      const warningMessage = `Shopify store ${shop} connected successfully. However, we noticed there is currently no data in this account. Your dashboard will update as soon as new activity occurs.`;
+      const showShopifyToast = (successMessage: string) => {
+        showConnectionResultToast({
+          warning,
+          successMessage,
+          warningMessage,
+        });
+      };
 
       try {
         const storedClientId = localStorage.getItem('pending_oauth_client_id');
@@ -59,19 +70,20 @@ export default function ShopifyCallbackHandler() {
           if (targetAccount) {
             // 3. Assign to client
             try {
-              await assignAccountToClient(parseInt(storedClientId), "shopify", targetAccount.id);
-              toast.success(`Shopify store ${shop} connected and assigned to client successfully`);
+              const assignmentResponse = await assignAccountToClient(parseInt(storedClientId), "shopify", targetAccount.id);
+              console.log("[Shopify assign account] response:", assignmentResponse);
+              showShopifyToast(`Shopify store ${shop} connected and assigned to client successfully`);
             } catch (assignError) {
               console.warn("Assignment warning (might be already assigned):", assignError);
               // Do not fail the whole flow if assignment fails - backend might have done it
-              toast.success(`Shopify store ${shop} connected successfully`);
+              showShopifyToast(`Shopify store ${shop} connected successfully`);
             }
           } else {
             console.warn("Could not find new Shopify account to assign");
-            toast.success(`Shopify store ${shop} connected (assignment pending - account not found)`);
+            showShopifyToast(`Shopify store ${shop} connected (assignment pending - account not found)`);
           }
         } else {
-          toast.success(`Shopify store ${shop} connected successfully`);
+          showShopifyToast(`Shopify store ${shop} connected successfully`);
         }
       } catch (error) {
         console.error("Callback processing error:", error);

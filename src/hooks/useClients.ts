@@ -141,6 +141,7 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
       accountName: name,
       accountIdentifier: identifier,
       connectedAt: account.createdAt || new Date().toISOString(),
+      hasInitialData: account.hasInitialData,
     };
   };
 
@@ -202,6 +203,7 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
             accountName: integration.name,
             accountIdentifier: resolvedIdentifier,
             connectedAt: integration.connectedAt || new Date().toISOString(),
+            hasInitialData: integration.hasInitialData,
           });
           processedIds.add(uniqueKey);
           if (integration.identifier) processedIds.add(identifierKey);
@@ -334,7 +336,8 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
           accountId: acc.id,
           accountName: flatAcc.propertyName || 'Google Analytics',
           accountIdentifier: flatAcc.propertyId || 'unknown',
-          connectedAt: acc.createdAt || new Date().toISOString()
+          connectedAt: acc.createdAt || new Date().toISOString(),
+          hasInitialData: acc.hasInitialData,
         });
         processedIds.add(uniqueKey);
         if (flatAcc.propertyName) processedIds.add(propertyNameKey);
@@ -356,7 +359,8 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
             accountId: platformAcc.id,
             accountName: platformAcc.account.propertyName,
             accountIdentifier: platformAcc.account.propertyId,
-            connectedAt: platformAcc.createdAt
+            connectedAt: platformAcc.createdAt,
+            hasInitialData: platformAcc.hasInitialData,
           });
           processedIds.add(uniqueKey);
           processedIds.add(propertyNameKey);

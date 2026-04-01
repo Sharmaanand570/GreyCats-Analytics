@@ -41,8 +41,19 @@ function AuthParentComp(): React.JSX.Element | null {
     }
 
     // Only redirect to dashboard if on an auth page (login/signup) — NOT pricing/billing
+    // But if there's a redirect param (e.g. from pricing flow), honour it instead
     if (authed && isAuthOnlyPage) {
-      navigate("/clients");
+      const params = new URLSearchParams(location.search);
+      const redirect = params.get("redirect");
+      if (redirect) {
+        const url = new URL(redirect, window.location.origin);
+        for (const [key, value] of params.entries()) {
+          if (key !== "redirect" && key !== "reason") url.searchParams.set(key, value);
+        }
+        navigate(url.pathname + url.search, { replace: true });
+      } else {
+        navigate("/clients");
+      }
       return;
     }
 

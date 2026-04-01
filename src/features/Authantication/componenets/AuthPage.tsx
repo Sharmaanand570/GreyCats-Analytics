@@ -154,7 +154,10 @@ export default function AuthPage() {
     setAuthError(null);
     setAuthSuccess(null);
     reset(); // Reset form values
-    navigate(isLogin ? "/auth/signup" : "/auth/login");
+    // Preserve redirect & planId params when toggling login/signup
+    const currentSearch = searchParams.toString();
+    const suffix = currentSearch ? `?${currentSearch}` : "";
+    navigate(isLogin ? `/auth/signup${suffix}` : `/auth/login${suffix}`);
   };
 
   const handleResendOtp = async () => {
@@ -196,7 +199,18 @@ export default function AuthPage() {
         if (response.user.role === "ADMIN" || response.user.role === "SUPER_ADMIN") {
           navigate("/admin/dashboard");
         } else {
-          navigate("/clients");
+          // Redirect to the original page if user came from pricing/another page
+          const redirect = searchParams.get("redirect");
+          if (redirect) {
+            // Preserve additional params like planId
+            const url = new URL(redirect, window.location.origin);
+            for (const [key, value] of searchParams.entries()) {
+              if (key !== "redirect" && key !== "reason") url.searchParams.set(key, value);
+            }
+            navigate(url.pathname + url.search, { replace: true });
+          } else {
+            navigate("/clients");
+          }
         }
       } else {
         // --- SIGNUP FLOW ---
@@ -233,6 +247,15 @@ export default function AuthPage() {
 
           // On success, backend should return token & user.
           // useVerifyOtpMutation handles storage.
+          // Persist redirect so SignupDetailsPage can pick it up after profile setup
+          const redirect = searchParams.get("redirect");
+          if (redirect) {
+            const url = new URL(redirect, window.location.origin);
+            for (const [key, value] of searchParams.entries()) {
+              if (key !== "redirect" && key !== "reason") url.searchParams.set(key, value);
+            }
+            sessionStorage.setItem("postSignupRedirect", url.pathname + url.search);
+          }
           // Navigate to signup details setup
           navigate("/auth/signup-details");
         }

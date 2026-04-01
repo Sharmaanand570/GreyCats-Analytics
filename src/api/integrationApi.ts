@@ -114,7 +114,7 @@ export const assignAccountToClient = async (
   console.log("assignAccountToClient", clientId, integration, accountId);
   try {
     // Special handling for Google Ads
-    if (integration === 'google-ads') {
+  if (integration === 'google-ads') {
       const { connectGoogleAdsAccount } = await import('../features/googleAds/API/googleAdsApi');
       // Note: In generic flow, we might not have the customerName handy. 
       // We pass the accountId (customerId) and a generic name if needed.
@@ -123,7 +123,7 @@ export const assignAccountToClient = async (
         customerName: 'Google Ads Account', // Placeholder, backend can update from API if needed
         clientId
       });
-      return { success: response.success, message: response.message };
+      return { success: response.success, message: response.message, warning: response.warning };
     }
 
     const response = await api.post<AccountAssignmentResponse>(

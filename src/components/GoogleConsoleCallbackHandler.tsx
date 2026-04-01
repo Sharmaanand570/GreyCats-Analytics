@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AccountSelectionModal } from "@/components/clients/AccountSelectionModal";
 import type { IntegrationType } from "@/types/client.types";
+import { showConnectionResultToast } from "@/utils/connectionToasts";
 
 function GoogleConsoleCallbackHandler() {
   const [searchParams] = useSearchParams();
@@ -32,6 +33,8 @@ function GoogleConsoleCallbackHandler() {
     const processCallback = () => {
       const status = searchParams.get("status");
       const reason = searchParams.get("reason");
+      const warning = searchParams.get("warning");
+      console.log("[Google Console callback] params:", Object.fromEntries(searchParams.entries()));
 
       // If status is error, handle error case
       if (status === "error") {
@@ -50,6 +53,7 @@ function GoogleConsoleCallbackHandler() {
 
       // If status is success or not provided (assuming success)
       if (!status || status === "success") {
+        showConnectionResultToast({ warning });
         // Invalidate queries to refetch after successful connection
         queryClient.invalidateQueries({ queryKey: ["google-console", "connect"] });
 
@@ -193,4 +197,3 @@ function GoogleConsoleCallbackHandler() {
 }
 
 export default GoogleConsoleCallbackHandler;
-

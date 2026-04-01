@@ -71,6 +71,16 @@ function formatCompactNumber(value: number): string {
   return value % 1 !== 0 ? value.toFixed(2) : String(value);
 }
 
+/**
+ * Format numbers as exact currency values with locale grouping.
+ * e.g. 22500 → "22,500", 1500000.5 → "15,00,000.50"
+ */
+function formatCurrencyNumber(value: number): string {
+  return value % 1 !== 0
+    ? value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : value.toLocaleString("en-IN");
+}
+
 export const renderWidgetEmptyState = (
   onConnectIntegration?: () => void,
   message = "No data yet"
@@ -1257,20 +1267,26 @@ export const renderWidgetContent = (
         : true;
 
       const finalValue = resolvedValue ?? metricData?.value ?? 0;
-      const formattedValue = typeof finalValue === "number"
-        ? formatCompactNumber(finalValue)
-        : finalValue;
 
       // Fallback unit if not specified in config
       let displayUnit = metricData?.unit;
+      let isCurrency = false;
       if (!displayUnit && widget.metricConfig?.metricKey) {
         const key = widget.metricConfig.metricKey;
         if (key.includes(".cpc") || key.includes(".cost") || key.includes(".spend") || key.endsWith(".avgOrderValue") || key.endsWith(".revenue")) {
           displayUnit = "₹";
+          isCurrency = true;
         } else if (key.includes(".ctr") || key.includes(".bounceRate") || key.includes(".conversionRate")) {
           displayUnit = "%";
         }
       }
+      if (!isCurrency && (displayUnit === "₹" || displayUnit === "$" || displayUnit === "€" || displayUnit === "£")) {
+        isCurrency = true;
+      }
+
+      const formattedValue = typeof finalValue === "number"
+        ? (isCurrency ? formatCurrencyNumber(finalValue) : formatCompactNumber(finalValue))
+        : finalValue;
 
       // NEW: Auto-populate sparklineData from resolved series
       const sparklineData = resolvedData?.series && Array.isArray(resolvedData.series)

@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSyncStatus, type SyncStatusResponse } from "../api/reportingApi";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { SyncError } from "@/utils/errorHandling";
 
 export const useSyncStatus = (clientId: number | null) => {
@@ -50,24 +50,44 @@ export const useSyncStatus = (clientId: number | null) => {
         }
     }, [query.data, shouldPoll]);
 
-    // Helper to check if a specific integration/account is syncing
-    const isAccountSyncing = (integrationType: string, accountId?: string | number) => {
-        if (!query.data?.data) return false;
+    const normalizeIntegrationKey = (value: string) =>
+        value.toLowerCase().trim().replace(/[ _]/g, '-');
 
-        // Normalize integration key (e.g. "google Analytics" -> "google-analytics")
-        // Map UI keys to API keys if needed
-        let apiKey = integrationType.toLowerCase().replace(/[ _]/g, '-'); // Replace space AND underscore
+    const integrationMap = useMemo(() => {
+        const map = new Map<string, SyncStatusResponse["data"][string]>();
+        if (!query.data?.data) return map;
+
+        Object.entries(query.data.data).forEach(([key, integration]) => {
+            const normalizedKey = normalizeIntegrationKey(key);
+            map.set(normalizedKey, integration);
+            map.set(normalizedKey.replace(/-/g, '_'), integration);
+            map.set(normalizedKey.replace(/-/g, ''), integration);
+        });
+
+        return map;
+    }, [query.data?.data]);
+
+    const getIntegrationByType = (integrationType: string) => {
+        let apiKey = normalizeIntegrationKey(integrationType);
         if (apiKey === 'google') apiKey = 'google-analytics';
         if (apiKey === 'woo') apiKey = 'woocommerce';
         if (apiKey === 'googleads') apiKey = 'google-ads';
+        return integrationMap.get(apiKey) || integrationMap.get(apiKey.replace(/-/g, '_')) || integrationMap.get(apiKey.replace(/-/g, ''));
+    };
 
-        // Check for both hyphenated and snake_case versions (backend often uses snake_case)
-        const integration = query.data.data[apiKey] || query.data.data[apiKey.replace(/-/g, '_')];
+    const isFullySynced = (integration: SyncStatusResponse["data"][string]) => {
+        if (integration.allSynced) return true;
+        if (!integration.accounts?.length) return false;
+        return integration.accounts.every(account => account.initialSyncComplete);
+    };
 
+    // Helper to check if a specific integration/account is syncing
+    const isAccountSyncing = (integrationType: string, accountId?: string | number) => {
+        const integration = getIntegrationByType(integrationType);
         if (!integration) return false;
 
         if (!integration.hasAccounts) return false;
-        if (integration.allSynced) return false;
+        if (isFullySynced(integration)) return false;
 
         // If specific account checking
         if (accountId) {
@@ -114,19 +134,13 @@ export const useSyncStatus = (clientId: number | null) => {
     })();
 
     const getIntegrationCounts = (integrationType: string) => {
-        if (!query.data?.data) return null;
-        let apiKey = integrationType.toLowerCase().replace(/[ _]/g, '-');
-        if (apiKey === 'google') apiKey = 'google-analytics';
-        if (apiKey === 'woo') apiKey = 'woocommerce';
-        if (apiKey === 'googleads') apiKey = 'google-ads';
-
-        const integration = query.data.data[apiKey] || query.data.data[apiKey.replace(/-/g, '_')];
+        const integration = getIntegrationByType(integrationType);
         if (!integration || !integration.hasAccounts) return null;
 
         const total = integration.accounts.length;
         const synced = integration.accounts.filter(a => a.initialSyncComplete).length;
 
-        return { total, synced, isSynced: integration.allSynced };
+        return { total, synced, isSynced: isFullySynced(integration) };
     };
 
     // Retry function to manually retry sync status fetch

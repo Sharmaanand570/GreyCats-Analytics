@@ -49,6 +49,7 @@ interface StatusCellProps {
   accountId: number;
   isSyncing: boolean;
   syncDetails: { total: number; synced: number } | null;
+  hasInitialData?: boolean;
 }
 
 const StatusCell: React.FC<StatusCellProps> = ({
@@ -57,6 +58,7 @@ const StatusCell: React.FC<StatusCellProps> = ({
   accountId,
   isSyncing,
   syncDetails,
+  hasInitialData,
 }) => {
   const { data: syncData, isLoading: syncLoading } = useSyncProgress(
     clientId,
@@ -64,25 +66,37 @@ const StatusCell: React.FC<StatusCellProps> = ({
     true
   );
 
+  const awaitingDataBadge = hasInitialData === false ? (
+    <div className="flex items-center px-2 py-1 text-xs font-medium bg-amber-50 text-amber-700 rounded-md whitespace-nowrap">
+      Awaiting Data
+    </div>
+  ) : null;
+
   // Show progress bar when a sync is happening or recently finished (not 'not_started')
   if (syncLoading || (syncData?.success && syncData?.status !== 'not_started')) {
     return (
-      <SyncProgressBar
-        clientId={clientId}
-        integrationType={integrationType}
-        accountId={accountId}
-        compact={true}
-      />
+      <div className="flex items-center gap-2">
+        <SyncProgressBar
+          clientId={clientId}
+          integrationType={integrationType}
+          accountId={accountId}
+          compact={true}
+        />
+        {awaitingDataBadge}
+      </div>
     );
   }
 
   // Fallback: static connected badge
   return (
-    <SyncStatusBadge
-      isSyncing={isSyncing}
-      statusText={capitalizeStatus("connected")}
-      syncDetails={syncDetails}
-    />
+    <div className="flex items-center gap-2">
+      <SyncStatusBadge
+        isSyncing={isSyncing}
+        statusText={capitalizeStatus("connected")}
+        syncDetails={syncDetails}
+      />
+      {awaitingDataBadge}
+    </div>
   );
 };
 
@@ -288,6 +302,7 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
             accountId={integration.accountId}
             isSyncing={isSyncing}
             syncDetails={syncDetails}
+            hasInitialData={integration.hasInitialData}
           />
         ),
         renderActions: () => (

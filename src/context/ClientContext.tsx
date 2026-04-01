@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
-import type { Client, ClientWithIntegrations } from '../types/client.types';
+import type { ClientWithIntegrations } from '../types/client.types';
 
 interface ClientContextType {
     currentClient: ClientWithIntegrations | null;

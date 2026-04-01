@@ -68,6 +68,7 @@ export interface ConnectedIntegration {
   accountName: string;
   accountIdentifier: string;
   connectedAt: string;
+  hasInitialData?: boolean;
 }
 
 export interface ClientWithIntegrations extends Client {

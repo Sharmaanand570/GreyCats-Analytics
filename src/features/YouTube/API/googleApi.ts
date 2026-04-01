@@ -11,6 +11,7 @@ export type connectGoogleTypeResponse = {
 export type GoogleCallbackResponse = {
   success: boolean;
   message: string;
+  warning?: string;
 };
 
 export type GoogleCallbackParams = {

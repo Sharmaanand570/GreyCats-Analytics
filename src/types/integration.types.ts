@@ -49,6 +49,7 @@ export interface AccountAssignmentRequest {
 export interface AccountAssignmentResponse {
   success: boolean;
   message: string;
+  warning?: string;
   assignment?: any;
 }
 

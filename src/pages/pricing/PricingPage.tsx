@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import ParticleBackground from "@/components/ParticleBackground";
 import logoBlack from "@/assets/images/greycats-black-logo.png";
 import { usePlansQuery } from "@/hooks/subscription/usePlansQuery";
@@ -35,6 +35,7 @@ export default function PricingPage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const spotlightRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const authed = isAuthenticated(StorageKey.ANALYTICS_TOKEN);
   const currentPlanName = subscriptionData?.plan?.planName;
 
@@ -61,10 +62,33 @@ export default function PricingPage() {
     return () => observer.disconnect();
   }, []);
 
+  // Auto-trigger checkout when returning from auth with a pending planId
+  const handleSelectPlanById = useCallback(
+    (planId: number) => {
+      const plan = plans?.find((p) => p.id === planId);
+      if (plan) handleSelectPlan(plan);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [plans]
+  );
+
+  useEffect(() => {
+    const pendingPlanId = searchParams.get("planId");
+    if (!pendingPlanId || !authed || !plans?.length) return;
+
+    // Clear the param so it doesn't re-trigger
+    setSearchParams((prev) => {
+      prev.delete("planId");
+      return prev;
+    }, { replace: true });
+
+    handleSelectPlanById(Number(pendingPlanId));
+  }, [authed, plans, searchParams, setSearchParams, handleSelectPlanById]);
+
   const handleSelectPlan = async (plan: Plan) => {
     if (!isAuthenticated(StorageKey.ANALYTICS_TOKEN)) {
       toast.info("Please log in or create an account to subscribe.");
-      navigate("/auth/login?redirect=/pricing");
+      navigate(`/auth/login?redirect=/pricing&planId=${plan.id}`);
       return;
     }
 

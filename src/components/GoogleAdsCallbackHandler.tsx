@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AccountSelectionModal } from "@/components/clients/AccountSelectionModal";
 import type { IntegrationType } from "@/types/client.types";
+import { showConnectionResultToast } from "@/utils/connectionToasts";
 
 function GoogleAdsCallbackHandler() {
     const [searchParams] = useSearchParams();
@@ -36,6 +37,8 @@ function GoogleAdsCallbackHandler() {
         const processCallback = () => {
             const status = searchParams.get("status");
             const reason = searchParams.get("reason");
+            const warning = searchParams.get("warning");
+            console.log("[Google Ads callback] params:", Object.fromEntries(searchParams.entries()));
 
             console.log("Google Ads OAuth callback - Full URL:", window.location.href);
             console.log("Google Ads OAuth callback - Params:", Object.fromEntries(searchParams.entries()));
@@ -57,6 +60,7 @@ function GoogleAdsCallbackHandler() {
 
             // Handle success status (or no explicit status — treat as success)
             if (!status || status.toLowerCase() === "success") {
+                showConnectionResultToast({ warning });
                 const storedClientId = localStorage.getItem("pending_oauth_client_id");
                 const storedIntegration = localStorage.getItem("pending_oauth_integration");
 

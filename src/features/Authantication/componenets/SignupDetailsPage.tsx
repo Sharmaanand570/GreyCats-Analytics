@@ -115,7 +115,14 @@ export default function SignupDetailsPage() {
                 companyPIN: data.pin,
             });
             toast.success("All set!");
-            navigate("/clients"); // New users land on pricing page to choose their plan
+            // If user came from pricing flow, redirect back to complete checkout
+            const pendingRedirect = sessionStorage.getItem("postSignupRedirect");
+            if (pendingRedirect) {
+              sessionStorage.removeItem("postSignupRedirect");
+              navigate(pendingRedirect, { replace: true });
+            } else {
+              navigate("/clients");
+            }
         } catch (error) {
             toast.error("Failed to save address details.");
         } finally {
@@ -125,7 +132,15 @@ export default function SignupDetailsPage() {
 
     const handleSkip = () => {
         if (step === 2) setStep(3);
-        else if (step === 3) navigate("/clients");
+        else if (step === 3) {
+            const pendingRedirect = sessionStorage.getItem("postSignupRedirect");
+            if (pendingRedirect) {
+                sessionStorage.removeItem("postSignupRedirect");
+                navigate(pendingRedirect, { replace: true });
+            } else {
+                navigate("/clients");
+            }
+        }
     };
 
     // ---------------------------

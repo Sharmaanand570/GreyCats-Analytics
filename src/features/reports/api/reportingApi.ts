@@ -241,6 +241,7 @@ export const getSyncStatus = (clientId: number) =>
       const response = await api.get<SyncStatusResponse>(
         `/clients/${clientId}/sync-status`
       );
+      console.log("[SyncStatus] response:", response.data);
       return response.data;
     } catch (err: any) {
       console.error(`Error fetching sync status for client ${clientId}:`, err.response?.status, err.message);

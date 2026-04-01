@@ -35,6 +35,7 @@ export type YouTubeThumbnail = {
 export type YouTubeChannelResponse = {
   success: boolean;
   message?: string;
+  warning?: string;
   channel: {
     channelId: string;
     channelTitle: string;
@@ -669,4 +670,3 @@ export const disconnectYouTube = async (
     );
   }
 };
-

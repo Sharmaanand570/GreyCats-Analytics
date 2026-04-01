@@ -150,13 +150,9 @@ export const useWooCommerceConnect = () => {
       return response.data;
     },
     onSuccess: () => {
-      toast.success('WooCommerce store connected successfully');
       // Invalidate relevant queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['woocommerce-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['integrations'] });
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to connect WooCommerce store. Please check your credentials.');
     },
   });
 };
