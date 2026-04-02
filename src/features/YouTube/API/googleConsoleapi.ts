@@ -183,8 +183,8 @@ const handleGoogleConsoleApiError = (
 ): never => {
   const axiosError = error as AxiosError<GoogleConsoleApiErrorResponse>;
   throw new Error(
-    axiosError.response?.data?.message ||
     axiosError.response?.data?.error ||
+    axiosError.response?.data?.message ||
     fallbackMessage
   );
 };
@@ -424,7 +424,7 @@ export const getGoogleConsoleTopPages = async (
     console.log(`[API] Fetching GSC Top Pages for client ${clientId}`, params);
     const response = await api.get<GoogleConsoleTopPagesResponse>(
       `/clients/${clientId}/google-search-console/top-pages`,
-      { params }
+      { params, timeout: 60000 }
     );
     console.log(`[API] GSC Top Pages Response for client ${clientId}:`, response.data);
     const body = response.data as any;
@@ -450,7 +450,7 @@ export const getGoogleConsoleTopQueries = async (
     console.log(`[API] Fetching GSC Top Queries for client ${clientId}`, params);
     const response = await api.get<GoogleConsoleTopQueriesResponse>(
       `/clients/${clientId}/google-search-console/top-queries`,
-      { params }
+      { params, timeout: 60000 }
     );
     console.log(`[API] GSC Top Queries Response for client ${clientId}:`, response.data);
     const body = response.data as any;

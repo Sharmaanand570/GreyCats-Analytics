@@ -30,7 +30,7 @@ import {
 
 const commonQueryOptions = {
   retry: 1,
-  staleTime: 60 * 1000,
+  staleTime: 5 * 60 * 1000,
 };
 
 export const useGoogleConsoleReconnect = () => {

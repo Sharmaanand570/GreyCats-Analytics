@@ -60,6 +60,7 @@ import {
   Trophy,
   ArrowUpRight,
   TrendingUp,
+  AlertCircle,
 } from "lucide-react";
 import { DataSyncBanner } from "@/components/DataSyncBanner";
 import { fetchUnifiedAggregate } from "@/features/reports/api/reportingApi";
@@ -230,11 +231,15 @@ function GoogleConsoleDetailPage() {
   const {
     data: topPagesData,
     isLoading: isLoadingTopPages,
+    error: topPagesError,
+    isError: isTopPagesError,
   } = useGoogleConsoleTopPages(clientId, { startDate, endDate });
 
   const {
     data: topQueriesData,
     isLoading: isLoadingTopQueries,
+    error: topQueriesError,
+    isError: isTopQueriesError,
   } = useGoogleConsoleTopQueries(clientId, { startDate, endDate });
 
   const topPages = topPagesData?.topPages ?? (topPagesData as any)?.data?.topPages ?? [];
@@ -514,6 +519,14 @@ function GoogleConsoleDetailPage() {
                       <Skeleton className="h-12 w-full" />
                       <Skeleton className="h-12 w-full" />
                     </div>
+                  ) : isTopPagesError ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <AlertCircle className="h-8 w-8 mb-3 text-red-400" />
+                      <p className="text-sm font-medium text-red-600 mb-1">Failed to load top pages</p>
+                      <p className="text-xs text-muted-foreground max-w-sm">
+                        {topPagesError?.message || "An unexpected error occurred"}
+                      </p>
+                    </div>
                   ) : topPages.length > 0 ? (
                     <div className="rounded-md border">
                       <Table>
@@ -592,6 +605,14 @@ function GoogleConsoleDetailPage() {
                       <Skeleton className="h-12 w-full" />
                       <Skeleton className="h-12 w-full" />
                       <Skeleton className="h-12 w-full" />
+                    </div>
+                  ) : isTopQueriesError ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <AlertCircle className="h-8 w-8 mb-3 text-red-400" />
+                      <p className="text-sm font-medium text-red-600 mb-1">Failed to load top queries</p>
+                      <p className="text-xs text-muted-foreground max-w-sm">
+                        {topQueriesError?.message || "An unexpected error occurred"}
+                      </p>
                     </div>
                   ) : topQueries.length > 0 ? (
                     <div className="rounded-md border">

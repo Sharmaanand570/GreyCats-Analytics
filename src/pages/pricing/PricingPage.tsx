@@ -4,14 +4,9 @@ import ParticleBackground from "@/components/ParticleBackground";
 import logoBlack from "@/assets/images/greycats-black-logo.png";
 import { usePlansQuery } from "@/hooks/subscription/usePlansQuery";
 import { useSubscriptionQuery } from "@/hooks/subscription/useSubscriptionQuery";
-import { useCreateOrderMutation } from "@/hooks/subscription/useCreateOrderMutation";
-import { useVerifyPaymentMutation } from "@/hooks/subscription/useVerifyPaymentMutation";
-import { useActivateFreePlanMutation } from "@/hooks/subscription/useActivateFreePlanMutation";
-import { openRazorpayCheckout } from "@/lib/payments/openRazorpayCheckout";
 import { PricingCard } from "@/components/subscription/PricingCard";
 import { PricingTable } from "@/components/subscription/PricingTable";
 import type { Plan } from "@/types/subscription.types";
-import { toast } from "sonner";
 import {
   Loader2,
   ChevronDown,
@@ -27,10 +22,6 @@ import { isAuthenticated, StorageKey } from "@/utils/storage";
 export default function PricingPage() {
   const { data: plans, isLoading: plansLoading } = usePlansQuery();
   const { data: subscriptionData } = useSubscriptionQuery();
-  const createOrder = useCreateOrderMutation();
-  const verifyPayment = useVerifyPaymentMutation();
-  const activateFreePlan = useActivateFreePlanMutation();
-  const [processingPlanId, setProcessingPlanId] = useState<number | null>(null);
   const [showTable, setShowTable] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const spotlightRef = useRef<HTMLDivElement>(null);
@@ -85,60 +76,12 @@ export default function PricingPage() {
     handleSelectPlanById(Number(pendingPlanId));
   }, [authed, plans, searchParams, setSearchParams, handleSelectPlanById]);
 
-  const handleSelectPlan = async (plan: Plan) => {
-    if (!isAuthenticated(StorageKey.ANALYTICS_TOKEN)) {
-      toast.info("Please log in or create an account to subscribe.");
-      navigate(`/auth/login?redirect=/pricing&planId=${plan.id}`);
-      return;
-    }
-
+  const handleSelectPlan = (plan: Plan) => {
     if (plan.name.toLowerCase() === "enterprise") {
       window.open("mailto:sales@greycats.tech?subject=Enterprise Plan Inquiry", "_blank");
       return;
     }
-
-    setProcessingPlanId(plan.id);
-    try {
-      if (plan.price === 0) {
-        if (currentPlanName?.toLowerCase() === "free") {
-          toast.info("You're already on a free plan.");
-          setProcessingPlanId(null);
-          return;
-        }
-        toast.promise(activateFreePlan.mutateAsync(plan.id), {
-          loading: `Switching to ${plan.displayName}...`,
-          success: `Successfully switched to ${plan.displayName}`,
-          error: "Failed to switch plans",
-        });
-        setProcessingPlanId(null);
-        return;
-      }
-
-      const orderData = await createOrder.mutateAsync(plan.id);
-      await openRazorpayCheckout({
-        orderData,
-        onSuccess: (payload) => {
-          toast.promise(verifyPayment.mutateAsync(payload), {
-            loading: "Verifying payment...",
-            success: `Successfully subscribed to ${plan.displayName}!`,
-            error: "Payment verification failed",
-          });
-          setProcessingPlanId(null);
-        },
-        onDismiss: () => {
-          toast.info("Payment cancelled.");
-          setProcessingPlanId(null);
-        },
-      });
-    } catch (err: any) {
-      console.error("[Checkout error]", err);
-      const msg =
-        err?.response?.data?.message ||
-        err?.message ||
-        "Could not initiate checkout. Please try again.";
-      toast.error(msg);
-      setProcessingPlanId(null);
-    }
+    navigate(`/checkout?planId=${plan.id}`);
   };
 
   return (
@@ -288,7 +231,7 @@ export default function PricingPage() {
                   plan={plan}
                   isCurrentPlan={plan.name.toLowerCase() === currentPlanName?.toLowerCase()}
                   onSelectPlan={handleSelectPlan}
-                  loading={processingPlanId === plan.id}
+                  loading={false}
                 />
               ))}
             </div>

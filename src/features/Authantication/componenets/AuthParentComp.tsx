@@ -28,7 +28,7 @@ function AuthParentComp(): React.JSX.Element | null {
     const authed = isAuthenticated(StorageKey.ANALYTICS_TOKEN);
 
     // Pages accessible without login
-    const allPublicPaths = ["/", "/auth/login", "/auth/signup", "/auth/forgot-password", "/pricing", "/billing"];
+    const allPublicPaths = ["/", "/auth/login", "/auth/signup", "/auth/forgot-password", "/pricing", "/billing", "/checkout"];
     // Pages that should redirect already-logged-in users away (auth-only pages)
     const authRedirectPaths = ["/auth/login", "/auth/signup", "/auth/forgot-password"];
 

@@ -81,6 +81,7 @@ const CookiePolicyPage = lazy(() => import("./pages/CookiePolicyPage"));
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 const PricingPage = lazy(() => import("./pages/pricing/PricingPage"));
 const BillingPage = lazy(() => import("./pages/billing/BillingPage"));
+const CheckoutPage = lazy(() => import("./pages/pricing/CheckoutPage"));
 
 // Admin Pages
 const AdminLayout = lazy(() => import("./components/AdminLayout"));
@@ -213,6 +214,7 @@ function App() {
             {/* Pricing & Billing — full-page, no sidebar */}
             <Route path="pricing" element={<PricingPage />} />
             <Route path="billing" element={<BillingPage />} />
+            <Route path="checkout" element={<CheckoutPage />} />
 
             {/* OAuth callback routes */}
             <Route path="youtube/callback" element={<YouTubeCallbackHandler />} />

@@ -1,12 +1,9 @@
-import React, { useState } from "react";
+import React from "react";
+import { useNavigate } from "react-router-dom";
 import type { Plan } from "@/types/subscription.types";
 import { X, Loader2, Sparkles } from "lucide-react";
 import { PricingCard } from "./PricingCard";
 import { usePlansQuery } from "@/hooks/subscription/usePlansQuery";
-import { useCreateOrderMutation } from "@/hooks/subscription/useCreateOrderMutation";
-import { useVerifyPaymentMutation } from "@/hooks/subscription/useVerifyPaymentMutation";
-import { openRazorpayCheckout } from "@/lib/payments/openRazorpayCheckout";
-import { toast } from "sonner";
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -21,10 +18,8 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   currentPlanName,
   reason,
 }) => {
+  const navigate = useNavigate();
   const { data: plans, isLoading: plansLoading } = usePlansQuery();
-  const createOrder = useCreateOrderMutation();
-  const verifyPayment = useVerifyPaymentMutation();
-  const [processingPlanId, setProcessingPlanId] = useState<number | null>(null);
 
   if (!isOpen) return null;
 
@@ -35,25 +30,9 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
       p.name.toLowerCase() !== currentPlanName?.toLowerCase()
   );
 
-  const handleSelectPlan = async (plan: Plan) => {
-    setProcessingPlanId(plan.id);
-    try {
-      const orderData = await createOrder.mutateAsync(plan.id);
-      await openRazorpayCheckout({
-        orderData,
-        onSuccess: (payload) => {
-          verifyPayment.mutate(payload);
-          onClose();
-        },
-        onDismiss: () => {
-          toast.info("Payment was cancelled.");
-          setProcessingPlanId(null);
-        },
-      });
-    } catch {
-      toast.error("Could not initiate payment. Please try again.");
-      setProcessingPlanId(null);
-    }
+  const handleSelectPlan = (plan: Plan) => {
+    navigate(`/checkout?planId=${plan.id}`);
+    onClose();
   };
 
   return (
@@ -109,7 +88,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
                   key={plan.id}
                   plan={plan}
                   onSelectPlan={handleSelectPlan}
-                  loading={processingPlanId === plan.id}
+                  loading={false}
                 />
               ))}
             </div>

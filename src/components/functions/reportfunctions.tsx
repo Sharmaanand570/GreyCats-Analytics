@@ -230,6 +230,58 @@ export async function exportAllSlidesToPDF(
           scrollX: 0,
           scrollY: 0,
           onclone: (clonedDoc) => {
+            // Remove text truncation on widget header titles so they render fully in PDF
+            clonedDoc.querySelectorAll(".truncate").forEach((el) => {
+              const h = el as HTMLElement;
+              h.classList.remove("truncate");
+              h.style.overflow = "visible";
+              h.style.textOverflow = "clip";
+              h.style.whiteSpace = "normal";
+              h.style.wordBreak = "break-word";
+              h.style.fontSize = "11px";
+              h.style.lineHeight = "1.3";
+            });
+
+            // Ensure slide header h1 descenders (g, y, p) are not clipped
+            clonedDoc.querySelectorAll("h1").forEach((el) => {
+              el.style.overflow = "visible";
+              el.style.paddingBottom = "4px";
+              el.style.lineHeight = "1.4";
+            });
+
+            // Make table columns auto-size so headers aren't cramped
+            clonedDoc.querySelectorAll("table.table-fixed").forEach((el) => {
+              (el as HTMLElement).style.tableLayout = "auto";
+              el.classList.remove("table-fixed");
+            });
+
+            // Fix table header cells — remove fixed height so wrapped text isn't clipped
+            clonedDoc.querySelectorAll("th").forEach((th) => {
+              const h = th as HTMLElement;
+              h.style.height = "auto";
+              h.style.minHeight = "40px";
+              h.style.paddingTop = "8px";
+              h.style.paddingBottom = "8px";
+              h.style.whiteSpace = "normal";
+              h.style.overflow = "visible";
+            });
+
+            // Force visible borders on table cells directly
+            // html2canvas cannot resolve CSS custom properties used by Tailwind border colors
+            // Applying to td/th directly is more reliable than tr borders
+            clonedDoc.querySelectorAll("table").forEach((table) => {
+              const t = table as HTMLElement;
+              t.style.borderCollapse = "collapse";
+            });
+            clonedDoc.querySelectorAll("td").forEach((td) => {
+              const h = td as HTMLElement;
+              h.style.borderBottom = "1px solid #e5e7eb";
+            });
+            clonedDoc.querySelectorAll("th").forEach((th) => {
+              const h = th as HTMLElement;
+              h.style.borderBottom = "2px solid #d1d5db";
+            });
+
             // Convert all oklch() and oklab() colors to RGB in the cloned document
             convertModernColorsInClonedDom(clonedDoc);
 

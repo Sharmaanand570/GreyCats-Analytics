@@ -402,7 +402,7 @@ export const useClient = (clientId: number | null) => {
       }
     },
     enabled: !!clientId,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 2,
   });
 };
