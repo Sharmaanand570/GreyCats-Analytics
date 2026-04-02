@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -396,10 +395,10 @@ export function AuthForm({
               <button
                 type="button"
                 onClick={handleResendOtp}
-                disabled={mutateResendOtp.isPending}
+                disabled={isResendOtpPending}
                 className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 disabled:opacity-50"
               >
-                {mutateResendOtp.isPending ? "Sending..." : "Resend OTP"}
+                {isResendOtpPending ? "Sending..." : "Resend OTP"}
               </button>
             </div>
           </div>
