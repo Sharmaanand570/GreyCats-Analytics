@@ -41,6 +41,29 @@ export default defineConfig(({ mode }) => {
     port: 5173,
     strictPort: true,
     proxy: {
+      "/api/linkedin/portability/connect": {
+        target: apiOrigin,
+        changeOrigin: true,
+        secure: false,
+        selfHandleResponse: true,
+        configure: (proxy, _options) => {
+          proxy.on('proxyRes', (proxyRes, _req, res) => {
+            if (proxyRes.statusCode === 302 && proxyRes.headers.location) {
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: true, url: proxyRes.headers.location }));
+            } else {
+              res.statusCode = proxyRes.statusCode || 200;
+              Object.keys(proxyRes.headers).forEach((key) => {
+                if (proxyRes.headers[key]) {
+                  res.setHeader(key, proxyRes.headers[key] as string | string[]);
+                }
+              });
+              proxyRes.pipe(res);
+            }
+          });
+        },
+      },
       "/api": {
         target: apiOrigin,
         changeOrigin: true,

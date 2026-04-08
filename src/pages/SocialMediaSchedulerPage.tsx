@@ -27,6 +27,7 @@ import { useClients, useCreateClient, useDeleteClient, useClient } from '../hook
 import { useClientContext } from '@/context/ClientContext';
 import { useAvailableAccounts, useAssignAccount, useRemoveAccount } from '@/hooks/useIntegrations';
 import { loginMetaBusiness } from '@/features/meta/API/metaBusinessApi';
+import { connectTwitter } from '@/features/twitter/api/twitterApi';
 import { getProfileImageUrl } from '@/utils/imageUtils';
 import type { ClientWithIntegrations, AvailableAccount } from '@/types/client.types';
 
@@ -46,7 +47,7 @@ const PLATFORMS = [
   },
   { id: 'linkedin', label: 'LinkedIn', sublabel: null, icon: <FaLinkedin className="w-5 h-5 text-blue-700" />, comingSoon: true },
   { id: 'threads', label: 'Threads', sublabel: null, icon: <SiThreads className="w-5 h-5 text-black" />, comingSoon: true },
-  { id: 'x', label: 'X (Twitter)', sublabel: null, icon: <FaXTwitter className="w-5 h-5 text-black" />, comingSoon: true },
+  { id: 'twitter', label: 'X (Twitter)', sublabel: null, icon: <FaXTwitter className="w-5 h-5 text-black" />, comingSoon: false },
 ];
 
 /* ═══════════════════════════════════════════════════
@@ -423,6 +424,7 @@ function StepConnectPlatforms({
   onBack: () => void;
 }) {
   const { data: availableMetaPages = [], isLoading: isLoadingPages } = useAvailableAccounts('meta-business');
+  const { data: availableTwitterAccounts = [], isLoading: isLoadingTwitter } = useAvailableAccounts('twitter');
   const assignAccount = useAssignAccount();
   const removeAccount = useRemoveAccount();
 
@@ -450,6 +452,30 @@ function StepConnectPlatforms({
     }
   };
 
+  const handleToggleTwitter = async (account: AvailableAccount) => {
+    const isAlreadyLinked = !!(client.integrations || []).find(
+      (i: any) => i.integrationType === 'twitter' && i.accountId === account.id
+    );
+
+    if (isAlreadyLinked) {
+      if (window.confirm(`Disconnect ${account.username}?`)) {
+        removeAccount.mutate({
+          clientId: client.id,
+          integrationType: 'twitter',
+          accountId: account.id,
+        });
+      }
+    } else {
+      assignAccount.mutate({
+        clientId: client.id,
+        data: {
+          integrationType: 'twitter',
+          accountId: account.id,
+        },
+      });
+    }
+  };
+
   const handleNewConnection = async () => {
     try {
       // Save context so the OAuth callback knows where to return
@@ -462,10 +488,27 @@ function StepConnectPlatforms({
     }
   };
 
+  const handleTwitterConnection = async () => {
+    try {
+      localStorage.setItem('pending_oauth_client_id', String(client.id));
+      localStorage.setItem('pending_oauth_integration', 'twitter');
+      localStorage.setItem('pending_oauth_return', '/social-media/scheduler');
+      const response = await connectTwitter();
+      if (response.url) {
+        window.location.href = response.url;
+      }
+    } catch (error) {
+      toast.error('Failed to initiate Twitter login');
+    }
+  };
+
   const linkedPages = (client.integrations || []).filter(
     (i) => i.integrationType === 'meta-business'
   );
-  const hasAnyConnection = linkedPages.length > 0;
+  const linkedTwitter = (client.integrations || []).filter(
+    (i) => i.integrationType === 'twitter'
+  );
+  const hasAnyConnection = linkedPages.length > 0 || linkedTwitter.length > 0;
 
   return (
     <div className="w-full p-6 relative">
@@ -619,6 +662,98 @@ function StepConnectPlatforms({
               </div>
             )}
 
+            {/* Twitter Integration */}
+            <div className="mt-10 pt-10 border-t border-zinc-100">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-50 border border-zinc-100">
+                  <FaXTwitter className="w-3.5 h-3.5 text-black" />
+                  <span className="text-[11px] font-bold text-zinc-700 tracking-tight ml-0.5">Twitter (X)</span>
+                </div>
+                {linkedTwitter.length > 0 && (
+                  <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider bg-green-50 border border-green-100 px-2 py-0.5 rounded-full">Connected</span>
+                )}
+              </div>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-bold text-zinc-900 tracking-tight">Available Accounts</h3>
+                  <p className="text-xs text-zinc-400 font-medium">Link Twitter profiles to this workspace.</p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleTwitterConnection}
+                  className="h-9 rounded-xl border-zinc-200 font-bold text-xs flex items-center gap-2"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Add New Account
+                </Button>
+              </div>
+
+              {isLoadingTwitter ? (
+                <div className="flex flex-col items-center justify-center py-10">
+                  <Loader2 className="w-8 h-8 text-zinc-200 animate-spin mb-3" />
+                  <p className="text-zinc-400 text-xs font-semibold uppercase tracking-wider">Syncing Twitter Accounts...</p>
+                </div>
+              ) : availableTwitterAccounts.length === 0 ? (
+                <div className="text-center py-10 bg-zinc-50 rounded-2xl border border-dashed border-zinc-200">
+                  <FaXTwitter className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
+                  <p className="text-zinc-500 font-bold mb-1">No Twitter Accounts Found</p>
+                  <p className="text-xs text-zinc-400 font-medium px-10">
+                    Connect your Twitter account to start scheduling posts.
+                  </p>
+                  <Button variant="link" onClick={handleTwitterConnection} className="mt-2 text-blue-600 font-bold">
+                    Connect Twitter Now
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 max-h-[45vh] overflow-y-auto pr-2 custom-scrollbar">
+                  {availableTwitterAccounts.map((account: AvailableAccount) => {
+                    const isLinked = !!linkedTwitter.find((p: any) => p.accountId === account.id);
+                    return (
+                      <div
+                        key={account.id}
+                        className={`flex items-center justify-between p-4 rounded-2xl border transition-all duration-300 ${
+                          isLinked
+                            ? 'bg-zinc-50/50 border-zinc-200'
+                            : 'bg-white border-zinc-100 hover:border-zinc-200 hover:shadow-md'
+                        }`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-xl bg-zinc-100 flex items-center justify-center border border-zinc-100 overflow-hidden text-zinc-400">
+                            {account.profileImageUrl ? (
+                              <img src={getProfileImageUrl(account.profileImageUrl)} className="w-full h-full object-cover" />
+                            ) : (
+                              <FaXTwitter className="w-6 h-6 text-black" />
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-zinc-900 leading-none mb-1">
+                              {account.username || 'Unknown Account'}
+                            </h4>
+                            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                              Twitter Profile
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant={isLinked ? 'outline' : 'default'}
+                          size="sm"
+                          onClick={() => handleToggleTwitter(account)}
+                          disabled={assignAccount.isPending || removeAccount.isPending}
+                          className={`h-9 px-5 rounded-lg font-bold text-xs tracking-tight ${
+                            isLinked
+                              ? 'border-red-200 text-red-500 hover:bg-red-50 hover:border-red-300'
+                              : 'bg-zinc-900 hover:bg-zinc-800 text-white'
+                          }`}
+                        >
+                          {isLinked ? 'Disconnect' : 'Link to Client'}
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             {/* Go to Calendar button inside the container */}
             <div className="mt-6 flex justify-end border-t border-zinc-100 pt-6">
               <Button
@@ -653,10 +788,16 @@ function StepWorkspace({
   const linkedPages = (client.integrations || []).filter(
     (i) => i.integrationType === 'meta-business'
   );
+  const linkedTwitter = (client.integrations || []).filter(
+      (i) => i.integrationType === 'twitter'
+  );
 
   const connectedIds = PLATFORMS.filter(p => {
     if (p.id === 'meta') {
       return linkedPages.length > 0;
+    }
+    if (p.id === 'twitter') {
+        return linkedTwitter.length > 0;
     }
     return false;
   }).map(p => p.id);
@@ -671,6 +812,19 @@ function StepWorkspace({
       } catch (error) {
         toast.error('Failed to connect Meta');
       }
+    }
+    if (platformId === 'twitter') {
+        try {
+            localStorage.setItem('pending_oauth_client_id', String(client.id));
+            localStorage.setItem('pending_oauth_integration', 'twitter');
+            localStorage.setItem('pending_oauth_return', '/social-media/scheduler');
+            const response = await connectTwitter();
+            if (response.url) {
+                window.location.href = response.url;
+            }
+        } catch (error) {
+            toast.error('Failed to connect Twitter');
+        }
     }
   };
 
@@ -689,6 +843,20 @@ function StepWorkspace({
        } catch {
          // Error toast already shown by useRemoveAccount hook
        }
+     }
+     if (platformId === 'twitter') {
+         try {
+             for (const acc of linkedTwitter) {
+                 await removeAccount.mutateAsync({
+                     clientId: client.id,
+                     integrationType: 'twitter',
+                     accountId: acc.accountId
+                 });
+             }
+             toast.success('Twitter disconnected from this workspace');
+         } catch {
+             // Error toast already shown by useRemoveAccount hook
+         }
      }
   };
 
@@ -719,6 +887,14 @@ function StepWorkspace({
                       {page.accountName || page.accountIdentifier || 'Meta Page'}
                     </span>
                   </div>
+                ))}
+                {linkedTwitter.map((acc) => (
+                    <div key={acc.accountId} className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-50 border border-zinc-100 shrink-0">
+                        <FaXTwitter className="w-3 h-3 text-black" />
+                        <span className="text-[11px] font-semibold text-zinc-600 truncate max-w-[120px]">
+                      {acc.accountName || acc.accountIdentifier || 'Twitter Account'}
+                    </span>
+                    </div>
                 ))}
               </div>
             )}

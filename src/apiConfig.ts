@@ -23,8 +23,17 @@ export const api: AxiosInstance = axios.create({
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = getAuthToken(StorageKey.ANALYTICS_TOKEN);
-    if (token) {
+    if (token && token !== "undefined" && token !== "null") {
       config.headers.Authorization = `Bearer ${token}`;
+    } else if (window.location.hash.startsWith("#/shared/")) {
+      // Shared report scheduled links: extract token from URL and use as Authorization
+      const qs = window.location.hash.split("?")[1];
+      if (qs) {
+        const shareToken = new URLSearchParams(qs).get("token");
+        if (shareToken) {
+          config.headers.Authorization = `Bearer ${shareToken}`;
+        }
+      }
     }
 
     return config;
@@ -56,9 +65,12 @@ api.interceptors.response.use(
     if (status === 401) {
       const isSharedEndpoint = error.config?.url?.includes("/shared/");
       const skipRedirect = (error.config as any)?.skipAuthRedirect;
+      const hasShareToken = !!(error.config?.params as any)?.token;
       const isLoginEndpoint = error.config?.url?.includes("/auth/login");
+      // Never redirect when viewing a shared report page
+      const isOnSharedReportPage = window.location.hash.startsWith("#/shared/");
 
-      if (!isSharedEndpoint && !isLoginEndpoint && !skipRedirect) {
+      if (!isSharedEndpoint && !isLoginEndpoint && !skipRedirect && !hasShareToken && !isOnSharedReportPage) {
         console.warn("Unauthorized — redirecting to login…");
         removeAuthToken(StorageKey.ANALYTICS_TOKEN);
         window.location.href = "/#/auth/login?reason=session_expired";

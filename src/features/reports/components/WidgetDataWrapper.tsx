@@ -122,6 +122,41 @@ export function WidgetDataWrapper({
 
   // ── Resolve final data, loading, and fetching state ─────────────────────────
 
+  // Shared reports: prefer pre-calculated snapshot data over live API calls.
+  // Special widgets (Meta, GA, etc.) normally bypass the batch fetcher and call
+  // APIs via useWidgetData, but those API endpoints may not return data when
+  // accessed via a share token. The snapshot already has the correct values.
+  //
+  // IMPORTANT: Distinguish REAL metric snapshots from WIDGET CONFIG data.
+  // Widget config objects ({label, value: 0, hideDataPoints}) are baked into every
+  // widget definition — they are NOT real snapshot data. Real snapshots never have
+  // 'label' or 'hideDataPoints' keys. Without this guard, value=0 config objects
+  // would short-circuit the live API fetch and display zeros.
+  const snapshotData = (widget as any).snapshotData;
+  if (shareToken && snapshotData && !isDemo) {
+    const isWidgetConfig = 'label' in snapshotData || 'hideDataPoints' in snapshotData || 'chartType' in snapshotData;
+    if (!isWidgetConfig) {
+      const hasSeries = Array.isArray(snapshotData.series) && snapshotData.series.length > 0;
+      const hasValue = typeof snapshotData.value === "number" ||
+        typeof snapshotData.total === "number" || hasSeries;
+      if (hasValue) {
+        // Compute total from series if value/total are missing (metric cards need this)
+        const seriesTotal = hasSeries
+          ? snapshotData.series.reduce((acc: number, pt: { y: number }) => acc + (pt.y ?? 0), 0)
+          : 0;
+        const resolved: ResolvedWidgetData = {
+          value: snapshotData.value ?? snapshotData.total ?? seriesTotal,
+          total: snapshotData.total ?? snapshotData.value ?? seriesTotal,
+          rawCount: snapshotData.rawCount ?? (hasSeries ? snapshotData.series.length : 0),
+          series: snapshotData.series ?? [],
+          rows: snapshotData.rows ?? [],
+          ...(snapshotData.columns ? { columns: snapshotData.columns } : {}),
+        } as ResolvedWidgetData;
+        return <>{children({ resolvedData: resolved, isLoading: false, isFetching: false })}</>;
+      }
+    }
+  }
+
   if (isDemo) {
     // Demographics: read from context (useMetaDemographicsQuery-backed), fallback to legacy prop
     const demoData =

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { IconType } from "react-icons";
-import { SiGoogleanalytics, SiGooglesearchconsole, SiYoutube, SiWoocommerce, SiMeta, SiGoogleads } from "react-icons/si";
+import { SiGoogleanalytics, SiGooglesearchconsole, SiYoutube, SiWoocommerce, SiMeta, SiGoogleads, SiX, SiLinkedin } from "react-icons/si";
 import React from "react";
 import { useYouTubeConnect } from "@/features/YouTube/hooks/useYouTubeConnect";
 import { toast } from "sonner";
@@ -22,6 +22,8 @@ import { useWooCommerceConnect } from "@/features/woocommerce/hooks/useWooCommer
 import { useMetaConnect } from "@/features/meta/hooks/useMetaConnect";
 import { useMetaBusinessConnect } from "@/features/meta/hooks/useMetaBusinessData";
 import { useGoogleAdsConnect } from "@/features/googleAds/hooks/useGoogleAds";
+import { useTwitterConnect } from "@/features/twitter/hooks/useTwitter";
+import { useLinkedinOrgConnect } from "@/features/linkedin/hooks/useLinkedin";
 import { useQueryClient } from "@tanstack/react-query";
 import { getPlatformConfig } from "@/utils/platformMapping";
 import { assignAccountToClient } from "@/api/integrationApi";
@@ -118,6 +120,18 @@ const dataSourceOptions: DataSourceOption[] = [
     icon: SiWoocommerce,
     color: getPlatformConfig("woo")?.color,
   },
+  {
+    id: "twitter",
+    name: "Twitter (X)",
+    icon: SiX,
+    color: getPlatformConfig("twitter")?.color,
+  },
+  {
+    id: "linkedin",
+    name: "LinkedIn",
+    icon: SiLinkedin,
+    color: getPlatformConfig("linkedin")?.color,
+  },
 ];
 
 function ConnectDataSource({
@@ -155,6 +169,8 @@ const [SelectedSource, setSelectedSource] = React.useState<DataSourceOption>({
 meta: useMetaConnect(),
     metaBusiness: useMetaBusinessConnect(),
     googleAds: useGoogleAdsConnect(),
+    twitter: useTwitterConnect(),
+    linkedin: useLinkedinOrgConnect(),
   };
 
   const connectYouTube = mutations.youtube.mutateAsync;
@@ -164,6 +180,8 @@ meta: useMetaConnect(),
 const connectMeta = mutations.meta.mutateAsync;
   const connectMetaBusiness = mutations.metaBusiness.mutateAsync;
   const connectGoogleAds = mutations.googleAds.mutateAsync;
+  const connectTwitter = mutations.twitter.mutateAsync;
+  const connectLinkedin = mutations.linkedin.mutateAsync;
 
   const isConnecting =
     mutations.youtube.isPending ||
@@ -172,7 +190,9 @@ const connectMeta = mutations.meta.mutateAsync;
     mutations.woocommerce.isPending ||
 mutations.meta.isPending ||
     mutations.metaBusiness.isPending ||
-    mutations.googleAds.isPending;
+    mutations.googleAds.isPending ||
+    mutations.twitter.isPending ||
+    mutations.linkedin.isPending;
 
   const queryClient = useQueryClient();
 
@@ -428,6 +448,46 @@ mutations.meta.isPending ||
                             : "Failed to connect Google Ads";
                         toast.error(errorMessage);
                       }
+                    } else if (SelectedSource.id === "twitter") {
+                      try {
+                        const response = await connectTwitter();
+                        if (response.success && response.url) {
+                          if (clientId) {
+                            localStorage.setItem("pending_oauth_client_id", clientId.toString());
+                            localStorage.setItem("pending_oauth_integration", "twitter");
+                          }
+                          window.location.href = response.url;
+                        } else {
+                          toast.error("Failed to initiate Twitter connection");
+                        }
+                      } catch (error) {
+                        const errorMessage =
+                          error instanceof Error
+                            ? error.message
+                            : "Failed to connect Twitter";
+                        toast.error(errorMessage);
+                      }
+                    } else if (SelectedSource.id === "linkedin") {
+                      try {
+                        const response = await connectLinkedin();
+                        console.log("[LinkedIn connect] response:", response);
+                        if (response.success && response.url) {
+                          if (clientId) {
+                            localStorage.setItem("pending_oauth_client_id", clientId.toString());
+                            localStorage.setItem("pending_oauth_integration", "linkedin");
+                          }
+                          window.location.href = response.url;
+                        } else {
+                          toast.error("Failed to initiate LinkedIn connection");
+                        }
+                      } catch (error) {
+                        console.error("[LinkedIn connect] error:", error);
+                        const errorMessage =
+                          error instanceof Error
+                            ? error.message
+                            : "Failed to connect LinkedIn";
+                        toast.error(errorMessage);
+                      }
                     } else {
                       // For other sources, just go to next step
                       setNext(SelectedSource.id as string);
@@ -577,19 +637,21 @@ mutations.meta.isPending ||
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Connection Successful! 🎉</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>
-                Your data source has been connected successfully.
-              </p>
-              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-blue-700 text-sm">
-                <p className="font-medium flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Syncing Data...
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  Your data source has been connected successfully.
                 </p>
-                <p className="mt-1">
-                  Please allow up to 5 minutes for your historical data to be fully fetched and processed.
-                  You can start building reports, but some metrics might be processing.
-                </p>
+                <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-blue-700 text-sm">
+                  <p className="font-medium flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Syncing Data...
+                  </p>
+                  <p className="mt-1">
+                    Please allow up to 5 minutes for your historical data to be fully fetched and processed.
+                    You can start building reports, but some metrics might be processing.
+                  </p>
+                </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>

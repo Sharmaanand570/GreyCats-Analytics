@@ -40,6 +40,8 @@ const BYPASS_BATCH_KEYS = new Set([
   "google.geo_country",
   "google.geo_city",
   "google.top_pages",
+  // LinkedIn recent posts table — served by fetchLinkedinPosts via useWidgetData
+  "linkedin.recent_posts",
 ]);
 
 const CHART_WIDGET_TYPES = new Set([
@@ -109,6 +111,14 @@ export function isSpecialWidget(widget: DashboardLayout): boolean {
     (mc.metricKey.startsWith("meta.facebook.") || mc.metricKey.startsWith("meta.page.")) &&
     mc.metricKey !== "meta.facebook.recent_posts"
   )
+    return true;
+
+  // Twitter (X) widgets use direct fetching via useWidgetData
+  if (mc.metricKey.startsWith("twitter."))
+    return true;
+
+  // LinkedIn widgets use direct fetching via fetchLinkedinAnalytics in useWidgetData
+  if (mc.metricKey.startsWith("linkedin."))
     return true;
 
   return false;
@@ -187,8 +197,13 @@ export function useBatchDashboardData(
   const { clientId, enabled = true, shareToken } = options;
 
   // 1. Collect all batchable widgets (deduplicated by widgetId)
-  const descriptors = useMemo<WidgetFetchDescriptor[]>(() => {
+  //    Also collect snapshot data for shared reports.
+  const { descriptors, snapshotById } = useMemo<{
+    descriptors: WidgetFetchDescriptor[];
+    snapshotById: Record<string, ResolvedWidgetResult>;
+  }>(() => {
     const result: WidgetFetchDescriptor[] = [];
+    const snapshots: Record<string, ResolvedWidgetResult> = {};
     const seen = new Set<string>();
 
     dashboards.forEach((layout) => {
@@ -207,6 +222,29 @@ export function useBatchDashboardData(
         if (seen.has(widgetId)) return;
         seen.add(widgetId);
 
+        // For shared reports: if snapshot data exists AND it is real metric data
+        // (not a widget display config object), use it directly without an API call.
+        // Widget config objects ({label, value: 0, hideDataPoints}) are baked into
+        // every widget definition — they are NOT real snapshots. Real snapshots never
+        // contain 'label' or 'hideDataPoints' keys.
+        const snap = (widget as any).snapshotData;
+        const isWidgetConfig = snap && ('label' in snap || 'hideDataPoints' in snap || 'chartType' in snap);
+        if (shareToken && snap && !isWidgetConfig && (snap.series || typeof snap.value === "number" || typeof snap.total === "number")) {
+          const hasSeries = Array.isArray(snap.series) && snap.series.length > 0;
+          const seriesTotal = hasSeries
+            ? snap.series.reduce((acc: number, pt: { x: string; y: number }) => acc + (pt.y ?? 0), 0)
+            : 0;
+          snapshots[widgetId] = {
+            id: widgetId,
+            success: true,
+            series: snap.series ?? [],
+            total: snap.total ?? snap.value ?? seriesTotal,
+            value: snap.value ?? snap.total ?? seriesTotal,
+            rawCount: snap.rawCount ?? (hasSeries ? snap.series.length : 0),
+          };
+          return; // Don't add to descriptors — no API call needed
+        }
+
         // Chart widgets always need daily grouping regardless of what's stored on the widget
         const isChartWidget = CHART_WIDGET_TYPES.has(widget.widgetType ?? "");
         const effectiveGroupBy = isChartWidget
@@ -224,11 +262,11 @@ export function useBatchDashboardData(
       });
     });
 
-    console.log(`[BatchDashboard] 📋 Batchable descriptors (${result.length}):`,
+    console.log(`[BatchDashboard] 📋 Batchable descriptors (${result.length}), snapshots (${Object.keys(snapshots).length}):`,
       result.map(d => ({ metricKey: d.metricKey, integration: d.integration, accountId: d.accountId || '(none)' }))
     );
-    return result;
-  }, [dashboards]);
+    return { descriptors: result, snapshotById: snapshots };
+  }, [dashboards, shareToken]);
 
   const canFetch = enabled && !!dateFrom && !!dateTo;
 
@@ -279,7 +317,8 @@ export function useBatchDashboardData(
   //    and index by widgetId for O(1) lookup
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const byId = useMemo<Record<string, ResolvedWidgetResult>>(() => {
-    const map: Record<string, ResolvedWidgetResult> = {};
+    // Start with snapshot data (shared reports) — API results will merge on top
+    const map: Record<string, ResolvedWidgetResult> = { ...snapshotById };
 
     descriptors.forEach(({ widgetId, metricKey, integration, accountId }, i) => {
       const apiResponse = queries[i]?.data;
@@ -325,7 +364,7 @@ export function useBatchDashboardData(
     console.log(`[BatchDashboard] 🗂️ byId keys: [${Object.keys(map).join(', ')}]`);
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [descriptors, queries]);
+  }, [descriptors, queries, snapshotById]);
 
   const results = Object.values(byId);
   const data: BatchResolveResponse | undefined =

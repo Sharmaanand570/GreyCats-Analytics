@@ -199,6 +199,70 @@ export const getIntegrations = async (
       });
     }
 
+    // Twitter Accounts
+    if (client.twitterAccounts) {
+      client.twitterAccounts.forEach((acc: any) => {
+        integrations.push({
+          id: acc.id,
+          userId: client.userId,
+          platform: 'twitter',
+          accountId: acc.twitterAccount?.username || acc.username || acc.id.toString(),
+          accountName: acc.twitterAccount?.name || acc.name || (acc.twitterAccount?.username ? `@${acc.twitterAccount.username}` : 'Twitter Account'),
+          status: 'connected',
+          lastSyncedAt: acc.lastSynced || null,
+          connectedAt: acc.createdAt,
+          extra: null,
+        });
+      });
+    }
+
+    // LinkedIn Accounts
+    if (client.linkedinAccounts) {
+      client.linkedinAccounts.forEach((acc: any) => {
+        integrations.push({
+          id: acc.id,
+          userId: client.userId,
+          platform: 'linkedin',
+          accountId: acc.urn || acc.id.toString(),
+          accountName: acc.linkedinName || 'LinkedIn Account',
+          status: 'connected',
+          lastSyncedAt: acc.lastSynced || null,
+          connectedAt: acc.createdAt,
+          extra: null,
+        });
+      });
+    }
+
+    // Fallback: Backend pre-calculated integrations array
+    // Some integrations (LinkedIn, Twitter) may only appear in client.integrations
+    // rather than as separate account arrays. Merge them if not already present.
+    if (Array.isArray(client.integrations)) {
+      // Track which platforms already have entries from the dedicated arrays above
+      const existingPlatformTypes = new Set(integrations.map(i => i.platform));
+
+      client.integrations.forEach((integration: any) => {
+        const type = integration.type || integration.integrationType;
+        const id = integration.id || integration.assignmentId;
+        if (!type || !id) return;
+
+        // Skip if this platform already has entries from dedicated arrays
+        if (existingPlatformTypes.has(type)) return;
+
+        existingPlatformTypes.add(type);
+        integrations.push({
+          id: id,
+          userId: client.userId,
+          platform: type,
+          accountId: integration.identifier || integration.accountIdentifier || id.toString(),
+          accountName: integration.name || integration.accountName || `${type} Account`,
+          status: 'connected',
+          lastSyncedAt: null,
+          connectedAt: integration.connectedAt || null,
+          extra: null,
+        });
+      });
+    }
+
     return {
       success: true,
       integrations,

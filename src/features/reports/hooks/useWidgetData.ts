@@ -17,6 +17,8 @@ import {
 } from "@/features/YouTube/API/googleConsoleapi";
 import { getShopifyTrends } from "@/features/shopify/API/shopifyApi";
 import { getMetricAggregation } from "@/utils/facebookMetrics";
+import { getTwitterSummary, getTwitterAudienceHistory } from "@/features/twitter/api/twitterApi";
+import { fetchLinkedinAnalytics, fetchLinkedinPosts } from "@/features/linkedin/api/linkedinApi";
 import api from "@/apiConfig";
 
 // ---------------------------------------------------------------------------
@@ -59,6 +61,7 @@ export function getWidgetQueryKey(
   else if (metricKeyLower.startsWith("meta.facebook.") || metricKeyLower.startsWith("meta.page.")) integrationForKey = "meta-facebook";
   else if (metricKeyLower.startsWith("meta.ads.")) integrationForKey = "meta_ads";
   else if (metricKeyLower.startsWith("youtube.")) integrationForKey = "youtube";
+  else if (metricKeyLower.startsWith("twitter.")) integrationForKey = "twitter";
 
   // Derive effective groupBy the same way fetchRawWidgetData does.
   // NOTE: widget.filters is intentionally excluded — it contains heavy snapshot/widget data
@@ -100,6 +103,8 @@ function normalizeIntegration(widget: ReportWidgetDefinition): string {
   if (metricKey.startsWith("meta.facebook.") || metricKey.startsWith("meta.page.")) return "meta-facebook";
   if (metricKey.startsWith("meta.ads.")) return "meta_ads";
   if (metricKey.startsWith("youtube.")) return "youtube";
+  if (metricKey.startsWith("twitter.")) return "twitter";
+  if (metricKey.startsWith("linkedin.")) return "linkedin";
 
   let normalized = widget.integration.toLowerCase();
 
@@ -155,6 +160,8 @@ const VALID_INTEGRATIONS = [
   "shopify",
   "woo",
   "google-ads",
+  "twitter",
+  "linkedin",
 ];
 
 function hasValidMetricPrefix(metricKey: string): boolean {
@@ -166,7 +173,9 @@ function hasValidMetricPrefix(metricKey: string): boolean {
     metricKey.startsWith("youtube.") ||
     metricKey.startsWith("shopify.") ||
     metricKey.startsWith("woo.") ||
-    metricKey.startsWith("google_ads.")
+    metricKey.startsWith("google_ads.") ||
+    metricKey.startsWith("twitter.") ||
+    metricKey.startsWith("linkedin.")
   );
 }
 
@@ -232,6 +241,193 @@ async function fetchRawWidgetData(
       } catch (err) {
         console.error("Shopify Direct Fetch Error", err);
       }
+    }
+  }
+
+  // --- Twitter (X) ---
+  if (normalizedInteg === "twitter") {
+    if (effectiveClientId) {
+      try {
+        if (widget.metricKey === "twitter.audience_history") {
+          // Calculate requested days diff
+          const fromDate = new Date(dateFrom);
+          const toDate = new Date(dateTo);
+          const daysDiff = Math.max(1, Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)));
+          // Add 1 to ensure we cover the range inclusively if possible
+          const audienceData = await getTwitterAudienceHistory(effectiveClientId, daysDiff + 1);
+          console.log(`📊 [TwitterDebug] Audience History Raw:`, audienceData);
+          
+          if (audienceData?.success && Array.isArray(audienceData.history)) {
+            // Transform history to generic series
+            const series = audienceData.history.map(point => ({
+              x: point.date,
+              y: Number(point.followers ?? 0),
+            }));
+            
+            // Filter series to strictly fall within dateFrom and dateTo
+            // Normalize dates to start of day for cleaner comparison
+            const startStr = new Date(dateFrom).toISOString().split('T')[0];
+            const endStr = new Date(dateTo).toISOString().split('T')[0];
+            
+            const filteredSeries = series.filter(p => {
+              const pDate = p.x.split('T')[0];
+              return pDate >= startStr && pDate <= endStr;
+            });
+
+            console.log(`📊 [TwitterDebug] Filtered Series (${filteredSeries.length} points):`, filteredSeries);
+            
+            // For the value metric card on the chart slide, use the latest point in range
+            const lastVal = filteredSeries.length > 0 ? filteredSeries[filteredSeries.length - 1].y : 0;
+            
+            return {
+              success: true,
+              series: filteredSeries,
+              total: lastVal,
+              value: lastVal,
+              rows: [],
+              rawCount: filteredSeries.length
+            };
+          }
+        } else {
+          // Summary Metrics
+          const summaryData = await getTwitterSummary(effectiveClientId);
+          console.log(`📊 [TwitterDebug] Summary Raw:`, summaryData);
+
+          if (summaryData?.success) {
+            let val = 0;
+            const summary = summaryData.summary || {};
+            const account = summaryData.account || {};
+
+            if (widget.metricKey === "twitter.followers") {
+              val = Number(summary.totalFollowers ?? account.followersCount ?? 0);
+            } else if (widget.metricKey === "twitter.tweets") {
+              val = Number(summary.tweetsPublishedLast30Days ?? summary.totalTweets ?? account.tweetCount ?? 0);
+            } else if (widget.metricKey === "twitter.following") {
+              val = Number(account.followingCount ?? summary.totalFollowing ?? 0);
+            } else if (widget.metricKey === "twitter.followers_gained") {
+              val = Number(summary.followersGained ?? 0);
+            }
+
+            console.log(`📊 [TwitterDebug] Metric ${widget.metricKey} resolved to:`, val);
+
+            return {
+              success: true,
+              rows: [],
+              value: val,
+              total: val,
+              summary: { [widget.metricKey.split('.').pop()!]: val },
+            };
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch Twitter widget data", err);
+      }
+    }
+  }
+
+  // --- LinkedIn ---
+  if (normalizedInteg === "linkedin") {
+    if (effectiveClientId || shareToken) {
+      try {
+        const analyticsData = await fetchLinkedinAnalytics(dateFrom, dateTo);
+        console.log(`📊 [LinkedInDebug] Analytics Raw:`, analyticsData);
+
+        if (analyticsData?.success && analyticsData.analytics) {
+          const dates = Object.keys(analyticsData.analytics).sort();
+          
+          if (widget.type === "line_chart" || widget.type === "bar_chart" || widget.type === "chart" || (widget as any).widgetType === "chart") {
+            // It's a time-series chart
+            const series = dates.map(dateKey => ({
+              x: dateKey,
+              y: Number(analyticsData.analytics[dateKey][widget.metricKey] || 0)
+            }));
+            
+            // Filter dates within range (assuming backend already filters, but double check)
+            const filteredSeries = series.filter(p => p.x >= dateFrom && p.x <= dateTo);
+            const total = filteredSeries.reduce((sum, p) => sum + p.y, 0);
+
+            return {
+              success: true,
+              series: filteredSeries,
+              total: total,
+              value: total,
+              rows: [],
+              rawCount: filteredSeries.length
+            };
+          } else {
+            // It's a metric card (scalar value)
+            let totalVal = 0;
+            dates.forEach(dateKey => {
+              if (dateKey >= dateFrom && dateKey <= dateTo) {
+                // followers might be a snapshot, don't sum if logic requires latest. The guide is vague. Summing usually safe for clicks.
+                // For followers, we take the max or the last day's value
+                if (widget.metricKey === "linkedin.followers") {
+                   totalVal = Number(analyticsData.analytics[dateKey][widget.metricKey] || totalVal);
+                } else {
+                   totalVal += Number(analyticsData.analytics[dateKey][widget.metricKey] || 0);
+                }
+              }
+            });
+
+            return {
+              success: true,
+              rows: [],
+              value: totalVal,
+              total: totalVal,
+              summary: { [widget.metricKey.split('.').pop()!]: totalVal },
+            };
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch LinkedIn widget data", err);
+      }
+    }
+  }
+
+  // --- LinkedIn Recent Posts ---
+  if (widget.metricKey === "linkedin.recent_posts") {
+    try {
+      if (effectiveClientId || shareToken) {
+        const postsData = await fetchLinkedinPosts();
+        
+        if (postsData?.success && Array.isArray(postsData.data)) {
+          const rows = postsData.data.map((p: any) => ({
+            id: p.id,
+            metricKey: widget.metricKey,
+            integration: "linkedin",
+            accountId: widget.accountId || "",
+            date: p.postedAt ? new Date(p.postedAt).toLocaleDateString() : "",
+            post: p.content || "(No text)",
+            impressions: p.impressions || 0,
+            clicks: p.clicks || 0,
+            likes: p.likes || 0,
+            comments: p.comments || 0,
+            shares: p.shares || 0,
+            fullPicture: p.mediaUrl || null,
+          }));
+
+          return {
+            success: true,
+            rows,
+            pagination: {
+              page: 1,
+              limit: rows.length,
+              total: rows.length,
+              totalPages: 1,
+            },
+            columns: [
+              { name: "Date", width: "15%", dataKey: "date" },
+              { name: "Post", width: "35%", dataKey: "post" },
+              { name: "Impressions", width: "12.5%", dataKey: "impressions" },
+              { name: "Likes", width: "12.5%", dataKey: "likes" },
+              { name: "Comments", width: "12.5%", dataKey: "comments" },
+              { name: "Shares", width: "12.5%", dataKey: "shares" },
+            ],
+          };
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch LinkedIn recent posts", err);
     }
   }
 
@@ -523,7 +719,7 @@ async function fetchRawWidgetData(
     (normalizedInteg === "google-ads" || normalizedInteg === "google_ads") &&
     GOOGLE_ADS_SUMMARY_METRICS.includes(widget.metricKey) &&
     !needsSeriesForAds &&
-    effectiveClientId
+    (effectiveClientId || shareToken)
   ) {
     try {
       const aggResult = await fetchUnifiedAggregate({
@@ -531,7 +727,7 @@ async function fetchRawWidgetData(
         integration: "google_ads",
         startDate: dateFrom,
         endDate: dateTo,
-        clientId: effectiveClientId,
+        clientId: effectiveClientId ?? undefined,
       });
 
       if (aggResult?.success && typeof aggResult.value === "number") {
@@ -557,7 +753,7 @@ async function fetchRawWidgetData(
     (normalizedInteg === "google-ads" || normalizedInteg === "google_ads") &&
     GOOGLE_ADS_SUMMARY_METRICS.includes(widget.metricKey) &&
     needsSeriesForAds &&
-    effectiveClientId
+    (effectiveClientId || shareToken)
   ) {
     try {
       const seriesResult = await getMetricData({
@@ -566,7 +762,7 @@ async function fetchRawWidgetData(
         dateFrom,
         dateTo,
         groupBy: "day",
-        clientId: effectiveClientId,
+        clientId: effectiveClientId ?? undefined,
         token: shareToken,
       });
 
@@ -593,7 +789,7 @@ async function fetchRawWidgetData(
     widget.metricKey.startsWith("meta.instagram.") &&
     widget.metricKey !== "meta.instagram.recent_media";
 
-  if (isInstagramMetric && effectiveClientId) {
+  if (isInstagramMetric && (effectiveClientId || shareToken)) {
     try {
       const groupBy = needsSeriesForAds ? "day" : undefined;
       const result = await getMetricData({
@@ -602,7 +798,7 @@ async function fetchRawWidgetData(
         dateFrom,
         dateTo,
         groupBy: groupBy as any,
-        clientId: effectiveClientId,
+        clientId: effectiveClientId ?? undefined,
         token: shareToken,
       });
       const series = result?.data?.series ?? [];
@@ -628,7 +824,7 @@ async function fetchRawWidgetData(
     (widget.metricKey.startsWith("meta.facebook.") || widget.metricKey.startsWith("meta.page.")) &&
     widget.metricKey !== "meta.facebook.recent_posts";
 
-  if (isFacebookMetric && effectiveClientId) {
+  if (isFacebookMetric && (effectiveClientId || shareToken)) {
     try {
       const groupBy = needsSeriesForAds ? "day" : undefined;
       const result = await getMetricData({
@@ -637,7 +833,7 @@ async function fetchRawWidgetData(
         dateFrom,
         dateTo,
         groupBy: groupBy as any,
-        clientId: effectiveClientId,
+        clientId: effectiveClientId ?? undefined,
         token: shareToken,
       });
       const series = result?.data?.series ?? [];
@@ -675,7 +871,7 @@ async function fetchRawWidgetData(
   const isGSCMetric = widget.metricKey.startsWith('google_seo.') &&
     !GA_DIMENSIONAL_KEYS.has(widget.metricKey);
 
-  if ((isGAMetric || isGSCMetric) && effectiveClientId) {
+  if ((isGAMetric || isGSCMetric) && (effectiveClientId || shareToken)) {
     try {
       if (isGSCMetric) {
         if (needsSeriesForAds) {
@@ -685,7 +881,7 @@ async function fetchRawWidgetData(
             dateFrom,
             dateTo,
             groupBy: "day",
-            clientId: effectiveClientId,
+            clientId: effectiveClientId ?? undefined,
             token: shareToken,
           });
 
@@ -707,7 +903,7 @@ async function fetchRawWidgetData(
           integration: "google-search-console",
           startDate: dateFrom,
           endDate: dateTo,
-          clientId: effectiveClientId,
+          clientId: effectiveClientId ?? undefined,
         });
 
         if (aggregateResult?.success && typeof aggregateResult.value === "number") {
@@ -725,7 +921,7 @@ async function fetchRawWidgetData(
           metricKey: widget.metricKey,
           dateFrom,
           dateTo,
-          clientId: effectiveClientId,
+          clientId: effectiveClientId ?? undefined,
           token: shareToken,
         });
 
@@ -749,7 +945,7 @@ async function fetchRawWidgetData(
         dateFrom,
         dateTo,
         groupBy: gaGroupBy as any,
-        clientId: effectiveClientId,
+        clientId: effectiveClientId ?? undefined,
         token: shareToken,
       });
 
@@ -1313,10 +1509,14 @@ export function processWidgetData(
     (!data.rows || (Array.isArray(data.rows) && data.rows.length === 0));
 
   if (isSnapshotData) {
+    const hasSeries = Array.isArray((data as any).series) && (data as any).series.length > 0;
+    const seriesTotal = hasSeries
+      ? (data as any).series.reduce((acc: number, pt: { x: string; y: number }) => acc + (pt.y ?? 0), 0)
+      : 0;
     return {
-      value: (data as any).value ?? 0,
-      total: (data as any).total ?? 0,
-      rawCount: (data as any).rawCount ?? 0,
+      value: (data as any).value ?? (data as any).total ?? seriesTotal,
+      total: (data as any).total ?? (data as any).value ?? seriesTotal,
+      rawCount: (data as any).rawCount ?? (hasSeries ? (data as any).series.length : 0),
       rows: data.rows ?? [],
       series: (data as any).series ?? [],
     };
@@ -1750,30 +1950,45 @@ export async function fetchAndProcessWidget(
   shareToken?: string,
   integrationsData?: any
 ): Promise<ResolvedWidgetData> {
-  // Snapshot shortcut
+  // Snapshot shortcut — use pre-calculated data from scheduled reports.
+  // IMPORTANT: Distinguish REAL metric snapshots (series, total, rows from API)
+  // from WIDGET CONFIG data ({label, value: 0, hideDataPoints}) which is the
+  // default display config baked into every widget. Widget config has 'label'
+  // or 'hideDataPoints' keys — real snapshots never do.
   if ((widget as any).snapshotData && shareToken) {
     const snap = (widget as any).snapshotData;
-    const isSnapshot =
-      snap.series ||
-      typeof snap.value === "number" ||
-      typeof snap.total === "number";
-    if (isSnapshot) {
-      return {
-        value: snap.value ?? 0,
-        total: snap.total ?? 0,
-        rawCount: snap.rawCount ?? 0,
-        rows: [],
-        series: snap.series ?? [],
-      };
+    const isWidgetConfig = 'label' in snap || 'hideDataPoints' in snap || 'chartType' in snap;
+    if (!isWidgetConfig) {
+      const hasSeries = Array.isArray(snap.series) && snap.series.length > 0;
+      const hasValue = typeof snap.value === "number" || typeof snap.total === "number";
+      if (hasSeries || hasValue) {
+        const seriesTotal = hasSeries
+          ? snap.series.reduce((acc: number, pt: { x: string; y: number }) => acc + (pt.y ?? 0), 0)
+          : 0;
+        const effectiveValue = snap.value ?? snap.total ?? seriesTotal;
+        const effectiveTotal = snap.total ?? snap.value ?? seriesTotal;
+        console.log(`%c[SharedWidget] ✅ SNAPSHOT used for ${widget.metricKey}`, 'color:#27ae60;font-weight:bold', {
+          value: effectiveValue, total: effectiveTotal, seriesPoints: snap.series?.length ?? 0,
+        });
+        return {
+          value: effectiveValue,
+          total: effectiveTotal,
+          rawCount: snap.rawCount ?? (hasSeries ? snap.series.length : 0),
+          rows: snap.rows ?? [],
+          series: snap.series ?? [],
+        };
+      }
     }
   }
 
   const normalizedInteg = normalizeIntegration(widget);
 
   if (!VALID_INTEGRATIONS.includes(normalizedInteg)) {
+    if (shareToken) console.warn(`[SharedWidget] ❌ INVALID integration "${normalizedInteg}" for ${widget.metricKey}`);
     return { value: 0, total: 0, rawCount: 0, rows: [], series: [] };
   }
   if (!hasValidMetricPrefix(widget.metricKey)) {
+    if (shareToken) console.warn(`[SharedWidget] ❌ INVALID metricKey prefix "${widget.metricKey}"`);
     return { value: 0, total: 0, rawCount: 0, rows: [], series: [] };
   }
 
@@ -1792,6 +2007,16 @@ export async function fetchAndProcessWidget(
     );
     console.timeEnd(`[Widget Timing] Raw API Fetch: ${widget.metricKey} (${widget.accountId})`);
 
+    if (shareToken) {
+      console.log(`%c[SharedWidget] 📦 API response for ${widget.metricKey}`, 'color:#3498db;font-weight:bold', {
+        hasData: !!rawData,
+        value: rawData?.value, total: rawData?.total,
+        seriesLen: rawData?.series?.length, rowsLen: rawData?.rows?.length,
+        success: rawData?.success,
+        rawDataKeys: rawData ? Object.keys(rawData) : [],
+      });
+    }
+
     // GA4 pre-aggregated dimensional table — bypass processWidgetData.
     if (rawData && Array.isArray(rawData.columns) && rawData.columns.length > 0 && Array.isArray(rawData.rows)) {
       return rawData as ResolvedWidgetData;
@@ -1800,6 +2025,14 @@ export async function fetchAndProcessWidget(
     console.time(`[Widget Timing] Processing/Aggregation: ${widget.metricKey} (${widget.accountId})`);
     const processedVars = processWidgetData(widget, rawData, effectiveClientId);
     console.timeEnd(`[Widget Timing] Processing/Aggregation: ${widget.metricKey} (${widget.accountId})`);
+
+    if (shareToken) {
+      console.log(`%c[SharedWidget] 🏁 FINAL for ${widget.metricKey}`, 'color:#9b59b6;font-weight:bold', {
+        value: processedVars.value, total: processedVars.total,
+        seriesLen: (processedVars as any).series?.length, rowsLen: (processedVars as any).rows?.length,
+      });
+    }
+
     return processedVars;
   } finally {
     // releaseFetchSlot(); removed
@@ -1826,13 +2059,13 @@ export function useWidgetData(params: UseWidgetDataParams) {
   const hasDateRange = !!dateFrom && !!dateTo;
   const hasClientOrToken = !!(effectiveClientId || shareToken);
 
-  const isEnabled = 
-    hasMetricKey && 
-    hasDateRange && 
-    hasClientOrToken && 
-    isSlideVisible && 
-    !isLoadingIntegrations && 
-    !!integrationsData;
+  const isEnabled =
+    hasMetricKey &&
+    hasDateRange &&
+    hasClientOrToken &&
+    isSlideVisible &&
+    // In shared mode, integrations are never fetched (readOnly) — skip the requirement
+    (!!shareToken ? true : (!isLoadingIntegrations && !!integrationsData));
 
   // Log once when query first becomes enabled (kept for debugging convenience, low noise)
   const wasEnabledRef = useRef(false);

@@ -26,6 +26,7 @@ import {
   CreditCard,
   ChevronDown,
   CalendarDays,
+  PenLine,
 } from "lucide-react";
 import { FiMenu } from "react-icons/fi";
 import { useEffect, useState } from "react";
@@ -164,10 +165,11 @@ function MainSideBar(): React.JSX.Element {
       ],
     },
     {
-      label: "Social Media",
+      label: "Scheduler",
       isCollapsible: true,
       items: [
-        { label: "Scheduler", path: "/social-media/scheduler", icon: <CalendarDays /> },
+        { label: "Social Media", path: "/social-media/scheduler", icon: <CalendarDays /> },
+        { label: "Blog", path: "/blog/scheduler", icon: <PenLine /> },
       ],
     },
     {

@@ -152,6 +152,7 @@ export function inferIntegrationFromMetricKey(
   if (k.startsWith("youtube.")) return "youtube";
   if (k.startsWith("shopify.")) return "shopify";
   if (k.startsWith("woo.")) return "woo";
+  if (k.startsWith("linkedin.")) return "linkedin";
   return normalizeIntegrationId(fallback);
 }
 
@@ -181,7 +182,7 @@ export async function getMetricData(
 
   // Some integrations scope data by clientId — sending accountId causes 0 rows
   // because the stored account ID format may differ from what the frontend holds.
-  const NO_ACCOUNT_ID_INTEGRATIONS = new Set(["meta_ads", "meta_instagram", "meta_facebook", "google-search-console", "woo", "shopify", "youtube"]);
+  const NO_ACCOUNT_ID_INTEGRATIONS = new Set(["meta_ads", "meta_instagram", "meta_facebook", "google-search-console", "woo", "shopify", "youtube", "linkedin"]);
   if (params.accountId && !NO_ACCOUNT_ID_INTEGRATIONS.has(integration)) queryParams.accountId = params.accountId;
   if (params.groupBy && params.groupBy !== "none")
     queryParams.groupBy = params.groupBy;
@@ -248,7 +249,7 @@ export async function getMetricData(
 export async function resolveDashboardMetrics(
   payload: BatchResolvePayload
 ): Promise<BatchResolveResponse> {
-  const NO_ACCOUNT_ID_INTEGRATIONS = new Set(["meta_ads", "meta_instagram", "meta_facebook", "google-search-console", "woo", "shopify", "youtube"]);
+  const NO_ACCOUNT_ID_INTEGRATIONS = new Set(["meta_ads", "meta_instagram", "meta_facebook", "google-search-console", "woo", "shopify", "youtube", "linkedin"]);
   const normalizedWidgets = payload.widgets.map((w) => {
     const integration = inferIntegrationFromMetricKey(w.metricKey, w.integration);
     return {

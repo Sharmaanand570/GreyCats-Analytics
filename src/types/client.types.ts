@@ -9,7 +9,9 @@ export type IntegrationType =
   | 'woocommerce'
   | 'google-search-console'
   | 'google-analytics'
-  | 'google-ads';
+  | 'google-ads'
+  | 'twitter'
+  | 'linkedin';
 
 export interface Client {
   id: number;
@@ -29,6 +31,8 @@ export interface Client {
     googleSearchConsoleAccounts: number;
     googleAnalyticsAccounts: number;
     googleAdsAccounts: number;
+    twitterAccounts: number;
+    linkedinAccounts: number;
   };
 }
 
@@ -53,6 +57,12 @@ export interface AvailableAccount {
   // Meta Ads fields
   accountId?: string;
   name?: string;
+  // Twitter fields
+  username?: string;
+  profileImageUrl?: string;
+  // LinkedIn fields
+  linkedinName?: string;
+  urn?: string;
   // Common fields
   createdAt?: string;
   connectedAt?: string;
@@ -83,6 +93,8 @@ export interface ClientWithIntegrations extends Client {
   googleSearchConsoleAccounts?: any[];
   googleAnalyticsAccounts?: any[];
   googleAdsAccounts?: any[];
+  twitterAccounts?: any[];
+  linkedinAccounts?: any[];
 }
 
 // API Response Types

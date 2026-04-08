@@ -226,6 +226,22 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
     "google_ads.conversions",
     "google_ads.conv_rate",
   ],
+  "twitter": [
+    "twitter.followers",
+    "twitter.following",
+    "twitter.tweets",
+    "twitter.followers_gained",
+    "twitter.audience_history",
+  ],
+  "linkedin": [
+    "linkedin.impressions",
+    "linkedin.clicks",
+    "linkedin.likes",
+    "linkedin.comments",
+    "linkedin.shares",
+    "linkedin.followers",
+    "linkedin.recent_posts",
+  ],
 };
 
 export const MAX_DEFAULT_WIDGETS = 25;
@@ -729,6 +745,20 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
     ]
   },
 
+  // TWITTER (X)
+  'twitter': {
+    widgets: [
+      // Row 1: Line Chart for Audience Growth
+      { type: 'line_chart', metricKey: 'twitter.audience_history', x: 0, y: 0, w: 12, h: 5, displayName: 'Audience Growth History' },
+
+      // Row 2: Summary Metrics
+      { type: 'metric', metricKey: 'twitter.followers', x: 0, y: 5, w: 4, h: 3, displayName: 'Total Followers' },
+      { type: 'metric', metricKey: 'twitter.tweets', x: 4, y: 5, w: 4, h: 3, displayName: 'Tweets Published' },
+      { type: 'metric', metricKey: 'twitter.following', x: 8, y: 5, w: 4, h: 3, displayName: 'Total Following' },
+    ]
+  },
+
+
   // GOOGLE ANALYTICS
   'google-analytics': {
     widgets: [
@@ -841,6 +871,48 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
     ]
   },
 
+  // LINKEDIN
+  'linkedin': {
+    widgets: [
+      // Row 1: Impressions trend chart (full width)
+      {
+        type: 'chart',
+        metricKey: 'linkedin.impressions',
+        x: 0, y: 0, w: 12, h: 6,
+        displayName: 'Impressions Over Time',
+        chartType: 'line',
+        groupBy: 'day',
+      },
+
+      // Row 2: 6 metric cards
+      { type: 'metric', metricKey: 'linkedin.impressions', x: 0,    y: 6, w: 2, h: 3, displayName: 'Impressions' },
+      { type: 'metric', metricKey: 'linkedin.clicks',      x: 2,    y: 6, w: 2, h: 3, displayName: 'Clicks' },
+      { type: 'metric', metricKey: 'linkedin.likes',       x: 4,    y: 6, w: 2, h: 3, displayName: 'Likes' },
+      { type: 'metric', metricKey: 'linkedin.comments',    x: 6,    y: 6, w: 2, h: 3, displayName: 'Comments' },
+      { type: 'metric', metricKey: 'linkedin.shares',      x: 8,    y: 6, w: 2, h: 3, displayName: 'Shares' },
+      { type: 'metric', metricKey: 'linkedin.followers',   x: 10,   y: 6, w: 2, h: 3, displayName: 'Followers' },
+
+      // Row 3: Recent Posts table (full width)
+      {
+        type: 'table',
+        metricKey: 'linkedin.recent_posts',
+        x: 0, y: 9, w: 12, h: 7,
+        displayName: 'Recent Posts',
+        customConfig: {
+          columns: [
+            { name: 'Date',        width: '15%',  dataKey: 'date' },
+            { name: 'Post',        width: '30%',  dataKey: 'post' },
+            { name: 'Impressions', width: '13%',  dataKey: 'impressions' },
+            { name: 'Clicks',      width: '11%',  dataKey: 'clicks' },
+            { name: 'Likes',       width: '11%',  dataKey: 'likes' },
+            { name: 'Comments',    width: '10%',  dataKey: 'comments' },
+            { name: 'Shares',      width: '10%',  dataKey: 'shares' },
+          ]
+        }
+      },
+    ]
+  },
+
 };
 
 // Aliases for consistent matching
@@ -873,6 +945,9 @@ INTEGRATION_TEMPLATES['google'] = INTEGRATION_TEMPLATES['google-analytics'];
 INTEGRATION_TEMPLATES['google_analytics'] = INTEGRATION_TEMPLATES['google-analytics'];
 INTEGRATION_TEMPLATES['googleanalytics'] = INTEGRATION_TEMPLATES['google-analytics'];
 INTEGRATION_TEMPLATES['ga'] = INTEGRATION_TEMPLATES['google-analytics'];
+INTEGRATION_TEMPLATES['linkedin_analytics'] = INTEGRATION_TEMPLATES['linkedin'];
+INTEGRATION_TEMPLATES['linkedinanalytics'] = INTEGRATION_TEMPLATES['linkedin'];
+INTEGRATION_TEMPLATES['li'] = INTEGRATION_TEMPLATES['linkedin'];
 
 
 // YouTube aliases
@@ -889,7 +964,8 @@ INTEGRATION_TEMPLATES['yt'] = INTEGRATION_TEMPLATES['youtube'];
     'google': 'google-analytics', 'ga': 'google-analytics', 'googleanalytics': 'google-analytics',
     'gsc': 'google-search-console', 'googlesearchconsole': 'google-search-console',
     'ads': 'meta-ads', 'metaads': 'meta-ads', 'meta_ads': 'meta-ads',
-    'yt': 'youtube', 'youtube_analytics': 'youtube', 'youtubeanalytics': 'youtube'
+    'yt': 'youtube', 'youtube_analytics': 'youtube', 'youtubeanalytics': 'youtube',
+    'li': 'linkedin', 'linkedin_analytics': 'linkedin', 'linkedinanalytics': 'linkedin'
   };
 
   Object.entries(aliases).forEach(([alias, target]) => {

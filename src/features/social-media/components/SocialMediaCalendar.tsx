@@ -15,7 +15,7 @@ import {
   parseISO,
 } from 'date-fns';
 import { ChevronLeft, ChevronRight, Share2, X, Image as ImageIcon, Video as VideoIcon, CalendarDays, ChevronDown, Pencil, Trash2, AlertCircle } from 'lucide-react';
-import { FaInstagram, FaFacebook } from 'react-icons/fa6';
+import { FaInstagram, FaFacebook, FaXTwitter } from 'react-icons/fa6';
 import { gsap } from 'gsap';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -53,12 +53,14 @@ const platformIcons: Record<PostPlatform, React.ReactNode> = {
       <FaInstagram className="w-3 h-3 text-pink-600" />
     </div>
   ),
+  twitter: <FaXTwitter className="w-3.5 h-3.5 text-zinc-900" />,
 };
 
 const platformColors: Record<PostPlatform, string> = {
   instagram: 'bg-pink-50 border-pink-100 text-pink-900',
   facebook: 'bg-blue-50 border-blue-100 text-blue-900',
   both: 'bg-purple-50 border-purple-100 text-purple-900',
+  twitter: 'bg-zinc-50 border-zinc-200 text-zinc-900',
 };
 
 const STATUS_FILTERS: { label: string; value: PostStatus | 'ALL' }[] = [

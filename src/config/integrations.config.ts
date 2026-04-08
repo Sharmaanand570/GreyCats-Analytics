@@ -92,6 +92,24 @@ export const INTEGRATION_CONFIG: Record<IntegrationType, IntegrationConfig> = {
     displayNameField: 'name',
     identifierField: 'customerId',
   },
+  'twitter': {
+    name: 'Twitter (X)',
+    icon: '𝕏', // Or a different icon if preferred, maybe '🐦'
+    color: 'bg-black dark:bg-white dark:text-black', // Standard X color
+    oauthUrl: '/twitter/connect',
+    availableAccountsUrl: '/api/integrations/twitter/available-accounts', // Assuming this exists if they use the standard pattern, but callback assignment is what the guide mentioned.
+    displayNameField: 'username',
+    identifierField: 'accountId',
+  },
+  'linkedin': {
+    name: 'LinkedIn',
+    icon: 'in', // Can use SiLinkedin in UI components
+    color: 'bg-[#0A66C2] text-white',
+    oauthUrl: '/linkedin/portability/connect',
+    availableAccountsUrl: '/api/integrations/linkedin/available-accounts',
+    displayNameField: 'linkedinName',
+    identifierField: 'urn',
+  },
 };
 
 // Helper functions

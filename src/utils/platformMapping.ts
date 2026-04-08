@@ -1,6 +1,6 @@
 import type { IconType } from "react-icons";
 import { FaCartShopping } from "react-icons/fa6";
-import { SiGoogleanalytics, SiShopify, SiMeta, SiQuora, SiYoutube, SiGooglesearchconsole, SiFacebook, SiInstagram, SiGoogleads } from "react-icons/si";
+import { SiGoogleanalytics, SiShopify, SiMeta, SiQuora, SiYoutube, SiGooglesearchconsole, SiFacebook, SiInstagram, SiGoogleads, SiX, SiLinkedin } from "react-icons/si";
 
 export type PlatformConfig = {
   name: string;
@@ -109,6 +109,18 @@ const platformMap: Record<string, PlatformConfig> = {
     icon: SiGoogleads,
     link: "/data-sources/google-ads",
     color: "#4285F4",
+  },
+  twitter: {
+    name: "Twitter (X)",
+    icon: SiX,
+    link: "/data-sources/twitter",
+    color: "#000000",
+  },
+  linkedin: {
+    name: "LinkedIn",
+    icon: SiLinkedin,
+    link: "/data-sources/linkedin",
+    color: "#0A66C2",
   },
 };
 

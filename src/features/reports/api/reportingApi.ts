@@ -615,9 +615,9 @@ export const fetchUnifiedMetric = (
     if (params.aggregation) requestParams.aggregation = params.aggregation;
     const META_NO_ACCOUNT_ID_FETCH = new Set(["meta_ads", "meta_instagram", "meta_facebook", "google-search-console", "woo", "shopify", "youtube"]);
     if (params.accountId && !META_NO_ACCOUNT_ID_FETCH.has(integrationName)) requestParams.accountId = params.accountId;
-    // GSC and other integrations that scope by clientId need it as an explicit query param
-    // (JWT token identifies the user but clientId scopes to the specific client account)
-    if (clientId && integrationName === 'google-search-console') requestParams.clientId = String(clientId);
+    // clientId scopes data to the specific client account — required for shared reports
+    // where the Bearer token is a share token (not a JWT with embedded user context).
+    if (clientId) requestParams.clientId = String(clientId);
 
     console.log(`[fetchUnifiedMetric] → /unified-metrics/data`, requestParams);
 
@@ -1044,6 +1044,51 @@ export const getReportTemplate = (templateId: number, token?: string) =>
         }
       }
     });
+
+    // Ensure clientId is preserved from the raw response envelope.
+    // The shared endpoint often returns { clientId, template: { ... } } where
+    // clientId sits at the top level, not inside apiTemplate.
+    if (!apiTemplate.clientId && !apiTemplate.client_id) {
+      const topLevelClientId =
+        (rawData as any).clientId ??
+        (rawData as any).client_id ??
+        (rawData as any).data?.clientId ??
+        (rawData as any).data?.client_id;
+      if (topLevelClientId) {
+        apiTemplate.clientId = topLevelClientId;
+        console.log(`✅ [SharedReport] Recovered clientId from response envelope: ${topLevelClientId}`);
+      }
+    }
+
+    // ── SHARED REPORT DIAGNOSTICS ──────────────────────────────────────────
+    if (token) {
+      const hasSnapshot = !!(rawData as any).snapshot || !!(apiTemplate as any).snapshot;
+      const slidesWithSnap = (apiTemplate.slides || []).filter(
+        (s: any) => s.widgets?.some((w: any) => w.snapshotData)
+      ).length;
+      console.log('%c[SharedReport] 🔍 FULL DIAGNOSTICS', 'color:#e74c3c;font-weight:bold;font-size:14px', {
+        clientId: apiTemplate.clientId ?? apiTemplate.client_id ?? '⚠️ MISSING',
+        'rawData.clientId': (rawData as any).clientId,
+        'rawData.client_id': (rawData as any).client_id,
+        hasSnapshot,
+        snapshotKeys: hasSnapshot ? Object.keys((rawData as any).snapshot || (apiTemplate as any).snapshot || {}) : [],
+        slidesCount: apiTemplate.slides?.length,
+        slidesWithSnapshotData: slidesWithSnap,
+        totalWidgets: apiTemplate.slides?.reduce((acc: number, s: any) => acc + (s.widgets?.length || 0), 0),
+        slidesSummary: apiTemplate.slides?.map((s: any) => ({
+          id: s.id,
+          title: s.title,
+          widgetCount: s.widgets?.length,
+          widgetsWithSnapshot: s.widgets?.filter((w: any) => w.snapshotData).length,
+          sampleWidgetKeys: s.widgets?.[0] ? {
+            metricKey: s.widgets[0].metricKey,
+            integration: s.widgets[0].integration,
+            hasSnap: !!s.widgets[0].snapshotData,
+            snapKeys: s.widgets[0].snapshotData ? Object.keys(s.widgets[0].snapshotData) : [],
+          } : null,
+        })),
+      });
+    }
 
     const mapped: GetTemplateResponse = {
       success: true,

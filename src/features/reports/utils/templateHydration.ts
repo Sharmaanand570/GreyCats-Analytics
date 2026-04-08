@@ -30,9 +30,57 @@ export const buildDashboardMapFromTemplate = (
     return new Map([[0, []]]);
   }
 
+  // ── Deduplication ────────────────────────────────────────────────────────────
+  // The backend appends new widget rows on each save instead of replacing them,
+  // causing the same widget to accumulate (2x, 3x…) over multiple saves.
+  // We deduplicate here so the frontend always renders each widget exactly once.
+  //
+  // Strategy:
+  //   1. By widget.id (DB primary key) — fastest, catches exact DB duplicates.
+  //   2. By (slideId + metricKey + type) — catches duplicates saved with new IDs
+  //      (e.g. after a report was copied or re-saved with fresh IDs).
+  const seenWidgetIds = new Set<string | number>();
+  const seenCompositeKeys = new Set<string>();
+  
+  // Create a reversed array so we process the NEWEST appended database rows first.
+  // This guarantees we keep the most recent layout positions (x,y,w,h) instead 
+  // of sticking to the oldest first-saved positions.
+  const reversedWidgets = [...widgets].reverse();
+  
+  const dedupedReversed = reversedWidgets.filter((widget) => {
+    // Primary: deduplicate by DB widget ID
+    if (widget.id !== undefined && widget.id !== null) {
+      if (seenWidgetIds.has(widget.id)) return false;
+      seenWidgetIds.add(widget.id);
+    }
+    // Secondary: deduplicate by (slideId + metricKey + normalizedType).
+    // Use normalizeWidgetType so "line_chart" / "bar_chart" / "chart" all become "chart",
+    // preventing the same chart widget from surviving under two different raw type strings.
+    const slideId = Number(widget.layout?.slideId ?? 0);
+    const normType = normalizeWidgetType(widget.type); // "chart" | "metric" | "table" | ...
+    const compositeKey = `${slideId}::${widget.metricKey ?? ''}::${normType}`;
+    if (seenCompositeKeys.has(compositeKey)) {
+      console.warn(`[Hydrate] ⚠️ Duplicate widget removed: ${compositeKey} (id=${widget.id}, rawType=${widget.type})`);
+      return false;
+    }
+    seenCompositeKeys.add(compositeKey);
+    return true;
+  });
+
+  // Reverse back to maintain the original relative order 
+  const dedupedWidgets = dedupedReversed.reverse();
+
+  if (dedupedWidgets.length < widgets.length) {
+    console.warn(
+      `[Hydrate] 🧹 Deduplication: ${widgets.length} → ${dedupedWidgets.length} widgets ` +
+      `(removed ${widgets.length - dedupedWidgets.length} duplicates)`
+    );
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
+
   const map: DashboardMap = new Map();
 
-  widgets.forEach((widget, index) => {
+  dedupedWidgets.forEach((widget, index) => {
 
     const layoutInfo = widget.layout;
     const slideId = Number(layoutInfo?.slideId ?? 0);

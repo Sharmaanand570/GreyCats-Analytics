@@ -175,6 +175,23 @@ export const GOOGLE_ADS_METRICS = [
   GOOGLE_ADS_CLICKS,
 ] as const;
 
+// ── LinkedIn ─────────────────────────────────────────────────────────────────
+export const LINKEDIN_IMPRESSIONS = "linkedin.impressions" as const;
+export const LINKEDIN_CLICKS = "linkedin.clicks" as const;
+export const LINKEDIN_LIKES = "linkedin.likes" as const;
+export const LINKEDIN_COMMENTS = "linkedin.comments" as const;
+export const LINKEDIN_SHARES = "linkedin.shares" as const;
+export const LINKEDIN_FOLLOWERS = "linkedin.followers" as const;
+
+export const LINKEDIN_METRICS = [
+  LINKEDIN_IMPRESSIONS,
+  LINKEDIN_CLICKS,
+  LINKEDIN_LIKES,
+  LINKEDIN_COMMENTS,
+  LINKEDIN_SHARES,
+  LINKEDIN_FOLLOWERS,
+] as const;
+
 // ── Integration identifiers ───────────────────────────────────────────────────
 export const INTEGRATION = {
   META_ADS: "meta_ads",
@@ -186,6 +203,7 @@ export const INTEGRATION = {
   SHOPIFY: "shopify",
   WOO: "woo",
   GOOGLE_ADS: "google_ads",
+  LINKEDIN: "linkedin",
 } as const;
 
 export type IntegrationId = (typeof INTEGRATION)[keyof typeof INTEGRATION];
@@ -201,4 +219,5 @@ export type MetricKey =
   | (typeof SHOPIFY_METRICS)[number]
   | (typeof WOO_METRICS)[number]
   | (typeof GOOGLE_ADS_METRICS)[number]
+  | (typeof LINKEDIN_METRICS)[number]
   | (string & {}); // allow arbitrary keys without losing autocomplete

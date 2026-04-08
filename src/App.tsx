@@ -65,9 +65,22 @@ const GoogleConsoleCallbackHandler = lazy(
 const GoogleAdsCallbackHandler = lazy(
   () => import("./components/GoogleAdsCallbackHandler")
 );
+const TwitterCallbackHandler = lazy(
+  () => import("./features/twitter/components/TwitterCallbackHandler")
+);
+const TwitterDetailPage = lazy(
+  () => import("./pages/TwitterDetailPage")
+);
+const LinkedinCallbackHandler = lazy(
+  () => import("./features/linkedin/components/LinkedinCallbackHandler")
+);
+const LinkedinDetailPage = lazy(
+  () => import("./pages/LinkedinDetailPage")
+);
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
 const SocialMediaSchedulerPage = lazy(() => import("./pages/SocialMediaSchedulerPage"));
+const BlogSchedulerPage = lazy(() => import("./pages/BlogSchedulerPage"));
 
 // Multi-Client Pages
 const ClientsPage = lazy(() => import("./pages/ClientsPage"));
@@ -168,6 +181,8 @@ function App() {
                   element={<InstagramInsightsPage />}
                 />
                 <Route path="google-ads/:clientId?" element={<GoogleAdsDetailPage />} />
+                <Route path="twitter/:clientId?" element={<TwitterDetailPage />} />
+                <Route path="linkedin/:clientId?" element={<LinkedinDetailPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
 
@@ -185,6 +200,7 @@ function App() {
               <Route path="tasks" element={<TasksPage />} />
               <Route path="account-setup" element={<SettingsPage />} />
               <Route path="social-media/scheduler" element={<SocialMediaSchedulerPage />} />
+              <Route path="blog/scheduler" element={<BlogSchedulerPage />} />
             </Route>
 
             {/* 404 catch-all for protected area — outside sidebar */}
@@ -231,6 +247,8 @@ function App() {
             <Route path="meta/callback" element={<MetaCallbackHandler />} />
             <Route path="meta-business/callback" element={<MetaCallbackHandler />} />
             <Route path="google-ads/callback" element={<GoogleAdsCallbackHandler />} />
+            <Route path="twitter/callback" element={<TwitterCallbackHandler />} />
+            <Route path="linkedin/callback" element={<LinkedinCallbackHandler />} />
 
             {/* Multi-Client OAuth Callback */}
             <Route path="oauth/callback" element={<OAuthCallbackPage />} />

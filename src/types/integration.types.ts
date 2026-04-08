@@ -7,7 +7,9 @@ export type IntegrationType =
   | 'google-analytics'
   | 'google-ads'
   | 'meta-ads'
-  | 'meta-insights';
+  | 'meta-insights'
+  | 'twitter'
+  | 'linkedin';
 
 export interface AvailableAccount {
   id: string | number;

@@ -119,6 +119,26 @@ const WOO_STATIC_METRICS: Array<{ metricKey: string; displayName: string; catego
   { metricKey: 'woo.itemsSold',  displayName: 'Items Sold',    category: 'Sales' },
 ];
 
+const TWITTER_STATIC_METRICS: Array<{ metricKey: string; displayName: string; category: string }> = [
+  { metricKey: 'twitter.impressions',      displayName: 'Impressions',      category: 'Overview' },
+  { metricKey: 'twitter.likes',            displayName: 'Likes',            category: 'Engagement' },
+  { metricKey: 'twitter.retweets',         displayName: 'Retweets',         category: 'Engagement' },
+  { metricKey: 'twitter.replies',          displayName: 'Replies',          category: 'Engagement' },
+  { metricKey: 'twitter.followers',        displayName: 'Followers',        category: 'Overview' },
+  { metricKey: 'twitter.tweets',           displayName: 'Tweets',           category: 'Overview' },
+  { metricKey: 'twitter.recent_posts',     displayName: 'Recent Posts (Table)', category: 'Tables' },
+];
+
+const LINKEDIN_STATIC_METRICS: Array<{ metricKey: string; displayName: string; category: string }> = [
+  { metricKey: 'linkedin.impressions',  displayName: 'Impressions',  category: 'Overview' },
+  { metricKey: 'linkedin.clicks',       displayName: 'Clicks',       category: 'Overview' },
+  { metricKey: 'linkedin.likes',        displayName: 'Likes',        category: 'Engagement' },
+  { metricKey: 'linkedin.comments',     displayName: 'Comments',     category: 'Engagement' },
+  { metricKey: 'linkedin.shares',       displayName: 'Shares',       category: 'Engagement' },
+  { metricKey: 'linkedin.followers',    displayName: 'Followers',    category: 'Overview' },
+  { metricKey: 'linkedin.recent_posts', displayName: 'Recent Posts (Table)', category: 'Tables' },
+];
+
 // Map from normalised integration platform → static metrics + canonical integration key
 const STATIC_METRIC_MAP: Record<string, { integration: string; metrics: Array<{ metricKey: string; displayName: string; category: string }> }> = {
   'google-ads':           { integration: 'google_ads',             metrics: GOOGLE_ADS_STATIC_METRICS },
@@ -131,6 +151,8 @@ const STATIC_METRIC_MAP: Record<string, { integration: string; metrics: Array<{ 
   'shopify':              { integration: 'shopify',                 metrics: SHOPIFY_STATIC_METRICS },
   'woocommerce':          { integration: 'woo',                     metrics: WOO_STATIC_METRICS },
   'woo':                  { integration: 'woo',                     metrics: WOO_STATIC_METRICS },
+  'twitter':              { integration: 'twitter',                 metrics: TWITTER_STATIC_METRICS },
+  'linkedin':             { integration: 'linkedin',                metrics: LINKEDIN_STATIC_METRICS },
 };
 
 function injectStaticMetrics(

@@ -50,7 +50,7 @@ export function pickDefaultMetricsForIntegration(
     'shopify', 'woo', 'woocommerce',
     'meta-ads', 'meta-business', 'meta-social', 'meta-facebook', 'meta-instagram', 'meta',
     'google-search-console', 'google-console', 'google-analytics', 'google',
-    'youtube'
+    'youtube', 'twitter', 'linkedin'
   ];
 
   // LOGIC CHECK: Is cold start triggered?
@@ -276,6 +276,8 @@ export function buildWidgetsFromTemplate(
       else if (m.startsWith('youtube.')) integration = 'youtube';
       else if (m.startsWith('shopify.')) integration = 'shopify';
       else if (m.startsWith('woo.')) integration = 'woo';
+      else if (m.startsWith('twitter.')) integration = 'twitter';
+      else if (m.startsWith('linkedin.')) integration = 'linkedin';
     }
 
     if (!integration && integrationPlatform) {
@@ -293,6 +295,8 @@ export function buildWidgetsFromTemplate(
       else if (p.includes('meta-facebook') || p.includes('facebook')) integration = 'meta-facebook';
       else if (p.includes('meta-ads')) integration = 'meta_ads';
       else if (p.includes('meta')) integration = 'meta';
+      else if (p.includes('twitter')) integration = 'twitter';
+      else if (p.includes('linkedin')) integration = 'linkedin';
     }
 
     if (!integration) integration = 'meta';

@@ -44,6 +44,8 @@ import {
   getGoogleConsoleTopPages,
   getGoogleConsoleTopQueries,
 } from "@/features/YouTube/API/googleConsoleapi";
+import { getTwitterSummary } from "@/features/twitter/api/twitterApi";
+import { fetchLinkedinAnalytics, fetchLinkedinPosts } from "@/features/linkedin/api/linkedinApi";
 import {
   Table,
   TableBody,
@@ -348,22 +350,11 @@ const DASHBOARD_SPECIAL_METRIC_KEYS = new Set([
   "google.geo_country",
   "google.geo_city",
   "google.top_pages",
+  // LinkedIn & Twitter tables
+  "linkedin.recent_posts",
+  "twitter.recent_posts",
 ]);
 
-const isDashboardRateMetric = (metricKey?: string) => {
-  const key = (metricKey || "").toLowerCase();
-  return (
-    key.includes("cpc") ||
-    key.includes("ctr") ||
-    key.includes("cpm") ||
-    key.includes("bouncerate") ||
-    key.includes("average") ||
-    key.includes("avg") ||
-    key.includes("rate") ||
-    key.includes("duration") ||
-    key.includes("perview")
-  );
-};
 
 const isDashboardSpecialWidget = (widget: DashboardWidget) => {
   const metricKey = widget.metricKey || "";
@@ -392,10 +383,12 @@ const isDashboardSpecialWidget = (widget: DashboardWidget) => {
     return true;
   }
 
-  if (
-    (normalizedIntegration === "google-ads" || normalizedIntegration === "google_ads") &&
-    isDashboardRateMetric(metricKey)
-  ) {
+  if (normalizedIntegration === "google-ads" || normalizedIntegration === "google_ads") {
+    return true;
+  }
+
+  // Twitter and LinkedIn use dedicated API endpoints, not /unified-metrics/data
+  if (metricKey.startsWith("twitter.") || metricKey.startsWith("linkedin.")) {
     return true;
   }
 
@@ -612,6 +605,8 @@ function Dashboard({
             'google-analytics',
             'google-search-console',
             'google-console',
+            'google-ads',
+            'google_ads',
             'meta',
             'meta-business',
             'meta_business',
@@ -621,7 +616,8 @@ function Dashboard({
             'meta_ads',      // Accept underscore variant for Meta Ads
             'meta_facebook', // Accept underscore variant for Meta Facebook
             'meta_instagram', // Accept underscore variant for Meta Instagram
-            'youtube', 'shopify', 'woo'
+            'youtube', 'shopify', 'woo',
+            'twitter', 'linkedin',
           ];
 
           if (!validIntegrations.includes(normalizedIntegration)) {
@@ -632,13 +628,15 @@ function Dashboard({
           // Validate metric key format (should have platform prefix)
           const hasValidPrefix =
             widget.metricKey?.startsWith('google.') ||
-            widget.metricKey?.startsWith('google_ads.') || // ✅ Added Google Ads
+            widget.metricKey?.startsWith('google_ads.') ||
             widget.metricKey?.startsWith('google_seo.') ||
             widget.metricKey?.startsWith('google-console.') ||
             widget.metricKey?.startsWith('meta.') ||
             widget.metricKey?.startsWith('youtube.') ||
             widget.metricKey?.startsWith('shopify.') ||
-            widget.metricKey?.startsWith('woo.');
+            widget.metricKey?.startsWith('woo.') ||
+            widget.metricKey?.startsWith('twitter.') ||
+            widget.metricKey?.startsWith('linkedin.');
 
           if (!hasValidPrefix) {
             console.warn(`⚠️ Invalid metric key format: ${widget.metricKey} (missing platform prefix)`);
@@ -1066,26 +1064,7 @@ function Dashboard({
 
           // --- START GOOGLE ADS MULTI-FETCH ---
           if ((normalizedIntegration === 'google-ads' || normalizedIntegration === 'google_ads')) {
-            if (isRateMetric) {
-              const summaryData = await fetchGoogleAdsSummary(clientId, {
-                startDate: params.startDate,
-                endDate: params.endDate,
-                accountId: widget.accountId || undefined
-              });
-
-              if (summaryData?.success && summaryData.summary) {
-                const summary = {
-                  ctr: summaryData.summary.ctr,
-                  cpc: summaryData.summary.cpc,
-                  roas: summaryData.summary.roas,
-                  cost: summaryData.summary.spend,
-                  clicks: summaryData.summary.clicks,
-                  revenue: summaryData.summary.revenue,
-                  impressions: summaryData.summary.impressions,
-                };
-                return { id: widget.id, widget, data: { rows: [], summary } };
-              }
-            } else if (widget.metricKey === 'google_ads.campaign_performance') {
+            if (widget.metricKey === 'google_ads.campaign_performance') {
               const campaignData = await fetchGoogleAdsCampaignPerformance(
                 clientId,
                 params.startDate,
@@ -1119,6 +1098,74 @@ function Dashboard({
                     ],
                   }
                 };
+              }
+            } else {
+              // All other Google Ads metrics (clicks, impressions, cost, ctr, cpc, etc.)
+              // Strategy: Try aggregate endpoint first, fall back to summary endpoint
+              try {
+                const aggResult = await fetchUnifiedAggregate({
+                  metricKey: widget.metricKey!,
+                  integration: "google_ads",
+                  startDate: params.startDate,
+                  endDate: params.endDate,
+                  // Do NOT send accountId — it's an internal DB ID that doesn't match
+                  // the Google customer ID. The backend scopes by clientId instead.
+                  clientId: clientId ?? undefined,
+                });
+
+                if (aggResult?.success && typeof aggResult.value === "number") {
+                  const metricSuffix = widget.metricKey!.split(".").pop()!;
+                  return {
+                    id: widget.id,
+                    widget,
+                    data: {
+                      rows: [],
+                      value: aggResult.value,
+                      total: aggResult.value,
+                      summary: { [metricSuffix]: aggResult.value },
+                    },
+                  };
+                }
+              } catch (err) {
+                console.error(`Failed to fetch Google Ads aggregate for ${widget.metricKey}, trying summary fallback`, err);
+              }
+
+              // Fallback: Use the summary endpoint which returns all metrics at once
+              try {
+                const summaryData = await fetchGoogleAdsSummary(clientId, {
+                  startDate: params.startDate,
+                  endDate: params.endDate,
+                });
+
+                if (summaryData?.success && summaryData.summary) {
+                  const summary = summaryData.summary;
+                  const metricSuffix = widget.metricKey!.split(".").pop()!;
+                  // Map metric suffix to summary field
+                  const summaryMap: Record<string, number> = {
+                    clicks: Number(summary.clicks ?? 0),
+                    impressions: Number(summary.impressions ?? 0),
+                    cost: Number(summary.spend ?? summary.cost ?? 0),
+                    spend: Number(summary.spend ?? summary.cost ?? 0),
+                    ctr: Number(summary.ctr ?? 0),
+                    cpc: Number(summary.cpc ?? 0),
+                    conversions: Number(summary.conversions ?? 0),
+                    roas: Number(summary.roas ?? 0),
+                    revenue: Number(summary.revenue ?? 0),
+                  };
+                  const val = summaryMap[metricSuffix] ?? 0;
+                  return {
+                    id: widget.id,
+                    widget,
+                    data: {
+                      rows: [],
+                      value: val,
+                      total: val,
+                      summary: { [metricSuffix]: val, ...summaryMap },
+                    },
+                  };
+                }
+              } catch (err2) {
+                console.error(`Failed to fetch Google Ads summary for ${widget.metricKey}`, err2);
               }
             }
           }
@@ -1236,6 +1283,105 @@ function Dashboard({
             }
           }
           // --- END GOOGLE SEARCH CONSOLE AGGREGATE FETCH ---
+
+          // --- START TWITTER FETCH ---
+          if (normalizedIntegration === "twitter") {
+            if (widget.metricKey === "twitter.recent_posts") {
+              return { id: widget.id, widget, data: { rows: [], value: 0 } };
+            }
+            const summaryData = await getTwitterSummary(clientId);
+            if (summaryData?.success) {
+              let val = 0;
+              const summary = summaryData.summary || {};
+              const account = summaryData.account || {};
+              if (widget.metricKey === "twitter.followers") {
+                val = Number(summary.totalFollowers ?? account.followersCount ?? 0);
+              } else if (widget.metricKey === "twitter.tweets") {
+                val = Number(summary.tweetsPublishedLast30Days ?? summary.totalTweets ?? account.tweetCount ?? 0);
+              } else if (widget.metricKey === "twitter.impressions") {
+                val = Number(summary.impressions ?? 0);
+              } else if (widget.metricKey === "twitter.likes") {
+                val = Number(summary.likes ?? 0);
+              } else if (widget.metricKey === "twitter.retweets") {
+                val = Number(summary.retweets ?? 0);
+              } else if (widget.metricKey === "twitter.replies") {
+                val = Number(summary.replies ?? 0);
+              } else if (widget.metricKey === "twitter.following") {
+                val = Number(account.followingCount ?? summary.totalFollowing ?? 0);
+              }
+              return {
+                id: widget.id,
+                widget,
+                data: { rows: [], value: val, total: val },
+              };
+            }
+            return { id: widget.id, widget, data: null };
+          }
+          // --- END TWITTER FETCH ---
+
+          // --- START LINKEDIN FETCH ---
+          if (normalizedIntegration === "linkedin") {
+            if (widget.metricKey === "linkedin.recent_posts") {
+              try {
+                const postsData = await fetchLinkedinPosts();
+                if (postsData?.success && Array.isArray(postsData.data)) {
+                  const rows = postsData.data.map((p: any) => ({
+                    id: p.id,
+                    metricKey: widget.metricKey,
+                    integration: "linkedin",
+                    accountId: widget.accountId || "",
+                    date: p.postedAt ? new Date(p.postedAt).toLocaleDateString() : "",
+                    post: p.content || "(No text)",
+                    impressions: p.impressions || 0,
+                    clicks: p.clicks || 0,
+                    likes: p.likes || 0,
+                    comments: p.comments || 0,
+                    shares: p.shares || 0,
+                  }));
+                  return {
+                    id: widget.id,
+                    widget,
+                    data: { success: true, rows, value: rows.length, total: rows.length },
+                  };
+                }
+              } catch (err) {
+                console.error("Failed to fetch LinkedIn posts for dashboard", err);
+              }
+              return { id: widget.id, widget, data: null };
+            }
+
+            try {
+              const analyticsData = await fetchLinkedinAnalytics(effectiveDateFrom, dateTo);
+              if (analyticsData?.success && analyticsData.analytics) {
+                const dates = Object.keys(analyticsData.analytics).sort();
+                const metricShortKey = widget.metricKey!;
+                let totalVal = 0;
+                const series: Array<{ x: string; y: number }> = [];
+
+                dates.forEach(dateKey => {
+                  if (dateKey >= effectiveDateFrom && dateKey <= dateTo) {
+                    const dayVal = Number(analyticsData.analytics[dateKey]?.[metricShortKey] || 0);
+                    series.push({ x: dateKey, y: dayVal });
+                    if (metricShortKey === "linkedin.followers") {
+                      totalVal = dayVal; // Snapshot — use latest
+                    } else {
+                      totalVal += dayVal;
+                    }
+                  }
+                });
+
+                return {
+                  id: widget.id,
+                  widget,
+                  data: { rows: [], series, value: totalVal, total: totalVal },
+                };
+              }
+            } catch (err) {
+              console.error("Failed to fetch LinkedIn analytics for dashboard", err);
+            }
+            return { id: widget.id, widget, data: null };
+          }
+          // --- END LINKEDIN FETCH ---
 
           const shouldTryMetaFallback =
             normalizedIntegration.startsWith("meta") && widget.accountId;

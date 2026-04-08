@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Pencil, Trash2, Plus, AlertCircle, Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
-import { FaInstagram, FaFacebook } from 'react-icons/fa6';
+import { Pencil, Trash2, Plus, AlertCircle, Image as ImageIcon, Video as VideoIcon, ExternalLink } from 'lucide-react';
+import { FaInstagram, FaFacebook, FaXTwitter } from 'react-icons/fa6';
 import { PostStatusBadge } from './PostStatusBadge';
 import type { ScheduledPost, PostPlatform, PostStatus } from '../api/types';
 
@@ -16,6 +16,7 @@ const platformIcons: Record<PostPlatform, React.ReactNode> = {
       <FaInstagram className="w-3.5 h-3.5 text-pink-600" />
     </div>
   ),
+  twitter: <FaXTwitter className="w-4 h-4 text-zinc-900" />,
 };
 
 interface DayPostsSheetProps {
@@ -207,31 +208,47 @@ export function DayPostsSheet({
                     </div>
                   )}
 
-                  {/* Actions */}
-                  {post.status !== 'PROCESSING' && (
-                    <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-zinc-100 mt-0.5">
-                      {post.status === 'PENDING' && (
+                  {/* Actions & Published Link */}
+                  <div className="flex items-center justify-between pt-2 border-t border-zinc-100 mt-0.5">
+                    <div className="flex items-center gap-2">
+                       {post.status === 'PUBLISHED' && post.platform === 'twitter' && (post.publishedPostIds as any)?.tweetId && (
+                           <a
+                               href={`https://x.com/i/status/${(post.publishedPostIds as any).tweetId}`}
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded-md transition-colors"
+                           >
+                               <FaXTwitter className="w-2.5 h-2.5" />
+                               View Tweet
+                               <ExternalLink className="w-2.5 h-2.5" />
+                           </a>
+                       )}
+                    </div>
+                    {post.status !== 'PROCESSING' && (
+                      <div className="flex items-center gap-1.5">
+                        {post.status === 'PENDING' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-3 text-xs font-semibold text-zinc-600 hover:text-zinc-900 gap-1.5 rounded-lg"
+                            onClick={() => onEdit(post)}
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                            Edit
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 px-3 text-xs font-semibold text-zinc-600 hover:text-zinc-900 gap-1.5 rounded-lg"
-                          onClick={() => onEdit(post)}
+                          className="h-8 px-3 text-xs font-semibold text-red-500 hover:text-red-700 hover:bg-red-50 gap-1.5 rounded-lg"
+                          onClick={() => onDelete(post)}
                         >
-                          <Pencil className="w-3.5 h-3.5" />
-                          Edit
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Delete
                         </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-3 text-xs font-semibold text-red-500 hover:text-red-700 hover:bg-red-50 gap-1.5 rounded-lg"
-                        onClick={() => onDelete(post)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Delete
-                      </Button>
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })
