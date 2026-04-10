@@ -41,12 +41,15 @@ export const buildDashboardMapFromTemplate = (
   //      (e.g. after a report was copied or re-saved with fresh IDs).
   const seenWidgetIds = new Set<string | number>();
   const seenCompositeKeys = new Set<string>();
-  
+  // Tertiary dedup: catch the same widget saved under different slideIds
+  // (e.g. frontend ID 0 vs backend DB ID 5503). Groups by integration+metricKey+type.
+  const seenCrossSlideKeys = new Set<string>();
+
   // Create a reversed array so we process the NEWEST appended database rows first.
-  // This guarantees we keep the most recent layout positions (x,y,w,h) instead 
+  // This guarantees we keep the most recent layout positions (x,y,w,h) instead
   // of sticking to the oldest first-saved positions.
   const reversedWidgets = [...widgets].reverse();
-  
+
   const dedupedReversed = reversedWidgets.filter((widget) => {
     // Primary: deduplicate by DB widget ID
     if (widget.id !== undefined && widget.id !== null) {
@@ -64,6 +67,21 @@ export const buildDashboardMapFromTemplate = (
       return false;
     }
     seenCompositeKeys.add(compositeKey);
+
+    // Tertiary: deduplicate across different slideIds for the same logical widget.
+    // The backend may store the same widget under slideId=0 (old frontend save) AND
+    // slideId=5503 (later backend-ID save). Without this, both survive the secondary
+    // dedup and get merged into the same slide during hydration → duplicates.
+    const integration = (widget.integration || '').toLowerCase().replace(/[_-]/g, '');
+    const metricKey = widget.metricKey ?? '';
+    if (metricKey) { // Only cross-slide dedup widgets with an actual metricKey
+      const crossSlideKey = `${integration}::${metricKey}::${normType}`;
+      if (seenCrossSlideKeys.has(crossSlideKey)) {
+        console.warn(`[Hydrate] ⚠️ Cross-slide duplicate removed: ${crossSlideKey} on slide ${slideId} (id=${widget.id})`);
+        return false;
+      }
+      seenCrossSlideKeys.add(crossSlideKey);
+    }
     return true;
   });
 

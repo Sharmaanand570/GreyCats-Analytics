@@ -1155,6 +1155,8 @@ async function fetchRawWidgetData(
             metricKey: widget.metricKey,
             integration: 'google-search-console',
             dimensionValue: dim,
+            page: dim,
+            query: dim,
             clicks: acc._clicks,
             impressions: acc._impressions,
             ctr: acc._ctrCount > 0 ? `${(acc._ctr / acc._ctrCount * 100).toFixed(2)}%` : "0.00%",

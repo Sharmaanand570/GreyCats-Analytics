@@ -1961,7 +1961,18 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           return updatedW;
         });
         const existing = map.get(move.to) || [];
-        map.set(move.to, [...existing, ...updated]);
+        // Deduplicate: backend widgets (updated) take priority over defaults/old-slideId widgets (existing)
+        const incomingKeys = new Set(
+          updated.map((w: any) => `${w.metricConfig?.metricKey ?? ''}::${w.widgetType ?? ''}`)
+        );
+        const uniqueExisting = existing.filter((w: any) => {
+          const key = `${w.metricConfig?.metricKey ?? ''}::${w.widgetType ?? ''}`;
+          return !incomingKeys.has(key);
+        });
+        if (uniqueExisting.length < existing.length) {
+          console.warn(`🧹 [Migration] Deduped merge for slide ${move.to}: ${existing.length} existing → ${uniqueExisting.length} unique + ${updated.length} incoming`);
+        }
+        map.set(move.to, [...uniqueExisting, ...updated]);
         map.delete(move.from);
       }
     });
@@ -2084,7 +2095,18 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                 }
                 return updatedW;
               });
-              map.set(targetFrontendId, [...existing, ...updatedWidgets]);
+              // Deduplicate: rescued backend widgets take priority over defaults/old-slideId widgets
+              const rescuedKeys = new Set(
+                updatedWidgets.map((w: any) => `${w.metricConfig?.metricKey ?? ''}::${w.widgetType ?? ''}`)
+              );
+              const uniqueExisting = existing.filter((w: any) => {
+                const key = `${w.metricConfig?.metricKey ?? ''}::${w.widgetType ?? ''}`;
+                return !rescuedKeys.has(key);
+              });
+              if (uniqueExisting.length < existing.length) {
+                console.warn(`🧹 [Rescue] Deduped merge for slide ${targetFrontendId}: ${existing.length} existing → ${uniqueExisting.length} unique + ${updatedWidgets.length} rescued`);
+              }
+              map.set(targetFrontendId, [...uniqueExisting, ...updatedWidgets]);
               map.delete(sId);
               idMapping.set(sId, targetFrontendId);
 
@@ -2120,14 +2142,19 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
     // ✅ SAFETY DEDUP: Remove any per-slide widget duplicates that may have slipped
     // through (e.g. same metricKey+type appears twice on one slide after rescue merges).
-    // Primary fix is the removed Phase 1 pre-fill above; this is a defensive safety net.
+    // We process in REVERSE so the LAST (most recently added / backend-priority) widget
+    // wins, then reverse back to restore original order.
     map.forEach((slideWidgets, sId) => {
+      if (slideWidgets.length <= 1) return;
       const seen = new Set<string>();
-      const deduped = slideWidgets.filter(w => {
+      const reversed = [...slideWidgets].reverse();
+      const dedupedReversed = reversed.filter(w => {
         const normType = (w.widgetType || '').includes('chart') ? 'chart'
           : (w.widgetType || '').includes('metric') ? 'metric'
+          : (w.widgetType || '').includes('table') ? 'table'
           : (w.widgetType || '');
         const key = `${w.metricConfig?.metricKey ?? ''}::${normType}`;
+        if (!key || key === '::') return true; // Keep widgets with no identifying info
         if (seen.has(key)) {
           console.warn(`[SafeDedup] Removed duplicate widget: ${key} from slide ${sId}`);
           return false;
@@ -2135,8 +2162,9 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         seen.add(key);
         return true;
       });
-      if (deduped.length !== slideWidgets.length) {
-        map.set(sId, deduped);
+      if (dedupedReversed.length !== slideWidgets.length) {
+        console.warn(`🧹 [SafeDedup] Slide ${sId}: ${slideWidgets.length} → ${dedupedReversed.length} widgets`);
+        map.set(sId, dedupedReversed.reverse());
       }
     });
 
