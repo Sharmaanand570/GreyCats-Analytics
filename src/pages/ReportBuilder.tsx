@@ -1663,57 +1663,12 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       (templateQuery.data.widgets ?? []) as ReportWidgetDefinition[]
     );
 
-    // Ensure all integration slides have dashboards (even if empty), unless explicitly deleted
-    // This fixes reports that were created with missing slides
-    if (!readOnly && integrationsData?.integrations) {
-      // Use slideIntegrationMap to create dashboards for all slides (handles multi-slide integrations)
-      slideIntegrationMap.forEach((_, slideId) => {
-        // Ã°Å¸â€ Â§ CRITICAL FIX: Check if this "Frontend Slide ID" (e.g. 0) is already mapped to a "Backend Slide ID" (e.g. 5946)
-        // If it is, we check if the DASHBOARD for that Backend ID exists.
-        // We only create a new dashboard if the slot is truly empty.
-
-        let shouldCreate = false;
-        if (backendIdMap.current.has(slideId)) {
-          const mappedBackendId = backendIdMap.current.get(slideId)!;
-          if (!map.has(mappedBackendId)) {
-            shouldCreate = true; // Mapped ID exists but no dashboard? Weird, but create it.
-          }
-        } else {
-          // No backend mapping found. 
-          // BUT wait! The deduplication loop above POPULATES backendIdMap.
-          // If we are here, it means this integration slot was NOT claimed by any backend slide.
-          // So we should create it.
-          if (!map.has(slideId)) {
-            shouldCreate = true;
-          }
-        }
-
-        if (shouldCreate && !deletedSlideIds.has(slideId)) {
-          const info = slideIntegrationMap.get(slideId);
-          console.log(`Ã°Å¸â€œÂ  [Hydration] Creating missing dashboard for slide ${slideId} (${info?.platform || 'unknown'})`);
-          
-          // Ã°Å¸â€ Â§ CRITICAL FIX: Populate with default widgets instead of an empty array!
-          let defaultWidgets: DashboardLayout[] = [];
-          if (info && integrationsData?.integrations?.[info.originalIndex]) {
-            const integration = integrationsData.integrations[info.originalIndex];
-             defaultWidgets = buildDefaultWidgetsForIntegration(
-              slideId,
-              [], // No metrics yet, builder will handle cold-start
-              integration.platform,
-              integration.accountId,
-              info.subSlideIndex
-            );
-          }
-          
-          map.set(slideId, defaultWidgets);
-
-          // Also map it to itself since it's a new "frontend-only" slide for now
-          if (!backendIdMap.current.has(slideId)) {
-            backendIdMap.current.set(slideId, slideId);
-          }
-        }
-      });
-    }
+    // FIX: Do NOT pre-fill slides with default widgets here (before rescue/migration).
+    // This block was the ROOT CAUSE of duplicate widgets appearing twice on every slide:
+    //   - It wrote N template widgets into each frontend slot (e.g. slot 0) BEFORE rescue ran
+    //   - The rescue loop below then merged real DB widgets ON TOP -> 2*N widgets shown
+    // The post-rescue guard below (slideIntegrationMap.forEach with !map.has(sId) check)
+    // already handles creating default widgets for genuinely empty slots AFTER rescue completes.
 
     // SHARED / READ-ONLY MODE
     if (readOnly) {
@@ -2163,7 +2118,29 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       }
     });
 
-    // Ã°Å¸â€ Â§ CRITICAL: Also ensure this slide exists in dashboards Map
+    // ✅ SAFETY DEDUP: Remove any per-slide widget duplicates that may have slipped
+    // through (e.g. same metricKey+type appears twice on one slide after rescue merges).
+    // Primary fix is the removed Phase 1 pre-fill above; this is a defensive safety net.
+    map.forEach((slideWidgets, sId) => {
+      const seen = new Set<string>();
+      const deduped = slideWidgets.filter(w => {
+        const normType = (w.widgetType || '').includes('chart') ? 'chart'
+          : (w.widgetType || '').includes('metric') ? 'metric'
+          : (w.widgetType || '');
+        const key = `${w.metricConfig?.metricKey ?? ''}::${normType}`;
+        if (seen.has(key)) {
+          console.warn(`[SafeDedup] Removed duplicate widget: ${key} from slide ${sId}`);
+          return false;
+        }
+        seen.add(key);
+        return true;
+      });
+      if (deduped.length !== slideWidgets.length) {
+        map.set(sId, deduped);
+      }
+    });
+
+        // Ã°Å¸â€ Â§ CRITICAL: Also ensure this slide exists in dashboards Map
     slideIntegrationMap.forEach((info, sId) => {
       if (!map.has(sId)) {
         console.log(`Ã°Å¸â€ Â§ [Hydration] Adding dashboard for rescued slide ${sId} (${info.platform})`);
