@@ -783,71 +783,29 @@ export const renderWidgetContent = (
                 tableData.columns[0]?.name === 'Name' &&
                 tableData.columns[1]?.name === 'Value';
 
-              // If we have generic columns, ignore them and use proper defaults
-              if (hasGenericColumns) {
-                if (metricConfig?.metricKey === 'meta.ads.campaign_performance') {
-                  return [
-                    { name: "Campaign", width: "20%", dataKey: "campaignName" },
-                    { name: "Ad", width: "20%", dataKey: "adName" },
-                    { name: "Ad Set", width: "15%", dataKey: "adsetName" },
-                    { name: "Clicks", width: "10%", dataKey: "clicks" },
-                    { name: "Impressions", width: "12%", dataKey: "impressions" },
-                    { name: "Average CPC", width: "12%", dataKey: "cpc" },
-                    { name: "CTR", width: "11%", dataKey: "ctr" }
-                  ];
-                }
-                if (metricConfig?.metricKey === 'google_ads.campaign_performance') {
-                  return [
-                    { name: "Campaign", width: "18%", dataKey: "name" },
-                    { name: "View-through conversions", width: "10%", dataKey: "viewThroughConversions" },
-                    { name: "Avg CPC", width: "10%", dataKey: "cpc" },
-                    { name: "Clicks", width: "9%", dataKey: "clicks" },
-                    { name: "Conversion rate", width: "10%", dataKey: "conversionRate" },
-                    { name: "Conversions", width: "10%", dataKey: "conversions" },
-                    { name: "Cost", width: "11%", dataKey: "cost" },
-                    { name: "Cost / conv.", width: "11%", dataKey: "costPerConversion" },
-                    { name: "Impressions", width: "11%", dataKey: "impressions" },
-                  ];
-                }
-                return metricConfig?.metricKey === 'meta.instagram.recent_media'
-                  ? [
-                    { name: "Date", width: "15%", dataKey: "date" },
-                    { name: "Full Picture", dataKey: "fullPicture" },
-                    { name: "Post Message", width: "35%", dataKey: "post" },
-                    { name: "Impressions", dataKey: "impressions" },
-                    { name: "Clicks", dataKey: "clicks" },
-                    { name: "Likes", dataKey: "likes" },
-                    { name: "Shares", dataKey: "shares" }
-                  ]
-                  : [
-                    { name: "Date", width: "10%" },
-                    { name: "Image", dataKey: "fullPicture" },
-                    { name: "Post", width: "35%", dataKey: "post" },
-                    { name: "Clicks", dataKey: "clicks" },
-                    { name: "Likes", dataKey: "likes" },
-                    { name: "Comments", dataKey: "comments" },
-                    { name: "Shares", dataKey: "shares" }
-                  ];
-              }
+              // Always prefer saved/user-customized columns (respects add/remove/reorder)
+              // Only fall back to defaults when columns are generic ("Name"/"Value") or empty
+              const savedCols = tableData?.columns?.length ? tableData.columns : null;
+              const resolvedCols = (resolvedData as any)?.columns;
 
-              // Force fresh column schema for Facebook posts (removes saved "Post impressions", adds Image)
-              if (metricConfig?.metricKey === 'meta.facebook.recent_posts') {
+              // If user has real saved columns (not generic defaults), always use them
+              if (savedCols && !hasGenericColumns) return savedCols;
+
+              // For generic defaults or empty columns, fall back to type-specific defaults
+              if (metricConfig?.metricKey === 'meta.ads.campaign_performance') {
                 return [
-                  { name: "Date", width: "10%" },
-                  { name: "Image", dataKey: "fullPicture" },
-                  { name: "Post", width: "35%", dataKey: "post" },
-                  { name: "Clicks", dataKey: "clicks" },
-                  { name: "Likes", dataKey: "likes" },
-                  { name: "Comments", dataKey: "comments" },
-                  { name: "Shares", dataKey: "shares" },
+                  { name: "Ad Image", width: "10%", dataKey: "thumbnailUrl" },
+                  { name: "Campaign", width: "18%", dataKey: "campaignName" },
+                  { name: "Ad", width: "12%", dataKey: "adName" },
+                  { name: "Ad Set", width: "12%", dataKey: "adsetName" },
+                  { name: "Spend", width: "8%", dataKey: "spend" },
+                  { name: "Impressions", width: "10%", dataKey: "impressions" },
+                  { name: "Clicks", width: "10%", dataKey: "clicks" },
+                  { name: "Likes", width: "8%", dataKey: "likes" },
+                  { name: "Average CPC", width: "10%", dataKey: "cpc" },
+                  { name: "CTR", width: "12%", dataKey: "ctr" }
                 ];
               }
-
-              // Otherwise use existing columns if present
-              const existingCols = tableData?.columns?.length ? tableData.columns : (resolvedData as any)?.columns;
-              if (existingCols?.length) return existingCols;
-
-              // Fallback for empty columns
               if (metricConfig?.metricKey === 'google_ads.campaign_performance') {
                 return [
                   { name: "Campaign", width: "18%", dataKey: "name" },
@@ -861,21 +819,8 @@ export const renderWidgetContent = (
                   { name: "Impressions", width: "11%", dataKey: "impressions" },
                 ];
               }
-
-              if (metricConfig?.metricKey === 'meta.ads.campaign_performance') {
+              if (metricConfig?.metricKey === 'meta.instagram.recent_media') {
                 return [
-                  { name: "Campaign", width: "20%", dataKey: "campaignName" },
-                  { name: "Ad", width: "20%", dataKey: "adName" },
-                  { name: "Ad Set", width: "15%", dataKey: "adsetName" },
-                  { name: "Clicks", width: "10%", dataKey: "clicks" },
-                  { name: "Impressions", width: "12%", dataKey: "impressions" },
-                  { name: "Average CPC", width: "12%", dataKey: "cpc" },
-                  { name: "CTR", width: "11%", dataKey: "ctr" }
-                ];
-              }
-
-              return metricConfig?.metricKey === 'meta.instagram.recent_media'
-                ? [
                   { name: "Date", width: "15%", dataKey: "date" },
                   { name: "Full Picture", dataKey: "fullPicture" },
                   { name: "Post Message", width: "35%", dataKey: "post" },
@@ -883,19 +828,34 @@ export const renderWidgetContent = (
                   { name: "Clicks", dataKey: "clicks" },
                   { name: "Likes", dataKey: "likes" },
                   { name: "Shares", dataKey: "shares" }
-                ]
-                : [
+                ];
+              }
+              if (metricConfig?.metricKey === 'meta.facebook.recent_posts') {
+                return [
                   { name: "Date", width: "10%" },
                   { name: "Image", dataKey: "fullPicture" },
                   { name: "Post", width: "35%", dataKey: "post" },
                   { name: "Clicks", dataKey: "clicks" },
                   { name: "Likes", dataKey: "likes" },
                   { name: "Comments", dataKey: "comments" },
-                  { name: "Shares", dataKey: "shares" }
+                  { name: "Shares", dataKey: "shares" },
                 ];
+              }
+
+              // Final fallback: resolved data columns or generic
+              if (resolvedCols?.length) return resolvedCols;
+              return [
+                { name: "Date", width: "10%" },
+                { name: "Image", dataKey: "fullPicture" },
+                { name: "Post", width: "35%", dataKey: "post" },
+                { name: "Clicks", dataKey: "clicks" },
+                { name: "Likes", dataKey: "likes" },
+                { name: "Comments", dataKey: "comments" },
+                { name: "Shares", dataKey: "shares" }
+              ];
             })()
             : usingGa4DimensionalRows
-              ? ga4Columns
+              ? (tableData?.columns?.length && !(tableData.columns.length === 2 && tableData.columns[0]?.name === 'Name') ? tableData.columns : ga4Columns)
               : usingDemographicRows
                 ? [
                   { name: demographicsConfig?.type === 'country' ? 'Country' : 'City', width: "60%" },
@@ -1084,9 +1044,9 @@ export const renderWidgetContent = (
                           );
                         }
 
-                        // Special rendering for image thumbnail column (dataKey is fullPicture)
-                        if (col.dataKey === "fullPicture" && (cellValue || (row as any).fullPicture)) {
-                          const imgSrc = String(cellValue || (row as any).fullPicture);
+                        // Special rendering for image thumbnail column (dataKey is fullPicture or thumbnailUrl)
+                        if ((col.dataKey === "fullPicture" || col.dataKey === "thumbnailUrl") && (cellValue || (row as any).fullPicture || (row as any).thumbnailUrl)) {
+                          const imgSrc = String(cellValue || (row as any).fullPicture || (row as any).thumbnailUrl);
                           const permalinkUrl = (row as any).permalinkUrl as string | undefined;
                           return (
                             <TableCell key={colIndex} className="px-2 md:px-4 py-2">

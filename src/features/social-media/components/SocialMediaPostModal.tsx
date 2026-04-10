@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { Sparkles, Image as ImageIcon, CheckCircle2, Plus, ChevronLeft, ChevronRight, Upload, Globe, Info, Tag, Users2, X as XIcon, Search, UserPlus, AlertCircle, Calendar, FileText, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
-import { FaInstagram, FaFacebook, FaXTwitter } from 'react-icons/fa6';
+import { FaInstagram, FaFacebook } from 'react-icons/fa6';
 import { useSocialMediaStore } from '@/store/useSocialMediaStore';
 
 import { useClientContext } from '@/context/ClientContext';
@@ -40,7 +40,6 @@ const PLATFORMS: { id: PostPlatform; icon: React.ReactNode; label: string }[] = 
     ),
     label: 'Both',
   },
-  { id: 'twitter', icon: <FaXTwitter className="w-5 h-5" />, label: 'Twitter (X)' },
 ];
 
 const ASPECT_RATIOS: Record<string, { label: string; value: string; css: string }[]> = {
@@ -62,19 +61,12 @@ const ASPECT_RATIOS: Record<string, { label: string; value: string; css: string 
     { label: 'Vertical (9:16)', value: '9:16', css: '9/16' },
     { label: 'Landscape (1.91:1)', value: '1.91:1', css: '1.91/1' },
   ],
-  twitter: [
-    { label: 'Square (1:1)', value: '1:1', css: '1/1' },
-    { label: 'Landscape (16:9)', value: '16:9', css: '16/9' },
-    { label: 'Landscape (4:3)', value: '4:3', css: '4/3' },
-    { label: 'Vertical (9:16)', value: '9:16', css: '9/16' },
-  ],
 };
 
 const CAPTION_LIMITS: Record<string, number> = {
   instagram: 2200,
   facebook: 63206,
   both: 2200,
-  twitter: 280,
 };
 
 const FIRST_COMMENT_LIMIT = 2200;
@@ -391,25 +383,14 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
     try {
       // 1. Find account IDs from integrations
       let metaAccountId: number | undefined;
-      let twitterAccountId: number | undefined;
 
-      if (platform === 'twitter') {
-        const xIntegration = currentClient?.integrations?.find(
-          (i) => i.integrationType === 'twitter'
-        );
-        if (!xIntegration) {
-          throw new Error('No Twitter account linked to this workspace. Please connect one in the studio header.');
-        }
-        twitterAccountId = xIntegration.accountId;
-      } else {
-        const metaIntegration = currentClient?.integrations?.find(
-          (i) => i.integrationType === 'meta-business'
-        );
-        if (!metaIntegration) {
-          throw new Error('No Meta account linked to this workspace. Please connect one in the studio header.');
-        }
-        metaAccountId = metaIntegration.accountId;
+      const metaIntegration = currentClient?.integrations?.find(
+        (i) => i.integrationType === 'meta-business'
+      );
+      if (!metaIntegration) {
+        throw new Error('No Meta account linked to this workspace. Please connect one in the studio header.');
       }
+      metaAccountId = metaIntegration.accountId;
 
       // 2. Create or Update using hooks
       if (isEditing && editingPost) {
@@ -421,7 +402,6 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
             scheduledFor: scheduledForStr,
             platform: platform as PostPlatform,
             metaAccountId,
-            twitterAccountId,
             // Keep existing URLs if no new files are being uploaded
             mediaUrls: mediaFiles.length === 0 ? mediaUrls : undefined,
             ...(isStory ? {} : {
@@ -446,7 +426,6 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
           files: mediaFiles,
           payload: {
             metaAccountId,
-            twitterAccountId,
             clientId,
             postType: postType || 'FEED',
             scheduledFor: scheduledForStr,
@@ -1189,7 +1168,6 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
                           onClick={() => {
                             updateDraft({ 
                               platform: p.id,
-                              ...(p.id === 'twitter' ? { postType: 'FEED', locationId: undefined } : {})
                             });
                             const validRatios = ASPECT_RATIOS[p.id] || ASPECT_RATIOS['instagram'];
                             if (!validRatios.find((r) => r.value === aspectRatio)) {
@@ -1217,7 +1195,6 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
                       </label>
                       <div className="flex gap-2">
                         {(['FEED', 'STORY'] as PostType[])
-                          .filter((pt) => pt !== 'STORY' || platform !== 'twitter')
                           .map((pt) => (
                           <button
                             key={pt}
@@ -1322,7 +1299,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
                   {platform === 'instagram' && renderCollaboratorsSection()}
 
                   {/* Location — Meta only (FB/IG) */}
-                  {platform !== 'twitter' && renderLocationSection()}
+                  {renderLocationSection()}
 
                   {/* Caption */}
                   <div>

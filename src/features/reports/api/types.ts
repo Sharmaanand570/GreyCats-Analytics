@@ -500,6 +500,8 @@ export interface MetaAdsCampaignRow {
   adsetName: string;
   clicks: number;
   impressions: number;
+  likes: number;
+  spend: number;
   cpc: number;
   ctr: number;
 }

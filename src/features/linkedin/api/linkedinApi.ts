@@ -1,6 +1,5 @@
 import api from "@/apiConfig";
 import type { AxiosError } from "axios";
-import { getAuthToken, StorageKey } from "@/utils/storage";
 
 // ==================== TYPES ====================
 
@@ -83,35 +82,39 @@ export const connectLinkedinPersonal = async (): Promise<ConnectLinkedinResponse
   }
 };
 
-export const connectLinkedinOrg = async (): Promise<ConnectLinkedinResponse> => {
-  console.log(`[LinkedIn API] connectLinkedinOrg → GET /linkedin/portability/connect`);
-  console.log(`[LinkedIn API] baseURL:`, api.defaults.baseURL);
-  const token = getAuthToken(StorageKey.ANALYTICS_TOKEN);
-  console.log(`[LinkedIn API] token present:`, !!token);
+export const connectLinkedinOrg = async (clientId?: string | number): Promise<ConnectLinkedinResponse> => {
+  console.log(`[LinkedIn API] connectLinkedinOrg → GET /linkedin/portability/connect`, { clientId });
+  
   try {
-    // Force the proxy by hitting current origin in dev instead of VITE_API_BASE_URL 
-    // to allow the vite proxy interceptor to capture the 302 and return JSON.
     const url = import.meta.env.DEV 
       ? `${window.location.origin}/api/linkedin/portability/connect`
       : "/linkedin/portability/connect";
 
     const response = await api.get<ConnectLinkedinResponse>(url);
-    console.log(`[LinkedIn API] connectLinkedinOrg ← status:`, response.status);
-    console.log(`[LinkedIn API] connectLinkedinOrg ← data:`, response.data);
-    console.log(`[LinkedIn API] connectLinkedinOrg ← headers:`, response.headers);
-    console.log(`[LinkedIn API] connectLinkedinOrg ← responseURL:`, response.request?.responseURL);
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError;
-    console.error(`[LinkedIn API] connectLinkedinOrg ERROR:`, {
-      status: axiosError.response?.status,
-      statusText: axiosError.response?.statusText,
-      data: axiosError.response?.data,
-      headers: axiosError.response?.headers,
-      responseURL: axiosError.request?.responseURL,
-      message: axiosError.message,
-      code: axiosError.code,
-    });
+    
+    // CORS/Redirect Block Fallback: If we hit a Network Error (likely a 303 redirect blocked by CORS),
+    // we manually construct the LinkedIn OAuth URL to allow full-page navigation.
+    if (axiosError.message === "Network Error" || axiosError.code === "ERR_NETWORK") {
+      console.warn(`[LinkedIn API] Network error detected. Constructing manual OAuth URL fallback...`);
+      
+      const baseURL = api.defaults.baseURL || "https://api.analytics.greycats.tech/api";
+      // Ensure baseURL doesn't have a trailing slash for consistency
+      const cleanBaseURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
+      const redirectUri = `${cleanBaseURL}/linkedin/portability/callback`;
+      
+      const manualUrl = `https://www.linkedin.com/oauth/v2/authorization?` + 
+        `response_type=code&` +
+        `client_id=77ilw5hr3ban3e&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `state=${clientId || ''}&` +
+        `scope=r_organization_social%20rw_organization_admin%20w_organization_social`;
+        
+      return { success: true, url: manualUrl };
+    }
+    
     return handleLinkedinApiError(error, "Failed to initiate LinkedIn Organization connection");
   }
 };

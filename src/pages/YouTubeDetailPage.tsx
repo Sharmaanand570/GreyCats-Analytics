@@ -35,7 +35,6 @@ import {
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
-  BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import {
@@ -202,43 +201,50 @@ function YouTubeDetailPage() {
     <div className="w-full h-full flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
       <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
         <div className="w-full h-full flex flex-col">
-          {/* Header */}
-          <div className="w-full min-h-[4.8em] h-auto border-b flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-5 py-3 lg:py-2">
-            <div className="flex items-center gap-3">
-              <FaYoutube className="text-2xl text-red-600" />
-              <span className="font-medium text-xl">YouTube Analytics</span>
+          {/* --- 1. Top Navigation Bar --- */}
+          <div className="w-full border-b flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-8 py-6 bg-white/80 backdrop-blur-md sticky top-0 z-20 border-slate-200/60 shadow-sm rounded-t-[32px] mb-6">
+            <div className="flex flex-col gap-2 relative">
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink onClick={() => navigate(-1)} className="cursor-pointer text-slate-500 hover:text-slate-800 transition-colors font-medium">Data Sources</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator className="text-slate-300" />
+                  <BreadcrumbItem>
+                    <span className="bg-zinc-100 text-zinc-900 px-2 py-0.5 rounded-md font-bold text-sm tracking-wide">YouTube</span>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
+              
+              <div className="flex items-center gap-5">
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-zinc-800 blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
+                  <div className="relative p-3.5 bg-gradient-to-br from-zinc-800 to-zinc-950 rounded-2xl shadow-xl shadow-zinc-900/10 ring-1 ring-white/20 flex items-center justify-center">
+                    <FaYoutube className="w-8 h-8 text-white" />
+                  </div>
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight text-slate-900">YouTube Analytics</h1>
+                  <p className="text-sm text-slate-500 mt-1 font-medium">Channel performance and audiences</p>
+                </div>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+
+            <div className="flex flex-wrap items-center gap-4">
               <DateRangePicker
                 value={dateRange}
                 onChange={(range: DateRange) => setDateRange(range)}
                 className="w-[240px]"
               />
-              <DataSyncBanner
-                compact={true}
-              />
-              <Button variant="outline" size="sm" onClick={handleSync} disabled={isSyncing} className="gap-2">
-                {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              <DataSyncBanner compact={true} />
+              <Button variant="outline" size="sm" onClick={handleSync} disabled={isSyncing} className="h-10 px-4 rounded-xl font-bold shadow-sm flex items-center gap-2">
+                {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4 text-slate-500" />}
                 Sync
               </Button>
-              <Button variant="destructive" size="sm" onClick={handleDisconnect} isLoading={isDisconnecting || removeAccount.isPending}>
+              <Button variant="destructive" size="sm" onClick={handleDisconnect} isLoading={isDisconnecting || removeAccount.isPending} className="h-10 rounded-xl px-4 shadow-sm">
                 Disconnect
               </Button>
             </div>
-          </div>
-
-          <div className="w-full px-5 pt-4 pb-2">
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink onClick={() => navigate(-1)} className="cursor-pointer">Data Sources</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>YouTube</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
           </div>
 
           <div className="w-full px-5 py-6 space-y-6 overflow-y-auto pb-20">

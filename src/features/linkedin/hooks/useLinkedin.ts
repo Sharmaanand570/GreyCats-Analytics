@@ -22,7 +22,7 @@ export const useLinkedinPersonalConnect = () => {
 
 export const useLinkedinOrgConnect = () => {
   return useMutation({
-    mutationFn: connectLinkedinOrg,
+    mutationFn: (clientId?: string | number) => connectLinkedinOrg(clientId),
   });
 };
 

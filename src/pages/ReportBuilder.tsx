@@ -1297,13 +1297,6 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     // Ã°Å¸â€œÂ  [SlideMap] Generated map:
     console.log('Ã°Å¸â€œÂ  [SlideMap] Generated map:', Array.from(map.entries()));
 
-    const twitterEntries = Array.from(map.entries()).filter(([, info]) => (info.platform || "").toLowerCase().includes("twitter"));
-    if (twitterEntries.length > 0) {
-      console.log('Ã°Å¸â€œÂ  [TwitterDebug] Twitter integrations detected in SlideMap:', twitterEntries);
-    } else {
-      console.log('Ã°Å¸â€œÂ  [TwitterDebug] No Twitter integrations found in IntegrationsData.');
-    }
-
     // Expose to window for console debugging
     if (typeof window !== 'undefined') {
       (window as any).__SLIDE_MAP_DEBUG__ = map;
@@ -3445,7 +3438,10 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             snapshotData: resolvedWidgets[widgetId] ?? widget.snapshotData,
             filters: {
               ...existingFilters,
-              widgetData: (resolvedWidgets[widgetId] || widget.data) as unknown,
+              // Merge resolved data with widget config so UI properties (columns, title, caption) survive round-trip
+              widgetData: resolvedWidgets[widgetId]
+                ? { ...resolvedWidgets[widgetId], ...(widget.data as any) }
+                : (widget.data as unknown),
               snapshotData: resolvedWidgets[widgetId] ?? widget.snapshotData,
               displayName,
               // Bake slide info into first widget as a recovery beacon
@@ -3853,24 +3849,29 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           const isMetric = w.type === 'metric' || (w as any).widgetType === 'metric';
 
           // Create a shallow copy to modify
-          // FIX: Merge live data rows/values BUT preserve UI config (columns, title, caption) from the builder state
+          // Ã¢Å“â€¦ FIX: Merge live data rows/values BUT preserve UI config (columns, title, caption) from the builder state
           const originalData = w.widgetData as any || {};
           const optimizedData = {
+            ...liveData,
             ...originalData,
-            ...liveData
+            // Force the actual metric results from liveData to ensure the snapshot is accurate
+            rows: liveData.rows ?? [],
+            value: liveData.value,
+            total: liveData.total,
+            series: liveData.series,
+            pagination: liveData.pagination,
+            success: liveData.success
           };
 
           if (isMetric) {
-            // Metrics rely on 'value'/'total'/'series'. They rarely need the full 'rows' dump.
-            // We replace it with an empty array to save space.
             optimizedData.rows = [];
           }
 
           return {
             ...w,
-            // Inject into widgetData (primary snapshot storage)
+            // Update all persistence fields (widgetData AND config) to ensure the backend saves the correct configuration
             widgetData: optimizedData,
-            // Also update filters.widgetData if it exists there (legacy/redundant ref)
+            config: optimizedData,
             filters: {
               ...w.filters,
               widgetData: optimizedData

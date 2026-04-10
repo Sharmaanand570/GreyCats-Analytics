@@ -9,7 +9,6 @@ import {
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
-  BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { WooCommerceKPICards } from "@/components/WooCommerceKPICards";
@@ -44,7 +43,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getStatusBadgeClass } from "@/utils/statusColors";
 import { MoreVertical, ExternalLink, RefreshCw, Loader2, Eye } from "lucide-react";
 import { useEffect, useState } from "react";
-import { format } from "date-fns";
+import { format, isValid, subDays } from "date-fns";
+
+const safeFormatDate = (dateStr: string | undefined | null, fmt: string = "MMM dd, yyyy HH:mm"): string => {
+  if (!dateStr) return "N/A";
+  const d = new Date(dateStr);
+  return isValid(d) ? format(d, fmt) : "N/A";
+};
 import {
   Dialog,
   DialogContent,
@@ -59,7 +64,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+
 import { DataSyncBanner } from "@/components/DataSyncBanner";
 
 const WooCommerceDetailPage = () => {
@@ -75,6 +80,7 @@ const WooCommerceDetailPage = () => {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
+
   // Pagination state (for future use)
   const perProductPage = 1;
   const perProductLimit = 10;
@@ -86,8 +92,14 @@ const WooCommerceDetailPage = () => {
     setSelectedClientId(clients[0].id);
   }
 
+  // Check if selected client has WooCommerce assignment
+  const selectedClient = clients.find(c => c.id === (selectedClientId || clients[0]?.id));
+  const hasWooCommerceAssignment = !!selectedClient?.integrations?.some(
+    (i) => i.integrationType === "woocommerce"
+  );
+
   const { data: accountsData, error: accountsError, isLoading: isLoadingAccounts } = useWooCommerceAccounts();
-  console.log(accountsData);
+  console.log('DEBUG: RAW accountsData from available-accounts:', accountsData);
 
   // Mutations
   const { mutateAsync: syncProducts, isPending: isSyncingProducts } =
@@ -102,26 +114,37 @@ const WooCommerceDetailPage = () => {
   const {
     data: accountInfoResponse,
     isLoading: isLoadingAccountInfo
-  } = useWooCommerceAccountInfo(1, accountId); // Defaulting clientId to 1 until route params are fixed
+  } = useWooCommerceAccountInfo(selectedClientId || 0, accountId); 
+
+  console.log('DEBUG: RAW accountInfoResponse from /woocommerce/accounts:', accountInfoResponse);
 
   const accountInfo = accountInfoResponse?.success ? accountInfoResponse : null;
 
   const { data: syncStatus, isLoading: isLoadingSyncStatus } =
-    useWooCommerceSyncStatus(1, accountId);
+    useWooCommerceSyncStatus(selectedClientId || 0, accountId);
 
-  // Fetch analytics data
+
+
+  // Fetch analytics data (always last 30 days – set inside the hook)
   const {
     data: analyticsData,
+    isLoading: isLoadingAnalytics,
     error: analyticsError,
-  } = useWooCommerceAnalytics(selectedClientId || 0); // Use selected client
+  } = useWooCommerceAnalytics(
+    selectedClientId || 0,
+    accountId,
+    hasWooCommerceAssignment
+  );
 
-  // Fetch per-product analytics data (for top products with revenue) - using paginated version
+  // Fetch per-product analytics data (for top products with revenue)
+  const last30Start = format(subDays(new Date(), 30), "yyyy-MM-dd");
+  const last30End = format(new Date(), "yyyy-MM-dd");
   const {
     data: productsAnalyticsData,
     isLoading: isLoadingProductsAnalytics,
     error: productsAnalyticsError,
   } = useWooCommercePerProductPaginated(
-    1,
+    selectedClientId || 0,
     accountId
       ? {
         accountId,
@@ -129,42 +152,44 @@ const WooCommerceDetailPage = () => {
         limit: perProductLimit,
         sort: "revenue",
         direction: "desc",
+        startDate: last30Start,
+        endDate: last30End,
       }
       : null
   );
 
-  // Fetch orders list
+  // Fetch orders list (always last 30 days – set inside the hook)
   const {
     data: ordersData,
     isLoading: isLoadingOrders,
     error: ordersError,
-  } = useWooCommerceOrders(selectedClientId || 0); // Use selected client
+  } = useWooCommerceOrders(selectedClientId || 0, accountId, hasWooCommerceAssignment);
 
   // Fetch single product detail
   const {
     data: productDetailData,
     isLoading: isLoadingProductDetail,
-  } = useWooCommerceProduct(1, selectedProductId ?? '', accountId ?? 0);
+  } = useWooCommerceProduct(selectedClientId || 0, selectedProductId ?? '', accountId ?? 0);
 
   // Fetch single order detail
   const {
     data: orderDetailData,
     isLoading: isLoadingOrderDetail,
-  } = useWooCommerceOrder(1, selectedOrderId, accountId);
+  } = useWooCommerceOrder(selectedClientId || 0, selectedOrderId, accountId);
 
   // Fetch products catalog
   const {
     data: productsCatalogData,
     isLoading: isLoadingProductsCatalog,
     error: productsCatalogError,
-  } = useWooCommerceProducts(selectedClientId || 0); // Use selected client
+  } = useWooCommerceProducts(selectedClientId || 0, accountId, hasWooCommerceAssignment); // Use selected client and accountId
 
   // Fetch agency rollup data for stores table
   const {
     data: rollupData,
     isLoading: isLoadingRollup,
     error: rollupError,
-  } = useWooCommerceAgencyRollup(1);
+  } = useWooCommerceAgencyRollup(selectedClientId || 0);
 
   // Calculate active stores count from rollup data
   const activeStoresCount = rollupData?.accounts?.filter(acc => acc.revenue > 0 || acc.orders > 0).length || rollupData?.accounts?.length || 0;
@@ -173,11 +198,14 @@ const WooCommerceDetailPage = () => {
   const lastProductsSync = syncStatus?.sync?.lastProductsSync;
   const lastOrdersSync = syncStatus?.sync?.lastOrdersSync;
 
-  // Fetch trends data for revenue chart
   const {
     data: trendsData,
     isLoading: isLoadingTrends,
-  } = useWooCommerceTrends(selectedClientId || 0); // Use selected client
+  } = useWooCommerceTrends(
+    selectedClientId || 0,
+    accountId,
+    hasWooCommerceAssignment
+  );
 
   // Transform trends data for chart
   const revenueChartData = trendsData?.trends?.map((trend) => ({
@@ -290,7 +318,7 @@ const WooCommerceDetailPage = () => {
     );
   }
 
-  // Show message if no accounts found
+  // Show message if no accounts found in the agency
   if (accountsData && accountsData.length === 0) {
     return (
       <div className="w-full h-full flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
@@ -300,7 +328,7 @@ const WooCommerceDetailPage = () => {
               <CardHeader>
                 <CardTitle>No WooCommerce Accounts</CardTitle>
                 <CardDescription>
-                  You don't have any connected WooCommerce accounts yet.
+                  You don't have any connected WooCommerce accounts in your agency list.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -315,70 +343,73 @@ const WooCommerceDetailPage = () => {
     );
   }
 
+
   return (
     <div className="w-full h-full flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
       <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
         <div className="w-full h-full flex flex-col">
-          {/* Header */}
-          <div className="w-full h-[4.8em]  border-b flex justify-between items-center px-5">
-            <div className="flex items-center gap-3">
-              <FaCartShopping
-                className="text-2xl"
-                style={{ color: "#96588A" }}
-              />
-              <span className="font-medium text-xl">
-                WooCommerce Store Overview
-              </span>
+          {/* --- 1. Top Navigation Bar --- */}
+          <div className="w-full border-b flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-8 py-6 bg-white/80 backdrop-blur-md sticky top-0 z-20 border-slate-200/60 shadow-sm rounded-t-[32px] mb-6">
+            <div className="flex flex-col gap-2 relative">
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink onClick={() => navigate(-1)} className="cursor-pointer text-slate-500 hover:text-slate-800 transition-colors font-medium">Data Sources</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator className="text-slate-300" />
+                  <BreadcrumbItem>
+                    <span className="bg-zinc-100 text-zinc-900 px-2 py-0.5 rounded-md font-bold text-sm tracking-wide">WooCommerce</span>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
+              
+              <div className="flex items-center gap-5">
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-zinc-800 blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
+                  <div className="relative p-3.5 bg-gradient-to-br from-zinc-800 to-zinc-950 rounded-2xl shadow-xl shadow-zinc-900/10 ring-1 ring-white/20 flex items-center justify-center">
+                    <FaCartShopping className="w-8 h-8 text-white" />
+                  </div>
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight text-slate-900">WooCommerce Analytics</h1>
+                  <p className="text-sm text-slate-500 mt-1 font-medium">Store performance and sales</p>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-4">
+
+            <div className="flex flex-wrap items-center gap-4">
               <DataSyncBanner compact={true} />
-              {/* Account Selector */}
-              {accountsData && accountsData.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="account-select" className="text-sm text-gray-600 whitespace-nowrap">
-                    Account:
-                  </Label>
-                  <Select
-                    value={accountId?.toString() || ""}
-                    onValueChange={handleAccountChange}
-                  >
-                    <SelectTrigger id="account-select" className="w-64">
+              <div className="w-[300px]">
+                {accountsData && accountsData.length > 0 && (
+                  <Select value={accountId?.toString() || ""} onValueChange={handleAccountChange}>
+                    <SelectTrigger className="h-10 bg-white border-slate-200 shadow-sm rounded-xl transition-all focus:ring-slate-200 font-medium text-slate-700">
                       <SelectValue placeholder="Select an account" />
                     </SelectTrigger>
                     <SelectContent>
                       {accountsData.map((account) => {
-                        const displayUrl = account.name || "Unknown Store";
-                        const statusText = account.original?.isActive ? " (Active)" : " (Inactive)";
+                        let isActive = account.original?.isActive ?? true; 
+                        if (accountId === account.id && accountInfo?.success) {
+                          isActive = accountInfo.account.isActive;
+                        }
+                        const statusText = isActive ? " (Active)" : " (Inactive)";
                         return (
                           <SelectItem key={account.id} value={account.id.toString()}>
-                            {displayUrl}{statusText}
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-zinc-800" />
+                              {account.name || "Unknown Store"} {statusText}
+                            </div>
                           </SelectItem>
                         );
                       })}
                     </SelectContent>
                   </Select>
-                </div>
-              )}
-
-              <button className="relative">
-                <FiBell className="text-xl text-gray-500" />
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                )}
+              </div>
+              <button className="relative ml-2 bg-white border border-slate-200 shadow-sm rounded-xl p-2.5 transition-colors hover:bg-slate-50">
+                <FiBell className="text-xl text-slate-500" />
+                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
             </div>
-          </div>
-
-          <div className="w-full px-5 pt-4">
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink onClick={() => navigate(-1)} className="cursor-pointer">Data Sources</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>WooCommerce</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
           </div>
 
           {/* Content */}
@@ -451,10 +482,7 @@ const WooCommerceDetailPage = () => {
                             <span className="text-gray-600">Last Products Sync:</span>{" "}
                             <span className="font-medium">
                               {lastProductsSync
-                                ? format(
-                                  new Date(lastProductsSync),
-                                  "MMM dd, yyyy HH:mm"
-                                )
+                                ? safeFormatDate(lastProductsSync)
                                 : "Never"}
                             </span>
                           </p>
@@ -462,10 +490,7 @@ const WooCommerceDetailPage = () => {
                             <span className="text-gray-600">Last Orders Sync:</span>{" "}
                             <span className="font-medium">
                               {lastOrdersSync
-                                ? format(
-                                  new Date(lastOrdersSync),
-                                  "MMM dd, yyyy HH:mm"
-                                )
+                                ? safeFormatDate(lastOrdersSync)
                                 : "Never"}
                             </span>
                           </p>
@@ -559,24 +584,32 @@ const WooCommerceDetailPage = () => {
                 )}
 
                 {/* KPI Cards - Use analytics data for current account, rollup totals for agency view */}
-                <WooCommerceKPICards
-                  totalRevenue={
-                    analyticsData?.summary?.totalRevenue ||
-                    rollupData?.totals?.totalRevenue ||
-                    0
-                  }
-                  totalOrders={
-                    analyticsData?.summary?.totalOrders ||
-                    rollupData?.totals?.totalOrders ||
-                    0
-                  }
-                  avgOrderValue={
-                    analyticsData?.summary?.averageOrderValue ||
-                    rollupData?.totals?.totalAvgOrder ||
-                    0
-                  }
-                  activeStores={activeStoresCount}
-                />
+                {isLoadingAnalytics ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[1, 2, 3, 4].map((i) => (
+                      <Skeleton key={i} className="h-32 rounded-2xl" />
+                    ))}
+                  </div>
+                ) : (
+                  <WooCommerceKPICards
+                    totalRevenue={
+                      analyticsData?.summary?.totalRevenue ||
+                      (accountId ? 0 : rollupData?.totals?.totalRevenue) ||
+                      0
+                    }
+                    totalOrders={
+                      analyticsData?.summary?.totalOrders ||
+                      (accountId ? 0 : rollupData?.totals?.totalOrders) ||
+                      0
+                    }
+                    avgOrderValue={
+                      analyticsData?.summary?.averageOrderValue ||
+                      (accountId ? 0 : rollupData?.totals?.totalAvgOrder) ||
+                      0
+                    }
+                    activeStores={activeStoresCount}
+                  />
+                )}
 
                 {/* Chart and Products Row */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -815,7 +848,7 @@ const WooCommerceDetailPage = () => {
                                     {order.currency}
                                   </TableCell>
                                   <TableCell className="text-sm text-gray-600">
-                                    {format(new Date(order.dateCreated), "MMM dd, yyyy HH:mm")}
+                                    {safeFormatDate(order.dateCreated)}
                                   </TableCell>
                                   <TableCell className="pr-6">
                                     <button
@@ -1072,10 +1105,7 @@ const WooCommerceDetailPage = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-500">Created At</p>
                   <p className="text-base text-gray-900 mt-1">
-                    {format(
-                      new Date(orderDetailData.order.dateCreated),
-                      "MMM dd, yyyy HH:mm"
-                    )}
+                    {safeFormatDate(orderDetailData.order.dateCreated)}
                   </p>
                 </div>
               </div>

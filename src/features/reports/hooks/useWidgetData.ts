@@ -610,8 +610,11 @@ async function fetchRawWidgetData(
             adsetName: row.adsetName,
             clicks: row.clicks,
             impressions: row.impressions,
+            likes: row.likes,
+            spend: row.spend,
             cpc: row.cpc,
             ctr: row.ctr,
+            thumbnailUrl: row.thumbnailUrl,
           }));
 
           return {
@@ -625,12 +628,14 @@ async function fetchRawWidgetData(
             },
             columns: [
               { name: "Campaign", width: "20%", dataKey: "campaignName" },
-              { name: "Ad", width: "20%", dataKey: "adName" },
+              { name: "Ad", width: "15%", dataKey: "adName" },
               { name: "Ad Set", width: "15%", dataKey: "adsetName" },
-              { name: "Clicks", width: "10%", dataKey: "clicks" },
+              { name: "Spend", width: "10%", dataKey: "spend" },
               { name: "Impressions", width: "12%", dataKey: "impressions" },
-              { name: "Average CPC", width: "12%", dataKey: "cpc" },
-              { name: "CTR", width: "11%", dataKey: "ctr" },
+              { name: "Clicks", width: "10%", dataKey: "clicks" },
+              { name: "Likes", width: "8%", dataKey: "likes" },
+              { name: "Avg CPC", width: "10%", dataKey: "cpc" },
+              { name: "CTR", width: "10%", dataKey: "ctr" },
             ],
           };
         }

@@ -7,6 +7,8 @@ export interface BlogTarget {
   platform: BlogPlatform;
   targetAccountId: string;
   targetAccountName?: string;
+  status?: BlogPostStatus;
+  errorMessage?: string | null;
 }
 
 export interface LinkedInTarget {
@@ -107,4 +109,25 @@ export interface BlogPlatformDetail {
 export interface BlogFetchDetailsResponse {
   success: boolean;
   details: BlogPlatformDetail[];
+}
+
+// ── WordPress ──
+
+export interface ConnectWordPressPayload {
+  siteUrl: string;
+  username: string;
+  applicationPassword: string;
+  siteName?: string;
+}
+
+export interface WordPressTarget {
+  id: string;
+  name: string;
+  type: 'wordpress';
+  url: string;
+}
+
+export interface FetchWordPressTargetsResponse {
+  success: boolean;
+  targets: WordPressTarget[];
 }

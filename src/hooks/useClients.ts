@@ -129,6 +129,14 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
         name = account.customerName || account.descriptiveName || name;
         identifier = account.customerId || identifier;
         break;
+      case 'twitter':
+        name = account.twitterAccount?.name || account.name || name;
+        identifier = account.twitterAccount?.username || account.username || identifier;
+        break;
+      case 'linkedin':
+        name = account.linkedinAccount?.linkedinName || account.linkedinName || name;
+        identifier = account.linkedinAccount?.urn || account.urn || identifier;
+        break;
     }
 
     processedIds.add(uniqueKey);

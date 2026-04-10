@@ -1,6 +1,6 @@
 // Scheduled Posts — Backend-aligned types
 
-export type PostPlatform = 'facebook' | 'instagram' | 'both' | 'twitter';
+export type PostPlatform = 'facebook' | 'instagram' | 'both';
 export type PostStatus = 'PENDING' | 'PROCESSING' | 'PUBLISHED' | 'FAILED';
 export type MediaType = 'IMAGE' | 'VIDEO' | 'CAROUSEL';
 export type PostType = 'FEED' | 'STORY';

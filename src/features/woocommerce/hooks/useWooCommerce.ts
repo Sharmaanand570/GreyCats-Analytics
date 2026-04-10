@@ -32,6 +32,7 @@ import {
 } from "@/api/integrationApi";
 import api from "@/apiConfig";
 import { toast } from "sonner";
+import { format, subDays } from "date-fns";
 
 // Common query options
 const commonQueryOptions = {
@@ -39,46 +40,55 @@ const commonQueryOptions = {
   staleTime: 30 * 1000, // 30 seconds
 };
 
+// Helper – always return last 30 days as ISO date strings
+const getLast30Days = () => ({
+  startDate: format(subDays(new Date(), 30), "yyyy-MM-dd"),
+  endDate: format(new Date(), "yyyy-MM-dd"),
+});
+
 // ============================================================================
 // CURRENT CLIENT-SPECIFIC HOOKS
 // ============================================================================
 
 // 1. Analytics/Summary Hook
-export const useWooCommerceAnalytics = (clientId: number) => {
+export const useWooCommerceAnalytics = (clientId: number, accountId?: number | null, hasAssignment: boolean = true, startDate?: string, endDate?: string) => {
+  const dates = getLast30Days();
   return useQuery<WooCommerceAnalyticsResponse>({
-    queryKey: ["woocommerce-analytics", clientId],
-    queryFn: () => getWooCommerceAnalytics(clientId),
-    enabled: !!clientId,
+    queryKey: ["woocommerce-analytics", clientId, accountId, dates.startDate, dates.endDate],
+    queryFn: () => getWooCommerceAnalytics(clientId, accountId, startDate ?? dates.startDate, endDate ?? dates.endDate),
+    enabled: !!clientId && (hasAssignment || !!accountId),
     ...commonQueryOptions,
   });
 };
 
 // 2. Products Hook
-export const useWooCommerceProducts = (clientId: number) => {
+export const useWooCommerceProducts = (clientId: number, accountId?: number | null, enabled: boolean = true) => {
   return useQuery<WooCommerceProductsResponse>({
-    queryKey: ["woocommerce-products", clientId],
-    queryFn: () => getWooCommerceProducts(clientId),
-    enabled: !!clientId,
+    queryKey: ["woocommerce-products", clientId, accountId],
+    queryFn: () => getWooCommerceProducts(clientId, accountId),
+    enabled: !!clientId && (enabled || !!accountId),
     ...commonQueryOptions,
   });
 };
 
 // 3. Orders Hook
-export const useWooCommerceOrders = (clientId: number) => {
+export const useWooCommerceOrders = (clientId: number, accountId?: number | null, enabled: boolean = true, startDate?: string, endDate?: string) => {
+  const dates = getLast30Days();
   return useQuery<WooCommerceOrdersResponse>({
-    queryKey: ["woocommerce-orders", clientId],
-    queryFn: () => getWooCommerceOrders(clientId),
-    enabled: !!clientId,
+    queryKey: ["woocommerce-orders", clientId, accountId, dates.startDate, dates.endDate],
+    queryFn: () => getWooCommerceOrders(clientId, accountId, startDate ?? dates.startDate, endDate ?? dates.endDate),
+    enabled: !!clientId && (enabled || !!accountId),
     ...commonQueryOptions,
   });
 };
 
 // 4. Trends Hook
-export const useWooCommerceTrends = (clientId: number) => {
+export const useWooCommerceTrends = (clientId: number, accountId?: number | null, enabled: boolean = true, startDate?: string, endDate?: string) => {
+  const dates = getLast30Days();
   return useQuery<WooCommerceTrendsResponse>({
-    queryKey: ["woocommerce-trends", clientId],
-    queryFn: () => getWooCommerceTrends(clientId),
-    enabled: !!clientId,
+    queryKey: ["woocommerce-trends", clientId, accountId, dates.startDate, dates.endDate],
+    queryFn: () => getWooCommerceTrends(clientId, accountId, startDate ?? dates.startDate, endDate ?? dates.endDate),
+    enabled: !!clientId && (enabled || !!accountId),
     ...commonQueryOptions,
   });
 };
@@ -105,7 +115,6 @@ export const useAssignWooCommerceAccount = () => {
       assignAccountToClient(clientId, 'woocommerce', accountId),
     onSuccess: () => {
       toast.success('WooCommerce account assigned successfully');
-      // Invalidate relevant queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['woocommerce-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       queryClient.invalidateQueries({ queryKey: ['woocommerce-analytics'] });
@@ -125,7 +134,6 @@ export const useRemoveWooCommerceAccount = () => {
       removeAccountFromClient(clientId, 'woocommerce', accountId),
     onSuccess: () => {
       toast.success('WooCommerce account removed successfully');
-      // Invalidate relevant queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['woocommerce-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       queryClient.invalidateQueries({ queryKey: ['woocommerce-analytics'] });
@@ -137,7 +145,7 @@ export const useRemoveWooCommerceAccount = () => {
 };
 
 // ============================================================================
-// STUB HOOKS (Not yet implemented in backend - returning disabled/empty states)
+// STUB HOOKS
 // ============================================================================
 
 // Connection hook (used in ConnectDataSource.tsx)
@@ -150,7 +158,6 @@ export const useWooCommerceConnect = () => {
       return response.data;
     },
     onSuccess: () => {
-      // Invalidate relevant queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['woocommerce-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['integrations'] });
     },
@@ -160,7 +167,15 @@ export const useWooCommerceConnect = () => {
 // Per-product paginated analytics (used in WooCommerceDetailPage)
 export const useWooCommercePerProductPaginated = (
   clientId: number,
-  params: { accountId: number; page: number; limit: number; sort: string; direction: string } | null
+  params: {
+    accountId: number;
+    page: number;
+    limit: number;
+    sort: string;
+    direction: string;
+    startDate?: string;
+    endDate?: string;
+  } | null
 ) => {
   return useQuery<WooCommercePerProductPaginatedResponse>({
     queryKey: ["woocommerce-per-product-paginated", clientId, params],
@@ -218,7 +233,7 @@ export const useWooCommerceOrder = (clientId: number, orderId: string | null, ac
 export const useWooCommerceSyncProducts = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ accountId }: { accountId: number }) => { // Expect accountId to be passed
+    mutationFn: async ({ accountId }: { accountId: number }) => {
       return syncWooProducts(accountId);
     },
     onSuccess: () => {

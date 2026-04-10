@@ -29,13 +29,13 @@ import {
   Redo2,
   CheckSquare,
 } from 'lucide-react';
-import { FaLinkedin } from 'react-icons/fa6';
+import { FaLinkedin, FaWordpress } from 'react-icons/fa6';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useBlogSchedulerStore } from '@/store/useBlogSchedulerStore';
-import { useLinkedInTargets } from '../hooks/useBlogPosts';
+import { useLinkedInTargets, useWordPressTargets } from '../hooks/useBlogPosts';
 import { useCreateBlogPost } from '../hooks/useCreateBlogPost';
 import { useUpdateBlogPost } from '../hooks/useUpdateBlogPost';
-import type { BlogPost, LinkedInTarget } from '../api/types';
+import type { BlogPost, LinkedInTarget, WordPressTarget } from '../api/types';
 import { toast } from 'sonner';
 
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -157,7 +157,10 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
   const createMutation = useCreateBlogPost();
   const updateMutation = useUpdateBlogPost();
 
-  const { data: linkedinTargets = [], isLoading: targetsLoading, isError: targetsError } = useLinkedInTargets();
+  const { data: linkedinTargets = [], isLoading: linkedinLoading, isError: linkedinError } = useLinkedInTargets();
+  const { data: wordpressTargets = [], isLoading: wpLoading, isError: wpError } = useWordPressTargets();
+  const targetsLoading = linkedinLoading || wpLoading;
+  const targetsError = linkedinError && wpError;
 
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -232,11 +235,11 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
   };
 
   // Platform target management
-  const isTargeted = (targetId: string) =>
-    targets.some((t) => t.targetAccountId === targetId && t.platform === 'linkedin');
+  const isTargeted = (targetId: string, platform: string) =>
+    targets.some((t) => t.targetAccountId === targetId && t.platform === platform);
 
   const toggleTarget = (target: LinkedInTarget) => {
-    if (isTargeted(target.id)) {
+    if (isTargeted(target.id, 'linkedin')) {
       updateDraft({
         targets: targets.filter((t) => !(t.targetAccountId === target.id && t.platform === 'linkedin')),
       });
@@ -246,6 +249,25 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
           ...targets,
           {
             platform: 'linkedin',
+            targetAccountId: target.id,
+            targetAccountName: target.name,
+          },
+        ],
+      });
+    }
+  };
+
+  const toggleWordPressTarget = (target: WordPressTarget) => {
+    if (isTargeted(target.id, 'wordpress')) {
+      updateDraft({
+        targets: targets.filter((t) => !(t.targetAccountId === target.id && t.platform === 'wordpress')),
+      });
+    } else {
+      updateDraft({
+        targets: [
+          ...targets,
+          {
+            platform: 'wordpress',
             targetAccountId: target.id,
             targetAccountName: target.name,
           },
@@ -492,16 +514,17 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
                   Failed to load blog integrations. Please check your connections.
                 </div>
               )}
-              {!targetsLoading && linkedinTargets.length === 0 && !targetsError && (
+              {/* LinkedIn targets */}
+              {!targetsLoading && linkedinTargets.filter((t) => t.type === 'page').length === 0 && wordpressTargets.length === 0 && !targetsError && (
                 <div className="text-center py-6 text-zinc-500 text-sm">
-                  No LinkedIn platforms connected. Connect one in Integrations.
+                  No publishing accounts connected. Connect one in Integrations.
                 </div>
               )}
-              {linkedinTargets.map((target) => {
-                const selected = isTargeted(target.id);
+              {linkedinTargets.filter((t) => t.type === 'page').map((target) => {
+                const selected = isTargeted(target.id, 'linkedin');
 
                 return (
-                  <div key={target.id} className="space-y-2">
+                  <div key={`li-${target.id}`} className="space-y-2">
                     <div
                       onClick={() => toggleTarget(target)}
                       className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
@@ -522,6 +545,48 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
                             selected ? 'bg-white/20' : 'bg-zinc-100 text-zinc-500'
                           }`}>
                             {target.type}
+                          </span>
+                        </p>
+                        <p className={`text-xs truncate ${selected ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                          {target.name}
+                        </p>
+                      </div>
+                      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                        selected ? 'bg-white border-white' : 'border-zinc-300'
+                      }`}>
+                        {selected && <CheckSquare className="w-3.5 h-3.5 text-zinc-900" />}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* WordPress targets */}
+              {wordpressTargets.map((target) => {
+                const selected = isTargeted(target.id, 'wordpress');
+
+                return (
+                  <div key={`wp-${target.id}`} className="space-y-2">
+                    <div
+                      onClick={() => toggleWordPressTarget(target)}
+                      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                        selected
+                          ? 'bg-zinc-900 text-white border-zinc-900 shadow-md'
+                          : 'bg-white border-zinc-200 hover:border-zinc-300 hover:shadow-sm'
+                      }`}
+                    >
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                        selected ? 'bg-white/10' : 'bg-zinc-100'
+                      }`}>
+                        <FaWordpress className={`w-5 h-5 ${selected ? 'text-white' : 'text-[#21759b]'}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-semibold flex items-center gap-2 ${selected ? 'text-white' : 'text-zinc-800'}`}>
+                          WordPress
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
+                            selected ? 'bg-white/20' : 'bg-zinc-100 text-zinc-500'
+                          }`}>
+                            site
                           </span>
                         </p>
                         <p className={`text-xs truncate ${selected ? 'text-zinc-300' : 'text-zinc-500'}`}>

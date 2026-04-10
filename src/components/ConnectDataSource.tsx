@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { IconType } from "react-icons";
-import { SiGoogleanalytics, SiGooglesearchconsole, SiYoutube, SiWoocommerce, SiMeta, SiGoogleads, SiX, SiLinkedin } from "react-icons/si";
+import { SiGoogleanalytics, SiGooglesearchconsole, SiYoutube, SiWoocommerce, SiMeta, SiGoogleads, SiLinkedin } from "react-icons/si";
 import React from "react";
 import { useYouTubeConnect } from "@/features/YouTube/hooks/useYouTubeConnect";
 import { toast } from "sonner";
@@ -22,7 +22,7 @@ import { useWooCommerceConnect } from "@/features/woocommerce/hooks/useWooCommer
 import { useMetaConnect } from "@/features/meta/hooks/useMetaConnect";
 import { useMetaBusinessConnect } from "@/features/meta/hooks/useMetaBusinessData";
 import { useGoogleAdsConnect } from "@/features/googleAds/hooks/useGoogleAds";
-import { useTwitterConnect } from "@/features/twitter/hooks/useTwitter";
+
 import { useLinkedinOrgConnect } from "@/features/linkedin/hooks/useLinkedin";
 import { useQueryClient } from "@tanstack/react-query";
 import { getPlatformConfig } from "@/utils/platformMapping";
@@ -121,12 +121,6 @@ const dataSourceOptions: DataSourceOption[] = [
     color: getPlatformConfig("woo")?.color,
   },
   {
-    id: "twitter",
-    name: "Twitter (X)",
-    icon: SiX,
-    color: getPlatformConfig("twitter")?.color,
-  },
-  {
     id: "linkedin",
     name: "LinkedIn",
     icon: SiLinkedin,
@@ -169,7 +163,6 @@ const [SelectedSource, setSelectedSource] = React.useState<DataSourceOption>({
 meta: useMetaConnect(),
     metaBusiness: useMetaBusinessConnect(),
     googleAds: useGoogleAdsConnect(),
-    twitter: useTwitterConnect(),
     linkedin: useLinkedinOrgConnect(),
   };
 
@@ -180,7 +173,6 @@ meta: useMetaConnect(),
 const connectMeta = mutations.meta.mutateAsync;
   const connectMetaBusiness = mutations.metaBusiness.mutateAsync;
   const connectGoogleAds = mutations.googleAds.mutateAsync;
-  const connectTwitter = mutations.twitter.mutateAsync;
   const connectLinkedin = mutations.linkedin.mutateAsync;
 
   const isConnecting =
@@ -191,7 +183,6 @@ const connectMeta = mutations.meta.mutateAsync;
 mutations.meta.isPending ||
     mutations.metaBusiness.isPending ||
     mutations.googleAds.isPending ||
-    mutations.twitter.isPending ||
     mutations.linkedin.isPending;
 
   const queryClient = useQueryClient();
@@ -448,28 +439,9 @@ mutations.meta.isPending ||
                             : "Failed to connect Google Ads";
                         toast.error(errorMessage);
                       }
-                    } else if (SelectedSource.id === "twitter") {
-                      try {
-                        const response = await connectTwitter();
-                        if (response.success && response.url) {
-                          if (clientId) {
-                            localStorage.setItem("pending_oauth_client_id", clientId.toString());
-                            localStorage.setItem("pending_oauth_integration", "twitter");
-                          }
-                          window.location.href = response.url;
-                        } else {
-                          toast.error("Failed to initiate Twitter connection");
-                        }
-                      } catch (error) {
-                        const errorMessage =
-                          error instanceof Error
-                            ? error.message
-                            : "Failed to connect Twitter";
-                        toast.error(errorMessage);
-                      }
                     } else if (SelectedSource.id === "linkedin") {
                       try {
-                        const response = await connectLinkedin();
+                        const response = await connectLinkedin(clientId);
                         console.log("[LinkedIn connect] response:", response);
                         if (response.success && response.url) {
                           if (clientId) {

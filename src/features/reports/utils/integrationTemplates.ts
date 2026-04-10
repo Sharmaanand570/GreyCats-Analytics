@@ -226,13 +226,6 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
     "google_ads.conversions",
     "google_ads.conv_rate",
   ],
-  "twitter": [
-    "twitter.followers",
-    "twitter.following",
-    "twitter.tweets",
-    "twitter.followers_gained",
-    "twitter.audience_history",
-  ],
   "linkedin": [
     "linkedin.impressions",
     "linkedin.clicks",
@@ -623,13 +616,16 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
         displayName: 'Campaign Name',
         customConfig: {
           columns: [
-            { name: 'Campaign', width: '20%', dataKey: 'campaignName' },
-            { name: 'Ad', width: '20%', dataKey: 'adName' },
-            { name: 'Ad Set', width: '15%', dataKey: 'adsetName' },
+            { name: "Ad Image", width: "10%", dataKey: "thumbnailUrl" },
+            { name: 'Campaign', width: '18%', dataKey: 'campaignName' },
+            { name: 'Ad', width: '12%', dataKey: 'adName' },
+            { name: 'Ad Set', width: '12%', dataKey: 'adsetName' },
+            { name: 'Spend', width: '8%', dataKey: 'spend' },
+            { name: 'Impressions', width: '10%', dataKey: 'impressions' },
             { name: 'Clicks', width: '10%', dataKey: 'clicks' },
-            { name: 'Impressions', width: '12%', dataKey: 'impressions' },
-            { name: 'Average CPC', width: '12%', dataKey: 'cpc' },
-            { name: 'CTR', width: '11%', dataKey: 'ctr' }
+            { name: 'Likes', width: '8%', dataKey: 'likes' },
+            { name: 'Average CPC', width: '10%', dataKey: 'cpc' },
+            { name: 'CTR', width: '12%', dataKey: 'ctr' }
           ]
         }
       },
@@ -744,20 +740,6 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
       { type: 'line_chart', metricKey: 'youtube.views', x: 0, y: 3, w: 12, h: 5, displayName: 'Views Over Time' },
     ]
   },
-
-  // TWITTER (X)
-  'twitter': {
-    widgets: [
-      // Row 1: Line Chart for Audience Growth
-      { type: 'line_chart', metricKey: 'twitter.audience_history', x: 0, y: 0, w: 12, h: 5, displayName: 'Audience Growth History' },
-
-      // Row 2: Summary Metrics
-      { type: 'metric', metricKey: 'twitter.followers', x: 0, y: 5, w: 4, h: 3, displayName: 'Total Followers' },
-      { type: 'metric', metricKey: 'twitter.tweets', x: 4, y: 5, w: 4, h: 3, displayName: 'Tweets Published' },
-      { type: 'metric', metricKey: 'twitter.following', x: 8, y: 5, w: 4, h: 3, displayName: 'Total Following' },
-    ]
-  },
-
 
   // GOOGLE ANALYTICS
   'google-analytics': {

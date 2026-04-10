@@ -137,12 +137,24 @@ export type WooCommerceOrderDetailResponse = {
 
 // 1. Summary (Analytics)
 export const getWooCommerceAnalytics = async (
-  clientId: number
+  clientId: number,
+  accountId?: number | null,
+  startDate?: string,
+  endDate?: string
 ): Promise<WooCommerceAnalyticsResponse> => {
   try {
-    const response = await api.get<WooCommerceAnalyticsResponse>(
-      `/clients/${clientId}/woocommerce/summary`
-    );
+    const url = accountId 
+      ? `/woocommerce/summary` 
+      : `/clients/${clientId}/woocommerce/summary`;
+    
+    const params: any = {};
+    if (accountId) params.accountId = accountId;
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+
+    const response = await api.get<WooCommerceAnalyticsResponse>(url, {
+      params
+    });
     return response.data;
   } catch (error: any) {
     console.error('Error fetching WooCommerce analytics:', error);
@@ -155,12 +167,17 @@ export const getWooCommerceAnalytics = async (
 
 // 2. Products
 export const getWooCommerceProducts = async (
-  clientId: number
+  clientId: number,
+  accountId?: number | null
 ): Promise<WooCommerceProductsResponse> => {
   try {
-    const response = await api.get<WooCommerceProductsResponse>(
-      `/clients/${clientId}/woocommerce/products`
-    );
+    const url = accountId 
+      ? `/woocommerce/products` 
+      : `/clients/${clientId}/woocommerce/products`;
+      
+    const response = await api.get<WooCommerceProductsResponse>(url, {
+      params: accountId ? { accountId } : {}
+    });
     return response.data;
   } catch (error: any) {
     console.error('Error fetching WooCommerce products:', error);
@@ -173,12 +190,24 @@ export const getWooCommerceProducts = async (
 
 // 3. Orders
 export const getWooCommerceOrders = async (
-  clientId: number
+  clientId: number,
+  accountId?: number | null,
+  startDate?: string,
+  endDate?: string
 ): Promise<WooCommerceOrdersResponse> => {
   try {
-    const response = await api.get<WooCommerceOrdersResponse>(
-      `/clients/${clientId}/woocommerce/orders`
-    );
+    const url = accountId 
+      ? `/woocommerce/orders` 
+      : `/clients/${clientId}/woocommerce/orders`;
+    
+    const params: any = {};
+    if (accountId) params.accountId = accountId;
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+
+    const response = await api.get<WooCommerceOrdersResponse>(url, {
+      params
+    });
     return response.data;
   } catch (error: any) {
     console.error('Error fetching WooCommerce orders:', error);
@@ -191,12 +220,24 @@ export const getWooCommerceOrders = async (
 
 // 4. Trends
 export const getWooCommerceTrends = async (
-  clientId: number
+  clientId: number,
+  accountId?: number | null,
+  startDate?: string,
+  endDate?: string
 ): Promise<WooCommerceTrendsResponse> => {
   try {
-    const response = await api.get<WooCommerceTrendsResponse>(
-      `/clients/${clientId}/woocommerce/trends`
-    );
+    const url = accountId 
+      ? `/woocommerce/trends` 
+      : `/clients/${clientId}/woocommerce/trends`;
+      
+    const params: any = {};
+    if (accountId) params.accountId = accountId;
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+
+    const response = await api.get<WooCommerceTrendsResponse>(url, {
+      params
+    });
     return response.data;
   } catch (error: any) {
     console.error('Error fetching WooCommerce trends:', error);
@@ -214,7 +255,15 @@ export const getWooCommerceTrends = async (
 // Per-product paginated analytics
 export const getWooCommercePerProductPaginated = async (
   _clientId: number, // kept for signature compatibility, unused by backend endpoint
-  params: { accountId: number; page: number; limit: number; sort: string; direction: string } | null
+  params: { 
+    accountId: number; 
+    page: number; 
+    limit: number; 
+    sort: string; 
+    direction: string;
+    startDate?: string;
+    endDate?: string;
+  } | null
 ): Promise<WooCommercePerProductPaginatedResponse> => {
   if (!params) return { success: true, products: [], page: 1, limit: 10, total: 0, totalPages: 0 };
 

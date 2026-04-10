@@ -16,7 +16,6 @@ import {
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
-  BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import {
@@ -268,62 +267,65 @@ function GoogleConsoleDetailPage() {
     <div className="w-full h-full flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
       <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
         <div className="w-full h-full flex flex-col">
-          {/* Header */}
-          <div className="w-full h-[4.8em] border-b flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-5 py-3 lg:py-0">
-            <div className="flex items-center gap-3">
-              <FaGoogle className="text-2xl text-[#4285F4]" />
-              <span className="font-medium text-xl">
-                Google Search Console Overview
-              </span>
+          {/* --- 1. Top Navigation Bar --- */}
+          <div className="w-full border-b flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-8 py-6 bg-white/80 backdrop-blur-md sticky top-0 z-20 border-slate-200/60 shadow-sm rounded-t-[32px] mb-6">
+            <div className="flex flex-col gap-2 relative">
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink onClick={() => navigate(-1)} className="cursor-pointer text-slate-500 hover:text-slate-800 transition-colors font-medium">Data Sources</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator className="text-slate-300" />
+                  <BreadcrumbItem>
+                    <span className="bg-zinc-100 text-zinc-900 px-2 py-0.5 rounded-md font-bold text-sm tracking-wide">Search Console</span>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
+              
+              <div className="flex items-center gap-5">
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-zinc-800 blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
+                  <div className="relative p-3.5 bg-gradient-to-br from-zinc-800 to-zinc-950 rounded-2xl shadow-xl shadow-zinc-900/10 ring-1 ring-white/20 flex items-center justify-center">
+                     <FaGoogle className="w-8 h-8 text-white" />
+                  </div>
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight text-slate-900">Google Search Console</h1>
+                  <p className="text-sm text-slate-500 mt-1 font-medium">Search performance and SEO</p>
+                </div>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {clients && clients.length > 0 && (
-                <Select
-                  value={selectedClientId?.toString() || ""}
-                  onValueChange={handleClientChange}
-                >
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Select Client" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id.toString()}>
-                        {client.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+
+            <div className="flex flex-wrap items-center gap-4">
               <DataSyncBanner compact={true} />
+              <div className="w-[280px]">
+                {clients && clients.length > 0 && (
+                  <Select value={selectedClientId?.toString() || ""} onValueChange={handleClientChange}>
+                    <SelectTrigger className="h-10 bg-white border-slate-200 shadow-sm rounded-xl transition-all focus:ring-slate-200 font-medium text-slate-700">
+                      <SelectValue placeholder="Select Client Account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-zinc-800" />
+                            {client.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
               <Button
                 variant="destructive"
-                size="sm"
+                className="h-10 rounded-xl px-4 shadow-sm"
                 onClick={handleDisconnect}
                 isLoading={removeAccount.isPending}
               >
                 Disconnect
               </Button>
             </div>
-          </div>
-
-          {/* Breadcrumb */}
-          <div className="w-full px-5 pt-4">
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink
-                    onClick={() => navigate(-1)}
-                    className="cursor-pointer"
-                  >
-                    Data Sources
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>Google Search Console</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
           </div>
 
           <div className="w-full px-5 py-6 space-y-6">

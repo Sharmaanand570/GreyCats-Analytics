@@ -1,6 +1,4 @@
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 type RevenueDataPoint = {
@@ -28,7 +26,7 @@ export function WooCommerceRevenueChart({
   data = defaultData,
   isLoading = false,
 }: WooCommerceRevenueChartProps) {
-  const [timeRange, setTimeRange] = useState("7");
+
 
   if (isLoading) {
     return (
@@ -54,16 +52,7 @@ export function WooCommerceRevenueChart({
               Financial trajectory over time
             </CardDescription>
           </div>
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-[140px] h-9">
-              <SelectValue placeholder="Last 7 Days" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Last 7 Days</SelectItem>
-              <SelectItem value="30">Last 30 Days</SelectItem>
-              <SelectItem value="90">Last 90 Days</SelectItem>
-            </SelectContent>
-          </Select>
+
         </div>
       </CardHeader>
       <CardContent>

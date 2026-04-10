@@ -1,6 +1,7 @@
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
+import { ArrowUp, ArrowDown } from "lucide-react";
 import type { TableWidgetData } from "../widgetTypes";
 
 // Constants from original file
@@ -55,20 +56,26 @@ const META_ADS_CAMPAIGN_COLUMNS = [
     { value: "campaignName", label: "Campaign" },
     { value: "adName", label: "Ad" },
     { value: "adsetName", label: "Ad Set" },
+    { value: "spend", label: "Spend" },
+    { value: "thumbnailUrl", label: "Ad Image" },
     { value: "clicks", label: "Clicks" },
     { value: "impressions", label: "Impressions" },
+    { value: "likes", label: "Likes" },
     { value: "cpc", label: "Average CPC" },
     { value: "ctr", label: "CTR" },
 ];
 
 export const DEFAULT_META_ADS_CAMPAIGN_COLUMNS = [
-    { name: 'Campaign', width: '20%', dataKey: 'campaignName' },
-    { name: 'Ad', width: '20%', dataKey: 'adName' },
-    { name: 'Ad Set', width: '15%', dataKey: 'adsetName' },
-    { name: 'Clicks', width: '10%', dataKey: 'clicks' },
-    { name: 'Impressions', width: '12%', dataKey: 'impressions' },
-    { name: 'Average CPC', width: '12%', dataKey: 'cpc' },
-    { name: 'CTR', width: '11%', dataKey: 'ctr' }
+    { name: "Ad Image", width: "10%", dataKey: "thumbnailUrl" },
+    { name: "Campaign", width: "18%", dataKey: "campaignName" },
+    { name: "Ad", width: "12%", dataKey: "adName" },
+    { name: "Ad Set", width: "12%", dataKey: "adsetName" },
+    { name: "Spend", width: "8%", dataKey: "spend" },
+    { name: "Impressions", width: "10%", dataKey: "impressions" },
+    { name: "Clicks", width: "10%", dataKey: "clicks" },
+    { name: "Likes", width: "8%", dataKey: "likes" },
+    { name: "Average CPC", width: "10%", dataKey: "cpc" },
+    { name: "CTR", width: "12%", dataKey: "ctr" },
 ];
 
 const GOOGLE_ADS_CAMPAIGN_COLUMNS = [
@@ -114,12 +121,14 @@ export const DEFAULT_GSC_TOP_QUERIES_COLUMNS = [
 interface TableGeneralTabProps {
     data?: TableWidgetData;
     onChange: (updates: Partial<TableWidgetData>) => void;
+    onColumnsChange?: (updates: Partial<TableWidgetData>) => void;
     metricKey?: string;
 }
 
 export function TableGeneralTab({
     data,
     onChange,
+    onColumnsChange,
     metricKey,
 }: TableGeneralTabProps) {
     const isRecentPosts = metricKey === 'meta.facebook.recent_posts';
@@ -149,7 +158,8 @@ export function TableGeneralTab({
                 name: `Column ${columns.length + 1}`,
                 width: "",
             };
-            onChange({ columns: [...columns, newColumn] });
+            const update = { columns: [...columns, newColumn] };
+            (onColumnsChange || onChange)(update);
             return;
         }
 
@@ -157,12 +167,22 @@ export function TableGeneralTab({
             name: "New Column",
             width: "",
         };
-        onChange({ columns: [...columns, newColumn] });
+        (onColumnsChange || onChange)({ columns: [...columns, newColumn] });
     };
 
     const removeColumn = (index: number) => {
         const nextColumns = columns.filter((_, i) => i !== index);
-        onChange({ columns: nextColumns });
+        (onColumnsChange || onChange)({ columns: nextColumns });
+    };
+
+    const moveColumn = (index: number, direction: "up" | "down") => {
+        const nextIndex = direction === "up" ? index - 1 : index + 1;
+        if (nextIndex < 0 || nextIndex >= columns.length) return;
+
+        const nextColumns = [...columns];
+        const [removed] = nextColumns.splice(index, 1);
+        nextColumns.splice(nextIndex, 0, removed);
+        (onColumnsChange || onChange)({ columns: nextColumns });
     };
 
     const addRecentPostColumn = (fieldValue: string, fieldLabel: string) => {
@@ -171,7 +191,7 @@ export function TableGeneralTab({
             dataKey: fieldValue,
             width: "",
         };
-        onChange({ columns: [...columns, newColumn] });
+        (onColumnsChange || onChange)({ columns: [...columns, newColumn] });
     };
 
     return (
@@ -312,13 +332,33 @@ export function TableGeneralTab({
                                 <span className="text-[11px] font-medium text-gray-700">
                                     {isRecentPosts ? `Column: ${col.name}` : `Column ${index + 1}`}
                                 </span>
-                                <button
-                                    type="button"
-                                    className="text-[11px] text-red-500 hover:text-red-700"
-                                    onClick={() => removeColumn(index)}
-                                >
-                                    Remove
-                                </button>
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        type="button"
+                                        className="p-1 text-gray-500 hover:text-blue-600 disabled:opacity-30"
+                                        onClick={() => moveColumn(index, "up")}
+                                        disabled={index === 0}
+                                        title="Move Up"
+                                    >
+                                        <ArrowUp size={12} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="p-1 text-gray-500 hover:text-blue-600 disabled:opacity-30"
+                                        onClick={() => moveColumn(index, "down")}
+                                        disabled={index === columns.length - 1}
+                                        title="Move Down"
+                                    >
+                                        <ArrowDown size={12} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="ml-2 text-[11px] text-red-500 hover:text-red-700"
+                                        onClick={() => removeColumn(index)}
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>

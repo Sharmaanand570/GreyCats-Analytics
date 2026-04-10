@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
-import { listBlogPosts, getBlogPost, getBlogIntegrations, fetchPlatformDetails, getLinkedInTargets } from '../api/blogPostsApi';
-import type { BlogPostStatus } from '../api/types';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { listBlogPosts, getBlogPost, getBlogIntegrations, fetchPlatformDetails, getLinkedInTargets, connectWordPress, getWordPressTargets } from '../api/blogPostsApi';
+import type { BlogPostStatus, ConnectWordPressPayload } from '../api/types';
 
 export const blogPostKeys = {
   all: ['blog-posts'] as const,
@@ -13,6 +13,7 @@ export const blogPostKeys = {
   linkedinTargets: () => ['blog-linkedin-targets'] as const,
   platformDetails: (platform: string, accountId: string) =>
     ['blog-platform-details', platform, accountId] as const,
+  wordpressTargets: () => ['blog-wordpress-targets'] as const,
 };
 
 export const useBlogPosts = (clientId?: number, status?: BlogPostStatus) => {
@@ -56,5 +57,24 @@ export const usePlatformDetails = (platform: string, accountId: string) => {
     queryFn: () => fetchPlatformDetails(platform, accountId),
     enabled: !!platform && !!accountId,
     staleTime: 60_000,
+  });
+};
+
+export const useWordPressTargets = () => {
+  return useQuery({
+    queryKey: blogPostKeys.wordpressTargets(),
+    queryFn: getWordPressTargets,
+    staleTime: 60_000,
+  });
+};
+
+export const useConnectWordPress = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ConnectWordPressPayload) => connectWordPress(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: blogPostKeys.wordpressTargets() });
+      queryClient.invalidateQueries({ queryKey: blogPostKeys.integrations() });
+    },
   });
 };

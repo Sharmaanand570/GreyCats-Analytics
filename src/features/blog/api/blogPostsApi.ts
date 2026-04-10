@@ -15,6 +15,9 @@ import type {
   BlogPlatformDetail,
   FetchLinkedInTargetsResponse,
   LinkedInTarget,
+  ConnectWordPressPayload,
+  WordPressTarget,
+  FetchWordPressTargetsResponse,
 } from './types';
 
 type ApiError = { message?: string; error?: string };
@@ -220,5 +223,43 @@ export const fetchPlatformDetails = async (
     return response.data.details;
   } catch (error) {
     throw new Error(extractError(error, 'Failed to fetch platform details'));
+  }
+};
+
+/**
+ * Connect a WordPress site via Application Password.
+ * POST /api/blog-posts/integrations/wordpress
+ */
+export const connectWordPress = async (
+  payload: ConnectWordPressPayload
+): Promise<void> => {
+  try {
+    const response = await api.post<{ success?: boolean; message?: string; error?: string }>(
+      '/blog-posts/integrations/wordpress',
+      payload
+    );
+    const data = response.data as any;
+    if (data.success === false || data.error) {
+      throw new Error(data.message || data.error || 'Failed to connect WordPress');
+    }
+  } catch (error) {
+    throw new Error(extractError(error, 'Failed to connect WordPress site'));
+  }
+};
+
+/**
+ * Fetch connected WordPress targets (sites).
+ * GET /api/blog-posts/targets/wordpress
+ */
+export const getWordPressTargets = async (): Promise<WordPressTarget[]> => {
+  try {
+    const response = await api.get<FetchWordPressTargetsResponse>('/blog-posts/targets/wordpress');
+    const data = response.data as any;
+    if (data.success === false || data.error) {
+      throw new Error(data.message || data.error || 'Failed to fetch WordPress targets');
+    }
+    return response.data.targets;
+  } catch (error) {
+    throw new Error(extractError(error, 'Failed to fetch WordPress targets'));
   }
 };

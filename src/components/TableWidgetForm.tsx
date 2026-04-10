@@ -44,7 +44,7 @@ function TableWidgetForm({
     }
   }, [data, id]);
 
-  // Debounced update to parent
+  // Debounced update to parent — only for text fields (title, caption, colors)
   React.useEffect(() => {
     if (JSON.stringify(localData) === JSON.stringify(data)) return;
 
@@ -57,6 +57,16 @@ function TableWidgetForm({
     return () => clearTimeout(timer);
   }, [localData, onChange, data]);
 
+  // Immediate update — for column add/remove (structural changes)
+  const handleChangeImmediate = (updates: Partial<TableWidgetData>) => {
+    const newData = { ...localData, ...updates } as TableWidgetData;
+    setLocalData(newData);
+    if (onChange) {
+      onChange(newData);
+    }
+  };
+
+  // Debounced update — for text fields (title, caption, colors)
   const handleChange = (updates: Partial<TableWidgetData>) => {
     setLocalData((prev) => ({ ...prev, ...updates } as TableWidgetData));
   };
@@ -114,6 +124,7 @@ function TableWidgetForm({
               <TableGeneralTab
                 data={localData}
                 onChange={handleChange}
+                onColumnsChange={handleChangeImmediate}
                 metricKey={metricKey}
               />
             </TabsContent>

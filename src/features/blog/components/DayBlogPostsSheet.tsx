@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { format, parseISO } from 'date-fns';
-import { Pencil, Trash2, Plus, AlertCircle, ExternalLink, FileText } from 'lucide-react';
+import { Pencil, Trash2, Plus, AlertCircle, ExternalLink, FileText, Loader2 } from 'lucide-react';
 import { FaWordpress, FaLinkedin, FaReddit } from 'react-icons/fa6';
 import { SiBlogger } from 'react-icons/si';
 import { BlogPostStatusBadge } from './BlogPostStatusBadge';
@@ -24,6 +24,7 @@ interface DayBlogPostsSheetProps {
   onNewPost: () => void;
   onStatusClick?: (status: BlogPostStatus) => void;
   isPast?: boolean;
+  isDeleting?: boolean;
 }
 
 export function DayBlogPostsSheet({
@@ -36,6 +37,7 @@ export function DayBlogPostsSheet({
   onNewPost,
   onStatusClick,
   isPast = false,
+  isDeleting = false,
 }: DayBlogPostsSheetProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -134,7 +136,12 @@ export function DayBlogPostsSheet({
                   {/* Actions */}
                   <div className="flex items-center justify-between pt-2 border-t border-zinc-100 mt-0.5">
                     <div className="flex items-center gap-2">
-                      {post.status === 'PUBLISHED' && post.publishedUrls && post.publishedUrls.length > 0 && (
+                      {post.targets.some(t => t.status === 'FAILED' && t.errorMessage === 'Post was deleted on LinkedIn') ? (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-md">
+                          <AlertCircle className="w-2.5 h-2.5" />
+                          Removed from LinkedIn
+                        </span>
+                      ) : post.status === 'PUBLISHED' && post.publishedUrls && post.publishedUrls.length > 0 ? (
                         <a
                           href={post.publishedUrls[0]}
                           target="_blank"
@@ -144,7 +151,7 @@ export function DayBlogPostsSheet({
                           View Post
                           <ExternalLink className="w-2.5 h-2.5" />
                         </a>
-                      )}
+                      ) : null}
                     </div>
                     <div className="flex items-center gap-1.5">
                       {post.status === 'PENDING' && (
@@ -163,8 +170,9 @@ export function DayBlogPostsSheet({
                         size="sm"
                         className="h-8 px-3 text-xs font-semibold text-red-500 hover:text-red-700 hover:bg-red-50 gap-1.5 rounded-lg"
                         onClick={() => onDelete(post)}
+                        disabled={isDeleting}
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                         Delete
                       </Button>
                     </div>

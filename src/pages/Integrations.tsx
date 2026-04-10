@@ -280,7 +280,7 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
 
       // Append Client ID for dynamic routes
       // List of platforms that support /:clientId
-      const dynamicPlatforms = ['google-analytics', 'google-console', 'youtube', 'meta-ads', 'google-ads', 'meta-business', 'meta-facebook', 'meta-instagram', 'twitter'];
+      const dynamicPlatforms = ['google-analytics', 'google-console', 'youtube', 'meta-ads', 'google-ads', 'meta-business', 'meta-facebook', 'meta-instagram'];
       if (clientId && dynamicPlatforms.includes(platformKey) && !link.endsWith(`/${clientId}`)) {
         link = `${link}/${clientId}`;
       }

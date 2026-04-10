@@ -1,7 +1,7 @@
 "use client";
 
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SiMeta } from "react-icons/si";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
@@ -28,6 +28,8 @@ import {
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { useMetaAdsMeta, useMetaAdsSummary, useMetaAdsCampaigns, useMetaAdsTrends } from "@/features/meta/hooks/useMetaAdsData";
 import { useClients } from "@/hooks/useClients";
+import { DataSyncBanner } from "@/components/DataSyncBanner";
+import { AlertCircle, RefreshCw } from "lucide-react";
 
 // --- Components ---
 
@@ -116,6 +118,27 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
+const ErrorState = ({ title, message, onRetry, className }: any) => (
+  <div className={`flex flex-col items-center justify-center p-8 bg-white border border-dashed border-slate-200 rounded-2xl text-center shadow-sm ${className}`}>
+    <div className="w-12 h-12 bg-rose-50 rounded-full flex items-center justify-center mb-4 transition-transform group-hover:scale-110">
+      <AlertCircle className="w-6 h-6 text-rose-500" />
+    </div>
+    <h3 className="text-slate-900 font-semibold mb-1">{title || "Sync Issue Detected"}</h3>
+    <p className="text-slate-500 text-sm max-w-md mb-6 leading-relaxed">
+      {message || "We encountered an error while fetching this data from Meta. This might be temporary."}
+    </p>
+    <Button 
+      variant="outline" 
+      size="sm" 
+      onClick={onRetry}
+      className="gap-2 border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm"
+    >
+      <RefreshCw className="w-3.5 h-3.5" />
+      Retry Fetch
+    </Button>
+  </div>
+);
+
 // --- Main Page ---
 
 function MetaDetailPage() {
@@ -142,10 +165,37 @@ function MetaDetailPage() {
     endDate: date?.to ? format(date.to, "yyyy-MM-dd") : undefined,
   };
 
-  const { data: metaData, isLoading: isLoadingMeta } = useMetaAdsMeta(selectedClientId || 0, apiParams);
-  const { data: summaryData, isLoading: isLoadingSummary } = useMetaAdsSummary(selectedClientId || 0, apiParams);
-  const { data: campaignsData, isLoading: isLoadingCampaigns } = useMetaAdsCampaigns(selectedClientId || 0, apiParams);
-  const { data: trendsData, isLoading: isLoadingTrends } = useMetaAdsTrends(selectedClientId || 0, apiParams);
+  const { 
+    data: metaData, 
+    isLoading: isLoadingMeta, 
+    isError: isErrorMeta, 
+    error: errorMeta,
+    refetch: refetchMeta
+  } = useMetaAdsMeta(selectedClientId || 0, apiParams);
+  
+  const { 
+    data: summaryData, 
+    isLoading: isLoadingSummary, 
+    isError: isErrorSummary, 
+    error: errorSummary,
+    refetch: refetchSummary
+  } = useMetaAdsSummary(selectedClientId || 0, apiParams);
+  
+  const { 
+    data: campaignsData, 
+    isLoading: isLoadingCampaigns, 
+    isError: isErrorCampaigns, 
+    error: errorCampaigns,
+    refetch: refetchCampaigns
+  } = useMetaAdsCampaigns(selectedClientId || 0, apiParams);
+  
+  const { 
+    data: trendsData, 
+    isLoading: isLoadingTrends, 
+    isError: isErrorTrends, 
+    error: errorTrends,
+    refetch: refetchTrends
+  } = useMetaAdsTrends(selectedClientId || 0, apiParams);
 
   const campaigns = summaryData?.campaigns || [];
   const allCampaigns = campaignsData?.campaigns || [];
@@ -153,12 +203,43 @@ function MetaDetailPage() {
   const meta = metaData?.summary;
   const accountName = metaData?.accountName || "Meta Ads Account";
 
+  // DEBUG: Console the Meta Ads response for verification
+  useEffect(() => {
+    if (isLoadingMeta || isLoadingSummary || isLoadingCampaigns || isLoadingTrends) {
+      console.log("META_ADS_LOADING_STATE:", { 
+        isLoadingMeta, 
+        isLoadingSummary, 
+        isLoadingCampaigns, 
+        isLoadingTrends,
+        selectedClientId,
+        apiParams
+      });
+    }
+    
+    if (metaData) console.log("META_ADS_META_RESPONSE:", metaData);
+    if (summaryData) console.log("META_ADS_SUMMARY_RESPONSE:", summaryData);
+    
+    if (allCampaigns && allCampaigns.length > 0) {
+      console.log("META_ADS_CAMPAIGNS_TABLE_RESPONSE:", allCampaigns);
+    }
+  }, [allCampaigns, isLoadingMeta, isLoadingSummary, isLoadingCampaigns, isLoadingTrends, metaData, summaryData, selectedClientId, apiParams]);
+
   // Use meta summary if available, otherwise calculate from campaigns
   const totalSpend = meta?.spend || campaigns.reduce((sum: number, c: any) => sum + c.spend, 0);
   const totalImpressions = meta?.impressions || campaigns.reduce((sum: number, c: any) => sum + c.impressions, 0);
   const totalClicks = meta?.clicks || campaigns.reduce((sum: number, c: any) => sum + c.clicks, 0);
   const avgCTR = meta?.ctr || (totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0);
   const avgCPM = meta?.cpm || 0;
+
+  // Check for "No Meta Ads account assigned to this client." error
+  const getAxiosErrorMsg = (err: any) => err?.response?.data?.message || err?.message;
+  
+  const anyErrorMsg = getAxiosErrorMsg(errorMeta) || 
+                      getAxiosErrorMsg(errorSummary) || 
+                      getAxiosErrorMsg(errorCampaigns) || 
+                      getAxiosErrorMsg(errorTrends);
+
+  const isNoAccountAssigned = anyErrorMsg === "No Meta Ads account assigned to this client.";
 
   return (
     <div className="flex flex-col h-screen bg-slate-50">
@@ -177,7 +258,7 @@ function MetaDetailPage() {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="text-slate-300" />
                 <BreadcrumbItem>
-                  <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md font-medium text-sm">Meta Ads</span>
+                  <span className="bg-zinc-100 text-zinc-900 px-2 py-0.5 rounded-md font-bold text-sm tracking-wide">Meta Ads</span>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
@@ -193,8 +274,8 @@ function MetaDetailPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex items-center gap-5">
               <div className="relative group">
-                <div className="absolute inset-0 bg-blue-500 blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
-                <div className="relative p-3.5 bg-gradient-to-br from-[#1877F2] to-[#0d65d9] rounded-2xl shadow-xl shadow-blue-500/10 ring-1 ring-white/20">
+                <div className="absolute inset-0 bg-zinc-800 blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
+                <div className="relative p-3.5 bg-gradient-to-br from-zinc-800 to-zinc-950 rounded-2xl shadow-xl shadow-zinc-900/10 ring-1 ring-white/20">
                   <SiMeta className="w-8 h-8 text-white" />
                 </div>
               </div>
@@ -208,9 +289,9 @@ function MetaDetailPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4 overflow-x-auto pb-2 md:pb-0">
+              <DataSyncBanner compact={true} />
               <DateRangePicker value={date} onChange={setDate} />
-
 
               {/* Client Selector */}
               <Select value={selectedClientId?.toString()} onValueChange={(v: string) => setSelectedClientId(Number(v))}>
@@ -231,6 +312,24 @@ function MetaDetailPage() {
       </div>
 
       {/* Main Content */}
+      {isNoAccountAssigned ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50">
+          <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-6 border-8 border-white shadow-sm transition-transform hover:scale-105">
+            <SiMeta className="w-10 h-10 text-slate-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-3 tracking-tight">No Meta Ads Account Connected</h2>
+          <p className="text-slate-500 max-w-md mx-auto mb-8 text-[15px] leading-relaxed">
+            There is no Meta Ads account currently assigned to this client. Please connect an account to start viewing advertising analytics and campaign performance.
+          </p>
+          <Button 
+            onClick={() => navigate('/integrations')}
+            className="bg-zinc-900 hover:bg-zinc-800 text-white shadow-lg shadow-zinc-900/25 px-8 h-12 rounded-xl font-bold transition-all hover:-translate-y-0.5 flex items-center gap-2"
+          >
+            <SiMeta className="w-4 h-4" />
+            Connect Meta Ads
+          </Button>
+        </div>
+      ) : (
       <div className="flex-1 overflow-auto custom-scrollbar">
         <div className="max-w-[1600px] mx-auto p-6 space-y-8">
 
@@ -240,6 +339,16 @@ function MetaDetailPage() {
               <>
                 {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-[140px] rounded-2xl bg-slate-100" />)}
               </>
+            ) : (isErrorMeta || isErrorSummary) ? (
+              <ErrorState 
+                title="Metrics Unavailable"
+                message={((errorMeta as any)?.message || (errorSummary as any)?.message || "Failed to load summary stats.")}
+                onRetry={() => {
+                  refetchMeta();
+                  refetchSummary();
+                }}
+                className="col-span-full"
+              />
             ) : (
               <>
                 <MetricCard
@@ -293,6 +402,13 @@ function MetaDetailPage() {
             <CardContent className="p-6">
               {isLoadingTrends ? (
                 <Skeleton className="h-96 w-full rounded-xl bg-slate-50" />
+              ) : isErrorTrends ? (
+                <ErrorState 
+                  title="Trend Chart Unavailable"
+                  message={(errorTrends as any)?.message}
+                  onRetry={() => refetchTrends()}
+                  className="h-96 border-none shadow-none"
+                />
               ) : trends.length > 0 ? (
                 <div className="w-full h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -396,6 +512,15 @@ function MetaDetailPage() {
                 <div className="p-6 space-y-4">
                   {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
                 </div>
+              ) : isErrorCampaigns ? (
+                <div className="p-12">
+                  <ErrorState 
+                    title="Campaign Data Unavailable"
+                    message={(errorCampaigns as any)?.message}
+                    onRetry={() => refetchCampaigns()}
+                    className="border-none shadow-none"
+                  />
+                </div>
               ) : allCampaigns.length > 0 ? (
                 <div className="overflow-x-auto">
                   <Table>
@@ -407,6 +532,7 @@ function MetaDetailPage() {
                         <TableHead className="font-semibold text-slate-500 text-right h-12">Spend</TableHead>
                         <TableHead className="font-semibold text-slate-500 text-right h-12">Impressions</TableHead>
                         <TableHead className="font-semibold text-slate-500 text-right h-12">Clicks</TableHead>
+                        <TableHead className="font-semibold text-slate-500 text-right h-12">Likes</TableHead>
                         <TableHead className="font-semibold text-slate-500 text-right h-12">CTR</TableHead>
                         <TableHead className="font-semibold text-slate-500 text-right pr-6 h-12">CPC</TableHead>
                         <TableHead className="w-[50px] h-12"></TableHead>
@@ -432,6 +558,7 @@ function MetaDetailPage() {
                           <TableCell className="text-right font-medium text-slate-700 py-4">₹{campaign.spend.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                           <TableCell className="text-right text-slate-600 py-4">{campaign.impressions.toLocaleString('en-IN')}</TableCell>
                           <TableCell className="text-right text-slate-600 py-4">{campaign.clicks.toLocaleString('en-IN')}</TableCell>
+                          <TableCell className="text-right text-slate-600 py-4">{(campaign.likes || 0).toLocaleString('en-IN')}</TableCell>
                           <TableCell className="text-right py-4">
                             <div className="inline-block px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-xs font-semibold">
                               {campaign.ctr.toFixed(2)}%
@@ -461,6 +588,7 @@ function MetaDetailPage() {
           </Card>
         </div>
       </div>
+      )}
     </div>
   );
 }

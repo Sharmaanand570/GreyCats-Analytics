@@ -23,6 +23,13 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { DataSyncBanner } from "@/components/DataSyncBanner";
+import {
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -191,31 +198,46 @@ function MetaBusinessDetailPage() {
             <div className="max-w-[1600px] mx-auto p-6 space-y-8">
 
                 {/* --- 1. Top Navigation Bar --- */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-4 border-b border-border">
-                    <div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                            <span onClick={() => navigate(-1)} className="hover:text-primary cursor-pointer transition-colors">Data Sources</span>
-                            <span className="text-muted-foreground/30">/</span>
-                            <span className="font-medium text-foreground">Meta Business</span>
+                <div className="w-full border-b flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-8 py-6 bg-white/80 backdrop-blur-md sticky top-0 z-20 border-slate-200/60 shadow-sm rounded-t-[32px] -mx-6 -mt-6 mb-6">
+                    <div className="flex flex-col gap-2 relative">
+                        <Breadcrumb>
+                            <BreadcrumbList>
+                                <BreadcrumbItem>
+                                    <BreadcrumbLink onClick={() => navigate('/integrations')} className="cursor-pointer text-slate-500 hover:text-slate-800 transition-colors font-medium">Data Sources</BreadcrumbLink>
+                                </BreadcrumbItem>
+                                <BreadcrumbSeparator className="text-slate-300" />
+                                <BreadcrumbItem>
+                                    <span className="bg-zinc-100 text-zinc-900 px-2 py-0.5 rounded-md font-bold text-sm tracking-wide">Meta Business</span>
+                                </BreadcrumbItem>
+                            </BreadcrumbList>
+                        </Breadcrumb>
+                        
+                        <div className="flex items-center gap-5">
+                            <div className="relative group">
+                                <div className="absolute inset-0 bg-zinc-800 blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
+                                <div className="relative p-3.5 bg-gradient-to-br from-zinc-800 to-zinc-950 rounded-2xl shadow-xl shadow-zinc-900/10 ring-1 ring-white/20">
+                                    <SiMeta className="w-8 h-8 text-white" />
+                                </div>
+                            </div>
+                            <div>
+                                <h1 className="text-3xl font-bold tracking-tight text-slate-900">Meta Business Center</h1>
+                                <p className="text-sm text-slate-500 mt-1 font-medium">Manage Facebook & Instagram</p>
+                            </div>
                         </div>
-                        <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                            <SiMeta className="w-6 h-6 text-primary" />
-                            Meta Business Center
-                        </h1>
                     </div>
 
                     <div className="flex items-center gap-4 md:items-center">
                         <DataSyncBanner compact={true} />
                         <div className="w-full md:w-[320px]">
                             <Select value={selectedClientId?.toString() || ""} onValueChange={(v) => setSelectedClientId(Number(v))}>
-                                <SelectTrigger className="h-10 bg-card border-border shadow-sm transition-all focus:ring-primary/20">
+                                <SelectTrigger className="h-10 bg-white border-slate-200 shadow-sm rounded-xl transition-all focus:ring-slate-200 font-medium text-slate-700">
                                     <SelectValue placeholder="Select Client Account" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {clients?.map((client) => (
-                                        <SelectItem key={client.id} value={client.id.toString()}>
+                                        <SelectItem key={client.id} value={client.id.toString()} className="font-medium cursor-pointer rounded-lg m-1">
                                             <div className="flex items-center gap-2">
-                                                <div className="w-2 h-2 rounded-full bg-primary" />
+                                                <div className="w-2 h-2 rounded-full bg-zinc-800" />
                                                 {client.name}
                                             </div>
                                         </SelectItem>

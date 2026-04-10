@@ -102,6 +102,12 @@ export const buildDashboardMapFromTemplate = (
         chartColor: rawConfig.chartColor || (widgetData as any).chartColor,
         backgroundColor: rawConfig.backgroundColor || (widgetData as any).backgroundColor,
         textColor: rawConfig.textColor || (widgetData as any).textColor,
+        // Preserve table column config from rawConfig when rawWidgetData lacks it
+        ...(Array.isArray(rawConfig.columns) && rawConfig.columns.length > 0 && !Array.isArray((widgetData as any).columns)
+          ? { columns: rawConfig.columns }
+          : {}),
+        ...(rawConfig.title && !(widgetData as any).title ? { title: rawConfig.title } : {}),
+        ...(rawConfig.caption && !(widgetData as any).caption ? { caption: rawConfig.caption } : {}),
       };
     }
     // END FIX
