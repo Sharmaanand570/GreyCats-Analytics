@@ -3,18 +3,27 @@
 export type BlogPlatform = 'wordpress' | 'linkedin' | 'blogger' | 'reddit';
 export type BlogPostStatus = 'PENDING' | 'PROCESSING' | 'PUBLISHED' | 'FAILED';
 
+export interface BlogTargetSettings {
+  categoryId?: number;
+}
+
 export interface BlogTarget {
   platform: BlogPlatform;
   targetAccountId: string;
   targetAccountName?: string;
+  targetSettings?: BlogTargetSettings;
   status?: BlogPostStatus;
   errorMessage?: string | null;
+  metrics?: {
+    comments?: number;
+  };
 }
 
 export interface LinkedInTarget {
   id: string;
   name: string;
   type: 'personal' | 'page';
+  portAccountId?: number;
 }
 
 export interface FetchLinkedInTargetsResponse {
@@ -120,11 +129,19 @@ export interface ConnectWordPressPayload {
   siteName?: string;
 }
 
+export interface WordPressCategory {
+  id: number;
+  name: string;
+  slug: string;
+}
+
 export interface WordPressTarget {
   id: string;
   name: string;
   type: 'wordpress';
   url: string;
+  siteIconUrl?: string;
+  categories?: WordPressCategory[];
 }
 
 export interface FetchWordPressTargetsResponse {

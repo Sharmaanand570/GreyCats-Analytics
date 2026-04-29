@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AxiosError } from "axios";
 import Screenshot from "../../../assets/images/Screenshot.png";
+import Logo from "../../../assets/images/greycats-black-logo.png";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -173,11 +174,10 @@ export default function ForgotPassword() {
             {/* ------------- LEFT AUTH SECTION ------------- */}
             <div className="relative flex flex-col items-center justify-center w-full md:w-1/2 px-6 md:px-16 py-12">
                 {/* Logo */}
-                <div className="absolute top-4 left-6 md:top-6 md:left-10">
-                    <div className="flex items-center space-x-2 text-foreground">
-                        <span className="text-xl font-semibold">⌘</span>
-                        <span className="font-medium">GreyCats</span>
-                    </div>
+                <div className="absolute top-4 left-6 md:top-6 md:left-10 z-10">
+                    <Link to="/" className="flex items-center">
+                        <img src={Logo} alt="GreyCats Logo" className="h-8 w-auto hover:opacity-80 transition-opacity" />
+                    </Link>
                 </div>
 
                 {/* Back to Login only visible on Step 1 */}

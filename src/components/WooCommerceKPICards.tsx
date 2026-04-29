@@ -1,5 +1,6 @@
 import { DollarSign, ShoppingBag, TrendingUp, Store } from "lucide-react";
 import { Card, CardContent } from "./ui/card";
+import { cn } from "@/lib/utils";
 
 type KPICardProps = {
   title: string;
@@ -7,38 +8,48 @@ type KPICardProps = {
   growth: string;
   icon: React.ReactNode;
   subtitle?: string;
+  color?: "blue" | "emerald" | "violet" | "amber" | "rose" | "zinc";
 };
 
-function KPICard({ title, value, growth, icon, subtitle }: KPICardProps) {
+function KPICard({ title, value, growth, icon, subtitle, color = "zinc" }: KPICardProps) {
+  const colorMap: any = {
+    blue: { text: "text-blue-600", bg: "bg-blue-50" },
+    emerald: { text: "text-emerald-600", bg: "bg-emerald-50" },
+    violet: { text: "text-violet-600", bg: "bg-violet-50" },
+    amber: { text: "text-amber-600", bg: "bg-amber-50" },
+    rose: { text: "text-rose-600", bg: "bg-rose-50" },
+    zinc: { text: "text-zinc-600", bg: "bg-zinc-50" },
+  };
+  const c = colorMap[color] || colorMap.zinc;
+
   return (
-    <Card className=" border rounded-2xl">
+    <Card className="rounded-[28px] border-zinc-100 shadow-sm transition-all duration-300 hover:border-zinc-300 hover:bg-zinc-50/30">
       <CardContent className="p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: "#96588A1A" }}>
-                <div style={{ color: "#96588A" }}>
-                  {icon}
-                </div>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 font-medium">{title}</p>
+        <div className="flex justify-between items-start">
+          <div className="space-y-1">
+            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{title}</p>
+            <div className="flex items-baseline gap-2">
+              <h3 className="text-3xl font-black text-zinc-900 tracking-tight">
+                {typeof value === "number" && (title.includes("Revenue") || title.includes("Order Value"))
+                  ? `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                  : typeof value === "number"
+                  ? value.toLocaleString("en-IN")
+                  : value}
+              </h3>
+            </div>
+            {(growth || subtitle) && (
+              <div className="flex items-center gap-2 mt-1">
+                {growth && (
+                   <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">{growth}</span>
+                )}
                 {subtitle && (
-                  <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
+                  <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest opacity-60">View Details</span>
                 )}
               </div>
-            </div>
-            <p className="text-2xl font-bold text-gray-900 mt-2">
-              {typeof value === "number" && (title.includes("Revenue") || title.includes("Order Value"))
-                ? `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                : typeof value === "number"
-                ? value.toLocaleString()
-                : value}
-            </p>
+            )}
           </div>
-          <div className="flex items-center gap-1 text-green-600">
-            <TrendingUp className="w-4 h-4" />
-            <span className="text-sm font-medium">{growth}</span>
+          <div className={cn("p-2.5 rounded-2xl ring-1 ring-zinc-100", c.bg)}>
+            <div className={cn("w-4 h-4", c.text)}>{icon}</div>
           </div>
         </div>
       </CardContent>
@@ -68,33 +79,36 @@ export function WooCommerceKPICards({
   storesGrowth = "+100%",
 }: WooCommerceKPICardsProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
       <KPICard
         title="Total Revenue"
         value={totalRevenue}
         growth={revenueGrowth}
-        icon={<DollarSign className="w-5 h-5" />}
+        icon={<DollarSign />}
+        color="emerald"
       />
       <KPICard
         title="Total Orders"
         value={totalOrders}
         growth={ordersGrowth}
-        icon={<ShoppingBag className="w-5 h-5" />}
+        icon={<ShoppingBag />}
+        color="blue"
       />
       <KPICard
         title="Avg. Order Value"
         value={avgOrderValue}
         growth={aovGrowth}
-        icon={<TrendingUp className="w-5 h-5" />}
+        icon={<TrendingUp />}
+        color="violet"
       />
       <KPICard
         title="Active Stores"
         value={activeStores}
         growth={storesGrowth}
-        icon={<Store className="w-5 h-5" />}
+        icon={<Store />}
+        color="amber"
         subtitle="Connected Accounts"
       />
     </div>
   );
 }
-

@@ -358,6 +358,8 @@ export function useBatchDashboardData(
         total,
         value: total,
         rawCount: payload.rawCount ?? (series.length > 0 ? series.length : 0),
+        privacyThresholdMet: payload.privacyThresholdMet,
+        currentFollowers: payload.currentFollowers,
       };
     });
 

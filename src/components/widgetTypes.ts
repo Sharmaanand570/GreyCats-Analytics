@@ -80,6 +80,9 @@ export interface CustomWidgetData {
   textColor?: string;
   fontSize?: string;
   fontWeight?: string;
+  // For TOC widget: when true, the renderer ignores `content` and builds the
+  // entries from the current slidesMeta list passed via render options.
+  autoPopulate?: boolean;
 }
 
 // Union type for all widget data

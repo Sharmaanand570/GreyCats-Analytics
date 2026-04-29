@@ -20,8 +20,21 @@ interface AlertFormProps {
 }
 
 export const AlertForm: React.FC<AlertFormProps> = ({ clientId, clientName, client, initialData, onSubmit, onCancel, isLoading }) => {
-    // Hooks
-    const { groupedMetrics, isLoading: statsLoading } = useAvailableMetrics(clientId);
+    const connectedIntegrations = React.useMemo(
+        () =>
+            client?.integrations?.map(i => ({
+                platform: i.integrationType,
+                accountId: (i.accountIdentifier && i.accountIdentifier !== 'unknown')
+                    ? i.accountIdentifier
+                    : i.accountId.toString(),
+                accountName: i.accountName,
+            })),
+        [client?.integrations]
+    );
+
+    const { groupedMetrics, isLoading: statsLoading } = useAvailableMetrics(clientId, {
+        connectedIntegrations,
+    });
 
     // State
     const [integration, setIntegration] = useState<string>(initialData?.integration || '');

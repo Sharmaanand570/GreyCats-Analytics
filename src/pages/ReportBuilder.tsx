@@ -127,6 +127,7 @@ import {
   customMetricItems,
   imageWidgetItems,
   embedWidgetItems,
+  prependDefaultSlides,
 } from "@/features/reports/utils/reportBuilderConstants";
 import {
   CURATED_DEFAULTS,
@@ -1240,8 +1241,18 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           INTEGRATION_TEMPLATES[normalizedPlatform.replace(/(meta)(.+)/, '$1-$2')]
         ) : undefined;
 
-        const slideCount = template?.slides?.length || 1;
+        let slideCount = template?.slides?.length || 1;
         const integrationKey = String(integ.id ?? integ.accountId ?? index);
+
+        // Ã°Å¸â€Â§ Handle Meta Business clients who only connected Facebook OR Instagram.
+        // The meta-business template always includes both sub-slides; skip any
+        // the client doesn't actually have connected.
+        const metaExtra = (integ as any).extra || {};
+        const isMetaBusiness = normalizedPlatform === 'meta-business';
+        const hasFacebook = !isMetaBusiness || metaExtra.hasFacebook !== false;
+        const hasInstagram = !isMetaBusiness || Boolean(metaExtra.hasInstagram);
+        // If extra flags are missing (older data), default to both (legacy behavior).
+        const metaFlagsKnown = isMetaBusiness && ('hasFacebook' in metaExtra || 'hasInstagram' in metaExtra);
 
         // Ã°Å¸â€Â DIAGNOSTIC LOG: Track Instagram slide creation
         if (integ.platform?.toLowerCase().includes('instagram')) {
@@ -1268,6 +1279,18 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
               platformKey = "instagram";
             } else {
               platformKey = "facebook";
+            }
+
+            // Skip sub-slides the client doesn't have connected (only when flags known).
+            if (metaFlagsKnown) {
+              if (platformKey === "instagram" && !hasInstagram) {
+                console.log(`[SlideMap] Skipping Instagram slide for ${integ.accountName} (not connected)`);
+                continue;
+              }
+              if (platformKey === "facebook" && !hasFacebook) {
+                console.log(`[SlideMap] Skipping Facebook slide for ${integ.accountName} (not connected)`);
+                continue;
+              }
             }
           } else if (normalizedPlatform === "twitter") {
             platformKey = "twitter";
@@ -2153,8 +2176,12 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           : (w.widgetType || '').includes('metric') ? 'metric'
           : (w.widgetType || '').includes('table') ? 'table'
           : (w.widgetType || '');
-        const key = `${w.metricConfig?.metricKey ?? ''}::${normType}`;
-        if (!key || key === '::') return true; // Keep widgets with no identifying info
+        const mk = w.metricConfig?.metricKey ?? '';
+        // Synthetic layout keys (__layout__.*) and empty metricKeys both indicate
+        // non-metric widgets (image, embed, title, custom). Multiple such widgets
+        // on one slide are intentional — dedup must not collapse them.
+        if (!mk || (typeof mk === 'string' && mk.startsWith('__layout__.'))) return true;
+        const key = `${mk}::${normType}`;
         if (seen.has(key)) {
           console.warn(`[SafeDedup] Removed duplicate widget: ${key} from slide ${sId}`);
           return false;
@@ -2474,6 +2501,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     });
 
     console.log(`Ã¢Å“â€¦ [Hydration] Setting dashboards map with ${map.size} slides:`, Array.from(map.keys()));
+    map.forEach((l, k) => console.log(`[Hydration] setDashboards slide ${k}: ${l.length} widgets`));
     setDashboards(map);
     setIsDashboardsInitialized(true);
     console.log(`Ã¢Å“â€¦ [Hydration] Completed for templateId ${templateId}`);
@@ -3360,7 +3388,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         if (!validSlide) return;
 
         layout.forEach((widget, indexInSlide) => {
-          const metricConfig = widget.metricConfig ?? {
+          const baseMetricConfig = widget.metricConfig ?? {
             id: widget.i,
             metricKey: "",
             integration: "",
@@ -3368,6 +3396,19 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             aggregation: "sum",
             type: widget.widgetType,
           };
+
+          // Clone so save-only transforms (synthetic metricKey below) don't
+          // leak into live widget state.
+          const metricConfig = { ...baseMetricConfig };
+
+          // Non-metric widgets (image, embed, title, custom) share an empty
+          // metricKey, so any backend dedup keyed on (slideId, metricKey, type)
+          // would collapse two image widgets on the same slide into one.
+          // Give each such widget a unique synthetic key derived from its ID.
+          const isNonMetric = !metricConfig.metricKey && !metricConfig.integration;
+          if (isNonMetric) {
+            metricConfig.metricKey = `__layout__.${widget.widgetType}.${widget.i}`;
+          }
 
           const existingFilters = (metricConfig.filters as Record<string, unknown> | undefined) ?? {};
           // Ensure we have a high-quality name for the backend to use as a label
@@ -3633,6 +3674,10 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       };
     }
 
+    // Seed every brand-new template with a Cover slide (logo + heading/subheading)
+    // and a Table of Contents slide that auto-populates from the slide list.
+    payload = prependDefaultSlides(payload, trimmedName, dateRange);
+
     console.log('sending Report Template Payload:', payload);
     const customPageCount = (payload.slidesMeta || []).filter((s: any) => s.source === 'custom').length;
     const integrationPageCount = (payload.slidesMeta || []).filter((s: any) => s.source === 'integration').length;
@@ -3650,18 +3695,27 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     buildTemplatePayloadFromDashboards // Dependency on the WYSIWYG builder
   ]);
 
+  // Aborts the previous in-flight save so a stale (earlier) response can't
+  // clobber state with older data. Combined with the debounced auto-save this
+  // prevents races where a newer widget is lost because PUT#N finished after
+  // PUT#N+1 and its response was applied last.
+  const saveAbortRef = useRef<AbortController | null>(null);
+
   const { mutate: saveTemplate, isPending: isSavingTemplate } = useMutation({
     mutationFn: async (payload: CreateTemplatePayload) => {
       if (!templateId || !parsedClientId) {
         throw new Error("Template not ready or missing client id");
       }
+      saveAbortRef.current?.abort();
+      const controller = new AbortController();
+      saveAbortRef.current = controller;
       console.log(`Ã°Å¸â€™Â¾ [SaveMutation] Sending to API:`, {
         templateId,
         clientId: parsedClientId,
         widgetCount: payload.widgets?.length,
         slideCount: payload.slidesMeta?.length
       });
-      return updateReportTemplate(parsedClientId, templateId, payload);
+      return updateReportTemplate(parsedClientId, templateId, payload, controller.signal);
     },
     onSuccess: (data) => {
       console.log(`Ã¢Å“â€¦ [SaveMutation] Success! Response:`, data);
@@ -3732,7 +3786,12 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       }
     },
     onError: (error: ApiError) => {
-      console.error(`Ã¢ÂÅ’ [SaveMutation] Failed:`, error);
+      const isAbort =
+        (error as any)?.name === "CanceledError" ||
+        (error as any)?.name === "AbortError" ||
+        (error as any)?.code === "ERR_CANCELED";
+      if (isAbort) return;
+      console.error(`[SaveMutation] Failed:`, error);
       toast.error(error.message || "Failed to save template");
     },
   });
@@ -4594,10 +4653,27 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         }
       }
 
+      // Avoid dropping on top of an existing widget (grid has
+      // preventCollision=true + compactType=null, so overlapping drops are
+      // silently rejected — making the new widget appear to vanish).
+      const existingLayout = dashboards.get(id) ?? [];
+      const dropX = widgetType !== "title" ? (layoutItem?.x ?? 0) : 0;
+      let dropY = widgetType !== "title" ? (layoutItem?.y ?? 0) : -1;
+      const collides = (y: number) =>
+        existingLayout.some((ex) =>
+          dropX < ex.x + ex.w &&
+          dropX + w > ex.x &&
+          y < ex.y + ex.h &&
+          y + h > ex.y
+        );
+      if (widgetType !== "title") {
+        while (collides(dropY)) dropY += 1;
+      }
+
       const newItem: DashboardLayout = {
         i: widgetIdentifier,
-        x: widgetType !== "title" ? layoutItem?.x : 0,
-        y: widgetType !== "title" ? layoutItem?.y : -1,
+        x: widgetType !== "title" ? dropX : 0,
+        y: dropY,
         w,
         h,
         widgetType,
@@ -4642,8 +4718,11 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         updated.set(id, [...existingLayout, newItem]);
         return updated;
       });
+
+      setHasUnsavedChanges(true);
+      modifiedSlideIds.current.add(id);
     },
-    [slideIntegrationMap]
+    [slideIntegrationMap, dashboards]
   );
 
   // Layout change helper: used when widgets are moved or resized
@@ -5360,14 +5439,30 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   //   2. Invalid positions: NaN, Infinity, or negative values
   // By doing this once securely outside the render loop, we maintain referential
   // identity of the layout arrays, which stops aggressive WidgetDataWrapper unmounting.
+  // Trace: log dashboards state changes for slide 2 with call stack to find the overwriter
+  const prevSlide2CountRef = useRef<number | null>(null);
+  useEffect(() => {
+    const count = dashboards.get(2)?.length ?? -1;
+    if (prevSlide2CountRef.current !== count) {
+      console.log(`[Trace] dashboards.get(2) count changed: ${prevSlide2CountRef.current} -> ${count}`);
+      console.trace('[Trace] setDashboards(slide 2) stack');
+      prevSlide2CountRef.current = count;
+    }
+  }, [dashboards]);
+
   const sanitizedLayoutsMap = useMemo(() => {
     const sanitizedMap = new Map<number, DashboardLayout[]>();
     
     dashboards.forEach((rawLayout, frontendId) => {
       const seen = new Set<string>();
+      console.log(`[Sanitize] Slide ${frontendId} raw count: ${rawLayout.length}`,
+        rawLayout.map(w => ({ i: w.i, type: w.widgetType })));
       const sanitized = rawLayout
         .filter(w => {
-          if (!w.i || seen.has(w.i)) return false;
+          if (!w.i || seen.has(w.i)) {
+            console.warn(`[Sanitize] Slide ${frontendId} DROPPED widget i="${w.i}" type=${w.widgetType}`);
+            return false;
+          }
           seen.add(w.i);
           return true;
         })
@@ -5383,6 +5478,27 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
     return sanitizedMap;
   }, [dashboards]);
+
+  // Slide list passed to TOC widgets (when `autoPopulate: true`). Built from the
+  // current effectivePageOrder so the TOC reflects whatever the user sees in the
+  // sidebar, with each slide's resolved title from processedSlidesMeta /
+  // slideIntegrationMap. The renderer skips the slide that hosts the TOC itself.
+  const tocSlidesMeta = useMemo<ReportSlideMeta[]>(() => {
+    return effectivePageOrder.map((id) => {
+      const meta = processedSlidesMeta.find((m) => Number(m.id) === Number(id));
+      const integrationInfo = slideIntegrationMap.get(id);
+      const title =
+        meta?.title ||
+        integrationInfo?.slideTitle ||
+        `Slide ${id}`;
+      return {
+        id,
+        title,
+        subtitle: meta?.subtitle,
+        source: meta?.source,
+      } as ReportSlideMeta;
+    });
+  }, [effectivePageOrder, processedSlidesMeta, slideIntegrationMap]);
 
   const handleScrollToSlide = (slideId: number) => {
     const el = slidesRef.current[slideId];
@@ -6025,6 +6141,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                           isDraggable={!readOnly && !isMobile && !isGeneratingPdf}
                           isResizable={!readOnly && !isMobile && !isGeneratingPdf}
                           compactType={null}
+                          preventCollision={true}
                           draggableHandle=".drag-handle"
                           draggableCancel=".non-draggable"
                           onDrop={(layoutArr, layoutItem, e) =>
@@ -6032,6 +6149,11 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                           }
                           onLayoutChange={createLayoutChangeHandler(id, layout)}
                         >
+                          {(() => {
+                            console.log(`[Grid][Render] Slide ${id} rendering ${layout.length} widgets`,
+                              layout.map(w => ({ i: w.i, type: w.widgetType, x: w.x, y: w.y, w: w.w, h: w.h })));
+                            return null;
+                          })()}
                           {layout.map((widget) => {
                             // Patch widget type for demographics if needed
                             let finalWidget = widget;
@@ -6091,6 +6213,8 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                                           isLoading,
                                           onConnectIntegration: handleConnectIntegration,
                                           readOnly: !!readOnly,
+                                          slidesMeta: tocSlidesMeta,
+                                          currentSlideId: id,
                                         })}
                                       </WidgetCard>
                                     );

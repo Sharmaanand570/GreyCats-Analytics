@@ -24,14 +24,15 @@ export function WooCommerceTopProducts({
 
   if (isLoading) {
     return (
-      <Card className=" border rounded-2xl">
-        <CardHeader>
-          <CardTitle>Top Performing Products</CardTitle>
+      <Card className="rounded-[28px] border-zinc-100 shadow-sm transition-all duration-300">
+        <CardHeader className="py-6 px-8 border-b border-zinc-50">
+           <CardTitle className="text-xl font-black text-zinc-900 tracking-tight uppercase">Top Sellers</CardTitle>
+           <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-1">Product performance</p>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-8">
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 bg-gray-100 animate-pulse rounded" />
+              <div key={i} className="h-16 bg-zinc-50 animate-pulse rounded-2xl" />
             ))}
           </div>
         </CardContent>
@@ -45,73 +46,72 @@ export function WooCommerceTopProducts({
     : Array(3).fill(null);
 
   return (
-    <Card className=" border rounded-2xl">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold">Top Performing Products</CardTitle>
-          {products.length > 0 && (
-            <Link
-              to="#"
-              className="text-sm font-medium"
-              style={{ color: "#96588A" }}
-            >
-              View All
-            </Link>
-          )}
+    <Card className="rounded-[28px] border-zinc-100 shadow-sm transition-all duration-500 hover:border-zinc-200 bg-white">
+      <CardHeader className="py-6 px-8 border-b border-zinc-50 flex flex-row items-center justify-between">
+        <div>
+           <CardTitle className="text-xl font-black text-zinc-900 tracking-tight uppercase">Top Sellers</CardTitle>
+           <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-1">Product performance</p>
         </div>
+        {products.length > 0 && (
+          <Link
+            to="#"
+            className="text-[10px] font-black text-zinc-400 uppercase tracking-widest hover:text-zinc-900 transition-colors"
+          >
+            View All
+          </Link>
+        )}
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
+      <CardContent className="p-8">
+        <div className="space-y-6">
           {displayProducts.slice(0, 3).map((product, index) => {
             const rank = index + 1;
             const hasData = product !== null;
 
             return (
-              <div key={product?.productId || `placeholder-${index}`} className="space-y-2">
+              <div key={product?.productId || `placeholder-${index}`} className="space-y-3">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-gray-700">
-                        #{rank}
+                    <div className="flex items-center gap-3 mb-1">
+                      <span className="text-xs font-black text-zinc-900 bg-zinc-100 w-6 h-6 rounded-full flex items-center justify-center">
+                        {rank}
                       </span>
                       <span
-                        className={`text-sm ${hasData ? "text-gray-900 font-medium" : "text-gray-400"
+                        className={`text-sm font-bold tracking-tight ${hasData ? "text-zinc-900" : "text-zinc-300"
                           }`}
                       >
-                        {hasData ? product.name : "Product Placeholder"}
+                        {hasData ? product.name : "Incoming Data..."}
                       </span>
                     </div>
                     <p
-                      className={`text-xs ${hasData ? "text-gray-600" : "text-gray-400"
+                      className={`text-[10px] font-bold uppercase tracking-widest ml-9 ${hasData ? "text-zinc-400" : "text-zinc-200"
                         }`}
                     >
                       {hasData
-                        ? `${product.qty} Unit(s) Sold`
-                        : "0 Units Sold"}
+                        ? `${product.qty} Units Shipped`
+                        : "Preparing statistics"}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {hasData && product.revenue > 0 && (
-                      <div
-                        className="h-2 w-16 rounded-full"
-                        style={{
-                          backgroundColor: "#96588A",
-                          opacity: product.revenue / maxRevenue,
-                        }}
-                      />
-                    )}
+                  <div className="flex flex-col items-end">
                     <span
-                      className={`text-sm font-semibold ${hasData && product.revenue > 0
-                          ? "text-gray-900"
-                          : "text-gray-400"
+                      className={`text-sm font-black tracking-tight ${hasData && product.revenue > 0
+                          ? "text-zinc-900"
+                          : "text-zinc-300"
                         }`}
                     >
                       {hasData && product.revenue > 0
-                        ? `₹${product.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                        : "₹0.00"}
+                        ? `₹${product.revenue.toLocaleString()}`
+                        : "₹0"}
                     </span>
                   </div>
                 </div>
+                {hasData && (
+                  <div className="ml-9 h-1.5 w-full bg-zinc-50 rounded-full overflow-hidden">
+                     <div 
+                        className="h-full bg-zinc-900 rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${(product.revenue / maxRevenue) * 100}%` }}
+                     />
+                  </div>
+                )}
               </div>
             );
           })}
@@ -120,4 +120,5 @@ export function WooCommerceTopProducts({
     </Card>
   );
 }
+
 

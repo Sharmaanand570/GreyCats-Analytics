@@ -35,11 +35,11 @@ export function AccountSelectionModal({
     onCancel
 }: AccountSelectionModalProps) {
     const [accounts, setAccounts] = useState<AvailableAccount[]>([]);
-    console.log("integration", integration);
     const [loading, setLoading] = useState(false);
     const [assigning, setAssigning] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedAccount, setSelectedAccount] = useState<AvailableAccount | null>(null);
+
     const queryClient = useQueryClient();
 
     // Reset state when modal opens
@@ -66,14 +66,18 @@ export function AccountSelectionModal({
     };
 
     const handleConnect = async () => {
-        if (!selectedAccount || !integration) return;
+        if (!integration) return;
+        if (!selectedAccount) return;
+
+        const accountIdToAssign = selectedAccount.id;
+        const accountNameToAssign = selectedAccount.name;
 
         setAssigning(true);
         try {
             const response = await assignAccountToClient(
                 clientId,
                 integration,
-                selectedAccount.id
+                accountIdToAssign
             );
             console.log("[Assign account] response:", response);
 
@@ -85,8 +89,8 @@ export function AccountSelectionModal({
 
             showConnectionResultToast({
                 warning: response.warning,
-                successMessage: `Successfully connected ${selectedAccount.name}`,
-                warningMessage: `Successfully connected ${selectedAccount.name}. However, we noticed there is currently no data in this account. Your dashboard will update as soon as new activity occurs.`,
+                successMessage: `Successfully connected ${accountNameToAssign}`,
+                warningMessage: `Successfully connected ${accountNameToAssign}. However, we noticed there is currently no data in this account. Your dashboard will update as soon as new activity occurs.`,
             });
             onSuccess();
             onOpenChange(false);
@@ -112,11 +116,9 @@ export function AccountSelectionModal({
             acc.name.toLowerCase().includes(lowerQuery) ||
             acc.identifier.toLowerCase().includes(lowerQuery);
 
-        // Accounts not assigned to any client OR assigned to THIS client
         const available = accounts.filter(
             acc => (!acc.assignedToClient || acc.assignedToClient.id === clientId) && matches(acc)
         );
-        // Accounts already assigned to a DIFFERENT client
         const inUse = accounts.filter(
             acc => acc.assignedToClient && acc.assignedToClient.id !== clientId && matches(acc)
         );
@@ -129,7 +131,7 @@ export function AccountSelectionModal({
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
-            <DialogContent className="sm:max-w-[500px] h-[80vh] flex flex-col p-0 gap-0 overflow-hidden">
+            <DialogContent className="sm:max-w-[500px] max-h-[80vh] flex flex-col p-0 gap-0 overflow-hidden">
                 <DialogHeader className="p-6 border-b">
                     <DialogTitle className="flex items-center gap-2">
                         {platformConfig?.icon && typeof platformConfig.icon !== 'string' && (
@@ -156,12 +158,12 @@ export function AccountSelectionModal({
 
                 <div className="flex-1 overflow-y-auto p-2">
                     {loading ? (
-                        <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2">
+                        <div className="flex flex-col items-center justify-center min-h-[200px] text-gray-500 gap-2">
                             <FiLoader className="animate-spin text-xl" />
                             <p>Loading accounts...</p>
                         </div>
                     ) : filteredAccounts.available.length === 0 && filteredAccounts.inUse.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full text-gray-500 p-8 text-center">
+                        <div className="flex flex-col items-center justify-center min-h-[200px] text-gray-500 p-8 text-center">
                             <p>No available accounts found.</p>
                             <p className="text-xs mt-1">Make sure you are logged into the correct account.</p>
                         </div>
@@ -234,6 +236,7 @@ export function AccountSelectionModal({
                                     ))}
                                 </>
                             )}
+                            
                         </div>
                     )}
                 </div>

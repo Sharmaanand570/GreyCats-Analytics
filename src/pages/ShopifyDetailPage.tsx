@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { SiShopify } from "react-icons/si";
@@ -48,22 +48,32 @@ import {
   useShopifyOrder,
 } from "@/features/shopify/hooks/useShopify";
 import { DataSyncBanner } from "@/components/DataSyncBanner";
+import { PlatformNotConnected } from "@/components/PlatformNotConnected";
 import { useClients } from "@/hooks/useClients";
 
 function ShopifyDetailPage() {
   const navigate = useNavigate();
-  // Get clients and auto-select first client (matching WooCommerce pattern)
+  const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
+
+  // Get clients and resolve clientId from URL param or fallback to first client
   const { data: clientsData } = useClients();
   const clients = clientsData || [];
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
 
-  // Auto-select first client
-  if (clients.length > 0 && !selectedClientId) {
+  // Priority: URL param > state > first client
+  const clientId = clientIdParam
+    ? parseInt(clientIdParam)
+    : selectedClientId ?? (clients.length > 0 ? clients[0].id : null);
+
+  // Only auto-select when no URL param is present
+  if (!clientIdParam && clients.length > 0 && !selectedClientId) {
     setSelectedClientId(clients[0].id);
   }
 
-  // Use the selected client ID, or the first client's ID if available, otherwise null
-  const clientId = selectedClientId || (clients.length > 0 ? clients[0].id : null);
+  const selectedClient = clients.find(c => c.id === clientId);
+  const hasShopifyIntegration = !!selectedClient?.integrations?.some(
+    (i: any) => i.integrationType === "shopify"
+  );
 
   // const [productsPage, setProductsPage] = useState(1);
   // const [ordersPage, setOrdersPage] = useState(1);
@@ -179,6 +189,13 @@ function ShopifyDetailPage() {
           </div>
 
           <div className="w-full px-5 py-6 space-y-6">
+            {clientId && selectedClient && !hasShopifyIntegration ? (
+              <PlatformNotConnected
+                platformName="Shopify"
+                icon={<SiShopify className="h-10 w-10 text-[#96BF48]" />}
+                clientName={selectedClient.name}
+              />
+            ) : <>
             {!isLoadingAnalytics && !summaryData?.summary && <DataSyncBanner />}
 
 
@@ -262,7 +279,7 @@ function ShopifyDetailPage() {
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600">Total Revenue</span>
                         <span className="text-sm font-semibold text-gray-900">
-                          ${summaryData.summary.totalRevenue.toFixed(2)}
+                          ₹{summaryData.summary.totalRevenue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
@@ -330,7 +347,7 @@ function ShopifyDetailPage() {
                               </div>
                             </TableCell>
                             <TableCell className="text-sm text-gray-600">
-                              ${product.price}
+                              ₹{Number(product.price).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </TableCell>
                             <TableCell className="pr-6">
                             </TableCell>
@@ -434,6 +451,7 @@ function ShopifyDetailPage() {
                 )}
               </Card>
             </div>
+            </>}
           </div>
         </div>
       </div>
@@ -487,7 +505,7 @@ function ShopifyDetailPage() {
                 <div>
                   <p className="text-gray-500">Price</p>
                   <p className="font-semibold text-gray-900 mt-1">
-                    ${productDetailData.product.price.toFixed(2)}
+                    ₹{productDetailData.product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
                 <div>

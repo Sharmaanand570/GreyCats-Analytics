@@ -59,23 +59,32 @@ export const buildDashboardMapFromTemplate = (
     // Secondary: deduplicate by (slideId + metricKey + normalizedType).
     // Use normalizeWidgetType so "line_chart" / "bar_chart" / "chart" all become "chart",
     // preventing the same chart widget from surviving under two different raw type strings.
+    //
+    // CRITICAL: Skip composite-key dedup when metricKey is empty.
+    // Non-metric widgets (image, embed, title, custom, text) have no metricKey, so two
+    // image widgets on the same slide would share the key "<slideId>::::image" and the
+    // second would always be removed. These widgets are uniquely identified by their DB
+    // `id` (already deduped above), so no secondary dedup is needed for them.
     const slideId = Number(widget.layout?.slideId ?? 0);
     const normType = normalizeWidgetType(widget.type); // "chart" | "metric" | "table" | ...
-    const compositeKey = `${slideId}::${widget.metricKey ?? ''}::${normType}`;
-    if (seenCompositeKeys.has(compositeKey)) {
-      console.warn(`[Hydrate] ⚠️ Duplicate widget removed: ${compositeKey} (id=${widget.id}, rawType=${widget.type})`);
-      return false;
-    }
-    seenCompositeKeys.add(compositeKey);
+    // Synthetic layout keys are a save-time workaround to keep non-metric widgets
+    // (image/embed/title/custom) from colliding on (slideId, metricKey, type).
+    // They are unique per-widget by construction, so skip composite-key dedup.
+    const isSyntheticLayoutKey = typeof widget.metricKey === "string" && widget.metricKey.startsWith("__layout__.");
+    if (widget.metricKey && !isSyntheticLayoutKey) {
+      const compositeKey = `${slideId}::${widget.metricKey}::${normType}`;
+      if (seenCompositeKeys.has(compositeKey)) {
+        console.warn(`[Hydrate] ⚠️ Duplicate widget removed: ${compositeKey} (id=${widget.id}, rawType=${widget.type})`);
+        return false;
+      }
+      seenCompositeKeys.add(compositeKey);
 
-    // Tertiary: deduplicate across different slideIds for the same logical widget.
-    // The backend may store the same widget under slideId=0 (old frontend save) AND
-    // slideId=5503 (later backend-ID save). Without this, both survive the secondary
-    // dedup and get merged into the same slide during hydration → duplicates.
-    const integration = (widget.integration || '').toLowerCase().replace(/[_-]/g, '');
-    const metricKey = widget.metricKey ?? '';
-    if (metricKey) { // Only cross-slide dedup widgets with an actual metricKey
-      const crossSlideKey = `${integration}::${metricKey}::${normType}`;
+      // Tertiary: deduplicate across different slideIds for the same logical widget.
+      // The backend may store the same widget under slideId=0 (old frontend save) AND
+      // slideId=5503 (later backend-ID save). Without this, both survive the secondary
+      // dedup and get merged into the same slide during hydration → duplicates.
+      const integration = (widget.integration || '').toLowerCase().replace(/[_-]/g, '');
+      const crossSlideKey = `${integration}::${widget.metricKey}::${normType}`;
       if (seenCrossSlideKeys.has(crossSlideKey)) {
         console.warn(`[Hydrate] ⚠️ Cross-slide duplicate removed: ${crossSlideKey} on slide ${slideId} (id=${widget.id})`);
         return false;
@@ -103,6 +112,12 @@ export const buildDashboardMapFromTemplate = (
     const layoutInfo = widget.layout;
     const slideId = Number(layoutInfo?.slideId ?? 0);
     ensureSlide(map, slideId);
+
+    // Strip the synthetic layout key added at save-time so non-metric widgets
+    // don't look like real metrics to downstream resolvers.
+    if (typeof widget.metricKey === "string" && widget.metricKey.startsWith("__layout__.")) {
+      widget.metricKey = "";
+    }
 
     const widgetType = normalizeWidgetType(widget.type);
     // Backend stores data in 'config', but we use 'widgetData' internally. Handle both.
@@ -154,6 +169,30 @@ export const buildDashboardMapFromTemplate = (
     }
 
     map.set(slideId, [...(map.get(slideId) ?? []), layoutItem]);
+  });
+
+  // De-collide: widgets saved with identical (x,y) overlap in the grid
+  // (preventCollision=true + compactType=null). Shift each colliding widget
+  // downward until it finds a free slot.
+  map.forEach((layout) => {
+    const placed: DashboardLayout[] = [];
+    layout.forEach((w) => {
+      const collides = (y: number) =>
+        placed.some(
+          (p) =>
+            w.x < p.x + p.w &&
+            w.x + w.w > p.x &&
+            y < p.y + p.h &&
+            y + w.h > p.y
+        );
+      let y = w.y;
+      while (collides(y)) y += 1;
+      if (y !== w.y) {
+        console.log(`[Hydrate][Collide] Shifted ${w.i} y ${w.y} → ${y}`);
+        w.y = y;
+      }
+      placed.push(w);
+    });
   });
 
   console.log(`[Hydrate] Final map keys:`, Array.from(map.keys()));

@@ -163,8 +163,8 @@ function App() {
               <Route path="data-sources">
                 <Route index element={<Integrations />} />
                 <Route path="youtube/:clientId?" element={<YouTubeDetailPage />} />
-                <Route path="woocommerce" element={<WooCommerceDetailPage />} />
-                <Route path="shopify" element={<ShopifyDetailPage />} />
+                <Route path="woocommerce/:clientId?" element={<WooCommerceDetailPage />} />
+                <Route path="shopify/:clientId?" element={<ShopifyDetailPage />} />
                 <Route
                   path="google-analytics/:clientId?"
                   element={<GoogleAnalyticsDetailPage />}
@@ -199,8 +199,8 @@ function App() {
               <Route path="alerts" element={<AlertsPage />} />
               <Route path="tasks" element={<TasksPage />} />
               <Route path="account-setup" element={<SettingsPage />} />
-              <Route path="social-media/scheduler" element={<SocialMediaSchedulerPage />} />
-              <Route path="blog/scheduler" element={<BlogSchedulerPage />} />
+              <Route path="social-media/scheduler/:clientId?" element={<SocialMediaSchedulerPage />} />
+              <Route path="blog/scheduler/:clientId?" element={<BlogSchedulerPage />} />
             </Route>
 
             {/* 404 catch-all for protected area — outside sidebar */}

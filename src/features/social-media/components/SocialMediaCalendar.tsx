@@ -14,8 +14,8 @@ import {
   compareAsc,
   parseISO,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Share2, X, Image as ImageIcon, Video as VideoIcon, CalendarDays, ChevronDown, Pencil, Trash2, AlertCircle } from 'lucide-react';
-import { FaInstagram, FaFacebook } from 'react-icons/fa6';
+import { ChevronLeft, ChevronRight, Share2, X, Image as ImageIcon, Video as VideoIcon, CalendarDays, ChevronDown, Pencil, Trash2, AlertCircle, CalendarPlus } from 'lucide-react';
+import { FaInstagram, FaFacebook, FaLinkedin } from 'react-icons/fa6';
 import { gsap } from 'gsap';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -47,6 +47,7 @@ interface CalendarGridProps {
 const platformIcons: Record<PostPlatform, React.ReactNode> = {
   instagram: <FaInstagram className="w-3.5 h-3.5 text-pink-600" />,
   facebook: <FaFacebook className="w-3.5 h-3.5 text-blue-600" />,
+  linkedin: <FaLinkedin className="w-3.5 h-3.5 text-blue-700" />,
   both: (
     <div className="flex -space-x-0.5">
       <FaFacebook className="w-3 h-3 text-blue-600" />
@@ -58,6 +59,7 @@ const platformIcons: Record<PostPlatform, React.ReactNode> = {
 const platformColors: Record<PostPlatform, string> = {
   instagram: 'bg-pink-50 border-pink-100 text-pink-900',
   facebook: 'bg-blue-50 border-blue-100 text-blue-900',
+  linkedin: 'bg-blue-50 border-blue-100 text-blue-900',
   both: 'bg-purple-50 border-purple-100 text-purple-900',
 };
 
@@ -78,6 +80,7 @@ const statusDotColors: Record<PostStatus, string> = {
 
 function CalendarGrid({ currentDate, slideDirection, posts, onDateClick }: CalendarGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const today = useMemo(() => new Date(), []);
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(monthStart);
@@ -105,32 +108,41 @@ function CalendarGrid({ currentDate, slideDirection, posts, onDateClick }: Calen
       const cloneDay = day;
       const dateKey = format(day, 'yyyy-MM-dd');
       const dayPosts = postsByDate.get(dateKey) || [];
+      const isToday = isSameDay(day, today);
+      const isPast = startOfDay(day) < startOfDay(today) && isSameMonth(day, monthStart);
+      const isOutside = !isSameMonth(day, monthStart);
 
       // Determine background color based on post status
       let statusBg = '';
       if (dayPosts.length > 0) {
-        if (dayPosts.some(p => p.status === 'FAILED')) statusBg = 'bg-red-100/60';
-        else if (dayPosts.some(p => p.status === 'PROCESSING')) statusBg = 'bg-amber-100/60';
-        else if (dayPosts.some(p => p.status === 'PENDING')) statusBg = 'bg-blue-100/60';
-        else if (dayPosts.some(p => p.status === 'PUBLISHED')) statusBg = 'bg-emerald-100/60';
+        if (dayPosts.some(p => p.status === 'FAILED')) statusBg = 'bg-red-50/80';
+        else if (dayPosts.some(p => p.status === 'PROCESSING')) statusBg = 'bg-amber-50/60';
+        else if (dayPosts.some(p => p.status === 'PENDING')) statusBg = 'bg-blue-50/50';
+        else if (dayPosts.some(p => p.status === 'PUBLISHED')) statusBg = 'bg-emerald-50/50';
       }
+
+      const cellClasses = isOutside
+        ? 'bg-zinc-50/50 text-zinc-300'
+        : isPast
+          ? `${statusBg || 'bg-zinc-50/40'} text-zinc-400`
+          : isToday
+            ? `${statusBg || 'bg-blue-50/30'} ring-2 ring-inset ring-blue-200`
+            : `${statusBg || 'bg-white'} text-zinc-800 hover:bg-zinc-50`;
 
       days.push(
         <div
           key={day.toString()}
           onClick={() => onDateClick(cloneDay, dayPosts)}
-          className={`min-h-[140px] p-2 border-b border-r border-zinc-100 transition-colors duration-200 cursor-pointer group relative ${
-            !isSameMonth(day, monthStart) 
-              ? 'bg-zinc-50/30 text-zinc-400' 
-              : statusBg || (isSameDay(day, new Date()) ? 'bg-zinc-50' : 'bg-white text-zinc-800 hover:bg-zinc-50')
-          }`}
+          className={`min-h-[130px] p-2 border-b border-r border-zinc-100 transition-all duration-200 cursor-pointer group relative ${cellClasses}`}
         >
           <div className="flex justify-between items-start">
             <span
-              className={`flex items-center justify-center w-7 h-7 text-sm rounded-full ${
-                isSameDay(day, new Date())
-                  ? 'bg-zinc-900 text-white font-medium shadow-sm'
-                  : 'text-zinc-600 group-hover:bg-zinc-200/50 group-hover:text-zinc-900'
+              className={`flex items-center justify-center w-7 h-7 text-sm rounded-full transition-colors ${
+                isToday
+                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
+                  : isPast
+                    ? 'text-zinc-400'
+                    : 'text-zinc-600 group-hover:bg-zinc-200/60 group-hover:text-zinc-900'
               }`}
             >
               {formattedDate}
@@ -141,12 +153,12 @@ function CalendarGrid({ currentDate, slideDirection, posts, onDateClick }: Calen
               return (
                 <div className="flex items-center gap-1">
                   {feedCount > 0 && (
-                    <span className="text-[9px] font-bold text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded-full">
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isPast ? 'text-zinc-400 bg-zinc-100/80' : 'text-zinc-500 bg-zinc-100'}`}>
                       {feedCount}
                     </span>
                   )}
                   {storyCount > 0 && (
-                    <span className="text-[9px] font-bold text-pink-500 bg-pink-50 px-1.5 py-0.5 rounded-full border border-pink-100">
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${isPast ? 'text-pink-300 bg-pink-50/50 border-pink-100/50' : 'text-pink-500 bg-pink-50 border-pink-100'}`}>
                       {storyCount}S
                     </span>
                   )}
@@ -154,7 +166,7 @@ function CalendarGrid({ currentDate, slideDirection, posts, onDateClick }: Calen
               );
             })()}
           </div>
-          <div className="mt-2 flex flex-col gap-1.5 overflow-hidden">
+          <div className={`mt-2 flex flex-col gap-1.5 overflow-hidden ${isPast ? 'opacity-60' : ''}`}>
             {dayPosts.slice(0, 3).map((post) => {
               const isStoryPost = post.postType === 'STORY';
               return (
@@ -347,11 +359,12 @@ export function SocialMediaCalendar({ clientId, canPost, headerExtra }: SocialMe
     <div className="flex justify-between items-end mb-4">
       <div className="flex items-end gap-4">
         <h2 className="text-lg font-semibold text-zinc-900 tracking-tight leading-none">Scheduler</h2>
-        {renderStatusFilter()}
+        {allPosts.length > 0 && renderStatusFilter()}
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         {headerExtra}
-        <div className="flex items-center bg-white border border-zinc-200 rounded-md shadow-sm h-10 px-1 shrink-0">
+        <div className="w-px h-6 bg-zinc-200 shrink-0 mx-1" />
+        <div className="flex items-center bg-white border border-zinc-200 rounded-lg shadow-sm h-10 px-1 shrink-0">
           <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8 hover:bg-zinc-100 rounded-md shrink-0">
             <ChevronLeft className="h-4 w-4 text-zinc-600" />
           </Button>
@@ -480,13 +493,16 @@ export function SocialMediaCalendar({ clientId, canPost, headerExtra }: SocialMe
     const startDate = startOfWeek(startOfMonth(currentDate));
 
     for (let i = 0; i < 7; i++) {
+      const isWeekend = i === 0 || i === 6;
       days.push(
-        <div key={i} className="text-center font-semibold text-xs text-zinc-500 py-3 uppercase tracking-wider border-b border-zinc-200">
+        <div key={i} className={`text-center font-semibold text-[11px] py-2.5 uppercase tracking-widest border-b border-zinc-200 ${
+          isWeekend ? 'text-zinc-400' : 'text-zinc-600'
+        }`}>
           {format(addDays(startDate, i), 'EEE')}
         </div>
       );
     }
-    return <div className="grid grid-cols-7 bg-zinc-50/50 rounded-t-lg border-b border-zinc-200">{days}</div>;
+    return <div className="grid grid-cols-7 bg-zinc-50 rounded-t-xl sticky top-0 z-[1]">{days}</div>;
   };
 
   const renderCells = () => (
@@ -655,13 +671,34 @@ export function SocialMediaCalendar({ clientId, canPost, headerExtra }: SocialMe
         </div>
       )}
       <div className="flex flex-1 min-h-0">
-        <div className="flex-1 min-w-0 overflow-auto bg-white border border-zinc-200 rounded-xl shadow-sm transition-all duration-300">
+        <div className="flex-1 min-w-0 overflow-auto bg-white border border-zinc-200 rounded-xl shadow-sm transition-all duration-300 relative">
           <div className="min-w-[800px] h-full flex flex-col">
             {renderDays()}
             <div className="flex-1">
               {renderCells()}
             </div>
           </div>
+          {/* Empty state overlay */}
+          {allPosts.length === 0 && canPost && (
+            <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/60 backdrop-blur-[2px]">
+              <div className="text-center px-8 py-10 bg-white rounded-2xl border border-zinc-200 shadow-xl max-w-sm">
+                <div className="w-14 h-14 rounded-2xl bg-zinc-100 flex items-center justify-center mx-auto mb-4">
+                  <CalendarPlus className="w-7 h-7 text-zinc-400" />
+                </div>
+                <h3 className="text-lg font-bold text-zinc-900 tracking-tight mb-1">No posts scheduled</h3>
+                <p className="text-sm text-zinc-500 mb-5 leading-relaxed">
+                  Click any future date on the calendar or use the button below to schedule your first post.
+                </p>
+                <Button
+                  onClick={() => openNewPostModal()}
+                  className="h-10 px-6 bg-zinc-900 hover:bg-zinc-800 text-white font-semibold text-sm shadow-sm"
+                >
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Schedule Your First Post
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
         {renderUpcomingSidebar()}
       </div>

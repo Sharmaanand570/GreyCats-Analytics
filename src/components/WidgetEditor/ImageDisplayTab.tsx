@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import {
@@ -17,6 +18,11 @@ interface ImageDisplayTabProps {
 }
 
 export function ImageDisplayTab({ data, onChange }: ImageDisplayTabProps) {
+    // Generate a stable unique ID per instance so multiple image widgets
+    // on the same slide don't share the same file-input id (which causes
+    // one upload to overwrite another's image).
+    const uniqueId = useId();
+    const fileInputId = `image-upload-${uniqueId}`;
     // Helper to compress image before setting state
     const compressImage = (file: File): Promise<string> => {
         return new Promise((resolve, reject) => {
@@ -137,13 +143,13 @@ export function ImageDisplayTab({ data, onChange }: ImageDisplayTabProps) {
                         type="file"
                         accept="image/*"
                         className="hidden"
-                        id="image-upload"
+                        id={fileInputId}
                         onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (file) handleFileChange(file);
                         }}
                     />
-                    <label htmlFor="image-upload" className="cursor-pointer absolute inset-0 w-full h-full opacity-0" />
+                    <label htmlFor={fileInputId} className="cursor-pointer absolute inset-0 w-full h-full opacity-0" />
                 </div>
             </div>
 

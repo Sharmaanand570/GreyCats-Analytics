@@ -79,6 +79,8 @@ export interface ResolvedWidgetResult {
   rows?: unknown[];
   columns?: Array<{ name: string; width?: string }>;
   error?: string;
+  privacyThresholdMet?: boolean;
+  currentFollowers?: number;
 }
 
 export interface BatchResolveResponse {
@@ -108,11 +110,22 @@ export interface DemographicsResponse {
     /** country code → follower count */
     fansByCountry: Record<string, number>;
     date?: string;
+    /**
+     * NEW (API v2): true when the account has fewer than 100 followers and
+     * Meta's privacy rules suppress all demographic data.
+     */
+    privacyThresholdMet?: boolean;
+    /** NEW (API v2): current follower count, provided alongside privacyThresholdMet. */
+    currentFollowers?: number;
   };
   // Some endpoints return the payload at root level (no wrapping data key)
   ageGender?: Record<string, number>;
   fansByCity?: Record<string, number>;
   fansByCountry?: Record<string, number>;
+  /** NEW (API v2): root-level privacy flag (flat response variant) */
+  privacyThresholdMet?: boolean;
+  /** NEW (API v2): root-level follower count (flat response variant) */
+  currentFollowers?: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

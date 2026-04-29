@@ -246,6 +246,112 @@ mutations.meta.isPending ||
     }
   }
 
+  const handleSelectSourceNext = async () => {
+    if (!SelectedSource.name) {
+      toast.error("Please select a data source");
+      return;
+    }
+    if (isConnecting) return;
+
+    if (SelectedSource.id === "youtube") {
+      try {
+        const response = await connectYouTube();
+        if (response.success && response.url) {
+          if (clientId) {
+            localStorage.setItem("pending_oauth_client_id", clientId.toString());
+            localStorage.setItem("pending_oauth_integration", "youtube");
+          }
+          window.location.href = response.url;
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to connect YouTube");
+      }
+    } else if (SelectedSource.id === "google-analytics") {
+      try {
+        const response = await connectGoogle();
+        if (response.success && response.url) {
+          if (clientId) {
+            localStorage.setItem("pending_oauth_client_id", clientId.toString());
+            localStorage.setItem("pending_oauth_integration", "google-analytics");
+          }
+          window.location.href = response.url;
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to connect Google Analytics");
+      }
+    } else if (SelectedSource.id === "google-console") {
+      try {
+        const response = await connectGoogleConsole();
+        if (response.success && response.url) {
+          if (clientId) {
+            localStorage.setItem("pending_oauth_client_id", clientId.toString());
+            localStorage.setItem("pending_oauth_integration", "google-search-console");
+          }
+          window.location.href = response.url;
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to connect Google Console");
+      }
+    } else if (SelectedSource.id === "meta-ads") {
+      try {
+        const response = await connectMeta({});
+        if (response.success && response.url) {
+          if (clientId) {
+            localStorage.setItem("pending_oauth_client_id", clientId.toString());
+            localStorage.setItem("pending_oauth_integration", "meta-ads");
+          }
+          window.location.href = response.url;
+        } else {
+          toast.error("Failed to initiate Meta connection");
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to connect Meta Ads");
+      }
+    } else if (SelectedSource.id === "meta-business") {
+      try {
+        await connectMetaBusiness();
+        if (clientId) {
+          localStorage.setItem("pending_oauth_client_id", clientId.toString());
+          localStorage.setItem("pending_oauth_integration", "meta-business");
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    } else if (SelectedSource.id === "google-ads") {
+      try {
+        const response = await connectGoogleAds();
+        if (response.success && response.url) {
+          if (clientId) {
+            localStorage.setItem("pending_oauth_client_id", clientId.toString());
+            localStorage.setItem("pending_oauth_integration", "google-ads");
+          }
+          window.location.href = response.url;
+        } else {
+          toast.error("Failed to initiate Google Ads connection");
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to connect Google Ads");
+      }
+    } else if (SelectedSource.id === "linkedin") {
+      try {
+        const response = await connectLinkedin(clientId);
+        if (response.success && response.url) {
+          if (clientId) {
+            localStorage.setItem("pending_oauth_client_id", clientId.toString());
+            localStorage.setItem("pending_oauth_integration", "linkedin");
+          }
+          window.location.href = response.url;
+        } else {
+          toast.error("Failed to initiate LinkedIn connection");
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to connect LinkedIn");
+      }
+    } else {
+      setNext(SelectedSource.id as string);
+    }
+  };
+
   return (
     <div>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -258,7 +364,17 @@ mutations.meta.isPending ||
             </DialogDescription>
           </DialogHeader>
           {Next === null ? (
-            <form>
+            <form 
+              onSubmit={(e) => { e.preventDefault(); handleSelectSourceNext(); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  if ((e.target as HTMLElement).tagName !== 'BUTTON') {
+                    e.preventDefault();
+                    handleSelectSourceNext();
+                  }
+                }
+              }}
+            >
               {/* Search Bar */}
               <div className="mt-3 sm:mt-4 md:mt-5">
                 <Input
@@ -281,8 +397,19 @@ mutations.meta.isPending ||
                     {filteredDataSources.map((option) => (
                       <div
                         onClick={() => setSelectedSource(option)}
+                        onDoubleClick={() => {
+                          setSelectedSource(option);
+                          setTimeout(() => handleSelectSourceNext(), 0);
+                        }}
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                           if (e.key === 'Enter' || e.key === ' ') {
+                               e.preventDefault();
+                               setSelectedSource(option);
+                           }
+                        }}
                         key={String(option.id)}
-                        className={`flex items-center gap-3 p-4 hover:bg-slate-50 cursor-pointer transition-colors ${String(SelectedSource.id) === String(option.id)
+                        className={`flex items-center gap-3 p-4 hover:bg-slate-50 cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${String(SelectedSource.id) === String(option.id)
                           ? "bg-slate-100"
                           : ""
                           }`}
@@ -330,142 +457,11 @@ mutations.meta.isPending ||
                 <Button
                   isLoading={isConnecting}
                   disabled={!SelectedSource.name || isConnecting}
-                  onClick={async (e) => {
+                  onClick={(e) => {
                     e.preventDefault();
-                    if (!SelectedSource.name) {
-                      toast.error("Please select a data source");
-                      return;
-                    }
-                    // If YouTube is selected, initiate OAuth flow
-                    if (SelectedSource.id === "youtube") {
-                      try {
-                        const response = await connectYouTube();
-                        if (response.success && response.url) {
-                          if (clientId) {
-                            localStorage.setItem("pending_oauth_client_id", clientId.toString());
-                            localStorage.setItem("pending_oauth_integration", "youtube");
-                          }
-                          window.location.href = response.url;
-                        }
-                      } catch (error) {
-                        const errorMessage =
-                          error instanceof Error
-                            ? error.message
-                            : "Failed to connect YouTube";
-                        toast.error(errorMessage);
-                      }
-                    } else if (SelectedSource.id === "google-analytics") {
-                      try {
-                        const response = await connectGoogle();
-                        console.log(response);
-                        if (response.success && response.url) {
-                          if (clientId) {
-                            localStorage.setItem("pending_oauth_client_id", clientId.toString());
-                            localStorage.setItem("pending_oauth_integration", "google-analytics");
-                          }
-                          window.location.href = response.url;
-                        }
-                      } catch (error) {
-                        const errorMessage =
-                          error instanceof Error
-                            ? error.message
-                            : "Failed to connect Google Analytics";
-                        toast.error(errorMessage);
-                      }
-                    } else if (SelectedSource.id === "google-console") {
-                      try {
-                        const response = await connectGoogleConsole();
-                        if (response.success && response.url) {
-                          if (clientId) {
-                            localStorage.setItem("pending_oauth_client_id", clientId.toString());
-                            localStorage.setItem("pending_oauth_integration", "google-search-console");
-                          }
-                          window.location.href = response.url;
-                        }
-                      } catch (error) {
-                        const errorMessage =
-                          error instanceof Error
-                            ? error.message
-                            : "Failed to connect Google Console";
-                        toast.error(errorMessage);
-                      }
-                    } else if (SelectedSource.id === "meta-ads") {
-                      // For Meta Ads, initiate OAuth flow
-                      try {
-                        const response = await connectMeta({});
-                        if (response.success && response.url) {
-                          if (clientId) {
-                            localStorage.setItem("pending_oauth_client_id", clientId.toString());
-                            localStorage.setItem("pending_oauth_integration", "meta-ads");
-                          }
-                          window.location.href = response.url;
-                        } else {
-                          toast.error("Failed to initiate Meta connection");
-                        }
-                      } catch (error) {
-                        const errorMessage =
-                          error instanceof Error
-                            ? error.message
-                            : "Failed to connect Meta Ads";
-                        toast.error(errorMessage);
-                        toast.error(errorMessage);
-                      }
-                    } else if (SelectedSource.id === "meta-business") {
-                      try {
-                        await connectMetaBusiness();
-                        if (clientId) {
-                          localStorage.setItem("pending_oauth_client_id", clientId.toString());
-                          localStorage.setItem("pending_oauth_integration", "meta-business");
-                        }
-                      } catch (error) {
-                        console.error(error);
-                      }
-                    } else if (SelectedSource.id === "google-ads") {
-                      try {
-                        const response = await connectGoogleAds();
-                        if (response.success && response.url) {
-                          if (clientId) {
-                            localStorage.setItem("pending_oauth_client_id", clientId.toString());
-                            localStorage.setItem("pending_oauth_integration", "google-ads");
-                          }
-                          window.location.href = response.url;
-                        } else {
-                          toast.error("Failed to initiate Google Ads connection");
-                        }
-                      } catch (error) {
-                        const errorMessage =
-                          error instanceof Error
-                            ? error.message
-                            : "Failed to connect Google Ads";
-                        toast.error(errorMessage);
-                      }
-                    } else if (SelectedSource.id === "linkedin") {
-                      try {
-                        const response = await connectLinkedin(clientId);
-                        console.log("[LinkedIn connect] response:", response);
-                        if (response.success && response.url) {
-                          if (clientId) {
-                            localStorage.setItem("pending_oauth_client_id", clientId.toString());
-                            localStorage.setItem("pending_oauth_integration", "linkedin");
-                          }
-                          window.location.href = response.url;
-                        } else {
-                          toast.error("Failed to initiate LinkedIn connection");
-                        }
-                      } catch (error) {
-                        console.error("[LinkedIn connect] error:", error);
-                        const errorMessage =
-                          error instanceof Error
-                            ? error.message
-                            : "Failed to connect LinkedIn";
-                        toast.error(errorMessage);
-                      }
-                    } else {
-                      // For other sources, just go to next step
-                      setNext(SelectedSource.id as string);
-                    }
+                    handleSelectSourceNext();
                   }}
-                  type="button"
+                  type="submit"
                   className="w-full sm:w-auto"
                 >
                   {isConnecting ? "Connecting..." : "Next"}

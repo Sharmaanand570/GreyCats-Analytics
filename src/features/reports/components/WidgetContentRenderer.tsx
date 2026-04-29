@@ -36,6 +36,7 @@ import type {
   ResolvedWidgetData,
   WidgetSeriesPoint,
   ReportWidgetDefinition,
+  ReportSlideMeta,
 } from "@/features/reports/api/types";
 import type {
   TitleWidgetData,
@@ -111,6 +112,11 @@ export const renderWidgetContent = (
     isLoading?: boolean;
     onConnectIntegration?: () => void;
     readOnly?: boolean;
+    // For TOC widgets with `autoPopulate: true`. The renderer derives the
+    // entries from this list (in order) and skips the slide that hosts the
+    // TOC itself.
+    slidesMeta?: ReportSlideMeta[];
+    currentSlideId?: number;
   }
 ) => {
   if (options?.isLoading) {
@@ -228,12 +234,37 @@ export const renderWidgetContent = (
   // Let's check renderWidget function again.
 
   const metricConfig = widget.metricConfig || ((widget as any).metricKey ? widget as any as ReportWidgetDefinition : undefined);
+
   const isIntegrationMetric =
     (widget.widgetType === "metric" || !!metricConfig?.metricKey) &&
     !!metricConfig?.metricKey &&
     !!metricConfig?.integration;
 
+  const privacyThresholdMet = finalResolvedData?.privacyThresholdMet || (finalResolvedData as any)?.privacy_threshold_met || (finalResolvedData as any)?.data?.privacyThresholdMet || (finalResolvedData as any)?.data?.privacy_threshold_met || (widgetData as any)?.privacyThresholdMet || (widgetData as any)?.privacy_threshold_met;
+  const currentFollowers = finalResolvedData?.currentFollowers ?? (finalResolvedData as any)?.current_followers ?? (finalResolvedData as any)?.data?.currentFollowers ?? (finalResolvedData as any)?.data?.current_followers ?? (widgetData as any)?.currentFollowers ?? (widgetData as any)?.current_followers ?? 0;
 
+  console.log(`[PrivacyDebug] Widget ${widget.i} (${widget.metricConfig?.metricKey}):`, {
+    privacyThresholdMet,
+    currentFollowers,
+    finalResolvedData,
+    widgetData
+  });
+
+  if (privacyThresholdMet) {
+    return (
+      <div className="h-full w-full flex items-center justify-center p-4">
+        <div className="bg-yellow-50 text-yellow-800 rounded-md p-4 flex flex-col gap-2 max-w-sm text-center shadow-sm text-sm">
+          <p className="font-semibold text-base mb-1">⚠️ Data Unavailable</p>
+          <p>
+            Meta (Facebook/Instagram) privacy rules require a minimum of 100 followers to provide demographic insights. This account currently has <strong>{currentFollowers}</strong> followers.
+          </p>
+          <p className="text-xs opacity-80 mt-1">
+            The charts will automatically appear once the account reaches the 100-follower threshold.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   switch (widget.widgetType) {
     case "chart":
@@ -971,7 +1002,7 @@ export const renderWidgetContent = (
                           if (key === 'impressions' || key === 'clicks' || key === 'conversions' || key === 'viewThroughConversions') {
                             cellValue = cellValue != null ? Number(cellValue).toLocaleString() : '0';
                           } else if (key === 'cpc' || key === 'cost' || key === 'costPerConversion') {
-                            cellValue = cellValue != null ? `₹${Number(cellValue).toFixed(2)}` : '₹0.00';
+                            cellValue = cellValue != null ? `₹${Number(cellValue).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '₹0.00';
                           } else if (key === 'ctr' || key === 'conversionRate') {
                             cellValue = cellValue != null ? `${Number(cellValue).toFixed(2)}%` : '0.00%';
                           }
@@ -1333,6 +1364,13 @@ export const renderWidgetContent = (
     case "image": {
       const imageData = widgetData as ImageWidgetData | undefined;
       const imageFit = imageData?.imageFit || "contain";
+      console.log(`[Render][IMG] ${widget.i}`, {
+        hasWidgetData: !!widgetData,
+        hasImageData: !!imageData,
+        srcType: typeof imageData?.src,
+        srcLen: typeof imageData?.src === 'string' ? imageData!.src!.length : 0,
+        srcPrefix: typeof imageData?.src === 'string' ? imageData!.src!.slice(0, 30) : imageData?.src,
+      });
       return (
         <div
           className="h-full flex items-center justify-center text-xs md:text-sm text-gray-500 p-0"
@@ -1431,27 +1469,48 @@ export const renderWidgetContent = (
 
       // Table-of-contents style custom block
       if (customData?.type === "toc") {
-        const lines =
-          (customData.content ?? "")
-            .split("\n")
-            .map((t) => t.trim())
-            .filter(Boolean) || [];
+        let parsedLines: { section: string; page: string }[] = [];
 
-        // Parse lines to extract section name and page number
-        // Format: "Section Name | 3" or just "Section Name" (auto-number)
-        const parsedLines = lines.map((line, idx) => {
-          const parts = line.split("|").map(p => p.trim());
-          if (parts.length >= 2) {
+        if (customData.autoPopulate && options?.slidesMeta?.length) {
+          // Auto-build entries from the live slidesMeta list. Page numbers use
+          // each slide's 1-indexed position in the full pageOrder. Skip:
+          //   - the slide that hosts this TOC widget (so it doesn't list itself)
+          //   - the seeded cover slide (matched by title)
+          // so the auto-rendered TOC focuses on content slides.
+          parsedLines = options.slidesMeta
+            .map((m, idx) => ({ meta: m, page: idx + 1 }))
+            .filter(({ meta }) => {
+              if (Number(meta.id) === options.currentSlideId) return false;
+              if ((meta.title || "").trim().toLowerCase() === "cover") return false;
+              return true;
+            })
+            .map(({ meta, page }, idx) => ({
+              section: meta.title || `Slide ${idx + 1}`,
+              page: String(page),
+            }));
+        } else {
+          const lines =
+            (customData.content ?? "")
+              .split("\n")
+              .map((t) => t.trim())
+              .filter(Boolean) || [];
+
+          // Parse lines to extract section name and page number
+          // Format: "Section Name | 3" or just "Section Name" (auto-number)
+          parsedLines = lines.map((line, idx) => {
+            const parts = line.split("|").map(p => p.trim());
+            if (parts.length >= 2) {
+              return {
+                section: parts[0],
+                page: parts[1]
+              };
+            }
             return {
-              section: parts[0],
-              page: parts[1]
+              section: line,
+              page: String(idx + 3) // Auto-number starting from page 3
             };
-          }
-          return {
-            section: line,
-            page: String(idx + 3) // Auto-number starting from page 3
-          };
-        });
+          });
+        }
 
         return (
           <div
@@ -1463,7 +1522,9 @@ export const renderWidgetContent = (
             </div>
             {parsedLines.length === 0 ? (
               <span className="text-xs text-gray-400 text-center">
-                Add entries like "Section Name | 3" (one per line)
+                {customData.autoPopulate
+                  ? "Add slides to see them listed here"
+                  : 'Add entries like "Section Name | 3" (one per line)'}
               </span>
             ) : (
               <div className="w-full space-y-2.5">

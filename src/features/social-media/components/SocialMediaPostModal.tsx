@@ -8,8 +8,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
-import { Sparkles, Image as ImageIcon, CheckCircle2, Plus, ChevronLeft, ChevronRight, Upload, Globe, Info, Tag, Users2, X as XIcon, Search, UserPlus, AlertCircle, Calendar, FileText, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
-import { FaInstagram, FaFacebook } from 'react-icons/fa6';
+import { Sparkles, Image as ImageIcon, CheckCircle2, Plus, ChevronLeft, ChevronRight, Upload, Globe, Info, Tag, Users2, X as XIcon, Search, UserPlus, AlertCircle, Calendar, FileText, ChevronDown, ChevronUp, MapPin, Building2 } from 'lucide-react';
+import { FaInstagram, FaFacebook, FaLinkedin } from 'react-icons/fa6';
 import { useSocialMediaStore } from '@/store/useSocialMediaStore';
 
 import { useClientContext } from '@/context/ClientContext';
@@ -40,6 +40,7 @@ const PLATFORMS: { id: PostPlatform; icon: React.ReactNode; label: string }[] = 
     ),
     label: 'Both',
   },
+  { id: 'linkedin', icon: <FaLinkedin className="w-5 h-5 text-blue-700" />, label: 'LinkedIn' },
 ];
 
 const ASPECT_RATIOS: Record<string, { label: string; value: string; css: string }[]> = {
@@ -61,12 +62,16 @@ const ASPECT_RATIOS: Record<string, { label: string; value: string; css: string 
     { label: 'Vertical (9:16)', value: '9:16', css: '9/16' },
     { label: 'Landscape (1.91:1)', value: '1.91:1', css: '1.91/1' },
   ],
+  linkedin: [
+    { label: 'Any (Auto)', value: '1:1', css: '1/1' },
+  ],
 };
 
 const CAPTION_LIMITS: Record<string, number> = {
   instagram: 2200,
   facebook: 63206,
   both: 2200,
+  linkedin: 3000,
 };
 
 const FIRST_COMMENT_LIMIT = 2200;
@@ -130,6 +135,9 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
   // Location tagging
   const [selectedLocation, setSelectedLocation] = useState<LocationSearchResult | null>(null);
 
+  // LinkedIn Targets
+  const [selectedLinkedinTargetId, setSelectedLinkedinTargetId] = useState<string>('');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mainVideoRef = useRef<HTMLVideoElement>(null);
 
@@ -178,6 +186,9 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
         firstComment: editingPost.firstComment || '',
         mediaFiles: [],
       });
+      if (editingPost.platform === 'linkedin' && editingPost.linkedinPortAccountId) {
+        setSelectedLinkedinTargetId(String(editingPost.linkedinPortAccountId));
+      }
     }
     // Always reset on open
     setUserTags([]);
@@ -187,6 +198,15 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
     clearTagSearch();
     clearCollabSearch();
   }, [isOpen, editingPost]);
+
+  useEffect(() => {
+    if (isOpen && platform === 'linkedin') {
+      const linked = currentClient?.integrations?.filter(i => i.integrationType === 'linkedin') || [];
+      if (linked.length === 1 && !selectedLinkedinTargetId) {
+        setSelectedLinkedinTargetId(String(linked[0].accountId));
+      }
+    }
+  }, [isOpen, platform, selectedLinkedinTargetId, currentClient]);
 
   // Auto-select first platform
   useEffect(() => {
@@ -384,13 +404,15 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
       // 1. Find account IDs from integrations
       let metaAccountId: number | undefined;
 
-      const metaIntegration = currentClient?.integrations?.find(
-        (i) => i.integrationType === 'meta-business'
-      );
-      if (!metaIntegration) {
-        throw new Error('No Meta account linked to this workspace. Please connect one in the studio header.');
+      if (platform !== 'linkedin') {
+        const metaIntegration = currentClient?.integrations?.find(
+          (i) => i.integrationType === 'meta-business'
+        );
+        if (!metaIntegration) {
+          throw new Error('No Meta account linked to this workspace. Please connect one in the studio header.');
+        }
+        metaAccountId = metaIntegration.accountId;
       }
-      metaAccountId = metaIntegration.accountId;
 
       // 2. Create or Update using hooks
       if (isEditing && editingPost) {
@@ -402,6 +424,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
             scheduledFor: scheduledForStr,
             platform: platform as PostPlatform,
             metaAccountId,
+            linkedinPortAccountId: platform === 'linkedin' && selectedLinkedinTargetId ? parseInt(selectedLinkedinTargetId) : undefined,
             // Keep existing URLs if no new files are being uploaded
             mediaUrls: mediaFiles.length === 0 ? mediaUrls : undefined,
             ...(isStory ? {} : {
@@ -430,6 +453,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
             postType: postType || 'FEED',
             scheduledFor: scheduledForStr,
             platform: platform as PostPlatform,
+            linkedinPortAccountId: platform === 'linkedin' && selectedLinkedinTargetId ? parseInt(selectedLinkedinTargetId) : undefined,
             ...(isStory ? {} : {
               message: caption || undefined,
               firstComment: firstComment || undefined,
@@ -464,7 +488,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
     (!isFirstCommentOverLimit || isStory) &&
     (isStory
       ? (hasNewMedia || hasExistingMedia) // Stories always require media
-      : (platform !== 'instagram' || hasNewMedia || hasExistingMedia)) &&
+      : (platform === 'facebook' || platform === 'linkedin' ? true : hasNewMedia || hasExistingMedia)) &&
     !createMutation.isPending &&
     !updateMutation.isPending &&
     !scheduledForPastError;
@@ -1187,6 +1211,33 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
                     </div>
                   </div>
 
+                  {/* LinkedIn Target Selection */}
+                  {platform === 'linkedin' && (
+                    <div>
+                      <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5" />
+                        LinkedIn Page
+                      </label>
+                      <select
+                        value={selectedLinkedinTargetId}
+                        onChange={(e) => setSelectedLinkedinTargetId(e.target.value)}
+                        className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-lg text-sm font-medium text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent appearance-none cursor-pointer"
+                      >
+                        <option value="" disabled>Select a LinkedIn Page...</option>
+                        {currentClient?.integrations?.filter(i => i.integrationType === 'linkedin').map((integration) => (
+                          <option key={integration.id} value={String(integration.accountId)}>
+                            {integration.accountName || integration.accountIdentifier}
+                          </option>
+                        ))}
+                      </select>
+                      {(currentClient?.integrations?.filter(i => i.integrationType === 'linkedin').length || 0) === 0 && (
+                        <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-md px-2.5 py-1.5 font-medium mt-2">
+                          No LinkedIn pages linked to this workspace. Please link one in the studio header.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Post Type (Feed / Story) */}
                   {platform && (
                     <div>
@@ -1299,7 +1350,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
                   {platform === 'instagram' && renderCollaboratorsSection()}
 
                   {/* Location — Meta only (FB/IG) */}
-                  {renderLocationSection()}
+                  {(platform === 'instagram' || platform === 'facebook' || platform === 'both') && renderLocationSection()}
 
                   {/* Caption */}
                   <div>

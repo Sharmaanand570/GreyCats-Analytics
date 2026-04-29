@@ -59,6 +59,8 @@ export type ResolvedWidgetData =
     rawCount?: number;
     rows?: unknown[];
     columns?: any[];
+    privacyThresholdMet?: boolean;
+    currentFollowers?: number;
   }
   | Record<string, unknown>;
 

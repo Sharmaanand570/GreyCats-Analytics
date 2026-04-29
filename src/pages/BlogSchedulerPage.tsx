@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useBlogSchedulerStore } from '@/store/useBlogSchedulerStore';
 import { BlogCalendar } from '@/features/blog/components/BlogCalendar';
 import {
@@ -21,7 +22,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 import { toast } from 'sonner';
-import { useClients, useCreateClient, useDeleteClient, useClient } from '../hooks/useClients';
+import { useCreateClient, useDeleteClient, useClient } from '../hooks/useClients';
 import { useClientContext } from '@/context/ClientContext';
 import { getProfileImageUrl } from '@/utils/imageUtils';
 import type { ClientWithIntegrations } from '@/types/client.types';
@@ -432,18 +433,37 @@ function StepWorkspace({
    Main Page
    ═══════════════════════════════════════════════════ */
 export default function BlogSchedulerPage() {
+  const { clientId: urlClientId } = useParams<{ clientId: string }>();
+  const navigate = useNavigate();
   const { currentStep, setCurrentStep } = useBlogSchedulerStore();
-  const { currentClient, setCurrentClient: _setCurrentClient } = useClientContext();
+  const { currentClient, setCurrentClient: _setCurrentClient, clients: allClients, isLoading: isLoadingClients } = useClientContext();
 
   const setCurrentClient = (client: ClientWithIntegrations | null) => {
     _setCurrentClient(client);
     if (client) {
       localStorage.setItem('lastBlogClientId', String(client.id));
+      if (urlClientId !== String(client.id)) {
+        navigate(`/blog/scheduler/${client.id}`);
+      }
+    } else {
+      navigate('/blog/scheduler');
     }
   };
+
+  // Sync URL clientId with state on mount or change
+  useEffect(() => {
+    if (urlClientId && allClients.length > 0) {
+      const client = allClients.find(c => String(c.id) === urlClientId);
+      if (client && (!currentClient || currentClient.id !== client.id)) {
+        console.log("DEBUG - Syncing blog client from URL:", urlClientId);
+        _setCurrentClient(client as ClientWithIntegrations);
+        setCurrentStep('workspace');
+      }
+    }
+  }, [urlClientId, allClients.length]);
+
   const [subStep, setSubStep] = useState<'main' | 'create' | 'existing'>('main');
 
-  const { data: allClients = [], isLoading: isLoadingClients, isError: isClientsError } = useClients();
   const { data: liveClient } = useClient(currentClient?.id || null);
   const createClient = useCreateClient();
   const deleteClient = useDeleteClient();
@@ -497,7 +517,7 @@ export default function BlogSchedulerPage() {
         <StepSelectClient
           clients={allClients}
           isLoading={isLoadingClients}
-          isError={isClientsError}
+          isError={false}
           onSelect={(client) => {
             setCurrentClient(client);
             setCurrentStep('workspace');
@@ -533,11 +553,7 @@ export default function BlogSchedulerPage() {
     <div className="w-full h-screen flex flex-col overflow-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
       <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
         <div className="w-full h-full flex flex-col relative">
-          <div className="w-full h-11 border-b flex justify-between items-center px-5 bg-white/50 backdrop-blur-sm sticky top-0 z-10 box-border shrink-0">
-            <span className="font-medium text-sm text-zinc-800 tracking-wide">Blog Studio</span>
-          </div>
-
-          <div className="flex-1 overflow-y-auto relative h-[calc(100vh-2.75rem)]">
+          <div className="flex-1 overflow-y-auto relative h-full">
             {renderContent()}
           </div>
         </div>

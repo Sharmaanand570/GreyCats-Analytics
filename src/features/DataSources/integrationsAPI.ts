@@ -46,16 +46,30 @@ export const getIntegrations = async (
     // Map all account types to integrations
     if (client.metaBusinessAccounts) {
       client.metaBusinessAccounts.forEach((acc: any) => {
+        const meta = acc.metaAccount || acc;
+        const pageId = meta.pageId || acc.pageId || null;
+        const instagramBusinessId = meta.instagramBusinessId ?? acc.instagramBusinessId ?? null;
+        const instagramUsername = meta.instagramUsername ?? acc.instagramUsername ?? null;
+        const hasFacebook = Boolean(pageId);
+        const hasInstagram = Boolean(
+          meta.hasInstagram ?? acc.hasInstagram ?? (instagramBusinessId || instagramUsername)
+        );
         integrations.push({
           id: acc.id,
           userId: client.userId,
           platform: 'meta-business',
-          accountId: acc.metaAccount?.pageId || acc.pageId || acc.id.toString(),
-          accountName: acc.metaAccount?.pageName || acc.pageName || 'Meta Business Account',
+          accountId: pageId || acc.id.toString(),
+          accountName: meta.pageName || acc.pageName || 'Meta Business Account',
           status: 'connected',
           lastSyncedAt: acc.lastSynced || null,
           connectedAt: acc.createdAt,
-          extra: null,
+          extra: {
+            hasFacebook,
+            hasInstagram,
+            pageId,
+            instagramBusinessId,
+            instagramUsername,
+          },
         });
       });
     }

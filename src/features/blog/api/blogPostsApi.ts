@@ -229,12 +229,17 @@ export const fetchPlatformDetails = async (
 /**
  * Connect a WordPress site via Application Password.
  * POST /api/blog-posts/integrations/wordpress
+ *
+ * Backend returns diagnosticCode on 401:
+ * - FIREWALL_BLOCKED: Wordfence/security firewall intercepted the request
+ * - AUTH_FAILED: Wrong Application Password
+ * - REST_API_DISABLED: REST API blocked on site
  */
 export const connectWordPress = async (
   payload: ConnectWordPressPayload
 ): Promise<void> => {
   try {
-    const response = await api.post<{ success?: boolean; message?: string; error?: string }>(
+    const response = await api.post<{ success?: boolean; message?: string; error?: string; diagnosticCode?: string }>(
       '/blog-posts/integrations/wordpress',
       payload
     );
@@ -243,6 +248,20 @@ export const connectWordPress = async (
       throw new Error(data.message || data.error || 'Failed to connect WordPress');
     }
   } catch (error) {
+    const axiosError = error as AxiosError<{ message?: string; error?: string; diagnosticCode?: string }>;
+    const diagCode = axiosError.response?.data?.diagnosticCode;
+    const serverMessage = axiosError.response?.data?.message;
+
+    if (diagCode === 'FIREWALL_BLOCKED') {
+      throw new Error(serverMessage || 'Your WordPress site\'s firewall (e.g. Wordfence) blocked the connection. Please whitelist our server IP in your security plugin settings.');
+    }
+    if (diagCode === 'AUTH_FAILED') {
+      throw new Error('Authentication failed. Please verify your WordPress username and Application Password are correct.');
+    }
+    if (diagCode === 'REST_API_DISABLED') {
+      throw new Error('The WordPress REST API is disabled on your site. Please enable it to allow connections.');
+    }
+
     throw new Error(extractError(error, 'Failed to connect WordPress site'));
   }
 };

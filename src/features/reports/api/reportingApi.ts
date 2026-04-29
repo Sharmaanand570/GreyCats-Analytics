@@ -1114,7 +1114,8 @@ export const listReportTemplates = (clientId?: number) =>
 export const updateReportTemplate = (
   clientId: number,
   templateId: number,
-  payload: UpdateTemplatePayload
+  payload: UpdateTemplatePayload,
+  signal?: AbortSignal
 ) =>
   handleRequest(async () => {
     const slides = buildSlidesFromWidgets(payload.widgets, payload.slidesMeta, payload.pageOrder);
@@ -1130,12 +1131,26 @@ export const updateReportTemplate = (
       client_id: clientId, // Try snake_case in case backend expects it
     };
 
+    const imgCountBySlide = slides.map((s: any) => ({
+      slideId: s.id,
+      widgetCount: s.widgets?.length ?? 0,
+      imageCount: (s.widgets || []).filter((w: any) => w.type === 'image').length,
+    }));
+    console.log('[PUT-FE] Sending widget counts:', imgCountBySlide);
+
     const response = await api.put<CreateTemplateResponse>(
       `/report-templates/${templateId}`,
-      body
+      body,
+      { signal }
     );
 
-    console.log("response", response.data);
+    const respSlides = (response.data as any)?.template?.slides || [];
+    const respImgCount = respSlides.map((s: any) => ({
+      slideId: s.id,
+      widgetCount: s.widgets?.length ?? 0,
+      imageCount: (s.widgets || []).filter((w: any) => w.type === 'image').length,
+    }));
+    console.log('[PUT-FE] Response widget counts:', respImgCount);
     return response.data;
   });
 

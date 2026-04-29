@@ -125,6 +125,18 @@ export function DayBlogPostsSheet({
                     </div>
                   )}
 
+                  {/* Per-target WordPress comment metrics */}
+                  {post.status === 'PUBLISHED' && post.targets.some(t => t.platform === 'wordpress' && t.metrics?.comments != null) && (
+                    <div className="flex items-center gap-2 text-[11px] font-semibold text-zinc-500">
+                      <FaWordpress className="w-3.5 h-3.5 text-[#21759b]" />
+                      {post.targets
+                        .filter(t => t.platform === 'wordpress' && t.metrics?.comments != null)
+                        .map((t, i) => (
+                          <span key={i}>{t.metrics!.comments} {t.metrics!.comments === 1 ? 'comment' : 'comments'}</span>
+                        ))}
+                    </div>
+                  )}
+
                   {/* Error for FAILED */}
                   {post.status === 'FAILED' && post.errorMessage && (
                     <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-xs text-red-700 font-medium leading-relaxed">

@@ -446,6 +446,7 @@ export const getFacebookPostInsights = async (
     return response.data;
   } catch (error) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
+    console.error("POST_INSIGHTS_API_ERROR:", axiosError.response?.status, axiosError.response?.data);
     throw new Error(
       axiosError.response?.data?.message ||
       axiosError.response?.data?.error ||

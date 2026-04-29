@@ -1,7 +1,7 @@
-"use client";
+// @ts-nocheck
 import { useNavigate, useParams } from "react-router-dom";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
     SiFacebook,
     SiInstagram,
@@ -46,7 +46,15 @@ import {
     LayoutGrid,
     TrendingUp,
     MousePointerClick,
-    Smile
+    Smile,
+    Eye,
+    Heart,
+    Share2,
+    Play,
+    Zap,
+    Bookmark,
+    Users,
+    Building2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +71,7 @@ import {
 } from "@/features/meta/hooks/useMetaBusinessData";
 import { useFacebookPageInfo } from "@/features/meta/hooks/useFacebookPageInfo";
 import { useClients, useClient } from "@/hooks/useClients";
+import { PlatformNotConnected } from "@/components/PlatformNotConnected";
 
 /**
  * Meta Business Detail Page
@@ -118,12 +127,17 @@ function MetaBusinessDetailPage() {
     useMetaBusinessSyncInstagram();
     const { mutateAsync: syncBoth, isPending: isSyncingBoth } = useMetaBusinessSync();
 
+    // Check if client has Meta Business integration
+    const hasMetaBusinessIntegration = !!clientData?.integrations?.some(
+        (i: any) => i.integrationType === "meta-business" || i.integrationType === "meta_facebook" || i.integrationType === "meta_instagram"
+    ) || (clientData?.metaBusinessAccounts && clientData.metaBusinessAccounts.length > 0);
+
     // 4. Data Processing
     const rawAccounts = clientData?.metaBusinessAccounts ?? [];
 
     // Map raw accounts to usable Page objects
     // Using acc.metaAccountId (from join table) as the primary ID for sync operations
-    const pages = rawAccounts.map((acc: any) => ({
+    const pages = useMemo(() => rawAccounts.map((acc: any) => ({
         id: acc.metaAccount?.pageId, // The Facebook Page ID (string)
         name: acc.metaAccount?.pageName || "Unknown Page",
         // Use instagramBusinessId if available, otherwise use instagramUsername as identifier
@@ -133,7 +147,19 @@ function MetaBusinessDetailPage() {
         // CRITICAL FIX: Use the correct account ID for sync endpoints. 
         // Trying metaAccountId first, falling back to id.
         accountId: acc.metaAccountId ?? acc.id,
-    }));
+    })), [rawAccounts]);
+
+    // Auto-select the first page if none is selected OR if the selected page is no longer in the pages list
+    useEffect(() => {
+        if (pages.length > 0) {
+            const currentIsFound = pages.some(p => p.id === selectedPageId);
+            if (!selectedPageId || !currentIsFound) {
+                setSelectedPageId(pages[0].id);
+            }
+        } else if (selectedPageId !== null) {
+            setSelectedPageId(null);
+        }
+    }, [pages, selectedPageId]);
 
     // Get the selected account and its ID for API calls
     const selectedAccount = pages.find(p => p.id === selectedPageId);
@@ -147,7 +173,16 @@ function MetaBusinessDetailPage() {
     const { data: postsData, isLoading: isLoadingPosts } = useFacebookPosts(accountId);
 
     // Facebook Post Insights - fetch insights for selected post
-    const { data: postInsightsData } = useFacebookPostInsights(selectedPostId || undefined);
+    const { data: postInsightsData, isLoading: isLoadingPostInsights, error: postInsightsError } = useFacebookPostInsights(selectedPostId || undefined);
+
+    useEffect(() => {
+        console.log("DEBUG_POST_INSIGHTS:", {
+            selectedPostId,
+            isLoadingPostInsights,
+            postInsightsData,
+            postInsightsError,
+        });
+    }, [selectedPostId, isLoadingPostInsights, postInsightsData, postInsightsError]);
 
     // Instagram Data Hooks
     // Use the metaAccountId (e.g., 7) for Instagram API calls
@@ -194,48 +229,49 @@ function MetaBusinessDetailPage() {
     // --- Render ---
 
     return (
-        <div className="min-h-screen bg-background">
-            <div className="max-w-[1600px] mx-auto p-6 space-y-8">
+        <div className="w-full h-full flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
+            <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd] animate-in fade-in slide-in-from-bottom-2 duration-1000">
+                <div className="w-full h-full flex flex-col px-8 py-4 space-y-8">
 
                 {/* --- 1. Top Navigation Bar --- */}
-                <div className="w-full border-b flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-8 py-6 bg-white/80 backdrop-blur-md sticky top-0 z-20 border-slate-200/60 shadow-sm rounded-t-[32px] -mx-6 -mt-6 mb-6">
+                <div className="w-full border-b flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-8 py-6 bg-white/80 backdrop-blur-md sticky top-0 z-20 border-slate-200/60 shadow-sm rounded-t-[32px] mb-6">
                     <div className="flex flex-col gap-2 relative">
                         <Breadcrumb>
                             <BreadcrumbList>
                                 <BreadcrumbItem>
-                                    <BreadcrumbLink onClick={() => navigate('/integrations')} className="cursor-pointer text-slate-500 hover:text-slate-800 transition-colors font-medium">Data Sources</BreadcrumbLink>
+                                    <BreadcrumbLink onClick={() => navigate(-1)} className="cursor-pointer text-slate-500 hover:text-slate-800 transition-colors font-medium text-xs">Data Sources</BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="text-slate-300" />
                                 <BreadcrumbItem>
-                                    <span className="bg-zinc-100 text-zinc-900 px-2 py-0.5 rounded-md font-bold text-sm tracking-wide">Meta Business</span>
+                                    <span className="bg-zinc-100 text-zinc-900 px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wider">Meta Business</span>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
                         </Breadcrumb>
                         
                         <div className="flex items-center gap-5">
                             <div className="relative group">
-                                <div className="absolute inset-0 bg-zinc-800 blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
-                                <div className="relative p-3.5 bg-gradient-to-br from-zinc-800 to-zinc-950 rounded-2xl shadow-xl shadow-zinc-900/10 ring-1 ring-white/20">
-                                    <SiMeta className="w-8 h-8 text-white" />
+                                <div className="absolute inset-0 bg-blue-500 blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
+                                <div className="relative p-3.5 bg-gradient-to-br from-[#0866FF] to-blue-700 rounded-2xl shadow-xl shadow-blue-900/10 ring-1 ring-white/20 flex items-center justify-center">
+                                    <SiMeta className="w-6 h-6 text-white" />
                                 </div>
                             </div>
                             <div>
-                                <h1 className="text-3xl font-bold tracking-tight text-slate-900">Meta Business Center</h1>
-                                <p className="text-sm text-slate-500 mt-1 font-medium">Manage Facebook & Instagram</p>
+                                <h1 className="text-3xl font-bold tracking-tight text-slate-900">Meta Business Suite</h1>
+                                <p className="text-xs text-slate-500 mt-1 font-bold uppercase tracking-widest">Facebook & Instagram Insights</p>
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4 md:items-center">
+                    <div className="flex flex-col sm:flex-row items-center gap-4">
                         <DataSyncBanner compact={true} />
-                        <div className="w-full md:w-[320px]">
+                        <div className="w-full sm:w-[280px]">
                             <Select value={selectedClientId?.toString() || ""} onValueChange={(v) => setSelectedClientId(Number(v))}>
                                 <SelectTrigger className="h-10 bg-white border-slate-200 shadow-sm rounded-xl transition-all focus:ring-slate-200 font-medium text-slate-700">
                                     <SelectValue placeholder="Select Client Account" />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="rounded-xl border-border shadow-lg">
                                     {clients?.map((client) => (
-                                        <SelectItem key={client.id} value={client.id.toString()} className="font-medium cursor-pointer rounded-lg m-1">
+                                        <SelectItem key={client.id} value={client.id.toString()} className="font-medium cursor-pointer rounded-lg m-1 hover:bg-muted focus:bg-muted">
                                             <div className="flex items-center gap-2">
                                                 <div className="w-2 h-2 rounded-full bg-zinc-800" />
                                                 {client.name}
@@ -272,94 +308,97 @@ function MetaBusinessDetailPage() {
                 )}
 
                 {/* --- 2. Accounts Overview Grid --- */}
-                {selectedClientId ? (
+                {selectedClientId && clientData && !hasMetaBusinessIntegration ? (
+                    <PlatformNotConnected
+                        platformName="Meta Business (Facebook & Instagram)"
+                        icon={<SiMeta className="h-10 w-10 text-blue-500" />}
+                        clientName={clientData.name}
+                    />
+                ) : selectedClientId ? (
                     <div className="space-y-6">
                         {pages.length === 0 ? (
-                            <Card className="border-dashed border-2 bg-muted/30 border-muted-foreground/20">
-                                <CardContent className="flex flex-col items-center justify-center p-12 text-center">
-                                    <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-                                        <AlertCircle className="w-8 h-8 text-muted-foreground" />
-                                    </div>
-                                    <h3 className="text-lg font-semibold text-foreground">No Meta Accounts Connected</h3>
-                                    <p className="text-sm text-muted-foreground max-w-sm mt-2">
-                                        This client doesn't have any Meta Business accounts connected yet. Connect them in the Integrations settings.
-                                    </p>
-                                </CardContent>
-                            </Card>
+                            <PlatformNotConnected
+                                platformName="Meta Business (Facebook & Instagram)"
+                                icon={<SiMeta className="h-10 w-10 text-blue-500" />}
+                                clientName={clientData?.name}
+                            />
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                {pages.map((page) => (
-                                    <Card
+                            <div className="flex flex-col gap-4">
+                                {pages.map((page, index) => (
+                                    <div
                                         key={page.id}
                                         onClick={() => {
                                             setSelectedPageId(page.id);
                                             setSelectedPostId(null);
                                         }}
+                                        style={{ animationDelay: `${index * 100}ms` }}
                                         className={cn(
-                                            "group cursor-pointer transition-all duration-300 border-l-4 hover:shadow-md",
+                                            "group cursor-pointer transition-all duration-500 border rounded-[28px] flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5",
                                             selectedPageId === page.id
-                                                ? "border-l-primary ring-2 ring-primary/10 shadow-md bg-card"
-                                                : "border-l-transparent border-border hover:border-primary/50 bg-card/80"
+                                                ? "border-zinc-300 bg-white ring-1 ring-zinc-100"
+                                                : "border-zinc-100 hover:border-zinc-200 hover:bg-zinc-50/50 bg-white/50 opacity-90 hover:opacity-100"
                                         )}
                                     >
-                                        <CardContent className="p-5">
-                                            <div className="flex items-start justify-between mb-4">
-                                                <div className="flex items-center gap-3">
-                                                    <Avatar className="h-10 w-10 border border-border shadow-sm">
-                                                        <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">
-                                                            {page.name?.substring(0, 2).toUpperCase() || 'FB'}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                    <div>
-                                                        <h3 className="font-semibold text-sm text-foreground line-clamp-1" title={page.name}>
-                                                            {page.name}
-                                                        </h3>
-                                                        <div className="flex items-center gap-1.5 mt-1">
-                                                            <div className="flex items-center gap-1 bg-blue-500/10 px-1.5 py-0.5 rounded text-[10px] text-blue-600 font-medium dark:text-blue-400">
-                                                                <SiFacebook className="w-3 h-3" />
-                                                                <span className="hidden sm:inline">Page</span>
-                                                            </div>
-                                                            {page.instagram_business_account && (
-                                                                <div className="flex items-center gap-1 bg-pink-500/10 px-1.5 py-0.5 rounded text-[10px] text-pink-600 font-medium dark:text-pink-400">
-                                                                    <SiInstagram className="w-3 h-3" />
-                                                                    <span className="hidden sm:inline">Linked</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
+                                        <div className="flex items-center gap-4 mb-4 sm:mb-0">
+                                            <Avatar className="h-12 w-12 border border-zinc-100 rounded-xl">
+                                                <AvatarFallback className="bg-muted text-foreground font-semibold text-sm rounded-xl">
+                                                    {page.name?.substring(0, 2).toUpperCase() || 'FB'}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <div>
+                                                <h3 className="font-semibold text-base text-foreground tracking-tight" title={page.name}>
+                                                    {page.name}
+                                                </h3>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
+                                                        <SiFacebook className="w-3.5 h-3.5 text-blue-600/80 saturate-50" />
+                                                        <span className="hidden sm:inline">Facebook Page</span>
                                                     </div>
+                                                    {page.instagram_business_account && (
+                                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium border-l pl-2.5 ml-0.5 border-border/50">
+                                                            <SiInstagram className="w-3.5 h-3.5 text-pink-600/80 saturate-50" />
+                                                            <span className="hidden sm:inline">Instagram Linked</span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
+                                        </div>
 
-                                            <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-border">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-8 text-xs font-medium text-muted-foreground hover:text-primary hover:bg-primary/10"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleSyncBoth(page.accountId);
-                                                    }}
-                                                    disabled={isSyncingBoth && syncingPageId === page.accountId.toString()}
-                                                >
-                                                    {isSyncingBoth && syncingPageId === page.accountId.toString() ? (
-                                                        <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
-                                                    ) : (
-                                                        <RefreshCw className="w-3 h-3 mr-1.5" />
-                                                    )}
-                                                    Sync All
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-8 text-xs font-medium text-muted-foreground hover:text-pink-600 hover:bg-pink-500/10 disabled:opacity-50"
-                                                    disabled={!page.instagram_business_account}
-                                                >
-                                                    <LayoutGrid className="w-3 h-3 mr-1.5" />
-                                                    View Details
-                                                </Button>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
+                                        <div className="flex items-center gap-3">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-9 px-4 font-medium text-muted-foreground hover:text-foreground transition-colors"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleSyncBoth(page.accountId);
+                                                }}
+                                                disabled={isSyncingBoth && syncingPageId === page.accountId.toString()}
+                                            >
+                                                {isSyncingBoth && syncingPageId === page.accountId.toString() ? (
+                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                ) : (
+                                                    <RefreshCw className="w-4 h-4 mr-2 opacity-70" />
+                                                )}
+                                                Sync Data
+                                            </Button>
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                className="h-9 px-4 font-medium transition-colors"
+                                                disabled={!page.instagram_business_account && selectedPageId !== page.id}
+                                            >
+                                                {selectedPageId === page.id ? (
+                                                    <>Active View</>
+                                                ) : (
+                                                    <>
+                                                        <LayoutGrid className="w-4 h-4 mr-2" />
+                                                        View Details
+                                                    </>
+                                                )}
+                                            </Button>
+                                        </div>
+                                    </div>
                                 ))}
                             </div>
                         )}
@@ -390,102 +429,76 @@ function MetaBusinessDetailPage() {
 
                         {/* --- 3. Main Data Area --- */}
                         {selectedPageId && (
-                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <div className="space-y-8">
 
                                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                                    <div className="flex items-center justify-between mb-6">
-                                        <TabsList className="bg-card border border-border p-1 shadow-sm h-11">
+                                    <div className="flex items-center justify-between mb-8">
+                                        <TabsList className="bg-muted/30 border border-border/40 p-1.5 shadow-none h-12 rounded-xl">
                                             <TabsTrigger
                                                 value="facebook"
-                                                className="data-[state=active]:bg-blue-500/10 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 px-6 h-9"
+                                                className="data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm px-8 h-9 rounded-[10px] transition-all"
                                             >
-                                                <SiFacebook className="w-4 h-4 mr-2" />
-                                                Facebook Page
+                                                <SiFacebook className="w-4 h-4 mr-2 opacity-70" />
+                                                Facebook
                                             </TabsTrigger>
                                             <TabsTrigger
                                                 value="instagram"
-                                                className="data-[state=active]:bg-pink-500/10 data-[state=active]:text-pink-600 dark:data-[state=active]:text-pink-400 px-6 h-9"
+                                                className="data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm px-8 h-9 rounded-[10px] transition-all"
                                                 disabled={!pages.find(p => p.id === selectedPageId)?.instagram_business_account}
                                             >
-                                                <SiInstagram className="w-4 h-4 mr-2" />
+                                                <SiInstagram className="w-4 h-4 mr-2 opacity-70" />
                                                 Instagram
                                             </TabsTrigger>
                                         </TabsList>
+                                        
+                                        <div className="hidden md:flex items-center gap-3">
+                                            {/* Compact Followers (Tab Aware) */}
+                                            {((activeTab === 'facebook' && 
+                                                pageInfoData?.page?.fan_count !== undefined) || 
+                                                (activeTab === 'instagram' && 
+                                                igProfileData?.data?.followers_count !== undefined)) && (
+                                                <div className="flex items-center gap-2 px-3 h-12 rounded-xl bg-muted/20 border border-border/40 text-muted-foreground whitespace-nowrap group hover:bg-muted/30 transition-colors">
+                                                    <Users className="w-3.5 h-3.5" />
+                                                    <span className="text-xs font-bold text-foreground">
+                                                        {activeTab === 'facebook' 
+                                                            ? pageInfoData?.page?.fan_count?.toLocaleString() 
+                                                            : igProfileData?.data?.followers_count?.toLocaleString()}
+                                                    </span>
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider opacity-60 ml-0.5">Followers</span>
+                                                </div>
+                                            )}
 
-                                        <div className="text-sm text-muted-foreground">
-                                            Showing data for <span className="font-semibold text-foreground">{pages.find(p => p.id === selectedPageId)?.name}</span>
+                                            {/* Compact Category */}
+                                            {pageInfoData?.page?.category_list?.[0] && (
+                                                <div className="flex items-center gap-2 px-3 h-12 rounded-xl bg-muted/20 border border-border/40 text-muted-foreground whitespace-nowrap">
+                                                    <Building2 className="w-3.5 h-3.5" />
+                                                    <span className="text-xs font-bold text-foreground">{pageInfoData?.page?.category_list?.[0]?.name}</span>
+                                                </div>
+                                            )}
+
+                                            {/* Actively Analyzing / Page Name */}
+                                            <div className="flex items-center gap-3 px-4 h-12 rounded-xl bg-foreground/5 border border-foreground/10 transition-all">
+                                                <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Live</span>
+                                                <div className="w-px h-4 bg-foreground/10" />
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.4)]" />
+                                                    <span className="text-xs font-bold text-foreground tracking-tight">{pages.find(p => p.id === selectedPageId)?.name}</span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* === FACEBOOK TAB === */}
                                     <TabsContent value="facebook" className="mt-0">
-                                        {/* Page Overview Section */}
-                                        {pageInfoData?.success && pageInfoData.page && (
-                                            <Card className="mb-6 border-border shadow-sm bg-card">
-                                                <CardHeader className="border-b border-border pb-4">
-                                                    <CardTitle className="text-base flex items-center gap-2">
-                                                        <LayoutGrid className="w-4 h-4 text-blue-600" />
-                                                        Page Overview
-                                                    </CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="p-6">
-                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                        {/* Followers */}
-                                                        <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/20 border border-border">
-                                                            <div className="p-2 rounded-full bg-blue-500/10">
-                                                                <ThumbsUp className="w-5 h-5 text-blue-600" />
-                                                            </div>
-                                                            <div>
-                                                                <p className="text-xs text-muted-foreground">Page Followers</p>
-                                                                <p className="text-2xl font-bold text-foreground">{pageInfoData.page.fan_count.toLocaleString()}</p>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Category */}
-                                                        {pageInfoData.page.category_list && pageInfoData.page.category_list.length > 0 && (
-                                                            <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/20 border border-border">
-                                                                <div className="p-2 rounded-full bg-purple-500/10">
-                                                                    <LayoutGrid className="w-5 h-5 text-purple-600" />
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-xs text-muted-foreground">Category</p>
-                                                                    <p className="text-sm font-semibold text-foreground">{pageInfoData.page.category_list[0].name}</p>
-                                                                </div>
-                                                            </div>
-                                                        )}
-
-                                                        {/* Page Link */}
-                                                        <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/20 border border-border">
-                                                            <div className="p-2 rounded-full bg-green-500/10">
-                                                                <ExternalLink className="w-5 h-5 text-green-600" />
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="text-xs text-muted-foreground mb-1">Facebook Page</p>
-                                                                <a
-                                                                    href={pageInfoData.page.link}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="text-sm font-semibold text-blue-600 hover:underline truncate block"
-                                                                >
-                                                                    View Page
-                                                                </a>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        )}
-
                                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[700px]">
                                             {/* FB Posts List */}
-                                            <Card className="lg:col-span-4 flex flex-col h-full border-border shadow-sm overflow-hidden bg-card">
-                                                <CardHeader className="bg-muted/30 border-b border-border py-4 px-5">
+                                            <Card className="lg:col-span-4 flex flex-col h-full border-border/60 shadow-sm overflow-hidden bg-card rounded-2xl">
+                                                <CardHeader className="bg-card border-b border-border/40 py-5 px-6">
                                                     <div className="flex items-center justify-between">
-                                                        <CardTitle className="text-sm font-semibold text-foreground">Recent Posts</CardTitle>
-                                                        <Badge variant="outline" className="bg-card border-border text-foreground">{posts.length}</Badge>
+                                                        <CardTitle className="text-base font-bold text-foreground font-satoshi tracking-tight">Recent Posts</CardTitle>
+                                                        <Badge variant="outline" className="bg-muted/30 border-border/60 text-foreground font-semibold px-2.5 rounded-md">{posts.length}</Badge>
                                                     </div>
                                                 </CardHeader>
-                                                <div className="flex-1 overflow-y-auto p-0">
+                                                <div className="flex-1 overflow-y-auto p-2 scrollbar-hide">
                                                     {isLoadingPosts ? (
                                                         <div className="p-4 grid grid-cols-3 gap-1">
                                                             {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="aspect-square w-full" />)}
@@ -502,18 +515,22 @@ function MetaBusinessDetailPage() {
                                                                     key={post.id}
                                                                     onClick={() => setSelectedPostId(post.id)}
                                                                     className={cn(
-                                                                        "aspect-square relative cursor-pointer group overflow-hidden rounded-sm",
-                                                                        selectedPostId === post.id ? "ring-2 ring-blue-500 z-10" : ""
+                                                                        "aspect-square relative cursor-pointer group overflow-hidden rounded-xl border border-border/30",
+                                                                        selectedPostId === post.id ? "ring-2 ring-foreground z-10 border-transparent shadow-sm" : "hover:border-foreground/30 hover:shadow-sm transition-all"
                                                                     )}
                                                                 >
                                                                     {post.attachments?.data?.[0]?.media?.image?.src ? (
-                                                                        <img src={post.attachments.data[0].media.image.src} alt="" className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-500" />
+                                                                        <img src={post.attachments.data[0].media.image.src} alt="" className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-700 ease-out" />
                                                                     ) : (
-                                                                        <div className="w-full h-full bg-muted flex items-center justify-center">
+                                                                        <div className="w-full h-full bg-muted/30 flex items-center justify-center">
                                                                             <SiFacebook className="text-muted-foreground/30 w-8 h-8" />
                                                                         </div>
                                                                     )}
-                                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                                                        <div className="absolute bottom-2 left-2 flex items-center gap-2 text-white/90 text-xs font-medium drop-shadow-md">
+                                                                            <span className="flex items-center gap-1"><ThumbsUp className="w-3 h-3" /> {post.likes?.summary?.total_count || 0}</span>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -527,174 +544,106 @@ function MetaBusinessDetailPage() {
                                                     const selectedPost = posts.find(p => p.id === selectedPostId);
                                                     if (!selectedPost) return null;
 
+                                                    const previewUrl = selectedPost.attachments?.data?.[0]?.media?.image?.src || selectedPost.full_picture;
+
                                                     return (
                                                         <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
-                                                            <Card className="border-border shadow-sm bg-card">
-                                                                <CardHeader className="border-b border-border pb-4">
-                                                                    <CardTitle className="text-base flex items-center gap-2">
-                                                                        <BarChart3 className="w-4 h-4 text-blue-600" />
-                                                                        Post Details
-                                                                    </CardTitle>
-                                                                </CardHeader>
-                                                                <CardContent className="p-6 space-y-4">
-                                                                    {/* Post Message */}
-                                                                    {selectedPost.message && (
-                                                                        <div>
-                                                                            <h4 className="text-sm font-semibold text-foreground mb-2">Caption</h4>
-                                                                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedPost.message}</p>
+                                                            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                                                                {/* Left: Media Preview */}
+                                                                <div className="md:col-span-5">
+                                                                    <Card className="border-border/60 overflow-hidden shadow-sm bg-card rounded-2xl flex flex-col h-full">
+                                                                        <div className="aspect-square bg-muted/20 flex items-center justify-center relative group">
+                                                                            {previewUrl ? (
+                                                                                <img
+                                                                                    src={previewUrl}
+                                                                                    alt="Post Preview"
+                                                                                    className="max-h-full max-w-full object-contain"
+                                                                                />
+                                                                            ) : (
+                                                                                <div className="flex flex-col items-center gap-2 text-muted-foreground/40">
+                                                                                    <ImageIcon className="w-12 h-12" />
+                                                                                    <span className="text-xs font-medium">No Preview Available</span>
+                                                                                </div>
+                                                                            )}
                                                                         </div>
-                                                                    )}
-
-                                                                    {/* Engagement Metrics */}
-                                                                    <div>
-                                                                        <h4 className="text-sm font-semibold text-foreground mb-3">Engagement</h4>
-                                                                        <div className="grid grid-cols-3 gap-4">
-                                                                            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/20 border border-border">
-                                                                                <ThumbsUp className="w-4 h-4 text-blue-600" />
-                                                                                <div>
-                                                                                    <p className="text-xs text-muted-foreground">Likes</p>
-                                                                                    <p className="text-lg font-bold text-foreground">{selectedPost.likes?.summary?.total_count || 0}</p>
-                                                                                </div>
+                                                                        <CardContent className="p-5 bg-card flex-1 flex flex-col">
+                                                                            <p className="text-sm text-foreground line-clamp-4 leading-relaxed flex-1 italic">
+                                                                                {selectedPost.message || "No text content"}
+                                                                            </p>
+                                                                            <div className="flex items-center gap-6 mt-4 pt-4 border-t border-border/40 text-sm font-medium text-muted-foreground">
+                                                                                <span className="flex items-center gap-2"><ThumbsUp className="w-4 h-4 text-foreground/80" /> {selectedPost.likes?.summary?.total_count || 0}</span>
+                                                                                <span className="flex items-center gap-2"><MessageCircle className="w-4 h-4 text-foreground/80" /> {selectedPost.comments?.summary?.total_count || 0}</span>
                                                                             </div>
-                                                                            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/20 border border-border">
-                                                                                <MessageCircle className="w-4 h-4 text-green-600" />
-                                                                                <div>
-                                                                                    <p className="text-xs text-muted-foreground">Comments</p>
-                                                                                    <p className="text-lg font-bold text-foreground">{selectedPost.comments?.summary?.total_count || 0}</p>
-                                                                                </div>
+                                                                        </CardContent>
+                                                                    </Card>
+                                                                </div>
+
+                                                                {/* Right: Insights */}
+                                                                <div className="md:col-span-7 space-y-6">
+                                                                    <Card className="border-border/60 shadow-sm bg-card rounded-2xl h-full flex flex-col">
+                                                                        <CardHeader className="border-b border-border/40 py-5 px-6">
+                                                                            <div className="flex items-center justify-between">
+                                                                                <CardTitle className="text-sm font-bold text-foreground font-satoshi tracking-tight flex items-center gap-2">
+                                                                                    <BarChart3 className="w-4 h-4 text-muted-foreground" />
+                                                                                    Performance Analytics
+                                                                                </CardTitle>
+                                                                                <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-widest bg-muted/30 px-2 py-0.5 rounded-full">
+                                                                                    Facebook
+                                                                                </span>
                                                                             </div>
-                                                                            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/20 border border-border">
-                                                                                <ExternalLink className="w-4 h-4 text-purple-600" />
-                                                                                <div>
-                                                                                    <p className="text-xs text-muted-foreground">Shares</p>
-                                                                                    <p className="text-lg font-bold text-foreground">{selectedPost.shares?.count || 0}</p>
-                                                                                </div>
+                                                                        </CardHeader>
+                                                                        <CardContent className="p-6 space-y-6 flex-1">
+                                                                            {(() => {
+                                                                                return (
+                                                                                    <div className="space-y-6">
+                                                                                        {/* Engagement Breakdown from post data */}
+                                                                                        <div className="p-5 rounded-2xl border border-border/40 bg-card/50 space-y-4">
+                                                                                            <div className="flex items-center justify-between">
+                                                                                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Engagement Breakdown</span>
+                                                                                                <div className="h-px bg-border/40 flex-1 ml-4" />
+                                                                                            </div>
+                                                                                            <div className="grid grid-cols-2 gap-4">
+                                                                                                <div className="flex justify-between items-center px-2 py-1">
+                                                                                                    <span className="text-xs text-muted-foreground flex items-center gap-2"><ThumbsUp className="w-3 h-3" /> Likes</span>
+                                                                                                    <span className="text-sm font-bold">{selectedPost.likes?.summary?.total_count || 0}</span>
+                                                                                                </div>
+                                                                                                <div className="flex justify-between items-center px-2 py-1 border-l border-border/40">
+                                                                                                    <span className="text-xs text-muted-foreground flex items-center gap-2"><MessageCircle className="w-3 h-3" /> Comments</span>
+                                                                                                    <span className="text-sm font-bold">{selectedPost.comments?.summary?.total_count || 0}</span>
+                                                                                                </div>
+                                                                                                <div className="flex justify-between items-center px-2 py-1">
+                                                                                                    <span className="text-xs text-muted-foreground flex items-center gap-2"><Share2 className="w-3 h-3" /> Shares</span>
+                                                                                                    <span className="text-sm font-bold">{selectedPost.shares?.count || 0}</span>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            })()}
+
+                                                                            <div className="pt-6 border-t border-border/40 mt-auto">
+                                                                                <Button variant="outline" size="sm" asChild className="w-full text-xs font-semibold h-10 rounded-xl border-border/60 hover:bg-muted/10">
+                                                                                    <a href={selectedPost.permalink_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2">
+                                                                                        <SiFacebook className="w-3 h-3" />
+                                                                                        View Official Post
+                                                                                        <ExternalLink className="w-3 h-3 ml-1 opacity-60" />
+                                                                                    </a>
+                                                                                </Button>
                                                                             </div>
-                                                                        </div>
-                                                                    </div>
-
-                                                                    {/* Post Date */}
-                                                                    <div>
-                                                                        <h4 className="text-sm font-semibold text-foreground mb-2">Posted</h4>
-                                                                        <p className="text-sm text-muted-foreground">{new Date(selectedPost.created_time).toLocaleString()}</p>
-                                                                    </div>
-
-                                                                    {/* Post Insights (Custom Layout) */}
-                                                                    {postInsightsData?.data?.data && (() => {
-                                                                        // Helper to get metric value safely
-                                                                        const getMetricValue = (metricName: string): number => {
-                                                                            const metric = postInsightsData.data.data.find((m: any) => m.name === metricName);
-                                                                            // console.log(`Metric ${metricName}:`, metric); // Debug individual metric
-                                                                            if (!metric?.values?.[0]?.value) return 0;
-
-                                                                            // Handle object values (like reactions/clicks map) by summing values
-                                                                            if (typeof metric.values[0].value === 'object') {
-                                                                                return Object.values(metric.values[0].value).reduce((a: any, b: any) => a + b, 0) as number;
-                                                                            }
-
-                                                                            return metric.values[0].value as number;
-                                                                        };
-
-                                                                        console.log("Post Insights Data:", postInsightsData);
-
-                                                                        // Try multiple click metrics to find available data
-                                                                        const clicks = getMetricValue('post_clicks') ||
-                                                                            getMetricValue('post_clicks_unique') ||
-                                                                            getMetricValue('post_clicks_by_type');
-
-                                                                        const reactions = getMetricValue('post_reactions_by_type_total');
-                                                                        const reach = getMetricValue('post_impressions_unique');
-                                                                        const impressions = getMetricValue('post_impressions');
-
-                                                                        return (
-                                                                            <div>
-                                                                                <h4 className="text-sm font-semibold text-foreground mb-3">Performance</h4>
-
-                                                                                {/* Row 1: Engagement Cards */}
-                                                                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                                                                                    {/* Likes (from Post Object) */}
-                                                                                    <div className="p-3 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border border-border">
-                                                                                        <div className="flex items-center gap-2 mb-1">
-                                                                                            <ThumbsUp className="w-4 h-4 text-blue-600" />
-                                                                                            <p className="text-xs text-muted-foreground">Likes</p>
-                                                                                        </div>
-                                                                                        <p className="text-lg font-bold text-foreground">{selectedPost.likes?.summary?.total_count || 0}</p>
-                                                                                    </div>
-
-                                                                                    {/* Comments (from Post Object) */}
-                                                                                    <div className="p-3 rounded-lg bg-green-50/50 dark:bg-green-950/20 border border-border">
-                                                                                        <div className="flex items-center gap-2 mb-1">
-                                                                                            <MessageCircle className="w-4 h-4 text-green-600" />
-                                                                                            <p className="text-xs text-muted-foreground">Comments</p>
-                                                                                        </div>
-                                                                                        <p className="text-lg font-bold text-foreground">{selectedPost.comments?.summary?.total_count || 0}</p>
-                                                                                    </div>
-
-                                                                                    {/* Shares (from Post Object) */}
-                                                                                    <div className="p-3 rounded-lg bg-purple-50/50 dark:bg-purple-950/20 border border-border">
-                                                                                        <div className="flex items-center gap-2 mb-1">
-                                                                                            <ExternalLink className="w-4 h-4 text-purple-600" />
-                                                                                            <p className="text-xs text-muted-foreground">Shares</p>
-                                                                                        </div>
-                                                                                        <p className="text-lg font-bold text-foreground">{selectedPost.shares?.count || 0}</p>
-                                                                                    </div>
-
-                                                                                    {/* Reactions (from Insights) */}
-                                                                                    <div className="p-3 rounded-lg bg-orange-50/50 dark:bg-orange-950/20 border border-border">
-                                                                                        <div className="flex items-center gap-2 mb-1">
-                                                                                            <Smile className="w-4 h-4 text-orange-600" />
-                                                                                            <p className="text-xs text-muted-foreground">Reactions</p>
-                                                                                        </div>
-                                                                                        <p className="text-lg font-bold text-foreground">{reactions || 0}</p>
-                                                                                    </div>
-                                                                                </div>
-
-                                                                                {/* Row 2: Clicks */}
-                                                                                <div className="p-4 rounded-lg bg-muted/20 border border-border mb-4">
-                                                                                    <div className="flex items-center gap-2 mb-2">
-                                                                                        <MousePointerClick className="w-4 h-4 text-foreground" />
-                                                                                        <p className="text-sm font-medium text-foreground">Post Clicks</p>
-                                                                                    </div>
-                                                                                    <p className="text-3xl font-bold text-foreground">{clicks.toLocaleString()}</p>
-                                                                                </div>
-
-                                                                                {/* Row 3: Reach & Impressions */}
-                                                                                <div className="grid grid-cols-2 gap-4">
-                                                                                    <div className="p-3 rounded-lg bg-muted/20 border border-border">
-                                                                                        <p className="text-xs text-muted-foreground">Reach</p>
-                                                                                        <p className="text-lg font-bold text-foreground">{reach.toLocaleString()}</p>
-                                                                                    </div>
-                                                                                    <div className="p-3 rounded-lg bg-muted/20 border border-border">
-                                                                                        <p className="text-xs text-muted-foreground">Impressions</p>
-                                                                                        <p className="text-lg font-bold text-foreground">{impressions.toLocaleString()}</p>
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-                                                                        );
-                                                                    })()}
-                                                                </CardContent>
-                                                            </Card>
-
-                                                            <div className="flex justify-end">
-                                                                <Button variant="outline" size="sm" asChild className="text-xs">
-                                                                    <a
-                                                                        href={selectedPost.permalink_url}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className="flex items-center gap-1"
-                                                                    >
-                                                                        <ExternalLink className="w-3 h-3" />
-                                                                        View Original Post
-                                                                    </a>
-                                                                </Button>
+                                                                        </CardContent>
+                                                                    </Card>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     );
-                                                })() : (<div className="h-full flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl bg-card text-muted-foreground">
-                                                    <MousePointerClick className="w-12 h-12 mb-3 opacity-20" />
-                                                    <h3 className="text-lg font-medium text-foreground">Select a post</h3>
-                                                    <p className="text-sm">Click on a post from the list to view detailed performance metrics</p>
-                                                </div>
+                                                })() : (
+                                                    <div className="h-full flex flex-col items-center justify-center border-2 border-dashed border-border/40 rounded-2xl bg-card/50 text-muted-foreground">
+                                                        <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4 ring-1 ring-border/50">
+                                                            <MousePointerClick className="w-8 h-8 text-muted-foreground/60" />
+                                                        </div>
+                                                        <h3 className="text-lg font-semibold text-foreground tracking-tight">Select a post</h3>
+                                                        <p className="text-sm mt-1 max-w-xs text-center leading-relaxed">Click on a post from the grid to view detailed performance metrics</p>
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
@@ -740,23 +689,28 @@ function MetaBusinessDetailPage() {
                                                                     key={item.id}
                                                                     onClick={() => setSelectedIgMediaId(item.id)}
                                                                     className={cn(
-                                                                        "aspect-square relative cursor-pointer group overflow-hidden rounded-sm",
-                                                                        selectedIgMediaId === item.id ? "ring-2 ring-pink-500 z-10" : ""
+                                                                        "aspect-square relative cursor-pointer group overflow-hidden rounded-xl border border-border/30",
+                                                                        selectedIgMediaId === item.id ? "ring-2 ring-foreground z-10 border-transparent shadow-sm" : "hover:border-foreground/30 hover:shadow-sm transition-all"
                                                                     )}
                                                                 >
                                                                     {previewUrl ? (
-                                                                        <img src={previewUrl} alt="IG Media" className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-500" />
+                                                                        <img src={previewUrl} alt="IG Media" className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-700 ease-out" />
                                                                     ) : (
-                                                                        <div className="w-full h-full bg-muted flex items-center justify-center">
+                                                                        <div className="w-full h-full bg-muted/30 flex items-center justify-center">
                                                                             <SiInstagram className="text-muted-foreground/30 w-8 h-8" />
                                                                         </div>
                                                                     )}
                                                                     {item.media_type === 'VIDEO' && (
-                                                                        <div className="absolute top-1 right-1 bg-black/50 p-1 rounded-full text-white backdrop-blur-sm">
-                                                                            <Video className="w-3 h-3" />
+                                                                        <div className="absolute top-2 right-2 bg-black/60 p-1.5 rounded-full text-white backdrop-blur-md shadow-sm">
+                                                                            <Video className="w-3.5 h-3.5" />
                                                                         </div>
                                                                     )}
-                                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                                                        <div className="absolute bottom-2 left-2 flex items-center gap-3 text-white/90 text-[10px] font-medium drop-shadow-md tracking-wider">
+                                                                            <span className="flex items-center gap-1"><ThumbsUp className="w-3 h-3" /> {item.like_count || 0}</span>
+                                                                            <span className="flex items-center gap-1"><MessageCircle className="w-3 h-3" /> {item.comments_count || 0}</span>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                             );
                                                             })}
@@ -767,92 +721,110 @@ function MetaBusinessDetailPage() {
 
                                             {/* IG Insights Detail */}
                                             <div className="lg:col-span-8 flex flex-col h-full space-y-6 overflow-y-auto pr-1">
-                                                {selectedIgMediaId ? (
-                                                    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                            {/* Media Preview */}
-                                                            <Card className="border-border overflow-hidden shadow-sm bg-card">
-                                                                <div className="aspect-square bg-muted/80 flex items-center justify-center">
-                                                                    {(() => {
-                                                                        const selectedMedia = igMedia.find((m: any) => m.id === selectedIgMediaId);
-                                                                        if (!selectedMedia?.media_url) {
-                                                                            return <div className="text-muted-foreground/50">No Media</div>;
-                                                                        }
+                                                {selectedIgMediaId ? (() => {
+                                                    const selectedMedia = igMedia.find((m: any) => m.id === selectedIgMediaId);
+                                                    if (!selectedMedia) return null;
 
-                                                                        // Check if it's a video
-                                                                        if (selectedMedia.media_type === 'VIDEO') {
-                                                                            return (
-                                                                                <video
-                                                                                    src={selectedMedia.media_url}
-                                                                                    className="max-h-full max-w-full object-contain"
-                                                                                    controls
-                                                                                    loop
-                                                                                    muted
-                                                                                    playsInline
-                                                                                    onMouseEnter={(e) => e.currentTarget.play()}
-                                                                                    onMouseLeave={(e) => e.currentTarget.pause()}
-                                                                                    poster={selectedMedia.thumbnail_url || undefined}
-                                                                                />
-                                                                            );
-                                                                        }
-
-                                                                        // Otherwise show image
-                                                                        return (
-                                                                            <img
-                                                                                src={selectedMedia.media_url}
-                                                                                alt="Selected"
-                                                                                className="max-h-full max-w-full object-contain"
-                                                                            />
-                                                                        );
-                                                                    })()}
-                                                                </div>
-                                                                <CardContent className="p-4 bg-card">
-                                                                    <p className="text-sm text-foreground line-clamp-2">
-                                                                        {igMedia.find((m: any) => m.id === selectedIgMediaId)?.caption || "No caption"}
-                                                                    </p>
-                                                                    <div className="flex items-center gap-4 mt-3 text-xs text-slate-500">
-                                                                        <span className="flex items-center gap-1"><ThumbsUp className="w-3 h-3" /> {igMedia.find((m: any) => m.id === selectedIgMediaId)?.like_count || 0}</span>
-                                                                        <span className="flex items-center gap-1"><MessageCircle className="w-3 h-3" /> {igMedia.find((m: any) => m.id === selectedIgMediaId)?.comments_count || 0}</span>
-                                                                    </div>
-                                                                </CardContent>
-                                                            </Card>
-
-                                                            {/* Insights Metrics */}
-                                                            <div className="space-y-4">
-                                                                <Card className="border-pink-100 bg-pink-50/30">
-                                                                    <CardHeader className="py-3 px-4 border-b border-pink-100/50">
-                                                                        <CardTitle className="text-sm font-semibold text-pink-900 flex items-center gap-2">
-                                                                            <TrendingUp className="w-4 h-4" /> Performance
-                                                                        </CardTitle>
-                                                                    </CardHeader>
-                                                                    <CardContent className="p-4">
-                                                                        {isLoadingIgInsights ? (
-                                                                            <div className="space-y-3">
-                                                                                <Skeleton className="h-12 w-full" />
-                                                                                <Skeleton className="h-12 w-full" />
-                                                                            </div>
-                                                                        ) : igInsightsError ? (
-                                                                            <div className="text-red-500 text-sm">Failed to load insights</div>
-                                                                        ) : (
-                                                                            <div className="space-y-3">
-                                                                                {igInsights.map((metric: any) => (
-                                                                                    <div key={metric.name} className="bg-card p-3 rounded-lg border border-pink-500/10 shadow-sm flex justify-between items-center">
-                                                                                        <span className="text-xs font-medium text-pink-700 dark:text-pink-300 uppercase tracking-wide">{metric.name.replace(/_/g, ' ')}</span>
-                                                                                        <span className="text-lg font-bold text-foreground">{metric.values[0]?.value}</span>
+                                                    return (
+                                                        <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+                                                            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                                                                {/* Media Preview */}
+                                                                <div className="md:col-span-5">
+                                                                    <Card className="border-border/60 overflow-hidden shadow-sm bg-card rounded-2xl flex flex-col h-full">
+                                                                        <div className="aspect-square bg-muted/40 flex items-center justify-center relative group">
+                                                                            {selectedMedia.media_type === 'VIDEO' ? (
+                                                                                <div className="relative w-full h-full flex items-center justify-center">
+                                                                                    <video
+                                                                                        src={selectedMedia.media_url}
+                                                                                        className="max-h-full max-w-full object-contain"
+                                                                                        controls
+                                                                                        playsInline
+                                                                                        poster={selectedMedia.thumbnail_url}
+                                                                                    />
+                                                                                    <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full ring-1 ring-white/20">
+                                                                                        <Play className="w-3 h-3 text-white fill-white" />
                                                                                     </div>
-                                                                                ))}
+                                                                                </div>
+                                                                            ) : (
+                                                                                <img
+                                                                                    src={selectedMedia.media_url}
+                                                                                    alt="Instagram Content"
+                                                                                    className="max-h-full max-w-full object-contain"
+                                                                                />
+                                                                            )}
+                                                                        </div>
+                                                                        <CardContent className="p-5 bg-card flex-1 flex flex-col">
+                                                                            <p className="text-sm text-foreground line-clamp-4 leading-relaxed flex-1 italic">
+                                                                                {selectedMedia.caption || "No caption provided"}
+                                                                            </p>
+                                                                            <div className="flex items-center gap-6 mt-4 pt-4 border-t border-border/40 text-sm font-medium text-muted-foreground">
+                                                                                <span className="flex items-center gap-2"><Heart className="w-4 h-4 text-pink-500/80 fill-pink-500/10" /> {selectedMedia.like_count || 0}</span>
+                                                                                <span className="flex items-center gap-2"><MessageCircle className="w-4 h-4 text-blue-500/80" /> {selectedMedia.comments_count || 0}</span>
                                                                             </div>
-                                                                        )}
-                                                                    </CardContent>
-                                                                </Card>
+                                                                        </CardContent>
+                                                                    </Card>
+                                                                </div>
+
+                                                                {/* Insights */}
+                                                                <div className="md:col-span-7 space-y-4">
+                                                                    <Card className="border-border/60 bg-card rounded-2xl h-full shadow-sm flex flex-col">
+                                                                        <CardHeader className="py-5 px-6 border-b border-border/40">
+                                                                            <div className="flex items-center justify-between">
+                                                                                <CardTitle className="text-sm font-bold text-foreground font-satoshi tracking-tight flex items-center gap-2">
+                                                                                    <TrendingUp className="w-4 h-4 text-muted-foreground" /> Performance Analytics
+                                                                                </CardTitle>
+                                                                                <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-widest bg-muted/30 px-2 py-0.5 rounded-full">
+                                                                                    Instagram
+                                                                                </span>
+                                                                            </div>
+                                                                        </CardHeader>
+                                                                        <CardContent className="p-6 space-y-6 flex-1">
+                                                                            {(() => {
+                                                                                return (
+                                                                                    <div className="space-y-6">
+                                                                                        {/* Engagement Breakdown */}
+                                                                                        <div className="p-5 rounded-2xl border border-border/40 bg-card/50 space-y-4">
+                                                                                            <div className="flex items-center justify-between">
+                                                                                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Breakdown</span>
+                                                                                                <div className="h-px bg-border/40 flex-1 ml-4" />
+                                                                                            </div>
+                                                                                            <div className="grid grid-cols-2 gap-4">
+                                                                                                <div className="flex justify-between items-center px-2 py-1">
+                                                                                                    <span className="text-xs text-muted-foreground flex items-center gap-2"><Heart className="w-3 h-3" /> Likes</span>
+                                                                                                    <span className="text-sm font-bold">{selectedMedia.like_count || 0}</span>
+                                                                                                </div>
+                                                                                                <div className="flex justify-between items-center px-2 py-1 border-l border-border/40">
+                                                                                                    <span className="text-xs text-muted-foreground flex items-center gap-2"><MessageCircle className="w-3 h-3" /> Comments</span>
+                                                                                                    <span className="text-sm font-bold">{selectedMedia.comments_count || 0}</span>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            })()}
+
+                                                                            <div className="pt-6 border-t border-border/40 mt-auto">
+                                                                                <Button variant="outline" size="sm" asChild className="w-full text-xs font-semibold h-10 rounded-xl border-border/60 hover:bg-muted/10">
+                                                                                    <a href={selectedMedia.permalink} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2">
+                                                                                        <SiInstagram className="w-3 h-3" />
+                                                                                        View Official Media
+                                                                                        <ExternalLink className="w-3 h-3 ml-1 opacity-60" />
+                                                                                    </a>
+                                                                                </Button>
+                                                                            </div>
+                                                                        </CardContent>
+                                                                    </Card>
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="h-full flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl bg-card text-muted-foreground">
-                                                        <SiInstagram className="w-12 h-12 mb-3 opacity-20" />
-                                                        <h3 className="text-lg font-medium text-foreground">Select media</h3>
-                                                        <p className="text-sm">Choose an image or video to view performance</p>
+                                                    );
+                                                })() : (
+                                                    <div className="h-full flex flex-col items-center justify-center border-2 border-dashed border-border/40 rounded-2xl bg-card/50 text-muted-foreground">
+                                                        <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4 ring-1 ring-border/50">
+                                                            <SiInstagram className="w-8 h-8 text-muted-foreground/60" />
+                                                        </div>
+                                                        <h3 className="text-lg font-semibold text-foreground tracking-tight">Select media</h3>
+                                                        <p className="text-sm mt-1 max-w-xs text-center leading-relaxed">Choose an image or video from the grid to view detailed performance metrics</p>
                                                     </div>
                                                 )}
                                             </div>
@@ -863,18 +835,28 @@ function MetaBusinessDetailPage() {
                         )}
                     </div>
                 ) : (
-                    <div className="h-[60vh] flex flex-col items-center justify-center text-center">
-                        <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-6 animate-pulse">
-                            <MousePointerClick className="w-10 h-10 text-muted-foreground" />
+                    <div className="h-[60vh] flex flex-col items-center justify-center text-center animate-in fade-in zoom-in-95 duration-700">
+                        <div className="relative mb-8">
+                            <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full" />
+                            <div className="relative w-24 h-24 bg-card border border-border/60 rounded-3xl flex items-center justify-center shadow-2xl overflow-hidden group">
+                                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent group-hover:opacity-100 transition-opacity" />
+                                <MousePointerClick className="w-10 h-10 text-foreground/80 relative z-10 group-hover:scale-110 transition-transform duration-500" />
+                            </div>
                         </div>
-                        <h2 className="text-2xl font-bold text-foreground mb-2">Select a Client</h2>
-                        <p className="text-muted-foreground max-w-md mx-auto">
-                            Choose a client from the dropdown above to manage their Meta Business assets, view insights, and sync data.
+                        <h2 className="text-3xl font-bold text-foreground mb-3 font-satoshi tracking-tight">Select a Client</h2>
+                        <p className="text-muted-foreground max-w-sm mx-auto leading-relaxed">
+                            Choose a client from the dropdown above to unlock Meta Business insights, manage assets, and sync your cross-platform data.
                         </p>
+                        <div className="mt-8 flex gap-2">
+                            <div className="w-2 h-2 rounded-full bg-border" />
+                            <div className="w-2 h-2 rounded-full bg-border/60" />
+                            <div className="w-2 h-2 rounded-full bg-border/30" />
+                        </div>
                     </div>
                 )}
             </div>
         </div>
+    </div>
     );
 }
 

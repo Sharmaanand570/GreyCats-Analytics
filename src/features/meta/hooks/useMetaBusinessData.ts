@@ -130,7 +130,7 @@ export const useFacebookPostInsights = (postId: string | undefined) => {
   return useQuery({
     queryKey: ["meta-business", "facebook", "post-insights", postId],
     queryFn: () => getFacebookPostInsights(postId!, {
-      metrics: "post_impressions,post_impressions_unique,post_clicks,post_clicks_unique,post_clicks_by_type,post_reactions_by_type_total"
+      metrics: "post_impressions,post_impressions_unique,post_engaged_users,post_reactions_by_type_total"
     }),
     enabled: !!postId,
     ...commonQueryOptions,

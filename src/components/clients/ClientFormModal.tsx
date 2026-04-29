@@ -55,8 +55,8 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({ open, onClose, client
         }
     }, [client, open]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSubmit = async (e?: React.FormEvent | React.KeyboardEvent) => {
+        if (e) e.preventDefault();
 
         if (!name.trim()) return;
 
@@ -149,6 +149,12 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({ open, onClose, client
                                 maxLength={50}
                                 required
                                 autoFocus
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleSubmit(e);
+                                    }
+                                }}
                             />
                         </div>
 
@@ -162,6 +168,12 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({ open, onClose, client
                                 disabled={isLoading}
                                 maxLength={500}
                                 rows={3}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSubmit(e);
+                                    }
+                                }}
                             />
                         </div>
 

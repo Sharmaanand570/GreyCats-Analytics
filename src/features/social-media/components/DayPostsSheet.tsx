@@ -203,7 +203,7 @@ export function DayPostsSheet({
                   {post.status === 'FAILED' && post.errorMessage && (
                     <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-xs text-red-700 font-medium leading-relaxed">
                       <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                      <span className="line-clamp-2">{post.errorMessage}</span>
+                      <span className="break-words">{post.errorMessage}</span>
                     </div>
                   )}
 

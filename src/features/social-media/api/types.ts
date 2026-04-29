@@ -1,6 +1,6 @@
 // Scheduled Posts — Backend-aligned types
 
-export type PostPlatform = 'facebook' | 'instagram' | 'both';
+export type PostPlatform = 'facebook' | 'instagram' | 'both' | 'linkedin';
 export type PostStatus = 'PENDING' | 'PROCESSING' | 'PUBLISHED' | 'FAILED';
 export type MediaType = 'IMAGE' | 'VIDEO' | 'CAROUSEL';
 export type PostType = 'FEED' | 'STORY';
@@ -25,6 +25,7 @@ export interface ScheduledPost {
   platform: PostPlatform;
   metaAccountId?: number | null;
   twitterAccountId?: number | null;
+  linkedinPortAccountId?: number | null;
   postType?: PostType;
   message: string | null;
   firstComment: string | null;
@@ -57,6 +58,7 @@ export interface LocationSearchResult {
 export interface CreatePostPayload {
   metaAccountId?: number;
   twitterAccountId?: number;
+  linkedinPortAccountId?: number;
   clientId?: number;
   platform: PostPlatform;
   postType?: PostType;
@@ -82,6 +84,7 @@ export interface UpdatePostPayload {
   platform?: PostPlatform;
   metaAccountId?: number;
   twitterAccountId?: number;
+  linkedinPortAccountId?: number;
   postType?: PostType;
   userTags?: UserTag[];
   collaboratorIds?: string[];

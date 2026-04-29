@@ -53,7 +53,7 @@ function MainSideBar(): React.JSX.Element {
   const is404Page = location.pathname.startsWith("/404");
   const { user, fetchProfile, logout } = useUserStore();
   const queryClient = useQueryClient();
-  const { setClients, setCurrentClient } = useClientContext();
+  const { setClients, setCurrentClient, currentClient } = useClientContext();
   const { data: subscriptionData } = useSubscriptionQuery();
   const currentPlanName = subscriptionData?.plan?.planName;
   const currentPlanDisplay = subscriptionData?.plan?.displayName;
@@ -125,8 +125,15 @@ function MainSideBar(): React.JSX.Element {
       handleLogout();
       return;
     }
-    navigate(path);
-    setActive(path);
+
+    // Append clientId to scheduler paths if available
+    let finalPath = path;
+    if (currentClient?.id && (path.includes("social-media/scheduler") || path.includes("blog/scheduler"))) {
+      finalPath = `${path}/${currentClient.id}`;
+    }
+
+    navigate(finalPath);
+    setActive(finalPath);
   };
 
   useEffect(() => {

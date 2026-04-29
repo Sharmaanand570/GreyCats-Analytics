@@ -15,33 +15,11 @@ interface ImageWidgetFormProps {
 }
 
 function ImageWidgetForm({ id, data, onChange }: ImageWidgetFormProps): React.JSX.Element {
-  const [localData, setLocalData] = React.useState(data);
-  const lastWidgetId = React.useRef(id);
-
-  // Sync local data when the widget being edited changes
-  React.useEffect(() => {
-    if (id !== lastWidgetId.current) {
-      setLocalData(data);
-      lastWidgetId.current = id;
-    }
-  }, [data, id]);
-
-  // Debounced update to parent
-  React.useEffect(() => {
-    if (JSON.stringify(localData) === JSON.stringify(data)) return;
-
-    const timer = setTimeout(() => {
-      if (onChange && localData) {
-        onChange(localData);
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [localData, onChange, data]);
-
   const handleChange = (updates: Partial<ImageWidgetData>) => {
-    setLocalData((prev) => ({ ...prev, ...updates } as ImageWidgetData));
+    if (!onChange) return;
+    onChange({ ...(data || {}), ...updates } as ImageWidgetData);
   };
+  void id;
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -60,7 +38,7 @@ function ImageWidgetForm({ id, data, onChange }: ImageWidgetFormProps): React.JS
           <div className="px-4 pb-4">
             <TabsContent value="display" className="mt-0">
               <ImageDisplayTab
-                data={localData}
+                data={data}
                 onChange={handleChange}
               />
             </TabsContent>

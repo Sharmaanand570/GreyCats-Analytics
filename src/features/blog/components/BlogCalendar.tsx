@@ -27,6 +27,7 @@ import {
   ExternalLink,
   FileText,
   Loader2,
+  CalendarPlus,
 } from 'lucide-react';
 import { FaWordpress, FaLinkedin, FaReddit } from 'react-icons/fa6';
 import { SiBlogger } from 'react-icons/si';
@@ -44,7 +45,6 @@ import type { BlogPlatform, BlogPostStatus, BlogPost } from '../api/types';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/security/ConfirmDialog';
 import { useBlogSchedulerStore } from '@/store/useBlogSchedulerStore';
-import { ConnectBlogPlatform } from './ConnectBlogPlatform';
 
 interface BlogCalendarProps {
   clientId: number;
@@ -90,6 +90,7 @@ const statusDotColors: Record<BlogPostStatus, string> = {
 
 function CalendarGrid({ currentDate, slideDirection, posts, onDateClick }: CalendarGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const today = useMemo(() => new Date(), []);
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(monthStart);
@@ -117,42 +118,51 @@ function CalendarGrid({ currentDate, slideDirection, posts, onDateClick }: Calen
       const cloneDay = day;
       const dateKey = format(day, 'yyyy-MM-dd');
       const dayPosts = postsByDate.get(dateKey) || [];
+      const isToday = isSameDay(day, today);
+      const isPast = startOfDay(day) < startOfDay(today) && isSameMonth(day, monthStart);
+      const isOutside = !isSameMonth(day, monthStart);
 
       let statusBg = '';
       if (dayPosts.length > 0) {
-        if (dayPosts.some(p => p.status === 'FAILED')) statusBg = 'bg-red-100/60';
-        else if (dayPosts.some(p => p.status === 'PROCESSING')) statusBg = 'bg-amber-100/60';
-        else if (dayPosts.some(p => p.status === 'PENDING')) statusBg = 'bg-blue-100/60';
-        else if (dayPosts.some(p => p.status === 'PUBLISHED')) statusBg = 'bg-emerald-100/60';
+        if (dayPosts.some(p => p.status === 'FAILED')) statusBg = 'bg-red-50/80';
+        else if (dayPosts.some(p => p.status === 'PROCESSING')) statusBg = 'bg-amber-50/60';
+        else if (dayPosts.some(p => p.status === 'PENDING')) statusBg = 'bg-blue-50/50';
+        else if (dayPosts.some(p => p.status === 'PUBLISHED')) statusBg = 'bg-emerald-50/50';
       }
+
+      const cellClasses = isOutside
+        ? 'bg-zinc-50/50 text-zinc-300'
+        : isPast
+          ? `${statusBg || 'bg-zinc-50/40'} text-zinc-400`
+          : isToday
+            ? `${statusBg || 'bg-blue-50/30'} ring-2 ring-inset ring-blue-200`
+            : `${statusBg || 'bg-white'} text-zinc-800 hover:bg-zinc-50`;
 
       days.push(
         <div
           key={day.toString()}
           onClick={() => onDateClick(cloneDay, dayPosts)}
-          className={`min-h-[140px] p-2 border-b border-r border-zinc-100 transition-colors duration-200 cursor-pointer group relative ${
-            !isSameMonth(day, monthStart)
-              ? 'bg-zinc-50/30 text-zinc-400'
-              : statusBg || (isSameDay(day, new Date()) ? 'bg-zinc-50' : 'bg-white text-zinc-800 hover:bg-zinc-50')
-          }`}
+          className={`min-h-[130px] p-2 border-b border-r border-zinc-100 transition-all duration-200 cursor-pointer group relative ${cellClasses}`}
         >
           <div className="flex justify-between items-start">
             <span
-              className={`flex items-center justify-center w-7 h-7 text-sm rounded-full ${
-                isSameDay(day, new Date())
-                  ? 'bg-zinc-900 text-white font-medium shadow-sm'
-                  : 'text-zinc-600 group-hover:bg-zinc-200/50 group-hover:text-zinc-900'
+              className={`flex items-center justify-center w-7 h-7 text-sm rounded-full transition-colors ${
+                isToday
+                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
+                  : isPast
+                    ? 'text-zinc-400'
+                    : 'text-zinc-600 group-hover:bg-zinc-200/60 group-hover:text-zinc-900'
               }`}
             >
               {formattedDate}
             </span>
             {dayPosts.length > 0 && (
-              <span className="text-[9px] font-bold text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded-full">
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isPast ? 'text-zinc-400 bg-zinc-100/80' : 'text-zinc-500 bg-zinc-100'}`}>
                 {dayPosts.length}
               </span>
             )}
           </div>
-          <div className="mt-2 flex flex-col gap-1.5 overflow-hidden">
+          <div className={`mt-2 flex flex-col gap-1.5 overflow-hidden ${isPast ? 'opacity-60' : ''}`}>
             {dayPosts.slice(0, 3).map((post) => {
               const firstPlatform = post.targets[0]?.platform;
               return (
@@ -336,11 +346,12 @@ export function BlogCalendar({ clientId, canPost, headerExtra }: BlogCalendarPro
     <div className="flex justify-between items-end mb-4">
       <div className="flex items-end gap-4">
         <h2 className="text-lg font-semibold text-zinc-900 tracking-tight leading-none">Blog Scheduler</h2>
-        {renderStatusFilter()}
+        {allPosts.length > 0 && renderStatusFilter()}
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         {headerExtra}
-        <div className="flex items-center bg-white border border-zinc-200 rounded-md shadow-sm h-10 px-1 shrink-0">
+        <div className="w-px h-6 bg-zinc-200 shrink-0 mx-1" />
+        <div className="flex items-center bg-white border border-zinc-200 rounded-lg shadow-sm h-10 px-1 shrink-0">
           <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8 hover:bg-zinc-100 rounded-md shrink-0">
             <ChevronLeft className="h-4 w-4 text-zinc-600" />
           </Button>
@@ -468,13 +479,16 @@ export function BlogCalendar({ clientId, canPost, headerExtra }: BlogCalendarPro
     const startDate = startOfWeek(startOfMonth(currentDate));
 
     for (let i = 0; i < 7; i++) {
+      const isWeekend = i === 0 || i === 6;
       days.push(
-        <div key={i} className="text-center font-semibold text-xs text-zinc-500 py-3 uppercase tracking-wider border-b border-zinc-200">
+        <div key={i} className={`text-center font-semibold text-[11px] py-2.5 uppercase tracking-widest border-b border-zinc-200 ${
+          isWeekend ? 'text-zinc-400' : 'text-zinc-600'
+        }`}>
           {format(addDays(startDate, i), 'EEE')}
         </div>
       );
     }
-    return <div className="grid grid-cols-7 bg-zinc-50/50 rounded-t-lg border-b border-zinc-200">{days}</div>;
+    return <div className="grid grid-cols-7 bg-zinc-50 rounded-t-xl sticky top-0 z-[1]">{days}</div>;
   };
 
   const renderCells = () => (
@@ -623,45 +637,6 @@ export function BlogCalendar({ clientId, canPost, headerExtra }: BlogCalendarPro
     );
   };
 
-  const renderEmptyState = () => (
-    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white border border-zinc-200 rounded-xl shadow-sm relative overflow-hidden group">
-      {/* Background Decorative Elements */}
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-      <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-50 rounded-full blur-3xl opacity-50" />
-      <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-purple-50 rounded-full blur-3xl opacity-50" />
-
-      <div className="relative z-10 max-w-sm">
-        <div className="w-20 h-20 bg-white shadow-2xl shadow-zinc-200 border border-zinc-100 rounded-3xl flex items-center justify-center mx-auto mb-8 transform group-hover:rotate-6 group-hover:scale-110 transition-all duration-500 ease-out">
-          <PenLine className="w-10 h-10 text-zinc-800" />
-        </div>
-        
-        <h3 className="text-2xl font-bold text-zinc-900 tracking-tight mb-3">Your Blog Workspace is Empty</h3>
-        <p className="text-zinc-500 font-medium mb-10 leading-relaxed text-sm">
-          Start composing and scheduling your blog posts across LinkedIn, WordPress, and more. Your scheduled content will appear here.
-        </p>
-        
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Button
-            onClick={() => openNewPostModal()}
-            className="h-12 px-8 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl font-bold text-sm shadow-xl shadow-zinc-200 transition-all active:scale-95 flex items-center gap-2"
-          >
-            Create Your First Blog
-            <PenLine className="w-4 h-4" />
-          </Button>
-          
-          <ConnectBlogPlatform clientId={clientId}>
-            <Button
-              variant="outline"
-              className="h-12 px-6 rounded-xl border-zinc-200 font-bold text-sm hover:bg-zinc-50 transition-all"
-            >
-              Connect Platform
-            </Button>
-          </ConnectBlogPlatform>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <div className="w-full h-full flex flex-col p-2 space-y-2 relative overflow-hidden">
       {renderHeader()}
@@ -672,25 +647,43 @@ export function BlogCalendar({ clientId, canPost, headerExtra }: BlogCalendarPro
         </div>
       )}
       <div className="flex-1 min-h-0 flex gap-4">
-        {allPosts.length === 0 && !postsData ? (
-          <div className="flex-1 flex items-center justify-center bg-white border border-zinc-200 rounded-xl shadow-sm">
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 className="w-8 h-8 text-zinc-300 animate-spin" />
-              <p className="text-sm font-medium text-zinc-400 tracking-wide">Fetching your scheduler data...</p>
-            </div>
-          </div>
-        ) : allPosts.length === 0 ? (
-          renderEmptyState()
-        ) : (
-          <div className="flex-1 min-w-0 overflow-auto bg-white border border-zinc-200 rounded-xl shadow-sm transition-all duration-300">
-            <div className="min-w-[800px] h-full flex flex-col">
-              {renderDays()}
-              <div className="flex-1">
-                {renderCells()}
+        <div className="flex-1 min-w-0 overflow-auto bg-white border border-zinc-200 rounded-xl shadow-sm transition-all duration-300 relative">
+          {allPosts.length === 0 && !postsData ? (
+            <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/80">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="w-8 h-8 text-zinc-300 animate-spin" />
+                <p className="text-sm font-medium text-zinc-400 tracking-wide">Fetching your scheduler data...</p>
               </div>
             </div>
+          ) : allPosts.length === 0 && canPost ? (
+            <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/60 backdrop-blur-[2px]">
+              <div className="text-center px-8 py-10 bg-white rounded-2xl border border-zinc-200 shadow-xl max-w-sm">
+                <div className="w-14 h-14 rounded-2xl bg-zinc-100 flex items-center justify-center mx-auto mb-4">
+                  <CalendarPlus className="w-7 h-7 text-zinc-400" />
+                </div>
+                <h3 className="text-lg font-bold text-zinc-900 tracking-tight mb-1">No blog posts scheduled</h3>
+                <p className="text-sm text-zinc-500 mb-5 leading-relaxed">
+                  Click any future date on the calendar or use the button below to create your first blog post.
+                </p>
+                <div className="flex items-center justify-center gap-3">
+                  <Button
+                    onClick={() => openNewPostModal()}
+                    className="h-10 px-6 bg-zinc-900 hover:bg-zinc-800 text-white font-semibold text-sm shadow-sm"
+                  >
+                    <PenLine className="w-4 h-4 mr-2" />
+                    Create Your First Blog
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+          <div className="min-w-[800px] h-full flex flex-col">
+            {renderDays()}
+            <div className="flex-1">
+              {renderCells()}
+            </div>
           </div>
-        )}
+        </div>
         {allPosts.length > 0 && renderUpcomingSidebar()}
       </div>
 

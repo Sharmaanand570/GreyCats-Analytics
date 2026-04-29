@@ -781,6 +781,8 @@ async function fetchRawWidgetData(
         value: total,
         rows: [],
         rawCount: seriesResult?.data?.rawCount ?? series.length,
+        privacyThresholdMet: (seriesResult as any)?.data?.privacyThresholdMet,
+        currentFollowers: (seriesResult as any)?.data?.currentFollowers,
       };
     } catch (err) {
       console.error("Failed to fetch Google Ads chart time-series", err);
@@ -816,6 +818,8 @@ async function fetchRawWidgetData(
         value: total,
         rows: [],
         rawCount: result?.data?.rawCount ?? series.length,
+        privacyThresholdMet: (result as any)?.data?.privacyThresholdMet,
+        currentFollowers: (result as any)?.data?.currentFollowers,
       };
     } catch (err) {
       console.error(`Failed to fetch Instagram metric ${widget.metricKey}`, err);
@@ -851,6 +855,8 @@ async function fetchRawWidgetData(
         value: total,
         rows: [],
         rawCount: result?.data?.rawCount ?? series.length,
+        privacyThresholdMet: (result as any)?.data?.privacyThresholdMet,
+        currentFollowers: (result as any)?.data?.currentFollowers,
       };
     } catch (err) {
       console.error(`Failed to fetch Facebook metric ${widget.metricKey}`, err);

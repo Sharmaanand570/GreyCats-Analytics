@@ -28,7 +28,17 @@ import type { DemographicsResponse } from "@/services/unifiedMetrics.api";
 
 type DemoType = "age" | "gender" | "country" | "city";
 
-export type DemographicDataMap = Record<string, { rows: DemoRow[]; value: number }>;
+export type DemographicDataMap = Record<
+  string,
+  {
+    rows: DemoRow[];
+    value: number;
+    /** True when the account has < 100 followers and Meta privacy rules suppress data. */
+    privacyThresholdMet?: boolean;
+    /** Current follower count, provided when privacyThresholdMet is true. */
+    currentFollowers?: number;
+  }
+>;
 
 interface DemoRow {
   metricKey: string;
@@ -81,7 +91,7 @@ function adaptDemographics(
   response: DemographicsResponse,
   type: DemoType,
   metricKey: string
-): { rows: DemoRow[]; value: number } {
+): { rows: DemoRow[]; value: number; privacyThresholdMet?: boolean; currentFollowers?: number } {
   // Normalise: handle both { fansByCountry, ... } and { data: { fansByCountry, ... } }
   const payload = response.data ?? response;
   const fansByCountry: Record<string, number> =
@@ -90,6 +100,19 @@ function adaptDemographics(
     (payload as any).fansByCity ?? (payload as any).city ?? {};
   const ageGender: Record<string, number> =
     (payload as any).ageGender ?? {};
+
+  // Read new privacy fields — present in either the wrapped or flat variant
+  const privacyThresholdMet: boolean | undefined =
+    (payload as any).privacyThresholdMet ?? response.privacyThresholdMet ?? (payload as any).privacy_threshold_met ?? (response as any).privacy_threshold_met;
+  const currentFollowers: number | undefined =
+    (payload as any).currentFollowers ?? (response as any).currentFollowers ?? (payload as any).current_followers ?? (response as any).current_followers;
+
+  // If Meta signals that the privacy threshold is not met, return the flag
+  // immediately so the renderer can show the informational warning instead
+  // of a blank/empty-state chart.
+  if (privacyThresholdMet) {
+    return { rows: [], value: 0, privacyThresholdMet: true, currentFollowers };
+  }
 
   // ── Country ────────────────────────────────────────────────────────────────
   if (type === "country") {
@@ -236,17 +259,34 @@ export function useBatchDemographicsData(
 
     demoWidgets.forEach(({ widgetId, accountId, metricKey, type }) => {
       const response = responseByAccountId[accountId];
+
+      console.log(`[PrivacyDebug] useBatchDemographicsData EVALUATING widget ${widgetId}:`, {
+        accountId, metricKey, type,
+        rawResponse: response
+      });
+
       // Handle both flat response { ageGender, fansByCountry, fansByCity }
       // and data-wrapped response { data: { ageGender, ... } }
       const hasData = response && (
         response.data ||
         (response as any).ageGender ||
-        (response as any).fansByCountry
+        (response as any).fansByCountry ||
+        (response as any).privacyThresholdMet ||
+        (response as any).privacy_threshold_met
       );
-      if (!hasData) return;
+      if (!hasData) {
+        console.log(`[PrivacyDebug] Skipping widget ${widgetId} because hasData evaluated to false!`);
+        return;
+      }
 
       const adapted = adaptDemographics(response, type, metricKey);
-      if (adapted.rows.length > 0) {
+      
+      console.log(`[PrivacyDebug] useBatchDemographicsData ADAPTED widget ${widgetId}:`, {
+        adaptedResult: adapted
+      });
+
+      // Store the entry even when rows are empty if a privacy warning should be shown
+      if (adapted.rows.length > 0 || adapted.privacyThresholdMet) {
         map[widgetId] = adapted;
       }
     });

@@ -172,6 +172,7 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
     media: false,
   });
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [wpCategorySelections, setWpCategorySelections] = useState<Record<string, number | undefined>>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -208,6 +209,14 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
       });
       setMediaUrls(editingPost.mediaUrls || []);
       editor?.commands.setContent(editingPost.content || '');
+      // Restore category selections from existing targets
+      const catSelections: Record<string, number | undefined> = {};
+      editingPost.targets.forEach((t) => {
+        if (t.platform === 'wordpress' && t.targetSettings?.categoryId) {
+          catSelections[t.targetAccountId] = t.targetSettings.categoryId;
+        }
+      });
+      setWpCategorySelections(catSelections);
     }
   }, [isOpen, editingPost]);
 
@@ -218,6 +227,7 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
       setMediaUrls([]);
       setUploadError(null);
       setValidationErrors([]);
+      setWpCategorySelections({});
     }
   }, [isOpen, editingPost]);
 
@@ -231,6 +241,7 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
     setMediaUrls([]);
     setUploadError(null);
     setValidationErrors([]);
+    setWpCategorySelections({});
     onClose();
   };
 
@@ -262,6 +273,11 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
       updateDraft({
         targets: targets.filter((t) => !(t.targetAccountId === target.id && t.platform === 'wordpress')),
       });
+      setWpCategorySelections((prev) => {
+        const next = { ...prev };
+        delete next[target.id];
+        return next;
+      });
     } else {
       updateDraft({
         targets: [
@@ -274,6 +290,17 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
         ],
       });
     }
+  };
+
+  const handleWpCategoryChange = (targetId: string, categoryId: number | undefined) => {
+    setWpCategorySelections((prev) => ({ ...prev, [targetId]: categoryId }));
+    updateDraft({
+      targets: targets.map((t) =>
+        t.targetAccountId === targetId && t.platform === 'wordpress'
+          ? { ...t, targetSettings: categoryId ? { categoryId } : undefined }
+          : t
+      ),
+    });
   };
 
   // Media handling
@@ -564,6 +591,8 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
               {/* WordPress targets */}
               {wordpressTargets.map((target) => {
                 const selected = isTargeted(target.id, 'wordpress');
+                const categories = target.categories || [];
+                const selectedCategoryId = wpCategorySelections[target.id];
 
                 return (
                   <div key={`wp-${target.id}`} className="space-y-2">
@@ -575,10 +604,14 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
                           : 'bg-white border-zinc-200 hover:border-zinc-300 hover:shadow-sm'
                       }`}
                     >
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 overflow-hidden ${
                         selected ? 'bg-white/10' : 'bg-zinc-100'
                       }`}>
-                        <FaWordpress className={`w-5 h-5 ${selected ? 'text-white' : 'text-[#21759b]'}`} />
+                        {target.siteIconUrl ? (
+                          <img src={target.siteIconUrl} alt="" className="w-5 h-5 rounded object-cover" />
+                        ) : (
+                          <FaWordpress className={`w-5 h-5 ${selected ? 'text-white' : 'text-[#21759b]'}`} />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-semibold flex items-center gap-2 ${selected ? 'text-white' : 'text-zinc-800'}`}>
@@ -599,6 +632,29 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
                         {selected && <CheckSquare className="w-3.5 h-3.5 text-zinc-900" />}
                       </div>
                     </div>
+
+                    {/* Category selector — shown when target is selected and has categories */}
+                    {selected && categories.length > 0 && (
+                      <div className="ml-12 mr-3" onClick={(e) => e.stopPropagation()}>
+                        <label className="text-[11px] font-semibold text-zinc-500 mb-1 block">Category (optional)</label>
+                        <Select
+                          value={selectedCategoryId?.toString() ?? 'none'}
+                          onValueChange={(val) => handleWpCategoryChange(target.id, val === 'none' ? undefined : Number(val))}
+                        >
+                          <SelectTrigger className="h-9 text-sm border-zinc-200">
+                            <SelectValue placeholder="No category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No category</SelectItem>
+                            {categories.map((cat) => (
+                              <SelectItem key={cat.id} value={cat.id.toString()}>
+                                {cat.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                 );
               })}

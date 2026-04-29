@@ -53,6 +53,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import type { YouTubeVideoItem } from "@/features/YouTube/API/youtubeApi";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import type { DateRange } from "react-day-picker";
+import { cn } from "@/lib/utils";
+import { PlatformNotConnected } from "@/components/PlatformNotConnected";
 
 const buildChartData = (series?: Array<Record<string, unknown>>) => {
   if (!series || !Array.isArray(series)) return [];
@@ -192,6 +194,10 @@ function YouTubeDetailPage() {
   const channelThumb = channelData?.channel?.thumbnails?.high?.url || "";
 
   // Check if we have any metrics to show in the table
+  const hasYouTubeIntegration = !!client?.integrations?.some(
+    (i: any) => i.integrationType === "youtube"
+  );
+
   const hasViews = videosData?.videos?.some(v => v.views !== undefined);
   const hasLikes = videosData?.videos?.some(v => v.likes !== undefined);
   const hasComments = videosData?.videos?.some(v => v.comments !== undefined);
@@ -199,7 +205,7 @@ function YouTubeDetailPage() {
 
   return (
     <div className="w-full h-full flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
-      <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
+      <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd] animate-in fade-in slide-in-from-bottom-2 duration-1000">
         <div className="w-full h-full flex flex-col">
           {/* --- 1. Top Navigation Bar --- */}
           <div className="w-full border-b flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-8 py-6 bg-white/80 backdrop-blur-md sticky top-0 z-20 border-slate-200/60 shadow-sm rounded-t-[32px] mb-6">
@@ -218,8 +224,8 @@ function YouTubeDetailPage() {
               
               <div className="flex items-center gap-5">
                 <div className="relative group">
-                  <div className="absolute inset-0 bg-zinc-800 blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
-                  <div className="relative p-3.5 bg-gradient-to-br from-zinc-800 to-zinc-950 rounded-2xl shadow-xl shadow-zinc-900/10 ring-1 ring-white/20 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-red-500 blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
+                  <div className="relative p-3.5 bg-gradient-to-br from-red-500 to-red-700 rounded-2xl shadow-xl shadow-red-900/10 ring-1 ring-white/20 flex items-center justify-center">
                     <FaYoutube className="w-8 h-8 text-white" />
                   </div>
                 </div>
@@ -248,12 +254,19 @@ function YouTubeDetailPage() {
           </div>
 
           <div className="w-full px-5 py-6 space-y-6 overflow-y-auto pb-20">
+            {numericClientId && client && !hasYouTubeIntegration ? (
+              <PlatformNotConnected
+                platformName="YouTube"
+                icon={<FaYoutube className="h-10 w-10 text-red-500" />}
+                clientName={client.name}
+              />
+            ) : <>
             {!isLoadingSummary && !summaryData?.summary && <DataSyncBanner />}
             {/* 1. Channel Info & Summary Cards */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Channel Profile */}
               <div className="col-span-1 lg:col-span-3">
-                <Card>
+                <Card className="rounded-[32px] border-zinc-100 shadow-sm overflow-hidden hover:border-zinc-200 transition-all duration-500">
                   <CardHeader>
                     <CardTitle>Channel Information</CardTitle>
                     <CardDescription>
@@ -319,7 +332,8 @@ function YouTubeDetailPage() {
                 value={summary?.totalViews}
                 loading={isLoadingSummary}
                 error={summaryError}
-                icon={<Eye className="w-4 h-4 text-blue-500" />}
+                icon={<Eye />}
+                color="blue"
                 subtext={`Avg ${summary?.averageViewsPerDay?.toLocaleString() ?? 0}/day`}
               />
               <SummaryCard
@@ -327,7 +341,8 @@ function YouTubeDetailPage() {
                 value={summary?.totalSubscribers}
                 loading={isLoadingSummary}
                 error={summaryError}
-                icon={<Users className="w-4 h-4 text-green-500" />}
+                icon={<Users />}
+                color="green"
                 subtext="Total Subscribers"
               />
               <SummaryCard
@@ -335,7 +350,8 @@ function YouTubeDetailPage() {
                 value={watchTimeData?.totalWatchTimeHours ? Math.round(Number(watchTimeData.totalWatchTimeHours)) : 0}
                 loading={isLoadingWatchTime || isLoadingSummary}
                 error={watchTimeError}
-                icon={<Clock className="w-4 h-4 text-amber-500" />}
+                icon={<Clock />}
+                color="amber"
                 subtext="Last 30 Days"
               />
               <SummaryCard
@@ -344,15 +360,16 @@ function YouTubeDetailPage() {
                 isString={true}
                 loading={isLoadingSummary}
                 error={engagementError}
-                icon={<TrendingUp className="w-4 h-4 text-purple-500" />}
+                icon={<TrendingUp />}
+                color="purple"
                 subtext={`${engagement?.likesPerView ?? 0} Likes/View`}
               />
             </div>
 
             {/* 2. Trends Chart */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <Card className="col-span-1 lg:col-span-2">
-                <CardHeader>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="col-span-1 lg:col-span-2 rounded-[32px] border-zinc-100 shadow-sm overflow-hidden hover:border-zinc-200 transition-all duration-500">
+                <CardHeader className="border-b border-zinc-50 py-6 px-8">
                   <CardTitle>Performance Trends</CardTitle>
                   <CardDescription>Daily views for the last 30 days.</CardDescription>
                 </CardHeader>
@@ -406,8 +423,8 @@ function YouTubeDetailPage() {
               </Card>
 
               {/* Top Videos */}
-              <Card className="col-span-1">
-                <CardHeader>
+              <Card className="col-span-1 rounded-[32px] border-zinc-100 shadow-sm overflow-hidden hover:border-zinc-200 transition-all duration-500">
+                <CardHeader className="border-b border-zinc-50 py-6 px-8">
                   <CardTitle>Top Performing Videos</CardTitle>
                   <CardDescription>Based on views (Last 30 days)</CardDescription>
                 </CardHeader>
@@ -458,8 +475,8 @@ function YouTubeDetailPage() {
 
 
             {/* Deep Dive Section */}
-            <Card>
-              <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <Card className="rounded-[32px] border-zinc-100 shadow-sm overflow-hidden hover:border-zinc-200 transition-all duration-500">
+              <CardHeader className="border-b border-zinc-50 py-8 px-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <CardTitle>Video Deep Dive</CardTitle>
                   <CardDescription>Detailed daily analytics for a specific video.</CardDescription>
@@ -601,8 +618,8 @@ function YouTubeDetailPage() {
             </Card>
 
             {/* Videos Table */}
-            <Card>
-              <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <Card className="rounded-[32px] border-zinc-100 shadow-sm overflow-hidden hover:border-zinc-200 transition-all duration-500">
+              <CardHeader className="border-b border-zinc-50 py-8 px-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <CardTitle>Video Library</CardTitle>
                   <CardDescription>Manage and track performance of all your videos.</CardDescription>
@@ -702,6 +719,7 @@ function YouTubeDetailPage() {
               </CardContent>
             </Card>
 
+          </>}
           </div>
         </div>
       </div>
@@ -709,28 +727,37 @@ function YouTubeDetailPage() {
   );
 }
 
-function SummaryCard({ title, value, loading, error, icon, subtext, isString, suffix = "" }: any) {
+function SummaryCard({ title, value, loading, error, icon, subtext, isString, suffix = "", color = "zinc" }: any) {
+  const colorMap: any = {
+    blue: { text: "text-blue-600", bg: "bg-blue-50" },
+    green: { text: "text-emerald-600", bg: "bg-emerald-50" },
+    amber: { text: "text-amber-600", bg: "bg-amber-50" },
+    purple: { text: "text-violet-600", bg: "bg-violet-50" },
+    zinc: { text: "text-zinc-600", bg: "bg-zinc-50" },
+  };
+  const c = colorMap[color] || colorMap.zinc;
+
   return (
-    <Card>
+    <Card className="rounded-[28px] border-zinc-100 shadow-sm transition-all duration-300 hover:border-zinc-300 hover:bg-zinc-50/30">
       <CardContent className="p-6">
         <div className="flex justify-between items-start">
           <div className="space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
+            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{title}</p>
             {loading ? (
               <Skeleton className="h-8 w-24" />
             ) : error ? (
-              <span className="text-sm text-destructive">Error</span>
+              <span className="text-sm text-destructive font-bold uppercase tracking-widest">Error</span>
             ) : (
               <div className="flex items-baseline gap-2">
-                <h3 className="text-2xl font-bold">
+                <h3 className="text-3xl font-black text-zinc-900 tracking-tight">
                   {isString ? `${value}${suffix}` : (value?.toLocaleString() ?? 0)}
                 </h3>
               </div>
             )}
-            {loading ? <Skeleton className="h-3 w-16 mt-1" /> : !error && <p className="text-xs text-muted-foreground mt-1">{subtext}</p>}
+            {loading ? <Skeleton className="h-3 w-16 mt-1" /> : !error && <p className="text-[9px] font-bold text-zinc-400 mt-1 uppercase tracking-widest">{subtext}</p>}
           </div>
-          <div className="p-2 bg-gray-50 rounded-full">
-            {icon}
+          <div className={cn("p-2.5 rounded-2xl ring-1 ring-zinc-100", c.bg)}>
+            <div className={cn("w-4 h-4", c.text)}>{icon}</div>
           </div>
         </div>
       </CardContent>

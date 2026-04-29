@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useSocialMediaStore } from '@/store/useSocialMediaStore';
 import { SocialMediaCalendar } from '@/features/social-media/components/SocialMediaCalendar';
 import {
@@ -15,6 +16,7 @@ import {
   UserPlus,
   Loader2,
   AlertCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,13 +25,30 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { FaInstagram, FaFacebook, FaLinkedin } from 'react-icons/fa6';
 import { SiThreads } from 'react-icons/si';
 import { toast } from 'sonner';
-import { useClients, useCreateClient, useDeleteClient, useClient } from '../hooks/useClients';
+import { useCreateClient, useDeleteClient, useClient } from '../hooks/useClients';
 import { useClientContext } from '@/context/ClientContext';
 import { useAvailableAccounts, useAssignAccount, useRemoveAccount } from '@/hooks/useIntegrations';
 import { loginMetaBusiness } from '@/features/meta/API/metaBusinessApi';
 
 import { getProfileImageUrl } from '@/utils/imageUtils';
 import type { ClientWithIntegrations, AvailableAccount } from '@/types/client.types';
+
+function ClientLogo({ logo, size = 'md' }: { logo?: string | null; size?: 'sm' | 'md' | 'lg' }) {
+  const [failed, setFailed] = useState(false);
+  const iconClass = size === 'sm' ? 'w-4 h-4' : size === 'lg' ? 'w-7 h-7' : 'w-6 h-6';
+  const showImg = logo && !failed;
+  return showImg ? (
+    <img
+      src={getProfileImageUrl(logo)}
+      className="w-full h-full object-cover"
+      onError={() => setFailed(true)}
+    />
+  ) : (
+    <div className="w-full h-full bg-gradient-to-br from-zinc-100 to-zinc-200 flex items-center justify-center">
+      <Layers className={`${iconClass} text-zinc-400`} />
+    </div>
+  );
+}
 
 // Meta = single connection for Instagram + Facebook
 const PLATFORMS = [
@@ -45,7 +64,7 @@ const PLATFORMS = [
     ),
     comingSoon: false,
   },
-  { id: 'linkedin', label: 'LinkedIn', sublabel: null, icon: <FaLinkedin className="w-5 h-5 text-blue-700" />, comingSoon: true },
+  { id: 'linkedin', label: 'LinkedIn', sublabel: null, icon: <FaLinkedin className="w-5 h-5 text-blue-700" />, comingSoon: false },
   { id: 'threads', label: 'Threads', sublabel: null, icon: <SiThreads className="w-5 h-5 text-black" />, comingSoon: true },
 ];
 
@@ -103,13 +122,7 @@ function StepSelectClient({
               >
                 <div onClick={() => onSelect(client)} className="flex items-center gap-5">
                   <div className="w-16 h-16 rounded-2xl border border-zinc-100 overflow-hidden flex items-center justify-center bg-zinc-50 shadow-inner shrink-0 group-hover:scale-105 transition-transform duration-500">
-                    {client.logo ? (
-                      <img src={getProfileImageUrl(client.logo)} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-zinc-100 to-zinc-200 flex items-center justify-center">
-                        <Layers className="w-7 h-7 text-zinc-400" />
-                      </div>
-                    )}
+                    <ClientLogo logo={client.logo} size="lg" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-xl text-zinc-900 group-hover:text-blue-600 transition-colors leading-tight tracking-tight">
@@ -381,13 +394,7 @@ function StepPickExistingClient({
                   className="flex items-center gap-5 p-5 rounded-[22px] border border-zinc-100 bg-white hover:border-zinc-300 hover:shadow-xl hover:shadow-zinc-100/50 cursor-pointer transition-all group"
                 >
                   <div className="w-14 h-14 rounded-2xl border border-zinc-50 overflow-hidden flex items-center justify-center bg-zinc-50 shadow-inner shrink-0 group-hover:scale-105 transition-transform duration-500">
-                    {client.logo ? (
-                      <img src={getProfileImageUrl(client.logo)} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-zinc-50 to-zinc-100 flex items-center justify-center">
-                        <Layers className="w-6 h-6 text-zinc-300" />
-                      </div>
-                    )}
+                    <ClientLogo logo={client.logo} size="md" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-lg text-zinc-900 group-hover:text-blue-600 transition-colors leading-tight">
@@ -423,6 +430,7 @@ function StepConnectPlatforms({
   onBack: () => void;
 }) {
   const { data: availableMetaPages = [], isLoading: isLoadingPages } = useAvailableAccounts('meta-business');
+  const { data: availableLinkedinPages = [], isLoading: isLoadingLinkedin } = useAvailableAccounts('linkedin');
   const assignAccount = useAssignAccount();
   const removeAccount = useRemoveAccount();
 
@@ -465,7 +473,10 @@ function StepConnectPlatforms({
   const linkedPages = (client.integrations || []).filter(
     (i) => i.integrationType === 'meta-business'
   );
-  const hasAnyConnection = linkedPages.length > 0;
+  const linkedLinkedin = (client.integrations || []).filter(
+    (i) => i.integrationType === 'linkedin'
+  );
+  const hasAnyConnection = linkedPages.length > 0 || linkedLinkedin.length > 0;
 
   return (
     <div className="w-full p-6 relative">
@@ -632,6 +643,104 @@ function StepConnectPlatforms({
             </div>
           </div>
 
+          {/* LinkedIn Integrations */}
+          <div className="bg-white/80 backdrop-blur-sm border border-zinc-200/50 rounded-[32px] p-8 shadow-xl shadow-zinc-100/50">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-100">
+                <FaLinkedin className="w-3.5 h-3.5 text-blue-700" />
+                <span className="text-[11px] font-bold text-blue-800 tracking-tight ml-0.5">LinkedIn</span>
+              </div>
+              {linkedLinkedin.length > 0 && (
+                <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider bg-green-50 border border-green-100 px-2 py-0.5 rounded-full">Connected</span>
+              )}
+            </div>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-zinc-900 tracking-tight">LinkedIn Pages</h3>
+                <p className="text-xs text-zinc-400 font-medium">Select LinkedIn organization pages to link.</p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    const { connectLinkedinOrg } = await import('@/features/linkedin/API/linkedinApi');
+                    const res = await connectLinkedinOrg(client.id);
+                    if (res.url) window.location.href = res.url;
+                  } catch (err) {
+                    toast.error('Failed to initiate LinkedIn login');
+                  }
+                }}
+                className="h-9 rounded-xl border-zinc-200 font-bold text-xs flex items-center gap-2"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Connect LinkedIn
+              </Button>
+            </div>
+
+            {isLoadingLinkedin ? (
+              <div className="flex flex-col items-center justify-center py-10">
+                <Loader2 className="w-8 h-8 text-zinc-200 animate-spin mb-3" />
+                <p className="text-zinc-400 text-xs font-semibold uppercase tracking-wider">Fetching LinkedIn Pages...</p>
+              </div>
+            ) : availableLinkedinPages.length === 0 ? (
+              <div className="text-center py-10 bg-zinc-50 rounded-2xl border border-dashed border-zinc-200">
+                <FaLinkedin className="w-10 h-10 text-zinc-200 mx-auto mb-3" />
+                <p className="text-zinc-500 font-bold mb-1">No LinkedIn Pages Found</p>
+                <p className="text-xs text-zinc-400 font-medium px-10">
+                  Connect your LinkedIn account to manage organization pages.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 max-h-[45vh] overflow-y-auto pr-2 custom-scrollbar">
+                {availableLinkedinPages.map((page: AvailableAccount) => {
+                  const isLinked = !!linkedLinkedin.find((p: any) => p.accountId === page.id);
+                  return (
+                    <div
+                      key={page.id}
+                      className={`flex items-center justify-between p-4 rounded-2xl border transition-all duration-300 ${
+                        isLinked
+                          ? 'bg-blue-50/50 border-blue-200'
+                          : 'bg-white border-zinc-100 hover:border-zinc-200 hover:shadow-md'
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-zinc-100 flex items-center justify-center border border-zinc-100 overflow-hidden text-zinc-400">
+                           <FaLinkedin className="w-5 h-5 text-blue-700" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-zinc-900 leading-none mb-1">
+                            {page.name}
+                          </h4>
+                          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                            LinkedIn Page
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant={isLinked ? 'outline' : 'default'}
+                        size="sm"
+                        onClick={() => {
+                          if (isLinked) {
+                            removeAccount.mutate({ clientId: client.id, integrationType: 'linkedin', accountId: page.id });
+                          } else {
+                            assignAccount.mutate({ clientId: client.id, data: { integrationType: 'linkedin', accountId: page.id } });
+                          }
+                        }}
+                        disabled={assignAccount.isPending || removeAccount.isPending}
+                        className={`h-9 px-5 rounded-lg font-bold text-xs tracking-tight ${
+                          isLinked
+                            ? 'border-red-200 text-red-500 hover:bg-red-50 hover:border-red-300'
+                            : 'bg-zinc-900 hover:bg-zinc-800 text-white'
+                        }`}
+                      >
+                        {isLinked ? 'Disconnect' : 'Link to Client'}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -653,9 +762,15 @@ function StepWorkspace({
   const linkedPages = (client.integrations || []).filter(
     (i) => i.integrationType === 'meta-business'
   );
+  const linkedLinkedin = (client.integrations || []).filter(
+    (i) => i.integrationType === 'linkedin'
+  );
   const connectedIds = PLATFORMS.filter(p => {
     if (p.id === 'meta') {
       return linkedPages.length > 0;
+    }
+    if (p.id === 'linkedin') {
+      return linkedLinkedin.length > 0;
     }
     return false;
   }).map(p => p.id);
@@ -669,6 +784,15 @@ function StepWorkspace({
         await loginMetaBusiness();
       } catch (error) {
         toast.error('Failed to connect Meta');
+      }
+    }
+    if (platformId === 'linkedin') {
+      try {
+        const { connectLinkedinOrg } = await import('@/features/linkedin/API/linkedinApi');
+        const res = await connectLinkedinOrg(client.id);
+        if (res.url) window.location.href = res.url;
+      } catch (error) {
+        toast.error('Failed to connect LinkedIn');
       }
     }
   };
@@ -689,6 +813,20 @@ function StepWorkspace({
          // Error toast already shown by useRemoveAccount hook
        }
      }
+     if (platformId === 'linkedin') {
+       try {
+         for (const page of linkedLinkedin) {
+           await removeAccount.mutateAsync({
+             clientId: client.id,
+             integrationType: 'linkedin',
+             accountId: page.accountId
+           });
+         }
+         toast.success('LinkedIn disconnected from this workspace');
+       } catch {
+         // Error toast
+       }
+     }
   };
 
   return (
@@ -697,11 +835,7 @@ function StepWorkspace({
         <div className="max-w-[1400px] mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-8 h-8 rounded-full border border-zinc-200 overflow-hidden flex items-center justify-center bg-zinc-50 shrink-0">
-              {client.logo ? (
-                <img src={getProfileImageUrl(client.logo)} className="w-full h-full object-cover" />
-              ) : (
-                <Layers className="w-4 h-4 text-zinc-400" />
-              )}
+              <ClientLogo logo={client.logo} size="sm" />
             </div>
             <span className="text-sm font-bold text-zinc-900 truncate">{client.name}</span>
             <div className="w-px h-4 bg-zinc-200 shrink-0" />
@@ -716,6 +850,18 @@ function StepWorkspace({
                     </div>
                     <span className="text-[11px] font-semibold text-zinc-600 truncate max-w-[120px]">
                       {page.accountName || page.accountIdentifier || 'Meta Page'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {linkedLinkedin.length > 0 && (
+              <div className="flex items-center gap-2 overflow-hidden">
+                {linkedLinkedin.map((page) => (
+                  <div key={page.accountId} className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-50 border border-zinc-100 shrink-0">
+                    <FaLinkedin className="w-3 h-3 text-blue-700" />
+                    <span className="text-[11px] font-semibold text-zinc-600 truncate max-w-[120px]">
+                      {page.accountName || page.accountIdentifier || 'LinkedIn Page'}
                     </span>
                   </div>
                 ))}
@@ -744,11 +890,23 @@ function StepWorkspace({
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="h-10 gap-2 bg-white shrink-0 border-zinc-200 hover:bg-zinc-50 transition-colors"
+                    className={`h-10 gap-2 shrink-0 transition-colors ${
+                      connectedIds.length < PLATFORMS.filter(p => !p.comingSoon).length
+                        ? 'bg-amber-50 border-amber-300 hover:bg-amber-100 text-amber-800'
+                        : 'bg-white border-zinc-200 hover:bg-zinc-50'
+                    }`}
                   >
-                    <Link2 className="w-4 h-4" />
+                    {connectedIds.length < PLATFORMS.filter(p => !p.comingSoon).length ? (
+                      <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    ) : (
+                      <Link2 className="w-4 h-4" />
+                    )}
                     Connections
-                    <div className="ml-2 bg-zinc-100 text-zinc-600 rounded-lg px-2 py-0.5 text-[9px] font-bold leading-none border border-zinc-200 flex items-center shadow-inner">
+                    <div className={`ml-1 rounded-lg px-2 py-0.5 text-[9px] font-bold leading-none border flex items-center ${
+                      connectedIds.length < PLATFORMS.filter(p => !p.comingSoon).length
+                        ? 'bg-amber-200/60 text-amber-800 border-amber-300'
+                        : 'bg-zinc-100 text-zinc-600 border-zinc-200 shadow-inner'
+                    }`}>
                       {connectedIds.length}/{PLATFORMS.length}
                     </div>
                   </Button>
@@ -832,19 +990,38 @@ function StepWorkspace({
    Main Page
    ═══════════════════════════════════════════════════ */
 export default function SocialMediaSchedulerPage() {
+  const { clientId: urlClientId } = useParams<{ clientId: string }>();
+  const navigate = useNavigate();
   const { currentStep, setCurrentStep } = useSocialMediaStore();
-  const { currentClient, setCurrentClient: _setCurrentClient } = useClientContext();
+  const { currentClient, setCurrentClient: _setCurrentClient, clients: allClients, isLoading: isLoadingClients } = useClientContext();
 
-  // Wrap setCurrentClient to persist lastClientId for OAuth redirect survival
+  // Sync URL clientId with state on mount or change
+  useEffect(() => {
+    if (urlClientId && allClients.length > 0) {
+      const client = allClients.find(c => String(c.id) === urlClientId);
+      if (client && (!currentClient || currentClient.id !== client.id)) {
+        console.log("DEBUG - Syncing client from URL:", urlClientId);
+        _setCurrentClient(client as ClientWithIntegrations);
+        const hasIntegrations = client.integrations && client.integrations.length > 0;
+        setCurrentStep(hasIntegrations ? 'workspace' : 'connect-platforms');
+      }
+    }
+  }, [urlClientId, allClients.length]); // depend on clients.length to ensure list is loaded
+
+  // Wrap setCurrentClient to persist lastClientId and update URL
   const setCurrentClient = (client: ClientWithIntegrations | null) => {
     _setCurrentClient(client);
     if (client) {
       localStorage.setItem('lastClientId', String(client.id));
+      if (urlClientId !== String(client.id)) {
+        navigate(`/social-media/scheduler/${client.id}`);
+      }
+    } else {
+      navigate('/social-media/scheduler');
     }
   };
   const [subStep, setSubStep] = useState<'main' | 'create' | 'existing'>('main');
 
-  const { data: allClients = [], isLoading: isLoadingClients, isError: isClientsError } = useClients();
   const { data: liveClient } = useClient(currentClient?.id || null);
   const createClient = useCreateClient();
   const deleteClient = useDeleteClient();
@@ -907,7 +1084,7 @@ export default function SocialMediaSchedulerPage() {
         <StepSelectClient
           clients={allClients}
           isLoading={isLoadingClients}
-          isError={isClientsError}
+          isError={false}
           onSelect={(client: ClientWithIntegrations) => {
             setCurrentClient(client);
             const hasIntegrations = client.integrations && client.integrations.length > 0;
@@ -964,12 +1141,7 @@ export default function SocialMediaSchedulerPage() {
     <div className="w-full h-screen flex flex-col overflow-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
       <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
         <div className="w-full h-full flex flex-col relative">
-          {/* Header */}
-          <div className="w-full h-11 border-b flex justify-between items-center px-5 bg-white/50 backdrop-blur-sm sticky top-0 z-10 box-border shrink-0">
-            <span className="font-medium text-sm text-zinc-800 tracking-wide">Social Media Studio</span>
-          </div>
-
-          <div className="flex-1 overflow-y-auto relative h-[calc(100vh-2.75rem)]">
+          <div className="flex-1 overflow-y-auto relative h-full">
             {renderContent()}
           </div>
         </div>

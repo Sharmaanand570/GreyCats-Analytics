@@ -1,6 +1,6 @@
 "use client";
 
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { SiMeta } from "react-icons/si";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,20 +15,19 @@ import type { DateRange } from "react-day-picker";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import {
   TrendingUp,
-  TrendingDown,
   DollarSign,
   Eye,
   MousePointerClick,
   Target,
-
-  Download,
   Filter,
   ArrowUpRight
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { cn } from "@/lib/utils";
 import { useMetaAdsMeta, useMetaAdsSummary, useMetaAdsCampaigns, useMetaAdsTrends } from "@/features/meta/hooks/useMetaAdsData";
-import { useClients } from "@/hooks/useClients";
+import { useClients, useClient } from "@/hooks/useClients";
 import { DataSyncBanner } from "@/components/DataSyncBanner";
+import { PlatformNotConnected } from "@/components/PlatformNotConnected";
 import { AlertCircle, RefreshCw } from "lucide-react";
 
 // --- Components ---
@@ -50,46 +49,36 @@ const StatusBadge = ({ status }: { status: string }) => {
   );
 };
 
-const MetricCard = ({ title, value, icon: Icon, trend, color, subValue }: any) => {
-  const gradients = {
-    blue: "from-blue-500/10 to-blue-600/5 border-blue-100 text-blue-600",
-    emerald: "from-emerald-500/10 to-emerald-600/5 border-emerald-100 text-emerald-600",
-    violet: "from-violet-500/10 to-violet-600/5 border-violet-100 text-violet-600",
-    amber: "from-amber-500/10 to-amber-600/5 border-amber-100 text-amber-600",
-    rose: "from-rose-500/10 to-rose-600/5 border-rose-100 text-rose-600",
+const BentoMetricCard = ({ title, value, icon, color = "zinc", subValue }: any) => {
+  const colorMap: any = {
+    blue: { text: "text-blue-600", bg: "bg-blue-50" },
+    emerald: { text: "text-emerald-600", bg: "bg-emerald-50" },
+    violet: { text: "text-violet-600", bg: "bg-violet-50" },
+    amber: { text: "text-amber-600", bg: "bg-amber-50" },
+    rose: { text: "text-rose-600", bg: "bg-rose-50" },
+    zinc: { text: "text-zinc-600", bg: "bg-zinc-50" },
   };
-
-  const activeColor = gradients[color as keyof typeof gradients] || gradients.blue;
+  const c = colorMap[color] || colorMap.zinc;
 
   return (
-    <div className="group relative overflow-hidden bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:border-slate-200 transition-all duration-300 cursor-default">
-      <div className={`absolute top-0 right-0 p-4 opacity-50 group-hover:opacity-100 transition-opacity`}>
-        <div className={`p-2.5 rounded-xl bg-gradient-to-br ${activeColor} bg-opacity-10`}>
-          <Icon className="w-5 h-5" />
-        </div>
-      </div>
-
-      <div className="p-6">
-        <p className="text-sm font-medium text-slate-500 mb-1 tracking-wide uppercase text-[11px]">{title}</p>
-        <div className="flex items-baseline gap-2">
-          <h3 className="text-2xl font-bold text-slate-900 tracking-tight">{value}</h3>
-        </div>
-
-        {trend !== undefined && (
-          <div className="flex items-center gap-3 mt-3">
-            <div className={`flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${trend >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-              {trend >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-              {Math.abs(trend)}%
+    <Card className="rounded-[28px] border-zinc-100 shadow-sm transition-all duration-300 hover:border-zinc-300 hover:bg-zinc-50/30">
+      <CardContent className="p-6">
+        <div className="flex justify-between items-start">
+          <div className="space-y-1">
+            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{title}</p>
+            <div className="flex items-baseline gap-2">
+              <h3 className="text-3xl font-black text-zinc-900 tracking-tight">{value}</h3>
             </div>
-            <span className="text-xs text-slate-400 font-medium">vs last 30 days</span>
+            {subValue && (
+              <p className="text-[9px] font-bold text-zinc-400 mt-1 uppercase tracking-widest">{subValue}</p>
+            )}
           </div>
-        )}
-
-        {subValue && (
-          <p className="text-xs text-slate-400 mt-3 font-medium">{subValue}</p>
-        )}
-      </div>
-    </div>
+          <div className={cn("p-2.5 rounded-2xl ring-1 ring-zinc-100", c.bg)}>
+            <div className={cn("w-4 h-4", c.text)}>{icon}</div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
@@ -143,7 +132,12 @@ const ErrorState = ({ title, message, onRetry, className }: any) => (
 
 function MetaDetailPage() {
   const navigate = useNavigate();
-  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+  const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
+  // Initialize from URL so the page shows the client the user came from,
+  // not the first client in the list.
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(
+    clientIdParam ? Number(clientIdParam) : null
+  );
 
   // Default to Dec 1, 2025 - Dec 31, 2025 as requested
   const [date, setDate] = useState<DateRange | undefined>({
@@ -153,11 +147,22 @@ function MetaDetailPage() {
 
   const { data: clientsData } = useClients();
   const clients = clientsData || [];
+  const { data: clientData } = useClient(selectedClientId);
+  const hasMetaAdsIntegration = !!clientData?.integrations?.some(
+    (i: any) => i.integrationType === "meta-ads" || i.integrationType === "meta_ads"
+  );
 
-  // Auto-select first client
-  if (clients.length > 0 && !selectedClientId) {
-    setSelectedClientId(clients[0].id);
-  }
+  // Sync with URL param; fall back to first client only when no param present
+  useEffect(() => {
+    if (clientIdParam) {
+      const parsed = Number(clientIdParam);
+      if (!Number.isNaN(parsed) && parsed !== selectedClientId) {
+        setSelectedClientId(parsed);
+      }
+    } else if (!selectedClientId && clients.length > 0) {
+      setSelectedClientId(clients[0].id);
+    }
+  }, [clientIdParam, clients, selectedClientId]);
 
   // Format dates for API
   const apiParams = {
@@ -224,12 +229,16 @@ function MetaDetailPage() {
     }
   }, [allCampaigns, isLoadingMeta, isLoadingSummary, isLoadingCampaigns, isLoadingTrends, metaData, summaryData, selectedClientId, apiParams]);
 
-  // Use meta summary if available, otherwise calculate from campaigns
-  const totalSpend = meta?.spend || campaigns.reduce((sum: number, c: any) => sum + c.spend, 0);
-  const totalImpressions = meta?.impressions || campaigns.reduce((sum: number, c: any) => sum + c.impressions, 0);
-  const totalClicks = meta?.clicks || campaigns.reduce((sum: number, c: any) => sum + c.clicks, 0);
+  // Use meta summary if it has values, otherwise aggregate from campaigns.
+  // Prefer summaryData.campaigns; fall back to allCampaigns from /campaigns endpoint.
+  const sourceForAggregation = (campaigns.length > 0 ? campaigns : allCampaigns) as any[];
+  const sumOf = (key: string) => sourceForAggregation.reduce((s, c) => s + (Number(c?.[key]) || 0), 0);
+
+  const totalSpend = meta?.spend || sumOf("spend");
+  const totalImpressions = meta?.impressions || sumOf("impressions");
+  const totalClicks = meta?.clicks || sumOf("clicks");
   const avgCTR = meta?.ctr || (totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0);
-  const avgCPM = meta?.cpm || 0;
+  const avgCPM = meta?.cpm || (totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0);
 
   // Check for "No Meta Ads account assigned to this client." error
   const getAxiosErrorMsg = (err: any) => err?.response?.data?.message || err?.message;
@@ -242,102 +251,82 @@ function MetaDetailPage() {
   const isNoAccountAssigned = anyErrorMsg === "No Meta Ads account assigned to this client.";
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50">
-      {/* Header */}
-      <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-slate-200/60 shadow-sm">
-        <div className="max-w-[1600px] mx-auto px-6 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="/dashboard" className="text-slate-500 hover:text-slate-800 transition-colors">Dashboard</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="text-slate-300" />
-                <BreadcrumbItem>
-                  <BreadcrumbLink onClick={() => navigate(-1)} className="text-slate-500 hover:text-slate-800 transition-colors cursor-pointer">Data Sources</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="text-slate-300" />
-                <BreadcrumbItem>
-                  <span className="bg-zinc-100 text-zinc-900 px-2 py-0.5 rounded-md font-bold text-sm tracking-wide">Meta Ads</span>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-
-            <div className="flex items-center gap-2">
-              <span className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg text-xs font-medium text-slate-600">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                Live Data
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="flex items-center gap-5">
-              <div className="relative group">
-                <div className="absolute inset-0 bg-zinc-800 blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
-                <div className="relative p-3.5 bg-gradient-to-br from-zinc-800 to-zinc-950 rounded-2xl shadow-xl shadow-zinc-900/10 ring-1 ring-white/20">
-                  <SiMeta className="w-8 h-8 text-white" />
+    <div className="w-full h-full flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
+      <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd] animate-in fade-in slide-in-from-bottom-2 duration-1000">
+        <div className="w-full h-full flex flex-col">
+          {/* --- 1. Top Navigation Bar --- */}
+          <div className="w-full border-b flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-8 py-6 bg-white/80 backdrop-blur-md sticky top-0 z-20 border-slate-200/60 shadow-sm rounded-t-[32px] mb-6">
+            <div className="flex flex-col gap-2 relative">
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink onClick={() => navigate(-1)} className="cursor-pointer text-slate-500 hover:text-slate-800 transition-colors font-medium text-xs">Data Sources</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator className="text-slate-300" />
+                  <BreadcrumbItem>
+                    <span className="bg-zinc-100 text-zinc-900 px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wider">Meta Ads</span>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
+              
+              <div className="flex items-center gap-5">
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-blue-500 blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
+                  <div className="relative p-3.5 bg-gradient-to-br from-[#0866FF] to-blue-700 rounded-2xl shadow-xl shadow-blue-900/10 ring-1 ring-white/20">
+                    <SiMeta className="w-8 h-8 text-white" />
+                  </div>
                 </div>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Meta Advertising</h1>
-                <div className="flex items-center gap-2 mt-1">
-                  <p className="text-sm font-medium text-slate-500">{accountName}</p>
-                  <span className="text-slate-300">•</span>
-                  <p className="text-xs text-slate-400 font-mono">ID: {metaData?.accountId || "..."}</p>
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight text-slate-900">Meta Ads</h1>
+                  <p className="text-xs text-slate-500 mt-1 font-bold uppercase tracking-widest">{accountName || "Campaign Insights"}</p>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-4 overflow-x-auto pb-2 md:pb-0">
+            <div className="flex items-center gap-4">
               <DataSyncBanner compact={true} />
-              <DateRangePicker value={date} onChange={setDate} />
-
-              {/* Client Selector */}
-              <Select value={selectedClientId?.toString()} onValueChange={(v: string) => setSelectedClientId(Number(v))}>
-                <SelectTrigger className="w-[260px] h-10 bg-white border-slate-200 text-slate-700 font-medium shadow-sm hover:border-blue-300 transition-colors focus:ring-blue-100">
-                  <SelectValue placeholder="Select Client" />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map((client: any) => (
-                    <SelectItem key={client.id} value={client.id.toString()} className="cursor-pointer font-medium text-slate-600 focus:bg-blue-50 focus:text-blue-700">
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="w-[280px]">
+                <Select value={selectedClientId?.toString()} onValueChange={(v: string) => setSelectedClientId(Number(v))}>
+                  <SelectTrigger className="h-10 bg-white border-slate-200 shadow-sm rounded-xl transition-all focus:ring-slate-200 font-medium text-slate-700">
+                    <SelectValue placeholder="Select Client" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((client: any) => (
+                      <SelectItem key={client.id} value={client.id.toString()} className="font-medium cursor-pointer rounded-lg m-1">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-zinc-800" />
+                          {client.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+               <DateRangePicker value={date} onChange={setDate} />
             </div>
           </div>
-        </div>
-      </div>
 
       {/* Main Content */}
-      {isNoAccountAssigned ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50">
-          <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-6 border-8 border-white shadow-sm transition-transform hover:scale-105">
-            <SiMeta className="w-10 h-10 text-slate-400" />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-3 tracking-tight">No Meta Ads Account Connected</h2>
-          <p className="text-slate-500 max-w-md mx-auto mb-8 text-[15px] leading-relaxed">
-            There is no Meta Ads account currently assigned to this client. Please connect an account to start viewing advertising analytics and campaign performance.
-          </p>
-          <Button 
-            onClick={() => navigate('/integrations')}
-            className="bg-zinc-900 hover:bg-zinc-800 text-white shadow-lg shadow-zinc-900/25 px-8 h-12 rounded-xl font-bold transition-all hover:-translate-y-0.5 flex items-center gap-2"
-          >
-            <SiMeta className="w-4 h-4" />
-            Connect Meta Ads
-          </Button>
-        </div>
+      {selectedClientId && clientData && !hasMetaAdsIntegration ? (
+        <PlatformNotConnected
+          platformName="Meta Ads"
+          icon={<SiMeta className="h-10 w-10 text-blue-500" />}
+          clientName={clientData.name}
+        />
+      ) : isNoAccountAssigned ? (
+        <PlatformNotConnected
+          platformName="Meta Ads"
+          icon={<SiMeta className="h-10 w-10 text-blue-500" />}
+          clientName={clientData?.name}
+        />
       ) : (
-      <div className="flex-1 overflow-auto custom-scrollbar">
-        <div className="max-w-[1600px] mx-auto p-6 space-y-8">
+          <div className="w-full px-8 py-4 space-y-8">
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
             {isLoadingMeta || isLoadingSummary ? (
               <>
-                {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-[140px] rounded-2xl bg-slate-100" />)}
+                {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-[140px] rounded-[28px]" />)}
               </>
             ) : (isErrorMeta || isErrorSummary) ? (
               <ErrorState 
@@ -347,38 +336,38 @@ function MetaDetailPage() {
                   refetchMeta();
                   refetchSummary();
                 }}
-                className="col-span-full"
+                className="col-span-full rounded-[32px]"
               />
             ) : (
               <>
-                <MetricCard
+                <BentoMetricCard
                   title="Total Spend"
                   value={`₹${totalSpend.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
-                  icon={DollarSign}
+                  icon={<DollarSign />}
                   color="emerald"
                 />
-                <MetricCard
+                <BentoMetricCard
                   title="Impressions"
                   value={totalImpressions.toLocaleString('en-IN')}
-                  icon={Eye}
+                  icon={<Eye />}
                   color="blue"
                 />
-                <MetricCard
+                <BentoMetricCard
                   title="Clicks"
                   value={totalClicks.toLocaleString('en-IN')}
-                  icon={MousePointerClick}
+                  icon={<MousePointerClick />}
                   color="violet"
                 />
-                <MetricCard
+                <BentoMetricCard
                   title="Avg CTR"
                   value={`${avgCTR.toFixed(2)}%`}
-                  icon={Target}
+                  icon={<Target />}
                   color="amber"
                 />
-                <MetricCard
+                <BentoMetricCard
                   title="Avg CPM"
                   value={`₹${avgCPM.toFixed(2)}`}
-                  icon={TrendingUp}
+                  icon={<TrendingUp />}
                   color="rose"
                 />
               </>
@@ -386,17 +375,14 @@ function MetaDetailPage() {
           </div>
 
           {/* Performance Trends Chart */}
-          <Card className="border border-slate-100 shadow-sm rounded-2xl overflow-hidden bg-white">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/30 px-6 py-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg font-bold text-slate-800">Performance Trends</CardTitle>
-                  <p className="text-sm text-slate-500 mt-1">Daily breakdown of spend vs impressions</p>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="ghost" size="sm" className="h-8 text-xs font-medium text-slate-500">Weekly</Button>
-                  <Button variant="secondary" size="sm" className="h-8 text-xs font-medium bg-slate-100 text-slate-700">Daily</Button>
-                </div>
+          <Card className="rounded-[32px] border-zinc-100 shadow-sm overflow-hidden hover:border-zinc-200 transition-all duration-500 bg-white">
+            <CardHeader className="border-b border-zinc-50 py-6 px-8 flex items-center justify-between">
+              <div>
+                <CardTitle className="text-xl font-black text-zinc-900 tracking-tight uppercase flex items-center gap-3">
+                   <TrendingUp className="h-6 w-6 text-blue-500" />
+                   Performance Trends
+                </CardTitle>
+                <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest mt-1">Daily Breakdown Analysis</p>
               </div>
             </CardHeader>
             <CardContent className="p-6">
@@ -482,29 +468,14 @@ function MetaDetailPage() {
           </Card>
 
           {/* Campaigns Table */}
-          <Card className="border border-slate-100 shadow-sm rounded-2xl overflow-hidden bg-white">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/30 px-6 py-5">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                    <Target className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg font-bold text-slate-800">Active Campaigns</CardTitle>
-                    <p className="text-sm text-slate-500 mt-1">Detailed performance metrics by campaign</p>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="border-slate-200 hover:bg-slate-50 text-slate-600">
-                    <Filter className="w-4 h-4 mr-2" />
-                    Filter
-                  </Button>
-                  <Button variant="outline" size="sm" className="border-slate-200 hover:bg-slate-50 text-slate-600">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export
-                  </Button>
-                </div>
+          <Card className="rounded-[32px] border-zinc-100 shadow-sm overflow-hidden hover:border-zinc-200 transition-all duration-500 bg-white">
+            <CardHeader className="border-b border-zinc-50 py-8 px-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-xl font-black text-zinc-900 tracking-tight uppercase flex items-center gap-3">
+                  <Target className="h-6 w-6 text-emerald-500" />
+                  Active Campaigns
+                </CardTitle>
+                <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest mt-1">Detailed Ad Performance</p>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -587,8 +558,9 @@ function MetaDetailPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }

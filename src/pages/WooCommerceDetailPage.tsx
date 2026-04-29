@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { FiBell, FiSearch } from "react-icons/fi";
 import { FaCartShopping } from "react-icons/fa6";
 import { Input } from "@/components/ui/input";
@@ -66,34 +66,46 @@ import {
 } from "@/components/ui/select";
 
 import { DataSyncBanner } from "@/components/DataSyncBanner";
+import { PlatformNotConnected } from "@/components/PlatformNotConnected";
 
 const WooCommerceDetailPage = () => {
   const navigate = useNavigate();
-  // Get clients list and auto-select first client (matching pattern from MetaDetailPage, GoogleAnalyticsDetailPage)
+  const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
+
+  // Get clients list; resolve clientId from URL param or fallback to first client
   const { data: clientsData } = useClients();
   const clients = clientsData || [];
 
-  // State management
-  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+  // State management — initialize from URL param so detail page shows the
+  // client the user navigated from, not the first client in the list.
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(
+    clientIdParam ? parseInt(clientIdParam) : null
+  );
   const [accountId, setAccountId] = useState<number | null>(null);
   const [productsSearch, setProductsSearch] = useState<string>("");
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
-
   // Pagination state (for future use)
   const perProductPage = 1;
   const perProductLimit = 10;
 
-  // Auto-select first client (matching pattern from MetaDetailPage - NOT in useEffect!)
-  console.log('DEBUG: clients =', clients, 'selectedClientId =', selectedClientId);
-  if (clients.length > 0 && !selectedClientId) {
-    console.log('DEBUG: Auto-selecting client:', clients[0]);
-    setSelectedClientId(clients[0].id);
-  }
+  // Keep selectedClientId in sync when the URL param changes
+  useEffect(() => {
+    if (clientIdParam) {
+      const parsed = parseInt(clientIdParam);
+      if (!Number.isNaN(parsed) && parsed !== selectedClientId) {
+        setSelectedClientId(parsed);
+      }
+    } else if (!selectedClientId && clients.length > 0) {
+      setSelectedClientId(clients[0].id);
+    }
+  }, [clientIdParam, clients, selectedClientId]);
+
+  const resolvedClientId = selectedClientId;
 
   // Check if selected client has WooCommerce assignment
-  const selectedClient = clients.find(c => c.id === (selectedClientId || clients[0]?.id));
+  const selectedClient = clients.find(c => c.id === resolvedClientId);
   const hasWooCommerceAssignment = !!selectedClient?.integrations?.some(
     (i) => i.integrationType === "woocommerce"
   );
@@ -275,9 +287,9 @@ const WooCommerceDetailPage = () => {
   if (isLoadingAccounts) {
     return (
       <div className="w-full h-full flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
-        <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
+        <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd] animate-in fade-in slide-in-from-bottom-2 duration-1000">
           <div className="w-full h-full flex flex-col items-center justify-center p-8">
-            <Card className="max-w-md w-full">
+            <Card className="max-w-md w-full rounded-[32px]">
               <CardContent className="p-6">
                 <div className="space-y-4">
                   <Skeleton className="h-8 w-64" />
@@ -346,7 +358,7 @@ const WooCommerceDetailPage = () => {
 
   return (
     <div className="w-full h-full flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
-      <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
+      <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd] animate-in fade-in slide-in-from-bottom-2 duration-1000">
         <div className="w-full h-full flex flex-col">
           {/* --- 1. Top Navigation Bar --- */}
           <div className="w-full border-b flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-8 py-6 bg-white/80 backdrop-blur-md sticky top-0 z-20 border-slate-200/60 shadow-sm rounded-t-[32px] mb-6">
@@ -354,25 +366,25 @@ const WooCommerceDetailPage = () => {
               <Breadcrumb>
                 <BreadcrumbList>
                   <BreadcrumbItem>
-                    <BreadcrumbLink onClick={() => navigate(-1)} className="cursor-pointer text-slate-500 hover:text-slate-800 transition-colors font-medium">Data Sources</BreadcrumbLink>
+                    <BreadcrumbLink onClick={() => navigate(-1)} className="cursor-pointer text-slate-500 hover:text-slate-800 transition-colors font-medium text-xs">Data Sources</BreadcrumbLink>
                   </BreadcrumbItem>
                   <BreadcrumbSeparator className="text-slate-300" />
                   <BreadcrumbItem>
-                    <span className="bg-zinc-100 text-zinc-900 px-2 py-0.5 rounded-md font-bold text-sm tracking-wide">WooCommerce</span>
+                    <span className="bg-zinc-100 text-zinc-900 px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wider">WooCommerce</span>
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
               
               <div className="flex items-center gap-5">
                 <div className="relative group">
-                  <div className="absolute inset-0 bg-zinc-800 blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
-                  <div className="relative p-3.5 bg-gradient-to-br from-zinc-800 to-zinc-950 rounded-2xl shadow-xl shadow-zinc-900/10 ring-1 ring-white/20 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-purple-600 blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
+                  <div className="relative p-3.5 bg-gradient-to-br from-[#7F54B3] to-purple-800 rounded-2xl shadow-xl shadow-purple-900/10 ring-1 ring-white/20 flex items-center justify-center">
                     <FaCartShopping className="w-8 h-8 text-white" />
                   </div>
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold tracking-tight text-slate-900">WooCommerce Analytics</h1>
-                  <p className="text-sm text-slate-500 mt-1 font-medium">Store performance and sales</p>
+                  <h1 className="text-3xl font-bold tracking-tight text-slate-900">WooCommerce</h1>
+                  <p className="text-xs text-slate-500 mt-1 font-bold uppercase tracking-widest">Store Inventory & Sales</p>
                 </div>
               </div>
             </div>
@@ -413,8 +425,15 @@ const WooCommerceDetailPage = () => {
           </div>
 
           {/* Content */}
-          <div className="w-full px-5 py-6 space-y-6">
-            {/* Show banner if no analytics data found (likely specific to selected client) */}
+          <div className="w-full px-8 py-4 space-y-8">
+            {/* Show warning if client doesn't have WooCommerce connected */}
+            {resolvedClientId && selectedClient && !hasWooCommerceAssignment ? (
+              <PlatformNotConnected
+                platformName="WooCommerce"
+                icon={<FaCartShopping className="h-10 w-10 text-purple-600" />}
+                clientName={selectedClient.name}
+              />
+            ) : <>
 
             {/* Account Info & Actions Card */}
             {accountId && (
@@ -740,7 +759,7 @@ const WooCommerceDetailPage = () => {
                                     {product.sku || "N/A"}
                                   </TableCell>
                                   <TableCell className="text-sm text-gray-600">
-                                    ${parseFloat(product.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    ₹{parseFloat(product.price).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </TableCell>
                                   <TableCell className="text-sm text-gray-600">
                                     {product.stockQuantity || 0}
@@ -983,6 +1002,7 @@ const WooCommerceDetailPage = () => {
                 </div>
               </>
             )}
+            </>}
           </div>
         </div>
       </div>
