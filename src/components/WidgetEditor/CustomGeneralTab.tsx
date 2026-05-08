@@ -79,62 +79,85 @@ export function CustomGeneralTab({ data, onChange }: CustomGeneralTabProps) {
 
             {isToc ? (
                 <div className="space-y-4">
-                    <p className="text-[11px] text-gray-500">
-                        Each entry has a section name and page number. Page numbers auto-start at 3 if not specified.
-                    </p>
+                    <label className="flex items-start gap-2 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={!!data?.autoPopulate}
+                            onChange={(e) => onChange({ autoPopulate: e.target.checked })}
+                            className="mt-0.5"
+                        />
+                        <div>
+                            <div className="text-xs text-gray-700 font-medium">Auto-populate from slides</div>
+                            <div className="text-[11px] text-gray-500">
+                                Build entries automatically from the report's slide list. Disable to edit entries manually.
+                            </div>
+                        </div>
+                    </label>
 
-                    <div className="flex items-center justify-between">
-                        <Label className="text-xs text-gray-600">Entries</Label>
-                        <button
-                            type="button"
-                            onClick={addTocLine}
-                            className="text-[11px] text-blue-600 hover:text-blue-700"
-                        >
-                            + Add entry
-                        </button>
-                    </div>
-
-                    {tocLines.length === 0 && (
-                        <p className="text-[11px] text-gray-400 text-center py-4">
-                            No entries yet. Click "+ Add entry" to start.
+                    {data?.autoPopulate ? (
+                        <p className="text-[11px] text-gray-500 bg-blue-50 border border-blue-100 rounded p-3">
+                            Entries are derived from the current slide list. To customise, uncheck "Auto-populate from slides" above.
                         </p>
+                    ) : (
+                        <>
+                            <p className="text-[11px] text-gray-500">
+                                Each entry has a section name and page number. Page numbers auto-start at 3 if not specified.
+                            </p>
+
+                            <div className="flex items-center justify-between">
+                                <Label className="text-xs text-gray-600">Entries</Label>
+                                <button
+                                    type="button"
+                                    onClick={addTocLine}
+                                    className="text-[11px] text-blue-600 hover:text-blue-700"
+                                >
+                                    + Add entry
+                                </button>
+                            </div>
+
+                            {tocLines.length === 0 && (
+                                <p className="text-[11px] text-gray-400 text-center py-4">
+                                    No entries yet. Click "+ Add entry" to start.
+                                </p>
+                            )}
+
+                            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                                {tocLines.map((line, index) => {
+                                    const parts = line.split("|").map(p => p.trim());
+                                    const section = parts[0] || "";
+                                    const page = parts[1] || String(index + 3);
+
+                                    return (
+                                        <div key={index} className="flex items-center gap-2">
+                                            <span className="text-[11px] text-gray-500 w-5 text-right">
+                                                {index + 1}.
+                                            </span>
+                                            <Input
+                                                value={section}
+                                                onChange={(e) => updateTocLine(index, `${e.target.value} | ${page}`)}
+                                                className="flex-1 text-xs"
+                                                placeholder={`Section ${index + 1}`}
+                                            />
+                                            <Input
+                                                value={page}
+                                                onChange={(e) => updateTocLine(index, `${section} | ${e.target.value}`)}
+                                                className="w-16 text-xs text-center"
+                                                placeholder="Page"
+                                                maxLength={5}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => removeTocLine(index)}
+                                                className="text-[11px] text-red-500 hover:text-red-700"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </>
                     )}
-
-                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                        {tocLines.map((line, index) => {
-                            const parts = line.split("|").map(p => p.trim());
-                            const section = parts[0] || "";
-                            const page = parts[1] || String(index + 3);
-
-                            return (
-                                <div key={index} className="flex items-center gap-2">
-                                    <span className="text-[11px] text-gray-500 w-5 text-right">
-                                        {index + 1}.
-                                    </span>
-                                    <Input
-                                        value={section}
-                                        onChange={(e) => updateTocLine(index, `${e.target.value} | ${page}`)}
-                                        className="flex-1 text-xs"
-                                        placeholder={`Section ${index + 1}`}
-                                    />
-                                    <Input
-                                        value={page}
-                                        onChange={(e) => updateTocLine(index, `${section} | ${e.target.value}`)}
-                                        className="w-16 text-xs text-center"
-                                        placeholder="Page"
-                                        maxLength={5}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => removeTocLine(index)}
-                                        className="text-[11px] text-red-500 hover:text-red-700"
-                                    >
-                                        ✕
-                                    </button>
-                                </div>
-                            );
-                        })}
-                    </div>
                 </div>
             ) : (
                 <div className="space-y-3">

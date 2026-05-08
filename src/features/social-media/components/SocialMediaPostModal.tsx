@@ -137,6 +137,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
 
   // LinkedIn Targets
   const [selectedLinkedinTargetId, setSelectedLinkedinTargetId] = useState<string>('');
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mainVideoRef = useRef<HTMLVideoElement>(null);
@@ -175,19 +176,30 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
 
   // Prefill draft when editing + reset tagging/collaborators
   useEffect(() => {
-    if (isOpen && editingPost) {
-      const scheduledDate = new Date(editingPost.scheduledFor);
-      updateDraft({
-        date: scheduledDate,
-        time: format(scheduledDate, 'HH:mm'),
-        platform: editingPost.platform,
-        postType: editingPost.postType || 'FEED',
-        message: editingPost.message || '',
-        firstComment: editingPost.firstComment || '',
-        mediaFiles: [],
-      });
-      if (editingPost.platform === 'linkedin' && editingPost.linkedinPortAccountId) {
-        setSelectedLinkedinTargetId(String(editingPost.linkedinPortAccountId));
+    if (isOpen) {
+      // Guard: if the persisted draft belongs to a different client, reset it first
+      if (draftPost.clientId !== null && draftPost.clientId !== clientId) {
+        resetDraft();
+      }
+
+      if (editingPost) {
+        const scheduledDate = new Date(editingPost.scheduledFor);
+        updateDraft({
+          date: scheduledDate,
+          time: format(scheduledDate, 'HH:mm'),
+          platform: editingPost.platform,
+          postType: editingPost.postType || 'FEED',
+          message: editingPost.message || '',
+          firstComment: editingPost.firstComment || '',
+          mediaFiles: [],
+          clientId,
+        });
+        if (editingPost.platform === 'linkedin' && editingPost.linkedinPortAccountId) {
+          setSelectedLinkedinTargetId(String(editingPost.linkedinPortAccountId));
+        }
+      } else {
+        // Stamp the current clientId so stale drafts can be detected on reload
+        updateDraft({ clientId });
       }
     }
     // Always reset on open
@@ -299,6 +311,37 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
   };
   const prevPreview = () => {
     if (currentPreviewIndex > 0) setCurrentPreviewIndex((p) => p - 1);
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) return;
+
+    const newMediaFiles = [...mediaFiles];
+    const newMediaUrls = [...mediaUrls];
+
+    // Swap files
+    const [movedFile] = newMediaFiles.splice(draggedIndex, 1);
+    newMediaFiles.splice(targetIndex, 0, movedFile);
+
+    // Swap URLs
+    const [movedUrl] = newMediaUrls.splice(draggedIndex, 1);
+    newMediaUrls.splice(targetIndex, 0, movedUrl);
+
+    updateDraft({ mediaFiles: newMediaFiles });
+    setMediaUrls(newMediaUrls);
+    setDraggedIndex(null);
   };
 
   const buildScheduledFor = (): string => {
@@ -440,6 +483,12 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
           },
         }, {
           onSuccess: () => {
+            setMediaUrls([]);
+            setUserTags([]);
+            setCollaborators([]);
+            setSelectedLocation(null);
+            setUploadError(null);
+            setCurrentPreviewIndex(0);
             resetDraft();
             onClose();
           }
@@ -467,6 +516,12 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
           },
         }, {
           onSuccess: () => {
+            setMediaUrls([]);
+            setUserTags([]);
+            setCollaborators([]);
+            setSelectedLocation(null);
+            setUploadError(null);
+            setCurrentPreviewIndex(0);
             resetDraft();
             onClose();
           }
@@ -579,7 +634,13 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
                 {mediaUrls.map((url, i) => (
                   <div
                     key={i}
-                    className="aspect-square relative rounded-lg border border-zinc-300 overflow-hidden bg-white shadow-sm group"
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, i)}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, i)}
+                    className={`aspect-square relative rounded-lg border border-zinc-300 overflow-hidden bg-white shadow-sm group transition-all ${
+                      draggedIndex === i ? 'opacity-40 scale-95 border-blue-400 border-2 cursor-grabbing' : 'hover:border-zinc-400 cursor-grab'
+                    }`}
                   >
                     {mediaFiles[i]?.type.startsWith('video/') ? (
                       <video src={url} className="w-full h-full object-cover pointer-events-none" autoPlay muted loop playsInline />
@@ -590,8 +651,11 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
                       onClick={() => removeFile(i)}
                       className="absolute top-1 right-1 w-5 h-5 bg-black/60 hover:bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-all shadow-sm"
                     >
-                      x
+                      <XIcon className="w-3 h-3" />
                     </button>
+                    <div className="absolute bottom-1 left-1 bg-black/40 text-white text-[8px] px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                      #{i + 1}
+                    </div>
                   </div>
                 ))}
                 {mediaFiles.length < (isStory ? 1 : 10) && (
@@ -600,7 +664,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
                     className="aspect-square rounded-lg border-2 border-dashed border-zinc-300 bg-white flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-50 transition-colors shadow-sm"
                   >
                     <Plus className="w-5 h-5 text-zinc-400" />
-                    <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-1">Add</span>
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase mt-1">Add</span>
                   </div>
                 )}
               </div>
@@ -945,8 +1009,8 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
   );
 
   const renderPreview = () => (
-    <div className="w-full md:w-[55%] lg:flex-1 bg-zinc-50 border-t md:border-t-0 md:border-l border-zinc-200 p-4 md:p-6 flex flex-col items-center justify-center overflow-y-auto min-h-[40vh] md:min-h-[600px]">
-      <div className="w-full max-w-[320px] bg-white border border-zinc-200 shadow-sm rounded-xl overflow-hidden flex flex-col my-auto">
+    <div className="w-full md:w-[55%] lg:flex-1 bg-zinc-50 border-t md:border-t-0 md:border-l border-zinc-200 p-4 md:p-6 flex flex-col items-center overflow-y-auto min-h-[40vh] md:min-h-[600px]">
+      <div className="w-full max-w-[320px] bg-white border border-zinc-200 shadow-sm rounded-xl overflow-hidden flex flex-col mt-4 mb-auto shrink-0">
         {isStory ? (
           <div className="flex items-center p-3 border-b border-zinc-100 gap-2">
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-pink-500 via-red-500 to-yellow-500 shrink-0 ring-2 ring-white"></div>
@@ -1225,7 +1289,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
                       >
                         <option value="" disabled>Select a LinkedIn Page...</option>
                         {currentClient?.integrations?.filter(i => i.integrationType === 'linkedin').map((integration) => (
-                          <option key={integration.id} value={String(integration.accountId)}>
+                          <option key={integration.accountId} value={String(integration.accountId)}>
                             {integration.accountName || integration.accountIdentifier}
                           </option>
                         ))}

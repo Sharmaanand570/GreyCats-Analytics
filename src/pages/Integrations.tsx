@@ -60,7 +60,7 @@ const StatusCell: React.FC<StatusCellProps> = ({
   syncDetails,
   hasInitialData,
 }) => {
-  const { data: syncData, isLoading: syncLoading } = useSyncProgress(
+  const { data: syncData, isLoading: syncLoading, isError } = useSyncProgress(
     clientId,
     integrationType,
     true
@@ -72,8 +72,8 @@ const StatusCell: React.FC<StatusCellProps> = ({
     </div>
   ) : null;
 
-  // Show progress bar when a sync is happening or recently finished (not 'not_started')
-  if (syncLoading || (syncData?.success && syncData?.status !== 'not_started')) {
+  // Show progress bar when a sync is happening, recently finished, or failed
+  if (syncLoading || isError || (syncData?.success && syncData?.status !== 'not_started')) {
     return (
       <div className="flex items-center gap-2">
         <SyncProgressBar
@@ -239,7 +239,37 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
     console.log('Client data:', client);
     console.log('Client integrations:', client.integrations);
 
-    let integrations = [...client.integrations];
+    let integrations: any[] = [];
+    if (client.integrations) {
+      client.integrations.forEach(integration => {
+        if (integration.integrationType === 'meta-business') {
+          // Look up raw account to check for Instagram
+          const rawAccount = client.metaBusinessAccounts?.find(
+            (acc: any) => acc.metaAccountId === integration.accountId || acc.id === integration.accountId
+          );
+          
+          // Always push Facebook Page
+          integrations.push({
+            ...integration,
+            integrationType: 'meta-facebook',
+            accountName: rawAccount?.metaAccount?.pageName || integration.accountName,
+            _originalIntegrationType: 'meta-business'
+          });
+
+          // If it has Instagram, push an Instagram row
+          if (rawAccount?.metaAccount?.instagramBusinessId || rawAccount?.metaAccount?.instagramUsername) {
+            integrations.push({
+              ...integration,
+              integrationType: 'meta-instagram',
+              accountName: `@${rawAccount.metaAccount.instagramUsername || rawAccount.metaAccount.instagramBusinessId}`,
+              _originalIntegrationType: 'meta-business'
+            });
+          }
+        } else {
+          integrations.push(integration);
+        }
+      });
+    }
 
     // Filter by platform
     if (platformFilter !== 'all') {
@@ -290,8 +320,9 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
         link = `${link}/${clientId}`;
       }
 
-      const syncDetails = getIntegrationCounts(integration.integrationType);
-      const isSyncing = isAccountSyncing(integration.integrationType, integration.accountId);
+      const originalType = integration._originalIntegrationType || integration.integrationType;
+      const syncDetails = getIntegrationCounts(originalType);
+      const isSyncing = isAccountSyncing(originalType, integration.accountId);
 
 
       return {
@@ -303,7 +334,7 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
         status: (
           <StatusCell
             clientId={clientId!}
-            integrationType={integration.integrationType}
+            integrationType={originalType}
             accountId={integration.accountId}
             isSyncing={isSyncing}
             syncDetails={syncDetails}
@@ -318,7 +349,11 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
               className="text-red-500 hover:text-red-700 hover:bg-red-50"
               onClick={(e) => {
                 e.stopPropagation();
-                setDisconnectTarget(integration);
+                // Pass original type to disconnect target so it disconnects the meta-business parent
+                setDisconnectTarget({
+                  ...integration,
+                  integrationType: originalType
+                });
               }}
             >
               Disconnect

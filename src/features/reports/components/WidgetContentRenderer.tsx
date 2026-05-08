@@ -858,6 +858,7 @@ export const renderWidgetContent = (
                   { name: "Impressions", dataKey: "impressions" },
                   { name: "Clicks", dataKey: "clicks" },
                   { name: "Likes", dataKey: "likes" },
+                  { name: "Comments", dataKey: "comments" },
                   { name: "Shares", dataKey: "shares" }
                 ];
               }

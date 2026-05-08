@@ -1824,8 +1824,10 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
       console.log(`Ã°Å¸â€ Â  [ID Mapping] Slide ${bId}: source="${slide.source}", integrationIndex=${iIdx}, typeof iIdx=${typeof iIdx}`);
 
-      // CRITICAL: Never remap custom pages (ID >= 1000 with source === 'custom')
-      if (bId >= 1000 && slide.source === 'custom') {
+      // CRITICAL: Never remap custom pages — backend may assign IDs both above
+      // and below 1000 (frontend-temp IDs are >=1000, but DB-assigned IDs can be
+      // anything). Trust `source === 'custom'` as the authoritative signal.
+      if (slide.source === 'custom') {
         console.log('Ã°Å¸â€ Â  [ID Mapping] Skipping custom page:', bId);
         // For custom pages, the ID is already the DB ID (if hydrated from DB)
         // or a temp ID (if created locally). We map it 1:1.
@@ -2654,9 +2656,28 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
         return false;
       });
 
+      // Ã°Å¸â€ Â§ FIX: Recover slides that exist in dedupedMeta but were dropped from
+      // pageOrder. This happens when the backend reassigns slide IDs on save
+      // (e.g. the seeded Cover at 9001 becomes 283) but stores pageOrder with
+      // the original IDs Ã¢â‚¬â€  the stale IDs fail validation above and would
+      // otherwise leave their slides invisible in the sidebar.
+      const orderedIds = new Set(finalValidatedOrder);
+      const recoveredOrder = [...finalValidatedOrder];
+      dedupedMeta.forEach((meta, idx) => {
+        const mId = Number(meta.id);
+        if (orderedIds.has(mId)) return;
+        if (!map.has(mId) && meta.source !== 'custom') return;
+        // Insert custom slides at their dedupedMeta position (typically the
+        // top, since cover/TOC are at the start) rather than the end.
+        const insertAt = meta.source === 'custom' ? idx : recoveredOrder.length;
+        recoveredOrder.splice(Math.min(insertAt, recoveredOrder.length), 0, mId);
+        orderedIds.add(mId);
+        console.log(`Ã°Å¸â€ Â§ [PageOrder] Recovered missing slide ${mId} (${meta.title}, source=${meta.source})`);
+      });
+
       // Ã¢Å“â€¦ Filter out explicitly deleted slides so they don't re-enter pageOrder
       // (which would feed back into auto-save and re-create the slide in the backend)
-      const withoutDeleted = finalValidatedOrder.filter(id => !deletedSlideIds.has(id));
+      const withoutDeleted = recoveredOrder.filter(id => !deletedSlideIds.has(id));
       setPageOrder(withoutDeleted);
     } else {
       console.log('Ã¢Å¡Â Ã¯Â¸Â  [PageOrder Hydration] No pageOrder in template data, using dedupedMeta order');
@@ -5775,7 +5796,9 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
                         // FIX: Aggressively remove any slide with ID < 1000 if it doesn't map to a valid integration
                         // usage. This catches both explicit 'integration' source AND 'custom' source ghosts.
-                        if (sId < 1000) {
+                        // EXCEPTION: keep slides explicitly marked as custom — backend may reassign them
+                        // to small IDs (e.g. 267) on save, so a low ID doesn't imply an integration index.
+                        if (sId < 1000 && s.source !== "custom") {
                           // If it's an integration index, check if valid
                           const idx = typeof s.integrationIndex === 'number' ? s.integrationIndex : sId;
                           if (!isNaN(idx) && idx >= numIntegrations) {

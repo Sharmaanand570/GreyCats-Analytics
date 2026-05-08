@@ -209,9 +209,14 @@ function WidgetsPageSideComponent({
       }[] = [];
 
       // 1. Process explicit integration slides (source === "integration")
-      // OR any slide that has ID < 1000 (Self-Healing for corrupted "custom" slides)
+      // OR any slide that has ID < 1000 (Self-Healing for corrupted "custom" slides).
+      // EXCEPTION: respect explicit source === "custom" — backend may assign DB IDs
+      // < 1000 to genuine custom pages (e.g. seeded Cover / TOC), and they must
+      // not be reclassified as integration slides.
       const integrationSlides = slidesMeta.filter(
-        (s) => s.source === "integration" || Number(s.id) < 1000
+        (s) =>
+          s.source === "integration" ||
+          (Number(s.id) < 1000 && s.source !== "custom")
       );
 
       // Track processed IDs so we don't duplicate them in the Custom pass
@@ -254,7 +259,7 @@ function WidgetsPageSideComponent({
         });
       });
 
-      // 2. Map custom slides (source === "custom") 
+      // 2. Map custom slides (source === "custom")
       // EXCLUDING any that we already treated as integration slides (IDs < 1000)
       const customSlides = slidesMeta.filter(
         (s) => (s.source === "custom" || !s.source) && !processedIds.has(Number(s.id))
@@ -308,6 +313,7 @@ function WidgetsPageSideComponent({
           ],
         };
       });
+
 
       return orderedPages;
     }

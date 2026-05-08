@@ -18,6 +18,9 @@ import type {
   ConnectWordPressPayload,
   WordPressTarget,
   FetchWordPressTargetsResponse,
+  ConnectTelegramPayload,
+  TelegramTarget,
+  FetchTelegramTargetsResponse,
 } from './types';
 
 type ApiError = { message?: string; error?: string };
@@ -280,5 +283,43 @@ export const getWordPressTargets = async (): Promise<WordPressTarget[]> => {
     return response.data.targets;
   } catch (error) {
     throw new Error(extractError(error, 'Failed to fetch WordPress targets'));
+  }
+};
+
+/**
+ * Connect a Telegram channel via Bot Token.
+ * POST /api/blog-posts/integrations/telegram
+ */
+export const connectTelegram = async (
+  payload: ConnectTelegramPayload
+): Promise<void> => {
+  try {
+    const response = await api.post<{ success?: boolean; message?: string; error?: string }>(
+      '/blog-posts/integrations/telegram',
+      payload
+    );
+    const data = response.data as any;
+    if (data.success === false || data.error) {
+      throw new Error(data.message || data.error || 'Failed to connect Telegram');
+    }
+  } catch (error) {
+    throw new Error(extractError(error, 'Failed to connect Telegram channel'));
+  }
+};
+
+/**
+ * Fetch connected Telegram targets (channels).
+ * GET /api/blog-posts/targets/telegram
+ */
+export const getTelegramTargets = async (): Promise<TelegramTarget[]> => {
+  try {
+    const response = await api.get<FetchTelegramTargetsResponse>('/blog-posts/targets/telegram');
+    const data = response.data as any;
+    if (data.success === false || data.error) {
+      throw new Error(data.message || data.error || 'Failed to fetch Telegram targets');
+    }
+    return response.data.targets;
+  } catch (error) {
+    throw new Error(extractError(error, 'Failed to fetch Telegram targets'));
   }
 };

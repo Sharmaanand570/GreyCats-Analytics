@@ -6,14 +6,14 @@ import type { FacebookPageInfoResponse } from "../API/metaInsightsApi";
  * Hook to fetch Facebook Page basic info (followers, category, etc.)
  * Uses Meta Insights API as Meta Business API doesn't have page insights yet
  */
-export const useFacebookPageInfo = (pageId: string | undefined) => {
+export const useFacebookPageInfo = (accountId: number | undefined) => {
     return useQuery<FacebookPageInfoResponse>({
-        queryKey: ["facebook-page-info", pageId],
+        queryKey: ["facebook-page-info", accountId],
         queryFn: () => {
-            if (!pageId) throw new Error("Page ID is required");
-            return getFacebookPageInfo(pageId);
+            if (!accountId) throw new Error("Account ID is required");
+            return getFacebookPageInfo(accountId);
         },
-        enabled: !!pageId,
+        enabled: !!accountId,
         staleTime: 5 * 60 * 1000, // 5 minutes
         retry: 2,
     });

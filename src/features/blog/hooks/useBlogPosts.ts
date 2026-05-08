@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listBlogPosts, getBlogPost, getBlogIntegrations, fetchPlatformDetails, getLinkedInTargets, connectWordPress, getWordPressTargets } from '../api/blogPostsApi';
-import type { BlogPostStatus, ConnectWordPressPayload } from '../api/types';
+import { listBlogPosts, getBlogPost, getBlogIntegrations, fetchPlatformDetails, getLinkedInTargets, connectWordPress, getWordPressTargets, connectTelegram, getTelegramTargets } from '../api/blogPostsApi';
+import type { BlogPostStatus, ConnectWordPressPayload, ConnectTelegramPayload } from '../api/types';
 
 export const blogPostKeys = {
   all: ['blog-posts'] as const,
@@ -14,6 +14,7 @@ export const blogPostKeys = {
   platformDetails: (platform: string, accountId: string) =>
     ['blog-platform-details', platform, accountId] as const,
   wordpressTargets: () => ['blog-wordpress-targets'] as const,
+  telegramTargets: () => ['blog-telegram-targets'] as const,
 };
 
 export const useBlogPosts = (clientId?: number, status?: BlogPostStatus) => {
@@ -74,6 +75,25 @@ export const useConnectWordPress = () => {
     mutationFn: (payload: ConnectWordPressPayload) => connectWordPress(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: blogPostKeys.wordpressTargets() });
+      queryClient.invalidateQueries({ queryKey: blogPostKeys.integrations() });
+    },
+  });
+};
+
+export const useTelegramTargets = () => {
+  return useQuery({
+    queryKey: blogPostKeys.telegramTargets(),
+    queryFn: getTelegramTargets,
+    staleTime: 60_000,
+  });
+};
+
+export const useConnectTelegram = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ConnectTelegramPayload) => connectTelegram(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: blogPostKeys.telegramTargets() });
       queryClient.invalidateQueries({ queryKey: blogPostKeys.integrations() });
     },
   });

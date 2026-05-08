@@ -142,6 +142,13 @@ export default function UserDetailsPage() {
                                     localStorage.setItem('impersonationToken', response.impersonationToken);
                                     localStorage.setItem(TOKEN_KEY, response.impersonationToken);
 
+                                    // Clear feature-specific state before starting impersonation
+                                    // to prevent admin's drafts from leaking into the user's session.
+                                    localStorage.removeItem('social-media-scheduler-storage');
+                                    localStorage.removeItem('blog-scheduler-storage');
+                                    localStorage.removeItem('lastClientId');
+                                    localStorage.removeItem('lastBlogClientId');
+
                                     console.log('After setting impersonation token:');
                                     console.log('- originalToken:', localStorage.getItem('originalToken'));
                                     console.log('- ANALYTICS_TOKEN_KEY_:', localStorage.getItem(TOKEN_KEY));

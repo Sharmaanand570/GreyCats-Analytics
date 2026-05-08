@@ -53,15 +53,18 @@ export const useUserStore = create<UserState>()(
         localStorage.removeItem("pending_oauth_integration");
         localStorage.removeItem("originalToken");
         localStorage.removeItem("impersonationToken");
+        // Clear feature-specific persisted stores so a different user
+        // logging in on the same browser never sees another user's draft.
+        localStorage.removeItem("social-media-scheduler-storage");
+        localStorage.removeItem("blog-scheduler-storage");
+        localStorage.removeItem("lastClientId");
+        localStorage.removeItem("lastBlogClientId");
 
         // Clear session storage
         sessionStorage.clear();
 
         // Reset state
         set({ user: null });
-
-        // Clear query cache if available (will be handled by App.tsx or similar if needed)
-        // window.location.href = '/'; // Optional: force full reload to clear memory
       },
       pageNotFound: false,
       setPageNotFound: (pageNotFound) => set({ pageNotFound }),

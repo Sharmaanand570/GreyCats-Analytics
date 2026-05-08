@@ -30,7 +30,7 @@ import {
   CalendarPlus,
 } from 'lucide-react';
 import { FaWordpress, FaLinkedin, FaReddit } from 'react-icons/fa6';
-import { SiBlogger } from 'react-icons/si';
+import { SiBlogger, SiTelegram } from 'react-icons/si';
 import { gsap } from 'gsap';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -64,6 +64,7 @@ const platformIcons: Record<BlogPlatform, React.ReactNode> = {
   linkedin: <FaLinkedin className="w-3.5 h-3.5 text-blue-700" />,
   blogger: <SiBlogger className="w-3.5 h-3.5 text-orange-600" />,
   reddit: <FaReddit className="w-3.5 h-3.5 text-orange-500" />,
+  telegram: <SiTelegram className="w-3.5 h-3.5 text-[#229ED9]" />,
 };
 
 const platformColors: Record<BlogPlatform, string> = {
@@ -71,6 +72,7 @@ const platformColors: Record<BlogPlatform, string> = {
   linkedin: 'bg-sky-50 border-sky-100 text-sky-900',
   blogger: 'bg-orange-50 border-orange-100 text-orange-900',
   reddit: 'bg-amber-50 border-amber-100 text-amber-900',
+  telegram: 'bg-sky-50 border-sky-100 text-sky-900',
 };
 
 const STATUS_FILTERS: { label: string; value: BlogPostStatus | 'ALL' }[] = [

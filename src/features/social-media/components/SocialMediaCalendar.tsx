@@ -14,7 +14,7 @@ import {
   compareAsc,
   parseISO,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Share2, X, Image as ImageIcon, Video as VideoIcon, CalendarDays, ChevronDown, Pencil, Trash2, AlertCircle, CalendarPlus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Share2, X, Image as ImageIcon, Video as VideoIcon, CalendarDays, ChevronDown, Pencil, Trash2, AlertCircle, CalendarPlus, Plus } from 'lucide-react';
 import { FaInstagram, FaFacebook, FaLinkedin } from 'react-icons/fa6';
 import { gsap } from 'gsap';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ import { scheduledPostKeys } from '../hooks/useScheduledPosts';
 import type { PostPlatform, PostStatus, ScheduledPost } from '../api/types';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/security/ConfirmDialog';
+import { retryScheduledPost } from '../api/scheduledPostsApi';
 
 interface SocialMediaCalendarProps {
   clientId: number;
@@ -263,6 +264,19 @@ export function SocialMediaCalendar({ clientId, canPost, headerExtra }: SocialMe
     },
   });
 
+  const retryMutation = useMutation({
+    mutationFn: ({ id, scheduledFor }: { id: number; scheduledFor?: string }) => 
+      retryScheduledPost(id, scheduledFor),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: scheduledPostKeys.all });
+      toast.success('Post queued for retry successfully');
+      setDaySheetOpen(false);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to retry post');
+    },
+  });
+
   const filteredPosts = statusFilter === 'ALL' ? allPosts : allPosts.filter((p: ScheduledPost) => p.status === statusFilter);
 
   const nextMonth = () => {
@@ -324,6 +338,12 @@ export function SocialMediaCalendar({ clientId, canPost, headerExtra }: SocialMe
 
   const handleDeletePost = (post: ScheduledPost) => {
     setDeleteTarget(post);
+  };
+
+  const handleRetryPost = (post: ScheduledPost) => {
+    if (window.confirm('Retry this post immediately?')) {
+      retryMutation.mutate({ id: post.id });
+    }
   };
 
   const confirmDelete = () => {
@@ -434,7 +454,7 @@ export function SocialMediaCalendar({ clientId, canPost, headerExtra }: SocialMe
             onClick={() => openNewPostModal()}
             className="h-10 bg-zinc-900 hover:bg-zinc-800 text-white shadow-sm shrink-0"
           >
-            <Share2 className="w-4 h-4 mr-2" />
+            <Plus className="w-4 h-4 mr-2" />
             New Post
           </Button>
         )}
@@ -622,9 +642,19 @@ export function SocialMediaCalendar({ clientId, canPost, headerExtra }: SocialMe
                         </span>
                       )}
                     </div>
-
                     {post.status !== 'PROCESSING' && (
                       <div className="flex items-center gap-1">
+                        {post.status === 'FAILED' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 rounded-full hover:bg-blue-50 text-blue-600"
+                            onClick={() => handleRetryPost(post)}
+                            title="Retry now"
+                          >
+                            <Share2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
                         {post.status === 'PENDING' && (
                           <Button
                             variant="ghost"
@@ -720,6 +750,7 @@ export function SocialMediaCalendar({ clientId, canPost, headerExtra }: SocialMe
         posts={selectedDayPosts}
         onEdit={handleEditPost}
         onDelete={handleDeletePost}
+        onRetry={handleRetryPost}
         onNewPost={() => openNewPostModal(selectedDay)}
         onStatusClick={setStatusFilter}
         isPast={isPastDate(selectedDay)}

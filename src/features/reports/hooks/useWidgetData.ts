@@ -555,6 +555,7 @@ async function fetchRawWidgetData(
             impressions: m.views || 0,
             clicks: 0,
             likes: m.likeCount,
+            comments: m.commentsCount,
             shares: m.shares,
             fullPicture: (m as any).thumbnailUrl || m.mediaUrl,
             permalinkUrl: m.permalinkUrl,
@@ -576,6 +577,7 @@ async function fetchRawWidgetData(
               { name: "Impressions", dataKey: "impressions" },
               { name: "Clicks", dataKey: "clicks" },
               { name: "Likes", dataKey: "likes" },
+              { name: "Comments", dataKey: "comments" },
               { name: "Shares", dataKey: "shares" },
             ],
           };

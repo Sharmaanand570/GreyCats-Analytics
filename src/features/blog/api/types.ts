@@ -1,6 +1,6 @@
 // Blog Scheduler — Backend-aligned types
 
-export type BlogPlatform = 'wordpress' | 'linkedin' | 'blogger' | 'reddit';
+export type BlogPlatform = 'wordpress' | 'linkedin' | 'blogger' | 'reddit' | 'telegram';
 export type BlogPostStatus = 'PENDING' | 'PROCESSING' | 'PUBLISHED' | 'FAILED';
 
 export interface BlogTargetSettings {
@@ -147,4 +147,23 @@ export interface WordPressTarget {
 export interface FetchWordPressTargetsResponse {
   success: boolean;
   targets: WordPressTarget[];
+}
+
+// ── Telegram ──
+
+export interface ConnectTelegramPayload {
+  botToken: string;
+  chatId: string;
+  displayName?: string;
+}
+
+export interface TelegramTarget {
+  id: string;
+  name: string;
+  type: 'telegram';
+}
+
+export interface FetchTelegramTargetsResponse {
+  success: boolean;
+  targets: TelegramTarget[];
 }

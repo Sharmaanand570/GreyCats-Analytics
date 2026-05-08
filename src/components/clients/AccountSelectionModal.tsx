@@ -16,6 +16,7 @@ import type { IntegrationType, AvailableAccount } from "@/types/integration.type
 import { getPlatformConfig } from "@/utils/platformMapping";
 import { useQueryClient } from "@tanstack/react-query";
 import { showConnectionResultToast } from "@/utils/connectionToasts";
+import { getErrorMessage } from "@/utils/errorHandling";
 
 interface AccountSelectionModalProps {
     open: boolean;
@@ -59,7 +60,7 @@ export function AccountSelectionModal({
             setAccounts(data);
         } catch (error) {
             console.error("Failed to fetch accounts:", error);
-            toast.error("Failed to load available accounts. Please try again.");
+            toast.error(getErrorMessage(error, "Failed to load available accounts. Please try again."));
         } finally {
             setLoading(false);
         }
@@ -96,7 +97,7 @@ export function AccountSelectionModal({
             onOpenChange(false);
         } catch (error: any) {
             console.error("Assignment failed:", error);
-            toast.error(error.response?.data?.message || "Failed to connect account");
+            toast.error(getErrorMessage(error, "Failed to connect account"));
         } finally {
             setAssigning(false);
         }

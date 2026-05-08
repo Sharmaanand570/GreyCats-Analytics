@@ -308,8 +308,16 @@ export const stopImpersonating = () => {
     localStorage.removeItem('originalToken');
     localStorage.removeItem('impersonationToken');
 
+    // Clear any feature state that belongs to the impersonated user
+    // so the admin never sees the impersonated user's draft (and vice-versa).
+    localStorage.removeItem('social-media-scheduler-storage');
+    localStorage.removeItem('blog-scheduler-storage');
+    localStorage.removeItem('lastClientId');
+    localStorage.removeItem('lastBlogClientId');
+
     return { success: true };
 };
+
 
 export const isImpersonating = (): boolean => {
     const TOKEN_KEY = 'ANALYTICS_TOKEN_KEY_';

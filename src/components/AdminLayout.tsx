@@ -9,6 +9,7 @@ import {
     LogOut,
     ShieldAlert,
     Menu,
+    Send,
     X
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -96,6 +97,12 @@ export default function AdminLayout() {
             href: "/admin/monitoring/integrations",
             icon: ShieldAlert,
             roles: ["SUPER_ADMIN"],
+        },
+        {
+            title: "Broadcasts",
+            href: "/admin/broadcasts",
+            icon: Send,
+            roles: ["ADMIN", "SUPER_ADMIN"],
         },
     ];
 

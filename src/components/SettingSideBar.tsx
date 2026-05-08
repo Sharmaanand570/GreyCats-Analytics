@@ -21,7 +21,12 @@ export default function SettingSideBar({ activeTab, setActive }: SettingSideBarP
         { id: "security-settings", label: "Security Settings" },
       ]
     },
-
+    {
+      category: "Communication",
+      items: [
+        { id: "broadcast-settings", label: "Broadcast Channels" },
+      ]
+    },
   ];
 
   return (

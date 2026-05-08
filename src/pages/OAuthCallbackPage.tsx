@@ -18,8 +18,21 @@ const OAuthCallbackPage: React.FC = () => {
     const [showAccountModal, setShowAccountModal] = useState(false);
     const [clientId, setClientId] = useState<number | null>(null);
     const [integrationType, setIntegrationType] = useState<IntegrationType | null>(null);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [showErrorDialog, setShowErrorDialog] = useState(false);
 
     useEffect(() => {
+        // Check for error parameters in URL
+        const params = new URLSearchParams(window.location.search);
+        const error = params.get('error');
+        const errorDescription = params.get('error_description');
+
+        if (error) {
+            setErrorMsg(errorDescription || error);
+            setShowErrorDialog(true);
+            return;
+        }
+
         // Retrieve stored context
         const storedClientId = localStorage.getItem('pending_oauth_client_id');
         const storedIntegration = localStorage.getItem('pending_oauth_integration');
@@ -115,6 +128,30 @@ const OAuthCallbackPage: React.FC = () => {
                     <AlertDialogFooter>
                         <AlertDialogAction onClick={handleContinue}>
                             Got it, continue
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={showErrorDialog} onOpenChange={() => navigate('/clients')}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-red-600">Connection Failed ❌</AlertDialogTitle>
+                        <AlertDialogDescription className="space-y-2">
+                            <p>
+                                There was an error while trying to connect your data source.
+                            </p>
+                            <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-red-700 text-sm">
+                                <p className="font-medium">Error details:</p>
+                                <p className="mt-1 opacity-90">
+                                    {errorMsg || "The authentication flow was cancelled or failed."}
+                                </p>
+                            </div>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogAction onClick={() => navigate('/clients')} className="bg-red-600 hover:bg-red-700">
+                            Back to Clients
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

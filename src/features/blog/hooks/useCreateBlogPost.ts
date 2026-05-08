@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { uploadBlogMedia, createBlogPost } from '../api/blogPostsApi';
 import { blogPostKeys } from './useBlogPosts';
-import type { CreateBlogPostPayload } from '../api/types';
+import type { BlogPost, BlogPostsListResponse, CreateBlogPostPayload } from '../api/types';
 
 export const useCreateBlogPost = () => {
   const queryClient = useQueryClient();
@@ -25,7 +25,19 @@ export const useCreateBlogPost = () => {
 
       return createBlogPost({ ...payload, mediaUrls });
     },
-    onSuccess: () => {
+    onSuccess: (newPost: BlogPost) => {
+      // Optimistically add the post to every cached list so it shows up
+      // immediately without waiting for the refetch.
+      queryClient.setQueriesData<BlogPostsListResponse | BlogPost[]>(
+        { queryKey: blogPostKeys.lists() },
+        (old) => {
+          if (!old) return old;
+          if (Array.isArray(old)) {
+            return [...old, newPost];
+          }
+          return { ...old, posts: [...old.posts, newPost], total: old.total + 1 };
+        }
+      );
       queryClient.invalidateQueries({ queryKey: blogPostKeys.all });
       setUploadProgress(0);
     },

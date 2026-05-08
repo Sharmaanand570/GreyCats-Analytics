@@ -87,7 +87,7 @@ const platformMap: Record<string, PlatformConfig> = {
     color: "#96BF48", // Shopify green
   },
   "meta-ads": {
-    name: "Meta Ads",
+    name: "Meta Business",
     icon: SiMeta,
     link: "/data-sources/meta-ads",
     color: "#0081FB", // Meta blue

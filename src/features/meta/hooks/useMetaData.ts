@@ -143,35 +143,37 @@ export const useFacebookPages = (
   });
 };
 
-export const useFacebookPageInfo = (pageId: string | undefined) => {
+export const useFacebookPageInfo = (accountId: number | undefined) => {
   return useQuery<FacebookPageInfoResponse, Error>({
-    queryKey: ["meta-insights", "facebook", "page-info", pageId],
-    queryFn: () => getFacebookPageInfo(pageId as string),
-    enabled: !!pageId,
+    queryKey: ["meta-insights", "facebook", "page-info", accountId],
+    queryFn: () => getFacebookPageInfo(accountId as number),
+    enabled: !!accountId,
     ...commonQueryOptions,
   });
 };
 
 export const useFacebookPagePosts = (
-  pageId: string | undefined,
+  accountId: number | undefined,
   limit?: number
 ) => {
   return useQuery<FacebookPagePostsResponse, Error>({
-    queryKey: ["meta-insights", "facebook", "page-posts", pageId, limit],
-    queryFn: () => getFacebookPagePosts(pageId as string, limit),
-    enabled: !!pageId,
+    queryKey: ["meta-insights", "facebook", "page-posts", accountId, limit],
+    queryFn: () => getFacebookPagePosts(accountId as number, limit),
+    enabled: !!accountId,
     ...commonQueryOptions,
   });
 };
 
+export const useFacebookPosts = useFacebookPagePosts;
+
 export const useFacebookPostInsights = (
   postId: string | undefined,
-  pageId: string | undefined
+  accountId: number | undefined
 ) => {
   return useQuery<FacebookPostInsightsResponse, Error>({
-    queryKey: ["meta-insights", "facebook", "post-insights", postId, pageId],
-    queryFn: () => getFacebookPostInsights(postId as string, pageId as string),
-    enabled: !!postId && !!pageId,
+    queryKey: ["meta-insights", "facebook", "post-insights", postId, accountId],
+    queryFn: () => getFacebookPostInsights(postId as string, accountId as number),
+    enabled: !!postId && !!accountId,
     ...commonQueryOptions,
   });
 };
@@ -201,37 +203,37 @@ export const useInstagramBusinessAccount = (pageId: string | undefined) => {
   });
 };
 
-export const useInstagramProfile = (clientId: number, igBusinessId: string | undefined) => {
+export const useInstagramProfile = (clientId: number, accountId: number | undefined) => {
   return useQuery<InstagramProfileResponse, Error>({
-    queryKey: ["meta", "instagram", "profile", clientId, igBusinessId],
-    queryFn: () => getInstagramProfile(clientId, igBusinessId as string),
-    enabled: !!clientId && !!igBusinessId,
+    queryKey: ["meta", "instagram", "profile", clientId, accountId],
+    queryFn: () => getInstagramProfile(clientId, accountId?.toString() as string),
+    enabled: !!clientId && !!accountId,
     ...commonQueryOptions,
   });
 };
 
 export const useInstagramMedia = (
   clientId: number,
-  igBusinessId: string | undefined,
+  accountId: number | undefined,
   limit?: number
 ) => {
   return useQuery<InstagramMediaResponse, Error>({
-    queryKey: ["meta", "instagram", "media", clientId, igBusinessId, limit],
-    queryFn: () => getInstagramMedia(clientId, igBusinessId as string, limit),
-    enabled: !!clientId && !!igBusinessId,
+    queryKey: ["meta", "instagram", "media", clientId, accountId, limit],
+    queryFn: () => getInstagramMedia(clientId, accountId?.toString() as string, limit),
+    enabled: !!clientId && !!accountId,
     ...commonQueryOptions,
   });
 };
 
 export const useInstagramMediaInsights = (
   clientId: number,
-  accountId: string | undefined,
+  accountId: number | undefined,
   mediaId: string | undefined
 ) => {
   return useQuery<InstagramMediaInsightsResponse, Error>({
     queryKey: ["meta", "instagram", "media-insights", clientId, accountId, mediaId],
     queryFn: () =>
-      getInstagramMediaInsights(clientId, accountId as string, mediaId as string),
+      getInstagramMediaInsights(clientId, accountId?.toString() as string, mediaId as string),
     enabled: !!clientId && !!accountId && !!mediaId,
     ...commonQueryOptions,
   });

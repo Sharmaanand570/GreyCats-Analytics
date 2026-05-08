@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { IconType } from "react-icons";
-import { SiGoogleanalytics, SiGooglesearchconsole, SiYoutube, SiWoocommerce, SiMeta, SiGoogleads, SiLinkedin } from "react-icons/si";
+import { SiGoogleanalytics, SiGooglesearchconsole, SiYoutube, SiWoocommerce, SiMeta, SiGoogleads, SiLinkedin, SiInstagram } from "react-icons/si";
 import React from "react";
 import { useYouTubeConnect } from "@/features/YouTube/hooks/useYouTubeConnect";
 import { toast } from "sonner";
@@ -30,6 +30,7 @@ import { assignAccountToClient } from "@/api/integrationApi";
 import { clientKeys } from "@/hooks/useClients";
 import { Loader2 } from "lucide-react";
 import { showConnectionResultToast } from "@/utils/connectionToasts";
+import { getErrorMessage } from "@/utils/errorHandling";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -113,6 +114,12 @@ const dataSourceOptions: DataSourceOption[] = [
     name: "Meta Business",
     icon: SiMeta,
     color: getPlatformConfig("meta-business")?.color,
+  },
+  {
+    id: "instagram-business",
+    name: "Instagram Business",
+    icon: SiInstagram,
+    color: getPlatformConfig("instagram")?.color || "#E1306C",
   },
   {
     id: "woocommerce",
@@ -237,11 +244,7 @@ mutations.meta.isPending ||
         queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
       }
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Failed to connect WooCommerce";
-
+      const errorMessage = getErrorMessage(error, "Failed to connect WooCommerce");
       toast.error(errorMessage);
     }
   }
@@ -264,7 +267,7 @@ mutations.meta.isPending ||
           window.location.href = response.url;
         }
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to connect YouTube");
+        toast.error(getErrorMessage(error, "Failed to connect YouTube"));
       }
     } else if (SelectedSource.id === "google-analytics") {
       try {
@@ -277,7 +280,7 @@ mutations.meta.isPending ||
           window.location.href = response.url;
         }
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to connect Google Analytics");
+        toast.error(getErrorMessage(error, "Failed to connect Google Analytics"));
       }
     } else if (SelectedSource.id === "google-console") {
       try {
@@ -290,7 +293,7 @@ mutations.meta.isPending ||
           window.location.href = response.url;
         }
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to connect Google Console");
+        toast.error(getErrorMessage(error, "Failed to connect Google Console"));
       }
     } else if (SelectedSource.id === "meta-ads") {
       try {
@@ -305,9 +308,9 @@ mutations.meta.isPending ||
           toast.error("Failed to initiate Meta connection");
         }
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to connect Meta Ads");
+        toast.error(getErrorMessage(error, "Failed to connect Meta Ads"));
       }
-    } else if (SelectedSource.id === "meta-business") {
+    } else if (SelectedSource.id === "meta-business" || SelectedSource.id === "instagram-business") {
       try {
         await connectMetaBusiness();
         if (clientId) {
@@ -315,6 +318,7 @@ mutations.meta.isPending ||
           localStorage.setItem("pending_oauth_integration", "meta-business");
         }
       } catch (error) {
+        toast.error(getErrorMessage(error, "Failed to connect Meta Business"));
         console.error(error);
       }
     } else if (SelectedSource.id === "google-ads") {
@@ -330,7 +334,7 @@ mutations.meta.isPending ||
           toast.error("Failed to initiate Google Ads connection");
         }
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to connect Google Ads");
+        toast.error(getErrorMessage(error, "Failed to connect Google Ads"));
       }
     } else if (SelectedSource.id === "linkedin") {
       try {
@@ -345,7 +349,7 @@ mutations.meta.isPending ||
           toast.error("Failed to initiate LinkedIn connection");
         }
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to connect LinkedIn");
+        toast.error(getErrorMessage(error, "Failed to connect LinkedIn"));
       }
     } else {
       setNext(SelectedSource.id as string);

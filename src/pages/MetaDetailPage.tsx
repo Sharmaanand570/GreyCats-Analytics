@@ -1,7 +1,7 @@
 "use client";
 
 import { useNavigate, useParams } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { SiMeta } from "react-icons/si";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
@@ -148,9 +148,29 @@ function MetaDetailPage() {
   const { data: clientsData } = useClients();
   const clients = clientsData || [];
   const { data: clientData } = useClient(selectedClientId);
-  const hasMetaAdsIntegration = !!clientData?.integrations?.some(
-    (i: any) => i.integrationType === "meta-ads" || i.integrationType === "meta_ads"
-  );
+  
+  useEffect(() => {
+    if (clientData) {
+      console.log("DEBUG - Client Data:", clientData);
+      console.log("DEBUG - Integrations:", clientData.integrations);
+      console.log("DEBUG - Meta Business Accounts:", clientData.metaBusinessAccounts);
+    }
+  }, [clientData]);
+
+  const hasMetaAdsIntegration = useMemo(() => {
+    const hasIntegration = !!clientData?.integrations?.some(
+      (i: any) => 
+        i.integrationType === "meta-ads" || 
+        i.integrationType === "meta_ads" || 
+        i.integrationType === "meta-business" || 
+        i.integrationType === "meta_business" ||
+        i.integrationType === "meta_facebook" ||
+        i.integrationType === "meta_instagram"
+    ) || (clientData?.metaBusinessAccounts && clientData.metaBusinessAccounts.length > 0);
+    
+    console.log("DEBUG - hasMetaAdsIntegration:", hasIntegration);
+    return hasIntegration;
+  }, [clientData]);
 
   // Sync with URL param; fall back to first client only when no param present
   useEffect(() => {
@@ -264,7 +284,7 @@ function MetaDetailPage() {
                   </BreadcrumbItem>
                   <BreadcrumbSeparator className="text-slate-300" />
                   <BreadcrumbItem>
-                    <span className="bg-zinc-100 text-zinc-900 px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wider">Meta Ads</span>
+                    <span className="bg-zinc-100 text-zinc-900 px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wider">Meta Business</span>
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
@@ -277,7 +297,7 @@ function MetaDetailPage() {
                   </div>
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold tracking-tight text-slate-900">Meta Ads</h1>
+                  <h1 className="text-3xl font-bold tracking-tight text-slate-900">Meta Business</h1>
                   <p className="text-xs text-slate-500 mt-1 font-bold uppercase tracking-widest">{accountName || "Campaign Insights"}</p>
                 </div>
               </div>

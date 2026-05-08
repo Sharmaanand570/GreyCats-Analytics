@@ -6,6 +6,7 @@ import CompanyDetailsForm from "@/components/CompanyDetailsForm";
 import PersonalInformation from "@/components/settings/PersonalInformation";
 import ReportSettings from "@/components/settings/ReportSettings";
 import SecuritySettings from "@/components/settings/SecuritySettings";
+import { ProviderManager } from "@/features/broadcasts/components/ProviderManager";
 
 
 export default function SettingsPage() {
@@ -22,6 +23,8 @@ export default function SettingsPage() {
         return <ReportSettings />;
       case "security-settings":
         return <SecuritySettings />;
+      case "broadcast-settings":
+        return <ProviderManager />;
       default:
         return <PersonalInformation />;
     }

@@ -115,6 +115,33 @@ export const classifyError = (error: unknown): SyncError => {
     };
 };
 
+/**
+ * Extracts a user-friendly error message from any error object.
+ * Useful for catch blocks where the error might be an AxiosError, Error, or string.
+ */
+export const getErrorMessage = (error: unknown, defaultMessage: string = "An unexpected error occurred"): string => {
+    if (!error) return defaultMessage;
+
+    // If it's already a string
+    if (typeof error === "string") return error;
+
+    // If it's a SyncError from classifyError
+    if (typeof error === "object" && "userMessage" in error && typeof (error as any).userMessage === "string") {
+        return (error as any).userMessage;
+    }
+
+    // Handle AxiosError
+    const axiosError = error as AxiosError<{ message?: string; error?: string; details?: string }>;
+    if (axiosError.isAxiosError && axiosError.response?.data) {
+        return axiosError.response.data.message || axiosError.response.data.error || axiosError.response.data.details || axiosError.message;
+    }
+
+    // Handle standard Error
+    if (error instanceof Error) return error.message;
+
+    return defaultMessage;
+};
+
 // ==================== RETRY LOGIC ====================
 
 export interface RetryOptions {

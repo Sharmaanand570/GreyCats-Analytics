@@ -435,11 +435,13 @@ function StepWorkspace({
 export default function BlogSchedulerPage() {
   const { clientId: urlClientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
-  const { currentStep, setCurrentStep } = useBlogSchedulerStore();
+  const { currentStep, setCurrentStep, resetDraft } = useBlogSchedulerStore();
   const { currentClient, setCurrentClient: _setCurrentClient, clients: allClients, isLoading: isLoadingClients } = useClientContext();
 
   const setCurrentClient = (client: ClientWithIntegrations | null) => {
     _setCurrentClient(client);
+    // Reset the blog draft when switching clients to prevent form state leakage
+    resetDraft();
     if (client) {
       localStorage.setItem('lastBlogClientId', String(client.id));
       if (urlClientId !== String(client.id)) {

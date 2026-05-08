@@ -6,6 +6,13 @@ import { FiLoader, FiAlertCircle, FiCheckCircle } from 'react-icons/fi';
 import { toast } from 'sonner';
 import type { IntegrationType } from '@/types/integration.types';
 
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 interface SyncProgressBarProps {
     clientId: number;
     integrationType: IntegrationType;
@@ -48,12 +55,12 @@ export const SyncProgressBar: React.FC<SyncProgressBarProps> = ({
     if (isError) {
         return (
             <div className="flex items-center gap-2 text-xs text-red-500">
-                <FiAlertCircle />
-                <span>Connection failed</span>
+                <FiAlertCircle className="flex-shrink-0" />
+                <span className="truncate max-w-[100px]">Connection failed</span>
                 <Button
                     variant="ghost"
                     size="sm"
-                    className="h-5 px-1.5 text-xs hover:bg-red-50 hover:text-red-600"
+                    className="h-5 px-1.5 text-xs hover:bg-red-50 hover:text-red-600 p-0"
                     onClick={handleRetryConnection}
                 >
                     Retry
@@ -78,29 +85,57 @@ export const SyncProgressBar: React.FC<SyncProgressBarProps> = ({
     }
 
     if (status === 'failed') {
+        const errorMsg = progress?.errorLog?.error || "Sync failed";
+        
+        if (compact) {
+            return (
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium bg-red-50 text-red-700 rounded-md cursor-help">
+                                <FiAlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                                <span>Failed</span>
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[250px] bg-white border-red-100 text-red-900 p-3 shadow-lg shadow-black/10">
+                            <p className="font-semibold mb-1 text-sm text-red-700">Sync Error</p>
+                            <p className="text-xs leading-relaxed text-red-600">{errorMsg}</p>
+                            {onRetry && (
+                                <Button 
+                                    variant="link" 
+                                    className="h-auto p-0 text-xs text-red-700 hover:text-red-900 mt-2 font-bold underline"
+                                    onClick={handleRetrySync}
+                                >
+                                    Retry Sync
+                                </Button>
+                            )}
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            );
+        }
+
         return (
             <div className="flex flex-col gap-1 w-full max-w-[200px]">
                 <div className="flex items-center justify-between text-xs text-red-600">
-                    <span className="flex items-center gap-1">
-                        <FiAlertCircle className="w-3 h-3" />
-                        Failed
+                    <span className="flex items-center gap-1 font-medium">
+                        <FiAlertCircle className="w-3.5 h-3.5" />
+                        Sync Failed
                     </span>
                     {onRetry && (
                         <Button
                             variant="ghost"
                             size="sm"
-                            className="h-5 px-1.5 text-xs hover:bg-red-50 hover:text-red-700 p-0"
+                            className="h-5 px-1.5 text-xs hover:bg-red-50 hover:text-red-700 p-0 font-bold"
                             onClick={handleRetrySync}
                         >
                             Retry
                         </Button>
                     )}
                 </div>
-                {!compact && progress?.errorLog && (
-                    <span className="text-[10px] text-red-500 truncate" title={progress.errorLog.error}>
-                        {progress.errorLog.error}
-                    </span>
-                )}
+                <span className="text-[10px] text-red-500 line-clamp-2 leading-tight" title={errorMsg}>
+                    {errorMsg}
+                </span>
             </div>
         );
     }

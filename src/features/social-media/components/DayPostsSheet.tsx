@@ -3,13 +3,14 @@ import { format, parseISO } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Pencil, Trash2, Plus, AlertCircle, Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
-import { FaInstagram, FaFacebook } from 'react-icons/fa6';
+import { FaInstagram, FaFacebook, FaLinkedin } from 'react-icons/fa6';
 import { PostStatusBadge } from './PostStatusBadge';
 import type { ScheduledPost, PostPlatform, PostStatus } from '../api/types';
 
 const platformIcons: Record<PostPlatform, React.ReactNode> = {
   instagram: <FaInstagram className="w-4 h-4 text-pink-600" />,
   facebook: <FaFacebook className="w-4 h-4 text-blue-600" />,
+  linkedin: <FaLinkedin className="w-4 h-4 text-blue-700" />,
   both: (
     <div className="flex -space-x-0.5">
       <FaFacebook className="w-3.5 h-3.5 text-blue-600" />
@@ -25,6 +26,7 @@ interface DayPostsSheetProps {
   posts: ScheduledPost[];
   onEdit: (post: ScheduledPost) => void;
   onDelete: (post: ScheduledPost) => void;
+  onRetry: (post: ScheduledPost) => void;
   onNewPost: () => void;
   onStatusClick?: (status: PostStatus) => void;
   isPast?: boolean;
@@ -65,6 +67,7 @@ export function DayPostsSheet({
   posts,
   onEdit,
   onDelete,
+  onRetry,
   onNewPost,
   onStatusClick,
   isPast = false
@@ -213,6 +216,17 @@ export function DayPostsSheet({
                     </div>
                     {post.status !== 'PROCESSING' && (
                       <div className="flex items-center gap-1.5">
+                        {post.status === 'FAILED' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-3 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50 gap-1.5 rounded-lg"
+                            onClick={() => onRetry(post)}
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            Retry Now
+                          </Button>
+                        )}
                         {post.status === 'PENDING' && (
                           <Button
                             variant="ghost"

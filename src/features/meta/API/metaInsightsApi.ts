@@ -12,6 +12,7 @@ export type FacebookPage = {
   id: string;
   name: string;
   instagram_business_account?: { id: string };
+  databaseId: number;
 };
 
 export type FacebookPagesResponse = {
@@ -225,13 +226,23 @@ export const getFacebookPages = async (
   }
 ): Promise<FacebookPagesResponse> => {
   try {
-    const response = await api.get<FacebookPagesResponse>(
-      '/meta-insights/facebook/pages',
+    const response = await api.get<any>(
+      '/metabusiness/accounts',
       { params }
     );
-    return response.data;
+    
+    // Map the new Meta Business accounts format to the legacy FacebookPagesResponse format
+    return {
+      success: response.data.success,
+      pages: (response.data.accounts || []).map((acc: any) => ({
+        id: acc.pageId,
+        name: acc.pageName,
+        instagram_business_account: acc.instagramBusinessId ? { id: acc.instagramBusinessId } : undefined,
+        databaseId: acc.id
+      }))
+    };
   } catch (error) {
-    return handleMetaInsightsError(error, "Failed to load Facebook pages");
+    return handleMetaInsightsError(error, "Failed to load Meta Business accounts");
   }
 };
 
@@ -253,29 +264,52 @@ export const getFacebookPageToken = async (
 };
 
 export const getFacebookPageInfo = async (
-  pageId: string
+  accountId: number
 ): Promise<FacebookPageInfoResponse> => {
   try {
-    const response = await api.get<FacebookPageInfoResponse>(
-      '/meta-insights/facebook/page-info',
-      { params: { pageId } }
+    const response = await api.get<any>(
+      `/metabusiness/facebook/insights/${accountId}`
     );
-    return response.data;
+    console.log("RAW_FACEBOOK_PAGE_INFO:", response.data);
+    
+    // Map the unified insights structure back to the legacy PageInfo format
+    const metrics = response.data.data?.data || [];
+    const fansMetric = metrics.find((m: any) => m.name === 'page_fans' || m.name === 'fans');
+    const fanCount = fansMetric?.values?.[fansMetric.values.length - 1]?.value || 0;
+
+    return {
+      success: response.data.success,
+      page: {
+        name: response.data.data?.name || response.data.pageName || "Facebook Page",
+        fan_count: fanCount,
+        category_list: response.data.pageCategory ? [{ name: response.data.pageCategory }] : [],
+        link: response.data.data?.link || response.data.pageLink || ""
+      }
+    };
   } catch (error) {
     return handleMetaInsightsError(error, "Failed to load Facebook page info");
   }
 };
 
 export const getFacebookPagePosts = async (
-  pageId: string,
+  accountId: number,
   limit?: number
 ): Promise<FacebookPagePostsResponse> => {
   try {
-    const response = await api.get<FacebookPagePostsResponse>(
-      '/meta-insights/facebook/page-posts',
-      { params: { pageId, limit } }
+    const response = await api.get<any>(
+      `/metabusiness/facebook/posts/${accountId}`,
+      { params: { limit } }
     );
-    return response.data;
+    console.log("RAW_FACEBOOK_PAGE_POSTS:", response.data);
+    if (response.data.data?.length > 0) {
+      console.log("FIRST_POST_STRUCTURE:", response.data.data[0]);
+    }
+    
+    // Map the new 'data' property to the legacy 'posts' property
+    return {
+      success: response.data.success,
+      posts: response.data.data || []
+    };
   } catch (error) {
     return handleMetaInsightsError(
       error,
@@ -286,17 +320,20 @@ export const getFacebookPagePosts = async (
 
 export const getFacebookPostInsights = async (
   postId: string,
-  pageId: string
+  accountId: number
 ): Promise<FacebookPostInsightsResponse> => {
   try {
-    const response = await api.get<FacebookPostInsightsResponse>(
-      '/meta-insights/facebook/post-insights',
-      { params: { postId, pageId } }
+    const response = await api.get<any>(
+      `/metabusiness/facebook/post/${postId}/insights`,
+      { params: { accountId } }
     );
-    console.log("✅ Facebook Post Insights Response:", response.data);
-    return response.data;
+    
+    // Map the unified response to the legacy insights format
+    return {
+      success: response.data.success,
+      insights: response.data.data?.data || []
+    };
   } catch (error) {
-    console.error("❌ Facebook Post Insights Error:", error);
     return handleMetaInsightsError(
       error,
       "Failed to load Facebook post insights"
@@ -343,19 +380,15 @@ export const getInstagramBusinessAccount = async (
  * This is a legacy wrapper that will be removed in a future version
  */
 export const getInstagramProfile = async (
-  clientId: number,
+  _clientId: number,
   accountId: string
 ): Promise<InstagramProfileResponse> => {
   try {
-    console.log("accountId", accountId);
-    // UPDATED: Using /clients/:clientId/metabusiness/instagram/profile/:accountId
     const response = await api.get<InstagramProfileResponse>(
-      `/clients/${clientId}/metabusiness/instagram/profile/${accountId}`
+      `/metabusiness/instagram/profile/${accountId}`
     );
-    console.log("✅ Instagram Profile Response:", response.data);
     return response.data;
   } catch (error) {
-    console.error("❌ Instagram Profile Error:", error);
     return handleMetaInsightsError(error, "Failed to load Instagram profile");
   }
 };
@@ -365,20 +398,17 @@ export const getInstagramProfile = async (
  * This is a legacy wrapper that will be removed in a future version
  */
 export const getInstagramMedia = async (
-  clientId: number,
+  _clientId: number,
   accountId: string,
   limit: number = 20
 ): Promise<InstagramMediaResponse> => {
-  console.log("accountId", accountId);
   try {
-    // UPDATED: Using /clients/:clientId/metabusiness/instagram/media/:accountId
     const response = await api.get<InstagramMediaResponse>(
-      `/clients/${clientId}/metabusiness/instagram/media/${accountId}`,
+      `/metabusiness/instagram/media/${accountId}`,
       { params: { limit } }
     );
     return response.data;
   } catch (error) {
-    console.error("❌ Instagram Media Error:", error);
     return handleMetaInsightsError(error, "Failed to load Instagram media");
   }
 };
@@ -388,21 +418,16 @@ export const getInstagramMedia = async (
  * This is a legacy wrapper that will be removed in a future version
  */
 export const getInstagramMediaInsights = async (
-  clientId: number,
+  _clientId: number,
   accountId: string,
   mediaId: string
 ): Promise<InstagramMediaInsightsResponse> => {
-  console.log("accountId", accountId);
-  console.log("mediaId", mediaId);
   try {
-    // UPDATED: Using /clients/:clientId/metabusiness/instagram/media/:accountId/:mediaId/insights
     const response = await api.get<InstagramMediaInsightsResponse>(
-      `/clients/${clientId}/metabusiness/instagram/media/${accountId}/${mediaId}/insights`
+      `/metabusiness/instagram/media/${accountId}/${mediaId}/insights`
     );
-    console.log("✅ Instagram Media Insights Response:", response.data);
     return response.data;
   } catch (error) {
-    console.error("❌ Instagram Media Insights Error:", error);
     return handleMetaInsightsError(
       error,
       "Failed to load Instagram media insights"

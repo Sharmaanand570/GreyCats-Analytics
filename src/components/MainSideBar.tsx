@@ -27,6 +27,7 @@ import {
   ChevronDown,
   CalendarDays,
   PenLine,
+  Send,
 } from "lucide-react";
 import { FiMenu } from "react-icons/fi";
 import { useEffect, useState } from "react";
@@ -120,7 +121,9 @@ function MainSideBar(): React.JSX.Element {
     window.location.href = "/#/auth/login";
   };
 
-  const handleChangeURL = (path: string): void => {
+  const handleChangeURL = (path: string, isComingSoon?: boolean): void => {
+    if (isComingSoon) return;
+
     if (path === "logout") {
       handleLogout();
       return;
@@ -177,6 +180,7 @@ function MainSideBar(): React.JSX.Element {
       items: [
         { label: "Social Media", path: "/social-media/scheduler", icon: <CalendarDays /> },
         { label: "Blog", path: "/blog/scheduler", icon: <PenLine /> },
+        { label: "Broadcasts", path: "/broadcasts", icon: <Send /> },
       ],
     },
     {
@@ -276,8 +280,10 @@ function MainSideBar(): React.JSX.Element {
                       {group.items.map((item, index) => (
                         <SidebarMenuItem key={item.path}>
                           <SidebarMenuButton
-                            onClick={() => handleChangeURL(item.path)}
-                            className={`group  text-[1rem] rounded-[0.5rem] font-normal h-11 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:text-zinc-100 ${!collabsState
+                            onClick={() => handleChangeURL(item.path, (item as any).isComingSoon)}
+                            className={`group text-[1rem] rounded-[0.5rem] font-normal h-11 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:text-zinc-100 ${
+                              (item as any).isComingSoon ? "opacity-50 cursor-not-allowed grayscale" : ""
+                            } ${!collabsState
                               ? "px-4"
                               : "flex justify-center items-center"
                               } ${(item.path !== "/" &&
@@ -296,9 +302,16 @@ function MainSideBar(): React.JSX.Element {
                               {item.icon}
                             </span>
                             {!collabsState && (
-                              <span className="ml-2 hidden md:hidden lg:block transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]">
-                                {item.label}
-                              </span>
+                              <div className="ml-2 flex items-center justify-between w-full">
+                                <span className="hidden md:hidden lg:block transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]">
+                                  {item.label}
+                                </span>
+                                {(item as any).isComingSoon && (
+                                  <span className="text-[10px] bg-zinc-700 text-zinc-400 px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter">
+                                    Soon
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -424,8 +437,10 @@ function MainSideBar(): React.JSX.Element {
                       {group.items.map((item, itemIndex) => (
                         <button
                           key={item.path}
-                          onClick={() => handleChangeURL(item.path)}
-                          className={`flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:translate-x-1 ${activeTab === item.path
+                          onClick={() => handleChangeURL(item.path, (item as any).isComingSoon)}
+                          className={`flex items-center justify-between w-full px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:translate-x-1 ${
+                            (item as any).isComingSoon ? "opacity-50 cursor-not-allowed" : ""
+                          } ${activeTab === item.path
                             ? "bg-zinc-800 translate-x-1 text-white"
                             : "text-zinc-300"
                             }`}
@@ -434,12 +449,19 @@ function MainSideBar(): React.JSX.Element {
                               }ms`,
                           }}
                         >
-                          <span className="transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-110">
-                            {item.icon}
-                          </span>
-                          <span className="transition-colors duration-300">
-                            {item.label}
-                          </span>
+                          <div className="flex items-center space-x-3">
+                            <span className="transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-110">
+                              {item.icon}
+                            </span>
+                            <span className="transition-colors duration-300">
+                              {item.label}
+                            </span>
+                          </div>
+                          {(item as any).isComingSoon && (
+                            <span className="text-[9px] bg-zinc-800 text-zinc-500 px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter border border-zinc-700">
+                              Soon
+                            </span>
+                          )}
                         </button>
                       ))}
                     </div>

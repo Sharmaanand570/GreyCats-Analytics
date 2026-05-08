@@ -1,6 +1,6 @@
 import * as React from "react";
 import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfYear } from "date-fns";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, CalendarDays } from "lucide-react";
 import { type DateRange } from "react-day-picker";
 import { Button } from "./ui/button";
 import { Calendar } from "./ui/calendar";
@@ -24,22 +24,12 @@ export function DateRangePicker({
   const [tempRange, setTempRange] = React.useState<DateRange>(
     value || { from: undefined, to: undefined }
   );
-  const [isMobile, setIsMobile] = React.useState(false);
 
   React.useEffect(() => {
     if (value) {
       setTempRange(value);
     }
   }, [value]);
-
-  React.useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
 
   const handleApply = () => {
     if (onChange) {
@@ -66,45 +56,45 @@ export function DateRangePicker({
   const presets = [
     {
       label: "Today",
-      getValue: () => ({
-        from: new Date(),
-        to: new Date(),
-      }),
+      getValue: () => ({ from: new Date(), to: new Date() }),
     },
     {
       label: "Yesterday",
-      getValue: () => ({
-        from: subDays(new Date(), 1),
-        to: subDays(new Date(), 1),
-      }),
+      getValue: () => ({ from: subDays(new Date(), 1), to: subDays(new Date(), 1) }),
+    },
+    {
+      label: "This Week",
+      getValue: () => {
+        const now = new Date();
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Monday start
+        return { from: new Date(now.setDate(diff)), to: new Date() };
+      },
+    },
+    {
+      label: "Last Week",
+      getValue: () => {
+        const now = new Date();
+        const day = now.getDay();
+        const diff = now.getDate() - day - 6; 
+        return { from: new Date(now.setDate(diff)), to: new Date(now.setDate(diff + 6)) };
+      },
     },
     {
       label: "Last 7 Days",
-      getValue: () => ({
-        from: subDays(new Date(), 6),
-        to: new Date(),
-      }),
+      getValue: () => ({ from: subDays(new Date(), 6), to: new Date() }),
     },
     {
       label: "Last 30 Days",
-      getValue: () => ({
-        from: subDays(new Date(), 29),
-        to: new Date(),
-      }),
+      getValue: () => ({ from: subDays(new Date(), 29), to: new Date() }),
     },
     {
       label: "Last 90 Days",
-      getValue: () => ({
-        from: subDays(new Date(), 89),
-        to: new Date(),
-      }),
+      getValue: () => ({ from: subDays(new Date(), 89), to: new Date() }),
     },
     {
       label: "This Month",
-      getValue: () => ({
-        from: startOfMonth(new Date()),
-        to: endOfMonth(new Date()),
-      }),
+      getValue: () => ({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }),
     },
     {
       label: "Last Month",
@@ -114,11 +104,16 @@ export function DateRangePicker({
       }),
     },
     {
+      label: "Last 6 Months",
+      getValue: () => ({ from: subMonths(new Date(), 6), to: new Date() }),
+    },
+    {
+      label: "Last 12 Months",
+      getValue: () => ({ from: subMonths(new Date(), 12), to: new Date() }),
+    },
+    {
       label: "This Year",
-      getValue: () => ({
-        from: startOfYear(new Date()),
-        to: new Date(),
-      }),
+      getValue: () => ({ from: startOfYear(new Date()), to: new Date() }),
     },
   ];
 
@@ -169,59 +164,111 @@ export function DateRangePicker({
       </PopoverTrigger>
       <PopoverContent
         className="w-auto p-0 max-w-[calc(100vw-2rem)]"
-        align="start"
+        align="end"
       >
         <div className="flex flex-col sm:flex-row">
           {/* Presets Sidebar */}
-          <div className="p-3 border-b bg-white sm:border-b-0 sm:border-r border-gray-10 sm:w-40 flex flex-col gap-1 overflow-y-auto max-h-[300px] sm:max-h-none">
-            <div className="text-xs font-semibold text-gray-500 mb-2 px-2 uppercase tracking-wider">
-              Presets
+          <div className="p-3 border-b bg-zinc-50 sm:border-b-0 sm:border-r border-zinc-100 sm:w-44 flex flex-col gap-0.5 overflow-y-auto max-h-[300px] sm:max-h-none">
+            <div className="text-[10px] font-bold text-zinc-400 mb-2 px-3 uppercase tracking-widest">
+              Quick Selection
             </div>
-            {presets.map((preset) => (
-              <Button
-                key={preset.label}
-                variant="ghost"
-                size="sm"
-                onClick={() => handlePresetSelect(preset)}
-                className="justify-start text-xs h-8 font-normal"
-              >
-                {preset.label}
-              </Button>
-            ))}
+            {presets.map((preset) => {
+              const isActive = value?.from?.getTime() === preset.getValue().from?.getTime() && 
+                               value?.to?.getTime() === preset.getValue().to?.getTime();
+              
+              return (
+                <Button
+                  key={preset.label}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handlePresetSelect(preset)}
+                  className={cn(
+                    "justify-start text-xs h-9 px-3 font-medium rounded-lg transition-all",
+                    isActive 
+                      ? "bg-zinc-900 text-white hover:bg-zinc-800 hover:text-white" 
+                      : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+                  )}
+                >
+                  {preset.label}
+                </Button>
+              );
+            })}
           </div>
 
           {/* Calendar Section */}
           <div className="p-3 sm:p-4 bg-white">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-medium">Custom Range</div>
-                {/* Mobile clear button shown here to save space at bottom if needed, or keep at bottom */}
-              </div>
-              <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
+            <div className="flex flex-col h-full">
+              <div className="p-3 sm:p-4 bg-white">
+                <div className="flex flex-col sm:flex-row items-center gap-3 mb-6">
+                  <div className="relative flex-1 group">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
+                      <CalendarDays className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Start Date"
+                      value={tempRange.from ? format(tempRange.from, "MMM d, yyyy") : ""}
+                      onChange={(e) => {
+                        const date = new Date(e.target.value);
+                        if (!isNaN(date.getTime())) {
+                          setTempRange((prev) => ({ ...prev, from: date }));
+                        }
+                      }}
+                      className="w-full pl-10 pr-4 py-2 bg-zinc-50 border border-zinc-100 rounded-xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all placeholder:font-medium"
+                    />
+                  </div>
+                  <div className="text-zinc-300 font-bold hidden sm:block">→</div>
+                  <div className="relative flex-1 group">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
+                      <CalendarDays className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="End Date"
+                      value={tempRange.to ? format(tempRange.to, "MMM d, yyyy") : ""}
+                      onChange={(e) => {
+                        const date = new Date(e.target.value);
+                        if (!isNaN(date.getTime())) {
+                          setTempRange((prev) => ({ ...prev, to: date }));
+                        }
+                      }}
+                      className="w-full pl-10 pr-4 py-2 bg-zinc-50 border border-zinc-100 rounded-xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all placeholder:font-medium"
+                    />
+                  </div>
+                </div>
+                
                 <Calendar
+                  initialFocus
                   mode="range"
-                  defaultMonth={tempRange?.from}
+                  defaultMonth={tempRange.from || new Date()}
                   selected={tempRange}
                   onSelect={(range) => setTempRange(range || { from: undefined, to: undefined })}
-                  numberOfMonths={isMobile ? 1 : 2}
+                  numberOfMonths={2}
                   className="rounded-lg border shadow-sm"
                 />
               </div>
-              <div className="flex justify-between items-center pt-2 border-t">
-                <div className="text-xs text-gray-400 hidden sm:block">
-                  {tempRange.from ? format(tempRange.from, "MMM d, yyyy") : "Start"} - {tempRange.to ? format(tempRange.to, "MMM d, yyyy") : "End"}
+              <div className="flex justify-between items-center pt-4 border-t border-zinc-100">
+                <div className="text-xs font-bold text-zinc-400 flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-blue-500" />
+                  {tempRange.from ? format(tempRange.from, "MMM d, yyyy") : "Select Start"}
+                  <span className="text-zinc-300 mx-1">→</span>
+                  {tempRange.to ? format(tempRange.to, "MMM d, yyyy") : "Select End"}
                 </div>
                 <div className="flex gap-2">
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     onClick={handleClear}
-                    className="text-xs"
+                    className="text-xs font-bold text-zinc-500 hover:text-red-500 hover:bg-red-50 rounded-lg"
                   >
                     Clear
                   </Button>
-                  <Button size="sm" onClick={handleApply} className="text-xs">
-                    Apply
+                  <Button 
+                    size="sm" 
+                    onClick={handleApply} 
+                    className="text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-white px-6 rounded-lg shadow-sm"
+                  >
+                    Apply Range
                   </Button>
                 </div>
               </div>

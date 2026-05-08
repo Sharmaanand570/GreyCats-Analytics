@@ -72,6 +72,7 @@ import {
 import { useFacebookPageInfo } from "@/features/meta/hooks/useFacebookPageInfo";
 import { useClients, useClient } from "@/hooks/useClients";
 import { PlatformNotConnected } from "@/components/PlatformNotConnected";
+import { CommentsManager } from "@/features/meta/components/CommentsManager";
 
 /**
  * Meta Business Detail Page
@@ -167,7 +168,7 @@ function MetaBusinessDetailPage() {
     const pageId = selectedAccount?.id; // This is the Facebook Page ID
 
     // Facebook Page Info (from Meta Insights API - basic info only)
-    const { data: pageInfoData } = useFacebookPageInfo(pageId);
+    const { data: pageInfoData } = useFacebookPageInfo(accountId);
 
     // Facebook Data Hooks - use accountId not pageId
     const { data: postsData, isLoading: isLoadingPosts } = useFacebookPosts(accountId);
@@ -324,82 +325,154 @@ function MetaBusinessDetailPage() {
                             />
                         ) : (
                             <div className="flex flex-col gap-4">
-                                {pages.map((page, index) => (
-                                    <div
-                                        key={page.id}
-                                        onClick={() => {
-                                            setSelectedPageId(page.id);
-                                            setSelectedPostId(null);
-                                        }}
-                                        style={{ animationDelay: `${index * 100}ms` }}
-                                        className={cn(
-                                            "group cursor-pointer transition-all duration-500 border rounded-[28px] flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5",
-                                            selectedPageId === page.id
-                                                ? "border-zinc-300 bg-white ring-1 ring-zinc-100"
-                                                : "border-zinc-100 hover:border-zinc-200 hover:bg-zinc-50/50 bg-white/50 opacity-90 hover:opacity-100"
-                                        )}
-                                    >
-                                        <div className="flex items-center gap-4 mb-4 sm:mb-0">
-                                            <Avatar className="h-12 w-12 border border-zinc-100 rounded-xl">
-                                                <AvatarFallback className="bg-muted text-foreground font-semibold text-sm rounded-xl">
-                                                    {page.name?.substring(0, 2).toUpperCase() || 'FB'}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <div>
-                                                <h3 className="font-semibold text-base text-foreground tracking-tight" title={page.name}>
-                                                    {page.name}
-                                                </h3>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-                                                        <SiFacebook className="w-3.5 h-3.5 text-blue-600/80 saturate-50" />
-                                                        <span className="hidden sm:inline">Facebook Page</span>
-                                                    </div>
-                                                    {page.instagram_business_account && (
-                                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium border-l pl-2.5 ml-0.5 border-border/50">
-                                                            <SiInstagram className="w-3.5 h-3.5 text-pink-600/80 saturate-50" />
-                                                            <span className="hidden sm:inline">Instagram Linked</span>
+                                {pages.flatMap((page, index) => {
+                                    const cards = [];
+                                    
+                                    // Always add Facebook Page card
+                                    cards.push(
+                                        <div
+                                            key={`fb-${page.id}`}
+                                            onClick={() => {
+                                                setSelectedPageId(page.id);
+                                                setSelectedPostId(null);
+                                                setActiveTab("facebook");
+                                            }}
+                                            style={{ animationDelay: `${index * 100}ms` }}
+                                            className={cn(
+                                                "group cursor-pointer transition-all duration-500 border rounded-[28px] flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5",
+                                                selectedPageId === page.id && activeTab === "facebook"
+                                                    ? "border-zinc-300 bg-white ring-1 ring-zinc-100"
+                                                    : "border-zinc-100 hover:border-zinc-200 hover:bg-zinc-50/50 bg-white/50 opacity-90 hover:opacity-100"
+                                            )}
+                                        >
+                                            <div className="flex items-center gap-4 mb-4 sm:mb-0">
+                                                <Avatar className="h-12 w-12 border border-zinc-100 rounded-xl bg-blue-50/50">
+                                                    <AvatarFallback className="bg-transparent text-blue-600 font-semibold text-sm rounded-xl">
+                                                        <SiFacebook className="w-5 h-5" />
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <div>
+                                                    <h3 className="font-semibold text-base text-foreground tracking-tight" title={page.name}>
+                                                        {page.name}
+                                                    </h3>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
+                                                            <SiFacebook className="w-3.5 h-3.5 text-blue-600/80 saturate-50" />
+                                                            <span className="hidden sm:inline">Facebook Page</span>
                                                         </div>
-                                                    )}
+                                                    </div>
                                                 </div>
                                             </div>
+                                            <div className="flex items-center gap-3">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-9 px-4 font-medium text-muted-foreground hover:text-foreground transition-colors"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleSyncBoth(page.accountId);
+                                                    }}
+                                                    disabled={isSyncingBoth && syncingPageId === page.accountId.toString()}
+                                                >
+                                                    {isSyncingBoth && syncingPageId === page.accountId.toString() ? (
+                                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                    ) : (
+                                                        <RefreshCw className="w-4 h-4 mr-2 opacity-70" />
+                                                    )}
+                                                    Sync Data
+                                                </Button>
+                                                <Button
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    className="h-9 px-4 font-medium transition-colors"
+                                                >
+                                                    {selectedPageId === page.id && activeTab === "facebook" ? (
+                                                        <>Active View</>
+                                                    ) : (
+                                                        <>
+                                                            <LayoutGrid className="w-4 h-4 mr-2" />
+                                                            View Details
+                                                        </>
+                                                    )}
+                                                </Button>
+                                            </div>
                                         </div>
+                                    );
 
-                                        <div className="flex items-center gap-3">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="h-9 px-4 font-medium text-muted-foreground hover:text-foreground transition-colors"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleSyncBoth(page.accountId);
+                                    // Add Instagram Business card if linked
+                                    if (page.instagram_business_account) {
+                                        cards.push(
+                                            <div
+                                                key={`ig-${page.id}`}
+                                                onClick={() => {
+                                                    setSelectedPageId(page.id);
+                                                    setSelectedPostId(null);
+                                                    setActiveTab("instagram");
                                                 }}
-                                                disabled={isSyncingBoth && syncingPageId === page.accountId.toString()}
-                                            >
-                                                {isSyncingBoth && syncingPageId === page.accountId.toString() ? (
-                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                                ) : (
-                                                    <RefreshCw className="w-4 h-4 mr-2 opacity-70" />
+                                                style={{ animationDelay: `${(index * 100) + 50}ms` }}
+                                                className={cn(
+                                                    "group cursor-pointer transition-all duration-500 border rounded-[28px] flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5",
+                                                    selectedPageId === page.id && activeTab === "instagram"
+                                                        ? "border-zinc-300 bg-white ring-1 ring-zinc-100"
+                                                        : "border-zinc-100 hover:border-zinc-200 hover:bg-zinc-50/50 bg-white/50 opacity-90 hover:opacity-100"
                                                 )}
-                                                Sync Data
-                                            </Button>
-                                            <Button
-                                                variant="secondary"
-                                                size="sm"
-                                                className="h-9 px-4 font-medium transition-colors"
-                                                disabled={!page.instagram_business_account && selectedPageId !== page.id}
                                             >
-                                                {selectedPageId === page.id ? (
-                                                    <>Active View</>
-                                                ) : (
-                                                    <>
-                                                        <LayoutGrid className="w-4 h-4 mr-2" />
-                                                        View Details
-                                                    </>
-                                                )}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                ))}
+                                                <div className="flex items-center gap-4 mb-4 sm:mb-0">
+                                                    <Avatar className="h-12 w-12 border border-zinc-100 rounded-xl bg-pink-50/50">
+                                                        <AvatarFallback className="bg-transparent text-pink-600 font-semibold text-sm rounded-xl">
+                                                            <SiInstagram className="w-5 h-5" />
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <div>
+                                                        <h3 className="font-semibold text-base text-foreground tracking-tight" title={page.instagram_business_account}>
+                                                            @{page.instagram_business_account}
+                                                        </h3>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
+                                                                <SiInstagram className="w-3.5 h-3.5 text-pink-600/80 saturate-50" />
+                                                                <span className="hidden sm:inline">Instagram Business</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-9 px-4 font-medium text-muted-foreground hover:text-foreground transition-colors"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleSyncBoth(page.accountId);
+                                                        }}
+                                                        disabled={isSyncingBoth && syncingPageId === page.accountId.toString()}
+                                                    >
+                                                        {isSyncingBoth && syncingPageId === page.accountId.toString() ? (
+                                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                        ) : (
+                                                            <RefreshCw className="w-4 h-4 mr-2 opacity-70" />
+                                                        )}
+                                                        Sync Data
+                                                    </Button>
+                                                    <Button
+                                                        variant="secondary"
+                                                        size="sm"
+                                                        className="h-9 px-4 font-medium transition-colors"
+                                                    >
+                                                        {selectedPageId === page.id && activeTab === "instagram" ? (
+                                                            <>Active View</>
+                                                        ) : (
+                                                            <>
+                                                                <LayoutGrid className="w-4 h-4 mr-2" />
+                                                                View Details
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    return cards;
+                                })}
                             </div>
                         )}
 
@@ -812,6 +885,12 @@ function MetaBusinessDetailPage() {
                                                                                     </a>
                                                                                 </Button>
                                                                             </div>
+                                                                        </CardContent>
+                                                                    </Card>
+
+                                                                    <Card className="border-border/60 bg-card rounded-2xl shadow-sm">
+                                                                        <CardContent className="p-6">
+                                                                            <CommentsManager mediaId={selectedIgMediaId} />
                                                                         </CardContent>
                                                                     </Card>
                                                                 </div>

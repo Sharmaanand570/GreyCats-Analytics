@@ -13,8 +13,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useLinkedinOrgConnect } from "@/features/linkedin/hooks/useLinkedin";
-import { useConnectWordPress } from "../hooks/useBlogPosts";
-import { SiLinkedin } from "react-icons/si";
+import { useConnectWordPress, useConnectTelegram } from "../hooks/useBlogPosts";
+import { SiLinkedin, SiTelegram } from "react-icons/si";
 import { FaWordpress, FaReddit } from "react-icons/fa6";
 import { SiBlogger } from "react-icons/si";
 import { ArrowLeft, ExternalLink, Eye, EyeOff } from "lucide-react";
@@ -46,6 +46,12 @@ const blogPlatformOptions: BlogPlatformOption[] = [
     color: "#21759b",
   },
   {
+    id: "telegram",
+    name: "Telegram",
+    icon: SiTelegram,
+    color: "#229ED9",
+  },
+  {
     id: "blogger",
     name: "Blogger",
     icon: SiBlogger,
@@ -70,16 +76,23 @@ export function ConnectBlogPlatform({
   const [selectedSource, setSelectedSource] = useState<BlogPlatformOption | null>(null);
 
   // WordPress form state
-  const [wpStep, setWpStep] = useState<"select" | "wordpress-form">("select");
+  const [wpStep, setWpStep] = useState<"select" | "wordpress-form" | "telegram-form">("select");
   const [wpSiteUrl, setWpSiteUrl] = useState("");
   const [wpUsername, setWpUsername] = useState("");
   const [wpAppPassword, setWpAppPassword] = useState("");
   const [wpSiteName, setWpSiteName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
+  // Telegram form state
+  const [tgBotToken, setTgBotToken] = useState("");
+  const [tgChatId, setTgChatId] = useState("");
+  const [tgDisplayName, setTgDisplayName] = useState("");
+  const [showBotToken, setShowBotToken] = useState(false);
+
   const linkedinMutation = useLinkedinOrgConnect();
   const wordpressMutation = useConnectWordPress();
-  const isConnecting = linkedinMutation.isPending || wordpressMutation.isPending;
+  const telegramMutation = useConnectTelegram();
+  const isConnecting = linkedinMutation.isPending || wordpressMutation.isPending || telegramMutation.isPending;
 
   const filteredOptions = React.useMemo(() => {
     if (!searchQuery.trim()) return blogPlatformOptions;
@@ -97,6 +110,14 @@ export function ConnectBlogPlatform({
     setShowPassword(false);
   };
 
+  const resetTelegramForm = () => {
+    setWpStep("select");
+    setTgBotToken("");
+    setTgChatId("");
+    setTgDisplayName("");
+    setShowBotToken(false);
+  };
+
   const handleConnect = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (!selectedSource) {
@@ -111,6 +132,11 @@ export function ConnectBlogPlatform({
 
     if (selectedSource.id === "wordpress") {
       setWpStep("wordpress-form");
+      return;
+    }
+
+    if (selectedSource.id === "telegram") {
+      setWpStep("telegram-form");
       return;
     }
 
@@ -171,10 +197,43 @@ export function ConnectBlogPlatform({
     }
   };
 
+  const handleTelegramConnect = async (e: React.MouseEvent) => {
+    e.preventDefault();
+
+    const botToken = tgBotToken.trim();
+    const chatId = tgChatId.trim();
+    const displayName = tgDisplayName.trim();
+
+    if (!botToken) {
+      toast.error("Bot Token is required");
+      return;
+    }
+    if (!chatId) {
+      toast.error("Channel ID/Username is required");
+      return;
+    }
+
+    try {
+      await telegramMutation.mutateAsync({
+        botToken,
+        chatId,
+        ...(displayName ? { displayName } : {}),
+      });
+      toast.success("Telegram channel connected successfully!");
+      resetTelegramForm();
+      setOpen(false);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to connect Telegram";
+      toast.error(errorMessage);
+    }
+  };
+
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
     if (!isOpen) {
       resetWpForm();
+      resetTelegramForm();
       setSelectedSource(null);
       setSearchQuery("");
     }
@@ -276,7 +335,7 @@ export function ConnectBlogPlatform({
               </DialogFooter>
             </form>
           </>
-        ) : (
+        ) : wpStep === "wordpress-form" ? (
           <>
             <DialogHeader>
               <div className="flex items-center gap-3">
@@ -381,6 +440,116 @@ export function ConnectBlogPlatform({
                   className="bg-zinc-900 hover:bg-zinc-800 text-white"
                 >
                   {wordpressMutation.isPending ? "Connecting..." : "Connect WordPress"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={resetTelegramForm}
+                  className="p-1.5 rounded-lg hover:bg-zinc-100 transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4 text-zinc-500" />
+                </button>
+                <div>
+                  <DialogTitle className="text-xl flex items-center gap-2">
+                    <SiTelegram className="w-6 h-6" style={{ color: "#229ED9" }} />
+                    Connect Telegram Channel
+                  </DialogTitle>
+                  <DialogDescription className="mt-1">
+                    Enter your Telegram Bot Token and Channel ID to connect.
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="mt-2 p-3 bg-blue-50/60 border border-blue-100 rounded-xl text-xs text-zinc-700 leading-relaxed space-y-1">
+              <p className="font-semibold text-zinc-800">Setup steps:</p>
+              <p>
+                1. Open Telegram and message{" "}
+                <a
+                  href="https://t.me/BotFather"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-700 font-medium inline-flex items-center gap-0.5"
+                >
+                  @BotFather
+                  <ExternalLink className="w-3 h-3" />
+                </a>{" "}
+                to create a new bot and copy the API token.
+              </p>
+              <p>2. Add your bot to your channel as an Administrator with "Post Messages" permission.</p>
+              <p>3. Paste the Bot Token and your Channel Username (e.g. @mychannel) below.</p>
+            </div>
+
+            <form className="mt-4 space-y-4">
+              <div>
+                <label className="text-sm font-medium text-zinc-700 mb-1.5 block">
+                  Bot Token <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <Input
+                    type={showBotToken ? "text" : "password"}
+                    value={tgBotToken}
+                    onChange={(e) => setTgBotToken(e.target.value)}
+                    placeholder="7123456789:ABCdefGHIjklMNOpqrSTUvwxYZ"
+                    className="h-11 pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowBotToken(!showBotToken)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                  >
+                    {showBotToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-zinc-400 mt-1">The HTTP API token from @BotFather</p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-zinc-700 mb-1.5 block">
+                  Channel ID/Username <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={tgChatId}
+                  onChange={(e) => setTgChatId(e.target.value)}
+                  placeholder="@my_tech_blog or -1001234567890"
+                  className="h-11"
+                />
+                <p className="text-xs text-zinc-400 mt-1">
+                  Public username (e.g. @channelname) or private numeric ID
+                </p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-zinc-700 mb-1.5 block">
+                  Display Name <span className="text-zinc-400 font-normal">(optional)</span>
+                </label>
+                <Input
+                  value={tgDisplayName}
+                  onChange={(e) => setTgDisplayName(e.target.value)}
+                  placeholder="My Tech Blog"
+                  className="h-11"
+                />
+                <p className="text-xs text-zinc-400 mt-1">Friendly name for the UI. Defaults to the channel ID.</p>
+              </div>
+
+              <DialogFooter className="mt-6 flex gap-3">
+                <Button variant="outline" type="button" onClick={resetTelegramForm}>
+                  Back
+                </Button>
+                <Button
+                  isLoading={telegramMutation.isPending}
+                  disabled={telegramMutation.isPending}
+                  onClick={handleTelegramConnect}
+                  type="button"
+                  className="bg-zinc-900 hover:bg-zinc-800 text-white"
+                >
+                  {telegramMutation.isPending ? "Connecting..." : "Connect Telegram"}
                 </Button>
               </DialogFooter>
             </form>

@@ -296,10 +296,11 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
             h: 6,
             displayName: 'Facebook – Posts Table',
             customConfig: {
+              // Note: 'Post impressions' was replaced with 'Comments' to prioritize engagement metrics
               columns: [
                 { name: 'Date', width: '15%', dataKey: 'date' },
                 { name: 'Post', width: '35%', dataKey: 'post' },
-                { name: 'Post impressions', width: '12.5%', dataKey: 'impressions' },
+                { name: 'Comments', width: '12.5%', dataKey: 'comments' },
                 { name: 'Likes', width: '12.5%', dataKey: 'likes' },
                 { name: 'Clicks', width: '12.5%', dataKey: 'clicks' },
                 { name: 'Shares', width: '12.5%', dataKey: 'shares' },

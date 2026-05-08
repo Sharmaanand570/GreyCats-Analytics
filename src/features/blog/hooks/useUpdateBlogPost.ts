@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { uploadBlogMedia, updateBlogPost } from '../api/blogPostsApi';
 import { blogPostKeys } from './useBlogPosts';
-import type { UpdateBlogPostPayload } from '../api/types';
+import type { BlogPost, BlogPostsListResponse, UpdateBlogPostPayload } from '../api/types';
 
 export const useUpdateBlogPost = () => {
   const queryClient = useQueryClient();
@@ -30,7 +30,22 @@ export const useUpdateBlogPost = () => {
 
       return updateBlogPost(id, { ...payload, mediaUrls });
     },
-    onSuccess: () => {
+    onSuccess: (updatedPost: BlogPost) => {
+      // Patch every cached list so the change is visible immediately.
+      queryClient.setQueriesData<BlogPostsListResponse | BlogPost[]>(
+        { queryKey: blogPostKeys.lists() },
+        (old) => {
+          if (!old) return old;
+          if (Array.isArray(old)) {
+            return old.map((p) => (p.id === updatedPost.id ? updatedPost : p));
+          }
+          return {
+            ...old,
+            posts: old.posts.map((p) => (p.id === updatedPost.id ? updatedPost : p)),
+          };
+        }
+      );
+      queryClient.setQueryData(blogPostKeys.detail(updatedPost.id), updatedPost);
       queryClient.invalidateQueries({ queryKey: blogPostKeys.all });
       setUploadProgress(0);
     },

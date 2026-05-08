@@ -663,7 +663,7 @@ function StepConnectPlatforms({
                 variant="outline"
                 onClick={async () => {
                   try {
-                    const { connectLinkedinOrg } = await import('@/features/linkedin/API/linkedinApi');
+                    const { connectLinkedinOrg } = await import('@/features/linkedin/api/linkedinApi');
                     const res = await connectLinkedinOrg(client.id);
                     if (res.url) window.location.href = res.url;
                   } catch (err) {
@@ -788,7 +788,7 @@ function StepWorkspace({
     }
     if (platformId === 'linkedin') {
       try {
-        const { connectLinkedinOrg } = await import('@/features/linkedin/API/linkedinApi');
+        const { connectLinkedinOrg } = await import('@/features/linkedin/api/linkedinApi');
         const res = await connectLinkedinOrg(client.id);
         if (res.url) window.location.href = res.url;
       } catch (error) {
@@ -992,7 +992,7 @@ function StepWorkspace({
 export default function SocialMediaSchedulerPage() {
   const { clientId: urlClientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
-  const { currentStep, setCurrentStep } = useSocialMediaStore();
+  const { currentStep, setCurrentStep, resetDraft } = useSocialMediaStore();
   const { currentClient, setCurrentClient: _setCurrentClient, clients: allClients, isLoading: isLoadingClients } = useClientContext();
 
   // Sync URL clientId with state on mount or change
@@ -1008,9 +1008,12 @@ export default function SocialMediaSchedulerPage() {
     }
   }, [urlClientId, allClients.length]); // depend on clients.length to ensure list is loaded
 
-  // Wrap setCurrentClient to persist lastClientId and update URL
+  // Wrap setCurrentClient to persist lastClientId, update URL, and reset the post draft.
+  // This ensures no form state bleeds across client switches.
   const setCurrentClient = (client: ClientWithIntegrations | null) => {
     _setCurrentClient(client);
+    // Always wipe any in-progress post draft so Client B never sees Client A's data
+    resetDraft();
     if (client) {
       localStorage.setItem('lastClientId', String(client.id));
       if (urlClientId !== String(client.id)) {

@@ -81,6 +81,7 @@ const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
 const SocialMediaSchedulerPage = lazy(() => import("./pages/SocialMediaSchedulerPage"));
 const BlogSchedulerPage = lazy(() => import("./pages/BlogSchedulerPage"));
+const BroadcastPage = lazy(() => import("./pages/BroadcastPage"));
 
 // Multi-Client Pages
 const ClientsPage = lazy(() => import("./pages/ClientsPage"));
@@ -109,6 +110,7 @@ const SystemStatsPage = lazy(() => import("./features/admin/pages/SystemStatsPag
 const ActivityTimelinePage = lazy(() => import("./features/admin/pages/ActivityTimelinePage"));
 const IntegrationHealthPage = lazy(() => import("./features/admin/pages/IntegrationHealthPage"));
 const SystemConfigPage = lazy(() => import("./features/admin/pages/SystemConfigPage"));
+const AdminBroadcastPage = lazy(() => import("./features/admin/pages/AdminBroadcastPage"));
 const RoleGuard = lazy(() => import("./components/RoleGuard"));
 
 const LoadingFallback = () => (
@@ -201,6 +203,7 @@ function App() {
               <Route path="account-setup" element={<SettingsPage />} />
               <Route path="social-media/scheduler/:clientId?" element={<SocialMediaSchedulerPage />} />
               <Route path="blog/scheduler/:clientId?" element={<BlogSchedulerPage />} />
+              <Route path="broadcasts" element={<BroadcastPage />} />
             </Route>
 
             {/* 404 catch-all for protected area — outside sidebar */}
@@ -222,6 +225,7 @@ function App() {
                 <Route path="monitoring/stats" element={<SystemStatsPage />} />
                 <Route path="monitoring/activity" element={<ActivityTimelinePage />} />
                 <Route path="monitoring/integrations" element={<IntegrationHealthPage />} />
+                <Route path="broadcasts" element={<AdminBroadcastPage />} />
                 <Route path="system" element={<SystemConfigPage />} />
                 <Route path="*" element={<Navigate to="dashboard" replace />} />
               </Route>

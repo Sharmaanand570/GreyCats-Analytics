@@ -297,6 +297,13 @@ export default function UsersListPage() {
                                                             localStorage.setItem('impersonationToken', response.impersonationToken);
                                                             localStorage.setItem(TOKEN_KEY, response.impersonationToken);
 
+                                                            // Clear feature-specific state before starting impersonation
+                                                            // to prevent admin's drafts from leaking into the user's session.
+                                                            localStorage.removeItem('social-media-scheduler-storage');
+                                                            localStorage.removeItem('blog-scheduler-storage');
+                                                            localStorage.removeItem('lastClientId');
+                                                            localStorage.removeItem('lastBlogClientId');
+
                                                             // Clear all cached queries to prevent stale data
                                                             queryClient.clear();
 

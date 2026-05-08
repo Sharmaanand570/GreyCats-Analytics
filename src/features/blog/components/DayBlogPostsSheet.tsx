@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { format, parseISO } from 'date-fns';
 import { Pencil, Trash2, Plus, AlertCircle, ExternalLink, FileText, Loader2 } from 'lucide-react';
 import { FaWordpress, FaLinkedin, FaReddit } from 'react-icons/fa6';
-import { SiBlogger } from 'react-icons/si';
+import { SiBlogger, SiTelegram } from 'react-icons/si';
 import { BlogPostStatusBadge } from './BlogPostStatusBadge';
 import type { BlogPost, BlogPlatform, BlogPostStatus } from '../api/types';
 
@@ -12,6 +12,7 @@ const platformIcons: Record<BlogPlatform, React.ReactNode> = {
   linkedin: <FaLinkedin className="w-4 h-4 text-blue-700" />,
   blogger: <SiBlogger className="w-4 h-4 text-orange-600" />,
   reddit: <FaReddit className="w-4 h-4 text-orange-500" />,
+  telegram: <SiTelegram className="w-4 h-4 text-[#229ED9]" />,
 };
 
 interface DayBlogPostsSheetProps {

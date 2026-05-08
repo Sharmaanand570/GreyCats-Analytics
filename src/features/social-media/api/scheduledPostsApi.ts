@@ -140,6 +140,25 @@ export const deleteScheduledPost = async (id: number): Promise<void> => {
   }
 };
 
+/**
+ * Retry or Reschedule a FAILED scheduled post.
+ * POST /api/scheduled-posts/:id/retry
+ */
+export const retryScheduledPost = async (
+  id: number,
+  scheduledFor?: string
+): Promise<ScheduledPost> => {
+  try {
+    const response = await api.post<ScheduledPostResponse>(
+      `/scheduled-posts/${id}/retry`,
+      { scheduledFor }
+    );
+    return response.data.post;
+  } catch (error) {
+    throw new Error(extractError(error, 'Failed to retry scheduled post'));
+  }
+};
+
 interface SearchLocationsResponse {
   success: boolean;
   locations: LocationSearchResult[];
