@@ -40,7 +40,7 @@ const ReportsLandingPage: React.FC = () => {
     const processedClients = useMemo(() => {
         if (!clients) return [];
 
-        let result = clients.filter(client =>
+        const result = clients.filter(client =>
             client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             client.description?.toLowerCase().includes(searchQuery.toLowerCase())
         );

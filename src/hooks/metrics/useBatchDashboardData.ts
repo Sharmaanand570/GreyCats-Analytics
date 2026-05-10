@@ -315,7 +315,7 @@ export function useBatchDashboardData(
 
   // 3. Adapt { success, data: { series, total, rawCount } } → ResolvedWidgetResult
   //    and index by widgetId for O(1) lookup
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   const byId = useMemo<Record<string, ResolvedWidgetResult>>(() => {
     // Start with snapshot data (shared reports) — API results will merge on top
     const map: Record<string, ResolvedWidgetResult> = { ...snapshotById };
@@ -365,7 +365,7 @@ export function useBatchDashboardData(
 
     console.log(`[BatchDashboard] 🗂️ byId keys: [${Object.keys(map).join(', ')}]`);
     return map;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [descriptors, queries, snapshotById]);
 
   const results = Object.values(byId);

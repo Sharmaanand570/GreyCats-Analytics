@@ -292,7 +292,7 @@ export function useBatchDemographicsData(
     });
 
     return map;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [demoWidgets, uniqueAccountIds, queries]);
 
   return { data, isLoading, isFetching };

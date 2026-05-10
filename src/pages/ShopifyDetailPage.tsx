@@ -109,7 +109,7 @@ function ShopifyDetailPage() {
 
   // NOTE: setDateRange is currently unused because we hardcoded valid dates for this task/demo. 
   // Functionality to pick dates can be re-enabled by exposing the setter.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   const [dateRange] = useState<{ from: Date; to: Date } | undefined>({
     from: new Date("2025-12-19"), // Example valid default or calculated
     to: new Date("2026-01-07")

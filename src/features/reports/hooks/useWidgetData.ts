@@ -2080,7 +2080,7 @@ export function useWidgetData(params: UseWidgetDataParams) {
     hasClientOrToken &&
     isSlideVisible &&
     // In shared mode, integrations are never fetched (readOnly) — skip the requirement
-    (!!shareToken ? true : (!isLoadingIntegrations && !!integrationsData));
+    (shareToken ? true : (!isLoadingIntegrations && !!integrationsData));
 
   // Log once when query first becomes enabled (kept for debugging convenience, low noise)
   const wasEnabledRef = useRef(false);

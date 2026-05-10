@@ -449,7 +449,7 @@ export const useAvailableMetrics = (clientId: number | null, options?: {
     }
 
     return grouped;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [data, connectedIntegrations]);
 
   return {

@@ -283,7 +283,7 @@ export const renderWidgetContent = (
 
 
 
-      let demographicChartData: Array<{ label: string; value: number }> = [];
+      const demographicChartData: Array<{ label: string; value: number }> = [];
 
       if (demographicsConfig && finalResolvedData && (finalResolvedData as any).rows) {
         const rows = (finalResolvedData as any).rows as any[];

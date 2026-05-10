@@ -1241,7 +1241,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           INTEGRATION_TEMPLATES[normalizedPlatform.replace(/(meta)(.+)/, '$1-$2')]
         ) : undefined;
 
-        let slideCount = template?.slides?.length || 1;
+        const slideCount = template?.slides?.length || 1;
         const integrationKey = String(integ.id ?? integ.accountId ?? index);
 
         // Ã°Å¸â€Â§ Handle Meta Business clients who only connected Facebook OR Instagram.
@@ -1532,7 +1532,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
     let cleanedSlidesMeta: ReportSlideMeta[] = [];
 
     if (Array.isArray(templateQuery.data.slidesMeta)) {
-      let rawSlidesMeta = [...templateQuery.data.slidesMeta];
+      const rawSlidesMeta = [...templateQuery.data.slidesMeta];
 
       // CRITICAL FIX: Sort slidesMeta according to the saved pageOrder!
       // The backend 'pageOrder' array is the source of truth for sorting.
@@ -3461,7 +3461,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
               }
 
               // Fix Account ID Mismatch
-              // eslint-disable-next-line eqeqeq
+               
               if (firstRow.accountId != fixedAccountId) {
                 console.log(`Ã°Å¸Â©Â¹ [Self-Healing] Correction for ${metricConfig.metricKey}: accountId ${fixedAccountId} -> ${firstRow.accountId}`);
                 toast.success(`Auto-corrected ${displayName} to Account ID ${firstRow.accountId}`);
@@ -4401,7 +4401,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             const defaultNewData = getDefaultWidgetData(newType);
 
             // Preserve common fields if possible (label/title)
-            let mergedData: any = { ...defaultNewData };
+            const mergedData: any = { ...defaultNewData };
             const oldData: any = widget.data || {};
 
             if (newType === 'chart' && (widget.widgetType === 'metric' || widget.widgetType === 'chart')) {
@@ -4591,7 +4591,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           expected &&
           metricData.accountId &&
           expected.accountId &&
-          // eslint-disable-next-line eqeqeq
+           
           metricData.accountId != expected.accountId &&
           expected.platform !== "meta-business" // Skip for meta-business (Business ID != Page/IG ID is expected)
         ) {
@@ -4636,7 +4636,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       const widgetIdentifier = generateWidgetId(safeLabel);
 
       // Default widget data
-      let widgetData = getDefaultWidgetData(widgetType);
+      const widgetData = getDefaultWidgetData(widgetType);
 
       // Apply the metric label if available
       if (metricData?.label && widgetData) {
@@ -5875,7 +5875,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                       // AND hydrate missing titles if they were saved as empty placeholders
                       // AND prioritize names from current customPages state over stale backend data
                       const augmentedBase = base.map(s => {
-                        let updated = { ...s };
+                        const updated = { ...s };
 
                         // Check if we have an override in customPages
                         const customOverride = customPages.find(p => Number(p.id) === Number(s.id));
@@ -6388,7 +6388,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
                             });
                           }
                           const augmentedBase = base.map(s => {
-                            let updated = { ...s };
+                            const updated = { ...s };
                             const customOverride = customPages.find(p => Number(p.id) === Number(s.id));
                             if (customOverride) {
                               updated.title = customOverride.name;

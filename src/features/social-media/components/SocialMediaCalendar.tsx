@@ -15,7 +15,7 @@ import {
   compareAsc,
   parseISO,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Share2, X, Image as ImageIcon, Video as VideoIcon, CalendarDays, ChevronDown, Pencil, Trash2, AlertCircle, CalendarPlus, Plus, Filter, Bell } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Share2, X, Image as ImageIcon, Video as VideoIcon, ChevronDown, Pencil, Trash2, AlertCircle, CalendarPlus, Plus, Filter, Bell } from 'lucide-react';
 import { FaInstagram, FaFacebook, FaLinkedin } from 'react-icons/fa6';
 import { gsap } from 'gsap';
 import { Button } from '@/components/ui/button';
