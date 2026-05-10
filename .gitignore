@@ -11,6 +11,7 @@ dist*.zip
 
 # Markdown files
 *.md
+!README.md
 
 # Environment variables
 
