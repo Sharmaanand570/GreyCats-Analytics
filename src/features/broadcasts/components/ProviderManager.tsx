@@ -1,21 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useIntegrations, useAdminIntegrations, useCreateIntegration } from '../hooks/useBroadcasts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
-  Plus, 
-  CheckCircle2, 
+  Plus,
   Loader2, 
   Globe, 
-  Settings2, 
   Server, 
   ShieldCheck, 
-  Zap,
-  ChevronRight,
-  Database,
   Info,
   Mail,
   MessageSquare,
+  AlertCircle,
   X
 } from 'lucide-react';
 import type { BroadcastChannel, BroadcastProvider } from '../api/types';
@@ -50,8 +46,38 @@ export function ProviderManager({ admin = false }: ProviderManagerProps = {}) {
   const [smtpPass, setSmtpPass] = useState('');
   const [smtpFromName, setSmtpFromName] = useState('');
   const [smtpSecure, setSmtpSecure] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isCreating) {
+      setError(null);
+      return;
+    }
+
+    if (name && name.length < 3) {
+      setError('Integration name is too short');
+      return;
+    }
+
+    if (provider === 'ADBIZZ') {
+      if (adbizzUser && adbizzUser.length < 3) setError('Invalid Adbizz Username');
+      else if (adbizzKey && adbizzKey.length < 10) setError('Invalid API Key');
+      else setError(null);
+    } else if (provider === 'SMTP') {
+      if (smtpHost && !smtpHost.includes('.')) setError('Invalid SMTP Host');
+      else if (smtpPort && isNaN(Number(smtpPort))) setError('Port must be a number');
+      else if (smtpUser && !smtpUser.includes('@')) setError('Username should be an email');
+      else setError(null);
+    } else {
+      setError(null);
+    }
+  }, [name, provider, adbizzUser, adbizzKey, smtpHost, smtpPort, smtpUser, isCreating]);
 
   const handleSubmit = async () => {
+    if (!name.trim()) {
+      setError('Integration name is required');
+      return;
+    }
     let config: Record<string, any> = {};
     if (provider === 'TWILIO') {
       config = { accountSid: twilioSid, authToken: twilioToken, from: twilioFrom };
@@ -353,7 +379,7 @@ export function ProviderManager({ admin = false }: ProviderManagerProps = {}) {
                 <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-1">Integration Name</label>
                 <input 
                   type="text" value={name} onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Twilio Production Gateway"
+                  placeholder="e.g. Adbizz Production Gateway"
                   className="w-full px-5 py-4 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none"
                 />
               </div>
@@ -378,8 +404,6 @@ export function ProviderManager({ admin = false }: ProviderManagerProps = {}) {
                   {type === 'SMS' ? (
                     <>
                       <option value="ADBIZZ">Adbizz</option>
-                      <option value="TWILIO">Twilio</option>
-                      <option value="MSG91">MSG91</option>
                     </>
                   ) : (
                     <option value="SMTP">SMTP (Gmail/Outlook/Custom)</option>
@@ -396,6 +420,13 @@ export function ProviderManager({ admin = false }: ProviderManagerProps = {}) {
                   : "Approved SMS templates require a connected provider to execute broadcasts."}
               </p>
             </div>
+
+            {error && (
+              <div className="flex items-center gap-2 p-3 bg-red-500/5 rounded-xl border border-red-500/10 mb-8 animate-in fade-in slide-in-from-top-1">
+                <AlertCircle className="w-4 h-4 text-red-500" />
+                <p className="text-[11px] font-bold text-red-600 uppercase tracking-widest">{error}</p>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-8 border-t border-gray-100 dark:border-white/5">
               {renderConfigFields()}

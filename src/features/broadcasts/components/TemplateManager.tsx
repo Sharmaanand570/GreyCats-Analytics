@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTemplates, useAdminTemplates, useCreateTemplate, useCreateSystemTemplate, useDeleteTemplate, useApproveTemplate } from '../hooks/useBroadcasts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -17,10 +17,8 @@ import {
   MessageSquare,
   Mail as MailIcon,
   Search,
-  MoreVertical,
-  AlertTriangle,
-  AlertCircle,
-  Info
+  Info,
+  AlertCircle
 } from 'lucide-react';
 import type { BroadcastChannel } from '../api/types';
 import { useUserStore } from '@/utils/useUserStore';
@@ -44,14 +42,33 @@ export function TemplateManager() {
   const [isSystemTemplate, setIsSystemTemplate] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [editingExternalIds, setEditingExternalIds] = useState<Record<number, string>>({});
+  const [error, setError] = useState<string | null>(null);
 
   const filteredTemplates = templates?.filter(t => 
     t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     t.content.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  useEffect(() => {
+    if (!isCreating) {
+      setError(null);
+      return;
+    }
+
+    if (name && name.length < 3) {
+      setError('Template name is too short');
+    } else if (channel === 'SMS' && content.length > 160) {
+      setError(`SMS exceeds 160 characters (${content.length})`);
+    } else {
+      setError(null);
+    }
+  }, [name, content, channel, isCreating]);
+
   const handleSubmit = async () => {
-    if (!name || !content) return;
+    if (!name || !content) {
+      setError('Name and content are required');
+      return;
+    }
     
     if (isAdmin && isSystemTemplate) {
       await createSystemTemplate.mutateAsync({ name, channel, content, externalId });
@@ -168,7 +185,21 @@ export function TemplateManager() {
                 placeholder="Craft your message here. Use {{name}} for dynamic tags..." rows={5}
                 className="w-full px-5 py-4 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none leading-relaxed outline-none"
               />
+              {channel === 'SMS' && (
+                <div className="flex justify-end pr-2">
+                  <span className={cn("text-[9px] font-black uppercase tracking-widest", content.length > 160 ? "text-red-500" : "text-gray-400")}>
+                    {content.length} / 160 Characters
+                  </span>
+                </div>
+              )}
             </div>
+
+            {error && (
+              <div className="flex items-center gap-2 p-3 bg-red-500/5 rounded-xl border border-red-500/10 mb-6 animate-in fade-in slide-in-from-top-1">
+                <AlertCircle className="w-3.5 h-3.5 text-red-500" />
+                <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">{error}</p>
+              </div>
+            )}
 
             {channel === 'SMS' && (
               <div className="flex items-center gap-2 mb-8 ml-1 text-[10px] font-bold text-amber-600 dark:text-amber-500/80 uppercase tracking-widest bg-amber-500/5 p-3 rounded-xl border border-amber-500/10">

@@ -1,3 +1,4 @@
+import { cn } from '@/lib/utils';
 import { useState, useMemo, useRef, useLayoutEffect } from 'react';
 import {
   format,
@@ -28,6 +29,8 @@ import {
   FileText,
   Loader2,
   CalendarPlus,
+  Bell,
+  Filter,
 } from 'lucide-react';
 import { FaWordpress, FaLinkedin, FaReddit } from 'react-icons/fa6';
 import { SiBlogger, SiTelegram } from 'react-icons/si';
@@ -35,6 +38,12 @@ import { gsap } from 'gsap';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { BlogPostModal } from './BlogPostModal';
 import { DayBlogPostsSheet } from './DayBlogPostsSheet';
 import { BlogPostStatusBadge } from './BlogPostStatusBadge';
@@ -243,6 +252,11 @@ export function BlogCalendar({ clientId, canPost, headerExtra }: BlogCalendarPro
   });
 
   const allPosts: BlogPost[] = postsData?.posts || (postsData as any)?.data || [];
+
+  const hasTodayBlogPosts = useMemo(() => {
+    const today = new Date();
+    return allPosts.some((p: BlogPost) => isSameDay(parseISO(p.scheduledFor), today));
+  }, [allPosts]);
   console.log('[BlogCalendar] allPosts:', allPosts);
 
   const deleteMutation = useMutation({
@@ -412,11 +426,24 @@ export function BlogCalendar({ clientId, canPost, headerExtra }: BlogCalendarPro
         </div>
         <Button
           variant="outline"
+          size="icon"
           onClick={() => setShowUpcoming((prev) => !prev)}
-          className="h-10 bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50 shadow-sm shrink-0"
+          className={cn(
+            "h-10 w-10 bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50 shadow-sm shrink-0 relative transition-all duration-200 rounded-xl",
+            showUpcoming && "bg-zinc-50 border-zinc-300 ring-2 ring-zinc-100",
+            hasTodayBlogPosts && !showUpcoming && "border-blue-200 bg-blue-50/30"
+          )}
         >
-          <CalendarDays className="w-4 h-4 mr-2" />
-          Upcoming
+          <Bell className={cn(
+            "w-4 h-4 transition-colors",
+            hasTodayBlogPosts ? "text-blue-600 fill-blue-600/10" : "text-zinc-500"
+          )} />
+          {hasTodayBlogPosts && (
+            <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-600 border-2 border-white shadow-sm"></span>
+            </span>
+          )}
         </Button>
         {canPost && (
           <Button
@@ -432,47 +459,75 @@ export function BlogCalendar({ clientId, canPost, headerExtra }: BlogCalendarPro
   );
 
   const renderStatusFilter = () => {
-    const filterColors: Record<string, string> = {
-      ALL: 'bg-zinc-900 text-white border-zinc-900',
-      PENDING: 'bg-blue-600 text-white border-blue-600',
-      PROCESSING: 'bg-amber-600 text-white border-amber-600',
-      PUBLISHED: 'bg-emerald-600 text-white border-emerald-600',
-      FAILED: 'bg-red-600 text-white border-red-600',
-    };
-    const inactiveColors: Record<string, string> = {
-      ALL: 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50',
-      PENDING: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100',
-      PROCESSING: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
-      PUBLISHED: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
-      FAILED: 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100',
+    const activeFilter = STATUS_FILTERS.find(f => f.value === statusFilter);
+    const activeCount = statusCounts[statusFilter] || 0;
+
+    const filterBadgeColors: Record<string, string> = {
+      ALL: 'bg-zinc-900',
+      PENDING: 'bg-blue-600',
+      PROCESSING: 'bg-amber-600',
+      PUBLISHED: 'bg-emerald-600',
+      FAILED: 'bg-red-600',
     };
 
     return (
-      <div className="flex items-center gap-2">
-        {STATUS_FILTERS.map((f) => {
-          const count = statusCounts[f.value] || 0;
-          const isActive = statusFilter === f.value;
-          return (
-            <button
-              key={f.value}
-              onClick={() => {
-                if (isActive) setStatusFilter('ALL');
-                else setStatusFilter(f.value);
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border shadow-sm ${
-                isActive ? filterColors[f.value] : inactiveColors[f.value]
-              }`}
-            >
-              {f.label}
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none ${
-                isActive ? 'bg-white/20 text-white' : 'bg-black/5 text-current'
-              }`}>
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button 
+            className="h-10 px-4 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 shadow-sm flex items-center gap-2 rounded-xl transition-all outline-none"
+          >
+            <Filter className="w-4 h-4 text-zinc-400" />
+            <span className="text-sm font-bold">
+              {activeFilter?.label || 'Filter'}
+            </span>
+            <span className={cn(
+              "text-[10px] font-black px-1.5 py-0.5 rounded-full text-white ml-0.5",
+              filterBadgeColors[statusFilter] || 'bg-zinc-400'
+            )}>
+              {activeCount}
+            </span>
+            <ChevronDown className="w-3.5 h-3.5 text-zinc-400 ml-0.5" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-56 p-1.5 rounded-2xl shadow-2xl border-zinc-200 bg-white dark:bg-[#0A0A0A]" align="start">
+          <div className="px-3 py-2 border-b border-zinc-100 dark:border-white/5 mb-1.5">
+            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Filter by status</p>
+          </div>
+          {STATUS_FILTERS.map((f) => {
+            const count = statusCounts[f.value] || 0;
+            const isActive = statusFilter === f.value;
+            return (
+              <DropdownMenuItem
+                key={f.value}
+                onClick={() => setStatusFilter(f.value)}
+                className={cn(
+                  "flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer transition-all mb-0.5 last:mb-0 border border-transparent",
+                  isActive ? "bg-zinc-50 dark:bg-white/5 border-zinc-100 dark:border-white/5 font-bold" : "hover:bg-zinc-50/80 dark:hover:bg-white/[0.02]"
+                )}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className={cn(
+                    "w-2 h-2 rounded-full",
+                    f.value === 'ALL' ? 'bg-zinc-400' : statusDotColors[f.value as BlogPostStatus]
+                  )} />
+                  <span className={cn(
+                    "text-sm tracking-tight",
+                    isActive ? "text-zinc-900 dark:text-white" : "text-zinc-600 dark:text-zinc-400"
+                  )}>
+                    {f.label}
+                  </span>
+                </div>
+                <span className={cn(
+                  "text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none",
+                  isActive ? "bg-zinc-900 text-white dark:bg-white dark:text-black" : "bg-zinc-100 dark:bg-white/10 text-zinc-500"
+                )}>
+                  {count}
+                </span>
+              </DropdownMenuItem>
+            );
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   };
 

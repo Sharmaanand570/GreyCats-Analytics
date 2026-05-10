@@ -1,9 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
   Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle 
+  DialogContent
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { 
@@ -12,13 +10,11 @@ import {
   Mail, 
   MessageSquare, 
   Upload, 
-  UserPlus, 
   Hash,
   Type,
   FileText,
   Info,
   Loader2,
-  X,
   ChevronRight,
   Sparkles,
   Zap
@@ -49,6 +45,7 @@ export function CreateBroadcastModal({ isOpen, onClose }: CreateBroadcastModalPr
   const [manualRecipients, setManualRecipients] = useState('');
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [columnName, setColumnName] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const { data: templates } = useTemplates();
   const { data: integrations } = useIntegrations();
@@ -63,36 +60,108 @@ export function CreateBroadcastModal({ isOpen, onClose }: CreateBroadcastModalPr
 
   const isSms = channel === 'SMS';
 
-  const handleSubmit = async () => {
-    if (!name || !templateId) return;
-
-    if (recipientMode === 'manual') {
+  // Real-time validation as user types
+  useEffect(() => {
+    if (recipientMode === 'manual' && manualRecipients) {
       const recipients = manualRecipients
-        .split(/[\n,]+/)
-        .map(r => r.trim())
+        .split(/[\n,;]+/)
+        .map(r => r.trim().replace(/\s/g, ''))
         .filter(Boolean);
       
-      if (recipients.length === 0) return;
+      if (recipients.length > 0) {
+        const invalidRecipients = recipients.filter(r => 
+          isSms ? !/^\d{10,12}$/.test(r) : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r)
+        );
+
+        if (invalidRecipients.length > 0) {
+          setError(`Invalid format: ${invalidRecipients.slice(0, 1).join(', ')}${invalidRecipients.length > 1 ? '...' : ''}`);
+        } else {
+          setError(null);
+        }
+      } else {
+        setError(null);
+      }
+    } else {
+      setError(null);
+    }
+  }, [manualRecipients, recipientMode, channel, isSms]);
+
+  const validateEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  const validatePhone = (phone: string) => {
+    // Basic validation: numeric only, 10-12 digits typical for India
+    return /^\d{10,12}$/.test(phone);
+  };
+
+  const handleSubmit = async () => {
+    setError(null);
+    if (!name.trim()) {
+      setError('Campaign name is required');
+      return;
+    }
+    if (!templateId) {
+      setError('Please select a message template');
+      return;
+    }
+    if (!isSms && !subject.trim()) {
+      setError('Email subject is required');
+      return;
+    }
+
+    if (recipientMode === 'manual') {
+      // Edge Case: Handling various delimiters, spaces, and empty lines
+      let recipients = manualRecipients
+        .split(/[\n,;]+/) // Support commas, newlines, and semicolons
+        .map(r => r.trim().replace(/\s/g, '')) // Remove internal spaces too
+        .filter(Boolean);
+      
+      if (recipients.length === 0) {
+        setError('Please enter at least one recipient');
+        return;
+      }
+
+      // Edge Case: De-duplication to prevent double spending/sending
+      recipients = Array.from(new Set(recipients));
+
+      // Edge Case: Normalizing emails to lowercase for consistency
+      if (!isSms) {
+        recipients = recipients.map(r => r.toLowerCase());
+      }
+
+      // Validate recipients
+      const invalidRecipients = recipients.filter(r => 
+        isSms ? !validatePhone(r) : !validateEmail(r)
+      );
+
+      if (invalidRecipients.length > 0) {
+        setError(`Invalid ${isSms ? 'phone numbers' : 'emails'}: ${invalidRecipients.slice(0, 2).join(', ')}${invalidRecipients.length > 2 ? '...' : ''}`);
+        return;
+      }
 
       await createManual.mutateAsync({
-        name,
+        name: name.trim(),
         channel,
         templateId,
         integrationId: integrationId || undefined,
-        subject: !isSms ? subject : undefined,
+        subject: !isSms ? subject.trim() : undefined,
         recipients
       });
     } else {
-      if (!csvFile) return;
+      if (!csvFile) {
+        setError('Please upload a CSV file to proceed');
+        return;
+      }
 
       await createCsv.mutateAsync({
         file: csvFile,
-        name,
+        name: name.trim(),
         channel,
         templateId,
         integrationId: integrationId || undefined,
-        columnName: columnName || undefined,
-        subject: !isSms ? subject : undefined
+        columnName: columnName.trim() || undefined,
+        subject: !isSms ? subject.trim() : undefined
       });
     }
 
@@ -108,6 +177,7 @@ export function CreateBroadcastModal({ isOpen, onClose }: CreateBroadcastModalPr
     setManualRecipients('');
     setCsvFile(null);
     setColumnName('');
+    setError(null);
   };
 
   const isLoading = createManual.isPending || createCsv.isPending;
@@ -252,7 +322,7 @@ export function CreateBroadcastModal({ isOpen, onClose }: CreateBroadcastModalPr
                       <SelectTrigger className="w-full h-14 bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10 rounded-2xl text-sm font-bold focus:ring-blue-500/20">
                         <SelectValue placeholder="System Default" />
                       </SelectTrigger>
-                      <SelectContent className="rounded-xl border-gray-100 dark:border-white/10 shadow-xl">
+                      <SelectContent>
                         {filteredIntegrations?.map(i => (
                           <SelectItem key={i.id} value={i.id.toString()} className="rounded-lg my-1 mx-1 font-medium">
                             {i.name}
@@ -275,7 +345,7 @@ export function CreateBroadcastModal({ isOpen, onClose }: CreateBroadcastModalPr
                     <SelectTrigger className="w-full h-14 bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10 rounded-2xl text-sm font-bold focus:ring-blue-500/20">
                       <SelectValue placeholder="Select Template" />
                     </SelectTrigger>
-                    <SelectContent className="rounded-xl border-gray-100 dark:border-white/10 shadow-xl">
+                    <SelectContent>
                       {filteredTemplates?.map(t => (
                         <SelectItem key={t.id} value={t.id.toString()} className="rounded-lg my-1 mx-1 font-medium">
                           {t.name}
@@ -338,7 +408,7 @@ export function CreateBroadcastModal({ isOpen, onClose }: CreateBroadcastModalPr
                 {recipientMode === 'manual' ? (
                   <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
                     <textarea 
-                      placeholder={isSms ? "+1234567890, +0987654321..." : "target@domain.com, lead@domain.com..."}
+                      placeholder={isSms ? "9123456789, 9876543210..." : "target@domain.com, lead@domain.com..."}
                       value={manualRecipients}
                       onChange={(e) => setManualRecipients(e.target.value)}
                       rows={4}
@@ -388,6 +458,12 @@ export function CreateBroadcastModal({ isOpen, onClose }: CreateBroadcastModalPr
                   </div>
                 )}
               </div>
+              {error && (
+                <div className="flex items-center gap-2 p-3 bg-red-500/5 rounded-xl border border-red-500/10 mb-4 animate-in fade-in slide-in-from-top-1">
+                  <AlertCircle className="w-4 h-4 text-red-500" />
+                  <p className="text-[11px] font-bold text-red-600 uppercase tracking-widest">{error}</p>
+                </div>
+              )}
             </div>
 
             <div className="p-10 pt-6 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.01] flex items-center justify-end gap-4">

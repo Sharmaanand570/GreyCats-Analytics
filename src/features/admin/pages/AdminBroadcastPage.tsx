@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { 
-  Plus, 
   Send, 
   Mail, 
   MessageSquare, 
@@ -10,13 +9,9 @@ import {
   Loader2,
   BarChart3,
   Search,
-  Users,
   ShieldCheck,
-  Activity,
-  Layout,
-  Server
+  Activity
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { useAdminBroadcasts, useAdminTemplates } from '@/features/broadcasts/hooks/useBroadcasts';
 import { useUserStore } from '@/utils/useUserStore';
 import { CreateBroadcastModal } from '@/features/broadcasts/components/CreateBroadcastModal';
@@ -60,7 +55,7 @@ const statusConfig = {
 export default function AdminBroadcastPage() {
   const { user } = useUserStore();
   const { data: broadcasts, isLoading: broadcastsLoading } = useAdminBroadcasts();
-  const { data: templates, isLoading: templatesLoading } = useAdminTemplates();
+  const { data: templates } = useAdminTemplates();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 

@@ -1,5 +1,5 @@
 export type BroadcastChannel = 'SMS' | 'EMAIL';
-export type BroadcastStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+export type BroadcastStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'RUNNING';
 export type BroadcastProvider = 'TWILIO' | 'ADBIZZ' | 'MSG91' | 'SHARED' | 'SMTP';
 export type TemplateStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
@@ -16,10 +16,12 @@ export interface Broadcast {
   message: string;
   subject?: string;
   templateId?: number;
+  template?: BroadcastTemplate;
   integrationId?: number;
   status: BroadcastStatus;
   sentCount: number;
   failedCount: number;
+  recipientCount?: number;
   totalCount: number;
   createdAt: string;
   updatedAt: string;

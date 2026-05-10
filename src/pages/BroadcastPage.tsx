@@ -31,6 +31,11 @@ const statusConfig = {
     icon: <Loader2 className="w-3.5 h-3.5 animate-spin" />,
     label: 'Processing'
   },
+  RUNNING: {
+    color: 'bg-blue-100 text-blue-700 border-blue-200',
+    icon: <Loader2 className="w-3.5 h-3.5 animate-spin" />,
+    label: 'Running'
+  },
   COMPLETED: {
     color: 'bg-emerald-100 text-emerald-700 border-emerald-200',
     icon: <CheckCircle2 className="w-3.5 h-3.5" />,
