@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import logoBlack from "../assets/images/greycats-black-logo.png";
 import { isAuthenticated, StorageKey } from "@/utils/storage";
 import ParticleBackground from "@/components/ParticleBackground";
+import { DottedSurface } from "@/components/ui/dotted-surface";
 import { 
   BarChart3, 
   Database, 
@@ -214,23 +215,6 @@ const LandingPage = () => {
         {children}
       </div>
     );
-  };
-
-  const Typewriter = ({ text, delay = 50 }: { text: string, delay?: number }) => {
-    const [displayText, setDisplayText] = useState("");
-    const [currentIndex, setCurrentIndex] = useState(0);
-
-    useEffect(() => {
-      if (currentIndex < text.length) {
-        const timeout = setTimeout(() => {
-          setDisplayText(prev => prev + text[currentIndex]);
-          setCurrentIndex(prev => prev + 1);
-        }, delay);
-        return () => clearTimeout(timeout);
-      }
-    }, [currentIndex, delay, text]);
-
-    return <span className="typewriter-cursor">{displayText}</span>;
   };
 
   const AnimatedText = ({ text, delayMultiplier = 0.04 }: { text: string, delayMultiplier?: number }) => {
@@ -475,7 +459,8 @@ const LandingPage = () => {
 
       {/* Zero-Gravity Hero Section */}
       <section className="relative min-h-[90vh] pt-28 md:pt-40 pb-20 px-4 md:px-6 flex flex-col items-center justify-center overflow-hidden z-10">
-        <div className="absolute inset-0 bg-grid-dots opacity-50 pointer-events-none mask-image-[linear-gradient(to_bottom,white,transparent)]" style={{ WebkitMaskImage: 'linear-gradient(to bottom, black, transparent)' }} />
+        <div className="absolute inset-0 bg-grid-dots opacity-40 pointer-events-none mask-image-[linear-gradient(to_bottom,white,transparent)]" style={{ WebkitMaskImage: 'linear-gradient(to bottom, black, transparent)' }} />
+        <DottedSurface className="absolute inset-0 top-[35%] size-full pointer-events-none z-0" />
 
         {/* Floating Abstract UI Elements (The Antigravity effect) */}
         <div className="absolute inset-0 pointer-events-none items-center justify-center max-w-7xl mx-auto hidden md:flex">
@@ -519,7 +504,7 @@ const LandingPage = () => {
           </div>
 
           <h1 className="text-4xl sm:text-6xl md:text-[5rem] lg:text-[6rem] font-medium tracking-tighter mb-8 leading-[1.1] text-[#111] min-h-[2.2em] md:min-h-[auto] px-4">
-            <Typewriter text="All your marketing data. One clear reporting platform." delay={40} />
+            All your marketing data. <br className="hidden md:block" /> One clear reporting platform.
           </h1>
           <p className="text-lg md:text-2xl text-[#111] mb-12 max-w-4xl mx-auto leading-relaxed font-semibold px-4">
             Connect channels, track KPIs, and deliver client-ready reports faster.
@@ -605,47 +590,55 @@ const LandingPage = () => {
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 reveal-on-scroll">
             {/* Agencies */}
-            <TiltCard index={0} className="group p-8 rounded-[3rem] border border-[#e5e5e5] hover:border-[#bdbdbd] transition-all duration-500 bg-[#fafafa]/50 hover:bg-white hover:shadow-[0_30px_60px_rgba(0,0,0,0.06)] cursor-pointer">
-              <div className="w-14 h-14 rounded-2xl bg-white border border-[#e5e5e5] flex items-center justify-center mb-10 group-hover:scale-110 transition-transform duration-500 shadow-sm">
-                <Users className="w-6 h-6 text-[#4285F4]" />
+            <TiltCard index={0} className="relative overflow-hidden group p-8 rounded-[3rem] border border-[#e5e5e5] hover:border-[#bdbdbd] transition-all duration-500 bg-[#fafafa]/50 hover:bg-white hover:shadow-[0_30px_60px_rgba(0,0,0,0.06)] cursor-pointer">
+              <div className="relative z-10">
+                <div className="w-14 h-14 rounded-2xl bg-white border border-[#e5e5e5] flex items-center justify-center mb-10 group-hover:scale-110 transition-transform duration-500 shadow-sm">
+                  <Users className="w-6 h-6 text-[#4285F4]" />
+                </div>
+                <h3 className="text-2xl font-medium mb-4 text-[#111]">Marketing Agencies</h3>
+                <p className="text-[#666] leading-relaxed text-sm">
+                  Manage reporting for hundreds of clients from a single login. Automate branded PDF delivery and save hours of manual data work every month.
+                </p>
               </div>
-              <h3 className="text-2xl font-medium mb-4 text-[#111]">Marketing Agencies</h3>
-              <p className="text-[#666] leading-relaxed text-sm">
-                Manage reporting for hundreds of clients from a single login. Automate branded PDF delivery and save hours of manual data work every month.
-              </p>
             </TiltCard>
 
             {/* In-house Growth */}
-            <TiltCard index={1} className="group p-8 rounded-[3rem] border border-[#e5e5e5] hover:border-[#bdbdbd] transition-all duration-500 bg-[#fafafa]/50 hover:bg-white hover:shadow-[0_30px_60px_rgba(0,0,0,0.06)] cursor-pointer">
-              <div className="w-14 h-14 rounded-2xl bg-white border border-[#e5e5e5] flex items-center justify-center mb-10 group-hover:scale-110 transition-transform duration-500 shadow-sm">
-                <Target className="w-6 h-6 text-[#EA4335]" />
+            <TiltCard index={1} className="relative overflow-hidden group p-8 rounded-[3rem] border border-[#e5e5e5] hover:border-[#bdbdbd] transition-all duration-500 bg-[#fafafa]/50 hover:bg-white hover:shadow-[0_30px_60px_rgba(0,0,0,0.06)] cursor-pointer">
+              <div className="relative z-10">
+                <div className="w-14 h-14 rounded-2xl bg-white border border-[#e5e5e5] flex items-center justify-center mb-10 group-hover:scale-110 transition-transform duration-500 shadow-sm">
+                  <Target className="w-6 h-6 text-[#EA4335]" />
+                </div>
+                <h3 className="text-2xl font-medium mb-4 text-[#111]">Growth Teams</h3>
+                <p className="text-[#666] leading-relaxed text-sm">
+                  Monitor KPIs across every stage of your funnel. Compare performance between search, social, and shop platforms in real-time.
+                </p>
               </div>
-              <h3 className="text-2xl font-medium mb-4 text-[#111]">Growth Teams</h3>
-              <p className="text-[#666] leading-relaxed text-sm">
-                Monitor KPIs across every stage of your funnel. Compare performance between search, social, and shop platforms in real-time.
-              </p>
             </TiltCard>
 
             {/* Performance Marketers */}
-            <TiltCard index={2} className="group p-8 rounded-[3rem] border border-[#e5e5e5] hover:border-[#bdbdbd] transition-all duration-500 bg-[#fafafa]/50 hover:bg-white hover:shadow-[0_30px_60px_rgba(0,0,0,0.06)] cursor-pointer">
-              <div className="w-14 h-14 rounded-2xl bg-white border border-[#e5e5e5] flex items-center justify-center mb-10 group-hover:scale-110 transition-transform duration-500 shadow-sm">
-                <TrendingUp className="w-6 h-6 text-[#FBBC05]" />
+            <TiltCard index={2} className="relative overflow-hidden group p-8 rounded-[3rem] border border-[#e5e5e5] hover:border-[#bdbdbd] transition-all duration-500 bg-[#fafafa]/50 hover:bg-white hover:shadow-[0_30px_60px_rgba(0,0,0,0.06)] cursor-pointer">
+              <div className="relative z-10">
+                <div className="w-14 h-14 rounded-2xl bg-white border border-[#e5e5e5] flex items-center justify-center mb-10 group-hover:scale-110 transition-transform duration-500 shadow-sm">
+                  <TrendingUp className="w-6 h-6 text-[#FBBC05]" />
+                </div>
+                <h3 className="text-2xl font-medium mb-4 text-[#111]">Performance Marketers</h3>
+                <p className="text-[#666] leading-relaxed text-sm">
+                  Deep dive into ad spend and conversion trends. Use data-backed insights to optimize campaigns and maximize your ROAS.
+                </p>
               </div>
-              <h3 className="text-2xl font-medium mb-4 text-[#111]">Performance Marketers</h3>
-              <p className="text-[#666] leading-relaxed text-sm">
-                Deep dive into ad spend and conversion trends. Use data-backed insights to optimize campaigns and maximize your ROAS.
-              </p>
             </TiltCard>
 
             {/* Data Analysts */}
-            <TiltCard index={3} className="group p-8 rounded-[3rem] border border-[#e5e5e5] hover:border-[#bdbdbd] transition-all duration-500 bg-[#fafafa]/50 hover:bg-white hover:shadow-[0_30px_60px_rgba(0,0,0,0.06)] cursor-pointer">
-              <div className="w-14 h-14 rounded-2xl bg-white border border-[#e5e5e5] flex items-center justify-center mb-10 group-hover:scale-110 transition-transform duration-500 shadow-sm">
-                <Presentation className="w-6 h-6 text-[#34A853]" />
+            <TiltCard index={3} className="relative overflow-hidden group p-8 rounded-[3rem] border border-[#e5e5e5] hover:border-[#bdbdbd] transition-all duration-500 bg-[#fafafa]/50 hover:bg-white hover:shadow-[0_30px_60px_rgba(0,0,0,0.06)] cursor-pointer">
+              <div className="relative z-10">
+                <div className="w-14 h-14 rounded-2xl bg-white border border-[#e5e5e5] flex items-center justify-center mb-10 group-hover:scale-110 transition-transform duration-500 shadow-sm">
+                  <Presentation className="w-6 h-6 text-[#34A853]" />
+                </div>
+                <h3 className="text-2xl font-medium mb-4 text-[#111]">Data Analysts</h3>
+                <p className="text-[#666] leading-relaxed text-sm">
+                  Access standardized, multi-platform data without the technical overhead. Easily export clean datasets for deeper analysis.
+                </p>
               </div>
-              <h3 className="text-2xl font-medium mb-4 text-[#111]">Data Analysts</h3>
-              <p className="text-[#666] leading-relaxed text-sm">
-                Access standardized, multi-platform data without the technical overhead. Easily export clean datasets for deeper analysis.
-              </p>
             </TiltCard>
           </div>
         </div>

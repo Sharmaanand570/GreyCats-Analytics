@@ -1,9 +1,10 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClients } from '../hooks/useClients';
+import { useClientContext } from '@/context/ClientContext';
 import { useSyncStatus } from '../features/reports/hooks/useSyncStatus';
-import { FileText, ArrowUpDown, Search, Loader2 } from 'lucide-react';
+import { FileText, ArrowUpDown, Search, Loader2, TrendingUp, ArrowRight } from 'lucide-react';
 import { FiBell } from "react-icons/fi";
 import { getProfileImageUrl } from "@/utils/imageUtils";
 import { Input } from "../components/ui/input";
@@ -30,8 +31,16 @@ import {
 const ReportsLandingPage: React.FC = () => {
     const navigate = useNavigate();
     const { data: clients, isLoading } = useClients();
+    const { currentClient } = useClientContext();
     const [searchQuery, setSearchQuery] = useState("");
     const [sortBy, setSortBy] = useState("name-asc");
+
+    // If a client is already selected, go straight to their reports
+    useEffect(() => {
+        if (currentClient?.id) {
+            navigate(`/clients/${currentClient.id}/reports`, { replace: true });
+        }
+    }, [currentClient, navigate]);
 
     const handleClientClick = (clientId: number) => {
         navigate(`/clients/${clientId}/reports`);
@@ -60,11 +69,10 @@ const ReportsLandingPage: React.FC = () => {
     }, [clients, searchQuery, sortBy]);
 
     return (
-        <div className="w-full h-[2000vh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
-            <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
-                <div className="w-full h-full flex flex-col">
-                    {/* Header */}
-                    <div className="w-full h-[4.8em] border-b flex justify-between items-center px-5 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
+        <div className="w-full min-h-screen flex flex-col overflow-x-hidden bg-white">
+            <div className="w-full h-full flex flex-col">
+                {/* Header */}
+                    <div className="w-full h-[4.8em] border-b flex justify-between items-center px-5 bg-white backdrop-blur-sm sticky top-0 z-10">
                         <span className="font-medium text-xl text-zinc-800">Reports</span>
                         <div className="flex items-center gap-4">
                             {/* Controls */}
@@ -183,7 +191,6 @@ const ReportsLandingPage: React.FC = () => {
                             </div>
                         )}
                     </div>
-                </div>
             </div>
         </div>
     );
@@ -213,9 +220,9 @@ const ClientRow: React.FC<ClientRowProps> = ({ client, onClick }) => {
         >
             <TableCell className="font-medium">
                 <div className="flex items-center gap-3">
-                    {client.companyLogo ? (
+                    {client.logo ? (
                         <img
-                            src={getProfileImageUrl(client.companyLogo)}
+                            src={getProfileImageUrl(client.logo)}
                             alt={client.name}
                             className="h-10 w-10 rounded-lg object-cover border border-zinc-200 group-hover:shadow-sm transition-all"
                         />

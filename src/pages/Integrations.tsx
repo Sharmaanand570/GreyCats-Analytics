@@ -31,6 +31,11 @@ import { SyncProgressBar } from "@/components/SyncProgressBar";
 
 import type { ConnectedIntegration } from "@/types/client.types";
 import { useShopifyPolling } from "@/features/shopify/hooks/useShopifyPolling";
+import { useWordPressTargets, useTelegramTargets } from "@/features/blog/hooks/useBlogPosts";
+import { useIntegrations as useBroadcastIntegrations } from "@/features/broadcasts/hooks/useBroadcasts";
+import { FaWordpress } from "react-icons/fa6";
+import { SiTelegram } from "react-icons/si";
+import { Mail, MessageSquare } from "lucide-react";
 
 interface IntegrationsProps {
   clientId?: number;
@@ -107,6 +112,9 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
   useShopifyPolling(clientId); // Add polling hook
 
   const { data: client, isLoading, error } = useClient(clientId);
+  const { data: wordpressTargets = [] } = useWordPressTargets(clientId ?? undefined);
+  const { data: telegramTargets = [] } = useTelegramTargets(clientId ?? undefined);
+  const { data: broadcastIntegrations = [] } = useBroadcastIntegrations(clientId ?? undefined);
   console.log("client", client);
   const removeAccount = useRemoveAccount();
   const [disconnectTarget, setDisconnectTarget] = useState<ConnectedIntegration | null>(null);
@@ -240,6 +248,42 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
     console.log('Client integrations:', client.integrations);
 
     let integrations: any[] = [];
+
+    // The Data Sources tab is the unified "everything this client is connected to"
+    // view. Pull from all separate backend tables so the user sees one full picture:
+    //  - WordPress sites           (BlogIntegration / blog API)
+    //  - Telegram channels         (TelegramAccount / blog API, used by broadcasts)
+    //  - SMS / Email gateways      (BroadcastIntegration / broadcast API)
+    const wordpressExtras = (wordpressTargets || []).map(w => ({
+      integrationType: 'wordpress',
+      accountId: w.id,
+      accountName: w.name || w.url,
+      connectedAt: undefined,
+      hasInitialData: undefined,
+      _isBlogIntegration: true,
+    }));
+
+    const telegramExtras = (telegramTargets || []).map(t => ({
+      integrationType: 'telegram',
+      accountId: t.id,
+      accountName: t.name,
+      connectedAt: undefined,
+      hasInitialData: undefined,
+      _isTelegramTarget: true,
+    }));
+
+    const broadcastExtras = (broadcastIntegrations || []).map(b => ({
+      integrationType: b.type === 'SMS' ? 'broadcast-sms' : 'broadcast-email',
+      accountId: String(b.id),
+      accountName: b.name,
+      provider: b.provider,
+      connectedAt: b.createdAt,
+      hasInitialData: undefined,
+      _isBroadcastIntegration: true,
+    }));
+
+    const blogExtras = [...wordpressExtras, ...telegramExtras, ...broadcastExtras];
+
     if (client.integrations) {
       client.integrations.forEach(integration => {
         if (integration.integrationType === 'meta-business') {
@@ -270,6 +314,9 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
         }
       });
     }
+
+    // Tack on WordPress / Telegram coming from /blog/integrations.
+    integrations.push(...blogExtras);
 
     // Filter by platform
     if (platformFilter !== 'all') {
@@ -304,6 +351,69 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
     return filtered.map((integration) => {
       const platformKey = (integration.integrationType || "").toLowerCase().replace(/_/g, "-");
       const platformConfig = getPlatformConfig(platformKey);
+
+      // Special-case the blog-sourced WordPress / Telegram rows since they don't
+      // live in client_integration_association and have no sync pipeline.
+      if (integration._isBlogIntegration) {
+        return {
+          name: 'WordPress',
+          icon: FaWordpress,
+          iconColor: '#21759b',
+          link: '/blog/scheduler' + (clientId ? `/${clientId}` : ''),
+          label: integration.accountName,
+          status: (
+            <div className="flex items-center px-2 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 rounded-md whitespace-nowrap w-fit">
+              Connected
+            </div>
+          ),
+          renderActions: () => (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-zinc-400 italic">Managed via Blog Scheduler</span>
+            </div>
+          ),
+        };
+      }
+
+      if (integration._isTelegramTarget) {
+        return {
+          name: 'Telegram',
+          icon: SiTelegram,
+          iconColor: '#229ED9',
+          link: '/broadcasts',
+          label: integration.accountName,
+          status: (
+            <div className="flex items-center px-2 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 rounded-md whitespace-nowrap w-fit">
+              Connected
+            </div>
+          ),
+          renderActions: () => (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-zinc-400 italic">Managed via Broadcasts</span>
+            </div>
+          ),
+        };
+      }
+
+      if (integration._isBroadcastIntegration) {
+        const isSms = integration.integrationType === 'broadcast-sms';
+        return {
+          name: isSms ? 'SMS Gateway' : 'Email Gateway',
+          icon: isSms ? MessageSquare : Mail,
+          iconColor: isSms ? '#ea580c' : '#4f46e5',
+          link: '/broadcasts',
+          label: `${integration.accountName} · ${integration.provider}`,
+          status: (
+            <div className="flex items-center px-2 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 rounded-md whitespace-nowrap w-fit">
+              Connected
+            </div>
+          ),
+          renderActions: () => (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-zinc-400 italic">Managed via Broadcasts</span>
+            </div>
+          ),
+        };
+      }
 
       // Prefer mapped link; otherwise fall back to data-sources/<platform>
       let link = platformConfig?.link || `/data-sources/${platformKey}`;
@@ -362,7 +472,7 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
         ),
       };
     });
-  }, [client, searchQuery, isAccountSyncing, clientId, getIntegrationCounts, sortOrder, platformFilter]);
+  }, [client, wordpressTargets, telegramTargets, broadcastIntegrations, searchQuery, isAccountSyncing, clientId, getIntegrationCounts, sortOrder, platformFilter]);
 
 
 
@@ -416,7 +526,7 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
           )}
           {client?.integrations && (
             <div className="text-sm text-muted-foreground">
-              {client.integrations.length} account{client.integrations.length !== 1 ? 's' : ''} connected
+              {tableData.length} account{tableData.length !== 1 ? 's' : ''} connected
             </div>
           )}
         </div>
@@ -521,8 +631,8 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
   }
 
   return (
-    <div className="w-full  h-[2000vh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 ">
-      <div className="w-full  rounded-l-2xl overflow-hidden h-full   my-4 bg-[#fdfdfd] ">
+    <div className="w-full min-h-screen flex flex-col overflow-x-hidden bg-white">
+      <div className="w-full h-full">
         {content}
       </div>
     </div>

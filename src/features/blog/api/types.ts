@@ -103,6 +103,7 @@ export interface BlogIntegration {
   accountId: string;
   accountName: string;
   profileImage?: string;
+  clientId?: number | null;
 }
 
 export interface BlogIntegrationsResponse {
@@ -127,6 +128,7 @@ export interface ConnectWordPressPayload {
   username: string;
   applicationPassword: string;
   siteName?: string;
+  clientId?: number;
 }
 
 export interface WordPressCategory {
@@ -142,6 +144,7 @@ export interface WordPressTarget {
   url: string;
   siteIconUrl?: string;
   categories?: WordPressCategory[];
+  clientId?: number | null;
 }
 
 export interface FetchWordPressTargetsResponse {
@@ -155,12 +158,14 @@ export interface ConnectTelegramPayload {
   botToken: string;
   chatId: string;
   displayName?: string;
+  clientId?: number;
 }
 
 export interface TelegramTarget {
   id: string;
   name: string;
   type: 'telegram';
+  clientId?: number | null;
 }
 
 export interface FetchTelegramTargetsResponse {

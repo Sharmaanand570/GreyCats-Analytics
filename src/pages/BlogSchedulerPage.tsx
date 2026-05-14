@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useBlogSchedulerStore } from '@/store/useBlogSchedulerStore';
 import { BlogCalendar } from '@/features/blog/components/BlogCalendar';
@@ -13,9 +13,10 @@ import {
   UserPlus,
   Loader2,
   AlertCircle,
-  Link2,
   PenLine,
 } from 'lucide-react';
+import { SiLinkedin, SiTelegram, SiBlogger } from 'react-icons/si';
+import { FaWordpress, FaReddit } from 'react-icons/fa6';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,6 +28,19 @@ import { useClientContext } from '@/context/ClientContext';
 import { getProfileImageUrl } from '@/utils/imageUtils';
 import type { ClientWithIntegrations } from '@/types/client.types';
 import { ConnectBlogPlatform } from '@/features/blog/components/ConnectBlogPlatform';
+import { useWordPressTargets, useLinkedInTargets } from '@/features/blog/hooks/useBlogPosts';
+import {
+  ConnectPlatformsButton,
+  type ConnectedPlatformIcon,
+} from '@/components/scheduler/ConnectPlatformsButton';
+
+const BLOG_PLATFORM_ICONS: Record<string, { name: string; icon: React.ReactNode }> = {
+  linkedin: { name: 'LinkedIn', icon: <SiLinkedin style={{ color: '#0A66C2' }} /> },
+  wordpress: { name: 'WordPress', icon: <FaWordpress style={{ color: '#21759b' }} /> },
+  telegram: { name: 'Telegram', icon: <SiTelegram style={{ color: '#229ED9' }} /> },
+  blogger: { name: 'Blogger', icon: <SiBlogger style={{ color: '#f57c00' }} /> },
+  reddit: { name: 'Reddit', icon: <FaReddit style={{ color: '#FF4500' }} /> },
+};
 
 // Blog platforms configuration removed, moved to ConnectBlogPlatform
 
@@ -376,34 +390,58 @@ function StepWorkspace({
   client: ClientWithIntegrations;
   onSwitchWorkspace: () => void;
 }) {
+  // Derive "connected platforms" from the per-platform target endpoints.
+  // Match BlogPostModal's behavior (no clientId filter) so the icon list
+  // and the modal's platform list stay in sync. Telegram is intentionally
+  // excluded — it's a broadcast destination, not a blog destination.
+  const { data: wordpressTargets = [] } = useWordPressTargets();
+  const { data: linkedinTargets = [] } = useLinkedInTargets();
+
+  const connectedPlatforms: ConnectedPlatformIcon[] = useMemo(() => {
+    const result: ConnectedPlatformIcon[] = [];
+    const add = (id: string) => {
+      const meta = BLOG_PLATFORM_ICONS[id];
+      if (meta) result.push({ id, name: meta.name, icon: meta.icon });
+    };
+    if (wordpressTargets.length > 0) add('wordpress');
+    if (linkedinTargets.length > 0) add('linkedin');
+    return result;
+  }, [wordpressTargets.length, linkedinTargets.length]);
+
   return (
     <div className="h-full flex flex-col">
       {/* Workspace header bar */}
-      <div className="px-5 py-3 border-b border-zinc-100 bg-white/60 backdrop-blur-sm flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="w-10 h-10 rounded-xl border border-zinc-100 overflow-hidden flex items-center justify-center bg-zinc-50 shrink-0">
-            {client.logo ? (
-              <img src={getProfileImageUrl(client.logo)} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-zinc-100 to-zinc-200 flex items-center justify-center">
-                <Layers className="w-4 h-4 text-zinc-400" />
-              </div>
-            )}
+      <div className="px-5 py-3 border-b border-zinc-100 bg-white/60 backdrop-blur-sm shrink-0">
+        <div className="max-w-[1400px] mx-auto flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl border border-zinc-100 overflow-hidden flex items-center justify-center bg-zinc-50 shrink-0">
+              {client.logo ? (
+                <img src={getProfileImageUrl(client.logo)} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-zinc-100 to-zinc-200 flex items-center justify-center">
+                  <Layers className="w-4 h-4 text-zinc-400" />
+                </div>
+              )}
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-bold text-sm text-zinc-900 truncate leading-tight">{client.name}</h3>
+              <p className="text-[11px] text-zinc-400 font-medium truncate">Blog Workspace</p>
+            </div>
+            <div className="w-px h-6 bg-zinc-200 shrink-0 mx-1 hidden sm:block" />
+            <ConnectBlogPlatform clientId={client.id}>
+              <ConnectPlatformsButton connected={connectedPlatforms} />
+            </ConnectBlogPlatform>
           </div>
-          <div className="min-w-0">
-            <h3 className="font-bold text-sm text-zinc-900 truncate leading-tight">{client.name}</h3>
-            <p className="text-[11px] text-zinc-400 font-medium truncate">Blog Workspace</p>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onSwitchWorkspace}
+            className="text-[11px] font-semibold text-zinc-600 hover:text-zinc-900 h-8 px-4 shrink-0 rounded-lg border-zinc-200 hover:bg-zinc-50 gap-1.5"
+          >
+            <ArrowLeft className="w-3 h-3" />
+            Switch Workspace
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onSwitchWorkspace}
-          className="text-[11px] font-semibold text-zinc-600 hover:text-zinc-900 h-8 px-4 shrink-0 rounded-lg border-zinc-200 hover:bg-zinc-50 gap-1.5"
-        >
-          <ArrowLeft className="w-3 h-3" />
-          Switch Workspace
-        </Button>
       </div>
 
       <div className="flex-1 p-6 overflow-hidden">
@@ -411,17 +449,6 @@ function StepWorkspace({
           <BlogCalendar
             clientId={client.id}
             canPost
-            headerExtra={
-              <ConnectBlogPlatform clientId={client.id}>
-                <Button
-                  variant="outline"
-                  className="h-10 gap-2 bg-white shrink-0 border-zinc-200 hover:bg-zinc-50 transition-colors"
-                >
-                  <Link2 className="w-4 h-4" />
-                  Connect Platform
-                </Button>
-              </ConnectBlogPlatform>
-            }
           />
         </div>
       </div>
@@ -454,15 +481,20 @@ export default function BlogSchedulerPage() {
 
   // Sync URL clientId with state on mount or change
   useEffect(() => {
-    if (urlClientId && allClients.length > 0) {
-      const client = allClients.find(c => String(c.id) === urlClientId);
-      if (client && (!currentClient || currentClient.id !== client.id)) {
-        console.log("DEBUG - Syncing blog client from URL:", urlClientId);
-        _setCurrentClient(client as ClientWithIntegrations);
-        setCurrentStep('workspace');
-      }
+    if (!urlClientId || allClients.length === 0) return;
+    const client = allClients.find(c => String(c.id) === urlClientId);
+    if (!client) return;
+
+    if (!currentClient || currentClient.id !== client.id) {
+      _setCurrentClient(client as ClientWithIntegrations);
     }
-  }, [urlClientId, allClients.length]);
+
+    // Always advance past the select-client step when the URL has a clientId,
+    // even if currentClient already matches.
+    if (currentStep === 'select-client') {
+      setCurrentStep('workspace');
+    }
+  }, [urlClientId, allClients.length, currentClient?.id, currentStep]);
 
   const [subStep, setSubStep] = useState<'main' | 'create' | 'existing'>('main');
 
@@ -552,7 +584,7 @@ export default function BlogSchedulerPage() {
   };
 
   return (
-    <div className="w-full h-screen flex flex-col overflow-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
+    <div className="w-full h-screen flex flex-col overflow-hidden bg-white">
       <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
         <div className="w-full h-full flex flex-col relative">
           <div className="flex-1 overflow-y-auto relative h-full">

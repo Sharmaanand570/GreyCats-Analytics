@@ -121,6 +121,16 @@ export function isSpecialWidget(widget: DashboardLayout): boolean {
   if (mc.metricKey.startsWith("linkedin."))
     return true;
 
+  // Broadcast / Blog: route every widget through the per-widget adapter
+  // (useWidgetData). Backend's /unified-metrics/resolve only intercepts
+  // series-style keys (.perDay, .channelSplit, .postingCadence, .postsByPlatform)
+  // — single-value keys (.total, .sent, .failed, .sms, .email, .telegram,
+  // .published, .scheduled, .totalViews, .wordpress, .linkedin) fall through
+  // and return 0. The adapter pulls one /broadcasts/stats or /blog/stats
+  // call and extracts the right field per metricKey, which is consistent.
+  if (mc.metricKey.startsWith("broadcast.") || mc.metricKey.startsWith("blog."))
+    return true;
+
   return false;
 }
 

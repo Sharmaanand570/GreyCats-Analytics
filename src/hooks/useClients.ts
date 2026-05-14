@@ -239,6 +239,67 @@ const normalizeClientData = (client: any): ClientWithIntegrations => {
     });
   }
 
+  // Universally map any WordPress/Telegram targets attached to the client object
+  const appendBlogTargets = () => {
+    const wpTargets = client.wordpressSites || client.wordpressTargets || [];
+    if (Array.isArray(wpTargets)) {
+      wpTargets.forEach((site: any) => {
+        const uniqueKey = `wordpress-${site.id}`;
+        if (!processedIds.has(uniqueKey)) {
+          integrations.push({
+            integrationType: 'wordpress',
+            accountId: site.id || site.assignmentId || Date.now(),
+            accountName: site.siteName || site.name || site.url || 'WordPress Site',
+            accountIdentifier: site.url || site.identifier || 'unknown',
+            connectedAt: site.createdAt || site.connectedAt || new Date().toISOString(),
+            hasInitialData: true,
+          });
+          processedIds.add(uniqueKey);
+        }
+      });
+    }
+
+    const tgTargets = client.telegramChannels || client.telegramTargets || [];
+    if (Array.isArray(tgTargets)) {
+      tgTargets.forEach((chan: any) => {
+        const uniqueKey = `telegram-${chan.id}`;
+        if (!processedIds.has(uniqueKey)) {
+          integrations.push({
+            integrationType: 'telegram',
+            accountId: chan.id || chan.assignmentId || Date.now(),
+            accountName: chan.channelTitle || chan.displayName || chan.name || chan.chatId || 'Telegram Channel',
+            accountIdentifier: chan.chatId || chan.identifier || 'unknown',
+            connectedAt: chan.createdAt || chan.connectedAt || new Date().toISOString(),
+            hasInitialData: true,
+          });
+          processedIds.add(uniqueKey);
+        }
+      });
+    }
+
+    const blogInts = client.blogIntegrations || [];
+    if (Array.isArray(blogInts)) {
+      blogInts.forEach((bi: any) => {
+        if (bi.platform === 'wordpress' || bi.platform === 'telegram') {
+          const uniqueKey = `${bi.platform}-${bi.id || bi.accountId}`;
+          if (!processedIds.has(uniqueKey)) {
+            integrations.push({
+              integrationType: bi.platform,
+              accountId: bi.id || bi.accountId || Date.now(),
+              accountName: bi.accountName || bi.label || bi.platform,
+              accountIdentifier: bi.accountId || 'unknown',
+              connectedAt: bi.createdAt || new Date().toISOString(),
+              hasInitialData: true,
+            });
+            processedIds.add(uniqueKey);
+          }
+        }
+      });
+    }
+  };
+
+  appendBlogTargets();
+
   // 2. Fallback / supplementary checks for specific arrays (Legacy support)
   // Only process if the primary integrations array was NOT provided
   if (hasPrimaryIntegrations) {

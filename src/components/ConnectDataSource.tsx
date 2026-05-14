@@ -11,7 +11,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { IconType } from "react-icons";
-import { SiGoogleanalytics, SiGooglesearchconsole, SiYoutube, SiWoocommerce, SiMeta, SiGoogleads, SiLinkedin, SiInstagram } from "react-icons/si";
+import { SiGoogleanalytics, SiGooglesearchconsole, SiYoutube, SiWoocommerce, SiMeta, SiGoogleads, SiLinkedin, SiInstagram, SiTelegram } from "react-icons/si";
+import { FaWordpress } from "react-icons/fa6";
+import { Eye, EyeOff } from "lucide-react";
 import React from "react";
 import { useYouTubeConnect } from "@/features/YouTube/hooks/useYouTubeConnect";
 import { toast } from "sonner";
@@ -24,6 +26,7 @@ import { useMetaBusinessConnect } from "@/features/meta/hooks/useMetaBusinessDat
 import { useGoogleAdsConnect } from "@/features/googleAds/hooks/useGoogleAds";
 
 import { useLinkedinOrgConnect } from "@/features/linkedin/hooks/useLinkedin";
+import { useConnectWordPress, useConnectTelegram } from "@/features/blog/hooks/useBlogPosts";
 import { useQueryClient } from "@tanstack/react-query";
 import { getPlatformConfig } from "@/utils/platformMapping";
 import { assignAccountToClient } from "@/api/integrationApi";
@@ -133,6 +136,18 @@ const dataSourceOptions: DataSourceOption[] = [
     icon: SiLinkedin,
     color: getPlatformConfig("linkedin")?.color,
   },
+  {
+    id: "wordpress",
+    name: "WordPress",
+    icon: FaWordpress,
+    color: "#21759b",
+  },
+  {
+    id: "telegram",
+    name: "Telegram",
+    icon: SiTelegram,
+    color: "#229ED9",
+  },
 ];
 
 function ConnectDataSource({
@@ -147,6 +162,19 @@ function ConnectDataSource({
     consumerKey: "",
     consumerSecret: "",
   });
+  const [wpForm, setWpForm] = React.useState({
+    siteUrl: "",
+    username: "",
+    applicationPassword: "",
+    siteName: "",
+  });
+  const [showWpPassword, setShowWpPassword] = React.useState(false);
+  const [tgForm, setTgForm] = React.useState({
+    botToken: "",
+    chatId: "",
+    displayName: "",
+  });
+  const [showTgToken, setShowTgToken] = React.useState(false);
 const [SelectedSource, setSelectedSource] = React.useState<DataSourceOption>({
     id: 0,
     name: "",
@@ -171,6 +199,8 @@ meta: useMetaConnect(),
     metaBusiness: useMetaBusinessConnect(),
     googleAds: useGoogleAdsConnect(),
     linkedin: useLinkedinOrgConnect(),
+    wordpress: useConnectWordPress(),
+    telegram: useConnectTelegram(),
   };
 
   const connectYouTube = mutations.youtube.mutateAsync;
@@ -181,6 +211,8 @@ const connectMeta = mutations.meta.mutateAsync;
   const connectMetaBusiness = mutations.metaBusiness.mutateAsync;
   const connectGoogleAds = mutations.googleAds.mutateAsync;
   const connectLinkedin = mutations.linkedin.mutateAsync;
+  const connectWordPress = mutations.wordpress.mutateAsync;
+  const connectTelegram = mutations.telegram.mutateAsync;
 
   const isConnecting =
     mutations.youtube.isPending ||
@@ -190,7 +222,9 @@ const connectMeta = mutations.meta.mutateAsync;
 mutations.meta.isPending ||
     mutations.metaBusiness.isPending ||
     mutations.googleAds.isPending ||
-    mutations.linkedin.isPending;
+    mutations.linkedin.isPending ||
+    mutations.wordpress.isPending ||
+    mutations.telegram.isPending;
 
   const queryClient = useQueryClient();
 
@@ -351,10 +385,76 @@ mutations.meta.isPending ||
       } catch (error) {
         toast.error(getErrorMessage(error, "Failed to connect LinkedIn"));
       }
+    } else if (SelectedSource.id === "wordpress" || SelectedSource.id === "telegram") {
+      setNext(SelectedSource.id as string);
     } else {
       setNext(SelectedSource.id as string);
     }
   };
+
+  async function handleConnectWordPress() {
+    const siteUrl = wpForm.siteUrl.trim();
+    const username = wpForm.username.trim();
+    const applicationPassword = wpForm.applicationPassword.trim();
+    const siteName = wpForm.siteName.trim();
+
+    if (!siteUrl) { toast.error("Site URL is required"); return; }
+    if (!username) { toast.error("Username is required"); return; }
+    if (!applicationPassword) { toast.error("Application Password is required"); return; }
+
+    try {
+      await connectWordPress({
+        siteUrl,
+        username,
+        applicationPassword,
+        ...(siteName ? { siteName } : {}),
+        ...(clientId ? { clientId } : {}),
+      });
+      toast.success("WordPress site connected successfully");
+      setWpForm({ siteUrl: "", username: "", applicationPassword: "", siteName: "" });
+      setShowWpPassword(false);
+      setNext(null);
+      setOpen(false);
+      // Invalidate all clientId variants of the cache so any list/picker refetches.
+      queryClient.invalidateQueries({ queryKey: ["blog-wordpress-targets"] });
+      queryClient.invalidateQueries({ queryKey: ["blog-integrations"] });
+      queryClient.invalidateQueries({ queryKey: ["integrations"] });
+      if (clientId) queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
+      setShowSuccessDialog(true);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to connect WordPress"));
+    }
+  }
+
+  async function handleConnectTelegram() {
+    const botToken = tgForm.botToken.trim();
+    const chatId = tgForm.chatId.trim();
+    const displayName = tgForm.displayName.trim();
+
+    if (!botToken) { toast.error("Bot Token is required"); return; }
+    if (!chatId) { toast.error("Channel ID/Username is required"); return; }
+
+    try {
+      await connectTelegram({
+        botToken,
+        chatId,
+        ...(displayName ? { displayName } : {}),
+        ...(clientId ? { clientId } : {}),
+      });
+      toast.success("Telegram channel connected successfully");
+      setTgForm({ botToken: "", chatId: "", displayName: "" });
+      setShowTgToken(false);
+      setNext(null);
+      setOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["blog-telegram-targets"] });
+      queryClient.invalidateQueries({ queryKey: ["blog-integrations"] });
+      queryClient.invalidateQueries({ queryKey: ["integrations"] });
+      if (clientId) queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
+      setShowSuccessDialog(true);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to connect Telegram"));
+    }
+  }
 
   return (
     <div>
@@ -592,6 +692,169 @@ mutations.meta.isPending ||
                   }}
                   className="flex-1 sm:flex-none w-full sm:w-auto text-sm sm:text-base md:text-base"
                   type="submit"
+                >
+                  Connect
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : Next === "wordpress" ? (
+            <div>
+              <div className="w-full flex justify-center flex-col items-center">
+                <div className="flex items-center gap-2 py-4">
+                  {SelectedSource.icon && typeof SelectedSource.icon !== "string" && (
+                    <SelectedSource.icon
+                      className="text-3xl sm:text-4xl"
+                      style={SelectedSource.color ? { color: SelectedSource.color } : undefined}
+                    />
+                  )}
+                  <span className="text-xl sm:text-2xl font-medium">{SelectedSource.name}</span>
+                </div>
+
+                <div className="w-full px-2 sm:px-4 space-y-3">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium mb-1.5">Site URL*</span>
+                    <Input
+                      type="text"
+                      placeholder="https://your-site.com"
+                      value={wpForm.siteUrl}
+                      onChange={(e) => setWpForm({ ...wpForm, siteUrl: e.target.value })}
+                    />
+                    {wpForm.siteUrl && !/^https?:\/\//.test(wpForm.siteUrl) && (
+                      <p className="text-xs text-red-500 mt-1">Must start with http:// or https://</p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium mb-1.5">Username*</span>
+                    <Input
+                      type="text"
+                      placeholder="admin"
+                      value={wpForm.username}
+                      onChange={(e) => setWpForm({ ...wpForm, username: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium mb-1.5">Application Password*</span>
+                    <div className="relative">
+                      <Input
+                        type={showWpPassword ? "text" : "password"}
+                        placeholder="xxxx xxxx xxxx xxxx xxxx xxxx"
+                        value={wpForm.applicationPassword}
+                        onChange={(e) => setWpForm({ ...wpForm, applicationPassword: e.target.value })}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowWpPassword(s => !s)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                        tabIndex={-1}
+                      >
+                        {showWpPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-zinc-500 mt-1">
+                      Generate one at <span className="font-mono">Users → Profile → Application Passwords</span> in your WordPress admin.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium mb-1.5">Display Name (optional)</span>
+                    <Input
+                      type="text"
+                      placeholder="My Blog"
+                      value={wpForm.siteName}
+                      onChange={(e) => setWpForm({ ...wpForm, siteName: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="mt-4 flex flex-col sm:flex-row justify-between w-full gap-2">
+                <Button onClick={() => setNext(null)} variant="outline" className="w-full sm:w-auto">Back</Button>
+                <Button
+                  isLoading={isConnecting}
+                  disabled={
+                    !wpForm.siteUrl ||
+                    !/^https?:\/\//.test(wpForm.siteUrl) ||
+                    !wpForm.username ||
+                    !wpForm.applicationPassword ||
+                    isConnecting
+                  }
+                  onClick={handleConnectWordPress}
+                  className="w-full sm:w-auto"
+                >
+                  Connect
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : Next === "telegram" ? (
+            <div>
+              <div className="w-full flex justify-center flex-col items-center">
+                <div className="flex items-center gap-2 py-4">
+                  {SelectedSource.icon && typeof SelectedSource.icon !== "string" && (
+                    <SelectedSource.icon
+                      className="text-3xl sm:text-4xl"
+                      style={SelectedSource.color ? { color: SelectedSource.color } : undefined}
+                    />
+                  )}
+                  <span className="text-xl sm:text-2xl font-medium">{SelectedSource.name}</span>
+                </div>
+
+                <div className="w-full px-2 sm:px-4 space-y-3">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium mb-1.5">Bot Token*</span>
+                    <div className="relative">
+                      <Input
+                        type={showTgToken ? "text" : "password"}
+                        placeholder="123456:ABC-DEF..."
+                        value={tgForm.botToken}
+                        onChange={(e) => setTgForm({ ...tgForm, botToken: e.target.value })}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowTgToken(s => !s)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                        tabIndex={-1}
+                      >
+                        {showTgToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-zinc-500 mt-1">
+                      Get one from <span className="font-mono">@BotFather</span> on Telegram.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium mb-1.5">Channel ID / Username*</span>
+                    <Input
+                      type="text"
+                      placeholder="@mychannel or -1001234567890"
+                      value={tgForm.chatId}
+                      onChange={(e) => setTgForm({ ...tgForm, chatId: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium mb-1.5">Display Name (optional)</span>
+                    <Input
+                      type="text"
+                      placeholder="My Channel"
+                      value={tgForm.displayName}
+                      onChange={(e) => setTgForm({ ...tgForm, displayName: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="mt-4 flex flex-col sm:flex-row justify-between w-full gap-2">
+                <Button onClick={() => setNext(null)} variant="outline" className="w-full sm:w-auto">Back</Button>
+                <Button
+                  isLoading={isConnecting}
+                  disabled={!tgForm.botToken || !tgForm.chatId || isConnecting}
+                  onClick={handleConnectTelegram}
+                  className="w-full sm:w-auto"
                 >
                   Connect
                 </Button>

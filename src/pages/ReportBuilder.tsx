@@ -110,6 +110,8 @@ import type {
 
 } from "@/features/reports/api/types";
 import { useIntegrations } from "@/features/DataSources/hooks/useIntegrations";
+import { useIntegrations as useBroadcastIntegrations } from "@/features/broadcasts/hooks/useBroadcasts";
+import { useTelegramTargets, useWordPressTargets } from "@/features/blog/hooks/useBlogPosts";
 import { getPlatformConfig } from "@/utils/platformMapping";
 import { useAvailableMetrics } from "@/features/reports/hooks/useAvailableMetrics";
 
@@ -641,13 +643,46 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   });
 
   const {
-    data: integrationsData,
+    data: rawIntegrationsData,
     isLoading: isLoadingIntegrations,
   } = useIntegrations(effectiveClientId, {
     enabled: !readOnly,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes instead of 60s to prevent constant widget hydration blocking
     placeholderData: keepPreviousData // Ã°Å¸â€Â§ FIX: Keep previous data during refetch to prevent slideIntegrationMap from becoming empty
   });
+
+  // Broadcast + Blog are pseudo-platforms — their data lives in dedicated tables
+  // (BroadcastCampaign / BlogScheduledPost), not client_integration_association.
+  //
+  // Visibility rule (Option B): only inject the synthetic platform record when
+  // the client actually has at least one connected provider — mirrors how the
+  // real OAuth integrations work (Meta only appears if a Meta account is linked).
+  //   • Broadcast: visible if client has ≥1 SMS/Email gateway OR ≥1 Telegram bot
+  //   • Blog:      visible if client has ≥1 WordPress site
+  const { data: broadcastGateways = [] } = useBroadcastIntegrations(effectiveClientId ?? undefined);
+  const { data: telegramBots = [] } = useTelegramTargets(effectiveClientId ?? undefined);
+  const { data: wordpressSites = [] } = useWordPressTargets(effectiveClientId ?? undefined);
+
+  const showBroadcastPlatform = broadcastGateways.length > 0 || telegramBots.length > 0;
+  const showBlogPlatform = wordpressSites.length > 0;
+
+  const integrationsData = useMemo(() => {
+    if (!rawIntegrationsData) return rawIntegrationsData;
+    const existing = (rawIntegrationsData as any).integrations ?? [];
+    const hasBroadcast = existing.some((i: any) => i?.platform === 'broadcast');
+    const hasBlog = existing.some((i: any) => i?.platform === 'blog');
+    const extras: any[] = [];
+    if (showBroadcastPlatform && !hasBroadcast) {
+      extras.push({ id: 'synthetic-broadcast', platform: 'broadcast', accountId: 'default', accountName: 'Outreach' });
+    }
+    if (showBlogPlatform && !hasBlog) {
+      extras.push({ id: 'synthetic-blog', platform: 'blog', accountId: 'default', accountName: 'Posts' });
+    }
+    return extras.length
+      ? { ...rawIntegrationsData, integrations: [...existing, ...extras] }
+      : rawIntegrationsData;
+  }, [rawIntegrationsData, showBroadcastPlatform, showBlogPlatform]);
+
 
   // Debug log with safe handling of undefined
   if (integrationsData) {
@@ -674,10 +709,14 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   } = useAvailableMetrics(effectiveClientId, {
     enabled: !readOnly && integrationVersion !== undefined,
     integrationVersion,
-    connectedIntegrations: integrationsData?.integrations?.map((i: any) => ({
-      platform: i.platform,
-      accountId: i.accountId ?? i.account_id ?? 'default',
-    })),
+    connectedIntegrations: [
+      ...(integrationsData?.integrations?.map((i: any) => ({
+        platform: i.platform,
+        accountId: i.accountId ?? i.account_id ?? 'default',
+      })) || []),
+      { platform: 'broadcast', accountId: 'default' },
+      { platform: 'blog', accountId: 'default' },
+    ],
   });
 
   // UI state for the AgencyAnalytics-style "Choose your Metrics" panel
@@ -3588,8 +3627,10 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
       return;
     }
 
-    // Prevent creating a report if there are no connected integrations
-    if ((integrationsData?.integrations?.length ?? 0) === 0) {
+    // Broadcast and Blog are built-in platforms now, so we always have at least these available.
+    const hasAnyIntegrations = (integrationsData?.integrations?.length ?? 0) > 0 || true;
+
+    if (!hasAnyIntegrations) {
       toast.error("You need to connect at least one data source before creating a report.");
       return;
     }

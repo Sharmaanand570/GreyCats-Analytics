@@ -8,7 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
-import { Sparkles, Image as ImageIcon, CheckCircle2, Plus, ChevronLeft, ChevronRight, Upload, Globe, Info, Tag, Users2, X as XIcon, Search, UserPlus, AlertCircle, Calendar, FileText, ChevronDown, ChevronUp, MapPin, Building2 } from 'lucide-react';
+import { Sparkles, Image as ImageIcon, CheckCircle2, SquarePlus, ChevronLeft, ChevronRight, Upload, Globe, Info, Tag, Users2, X as XIcon, Search, UserPlus, AlertCircle, Calendar, FileText, ChevronDown, ChevronUp, MapPin, Building2 } from 'lucide-react';
 import { FaInstagram, FaFacebook, FaLinkedin } from 'react-icons/fa6';
 import { useSocialMediaStore } from '@/store/useSocialMediaStore';
 
@@ -143,8 +143,8 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
   const mainVideoRef = useRef<HTMLVideoElement>(null);
 
   // Meta account ID for collaborator search proxy
-  const metaAccountIdForSearch: number | null =
-    (currentClient?.integrations?.find((i) => i.integrationType === 'meta-business')?.accountId) ?? null;
+  const metaAccountIdRaw = currentClient?.integrations?.find((i) => i.integrationType === 'meta-business')?.accountId;
+  const metaAccountIdForSearch: number | null = typeof metaAccountIdRaw === 'number' ? metaAccountIdRaw : metaAccountIdRaw ? parseInt(metaAccountIdRaw as string) || null : null;
 
   const {
     query: tagQuery,
@@ -454,7 +454,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
         if (!metaIntegration) {
           throw new Error('No Meta account linked to this workspace. Please connect one in the studio header.');
         }
-        metaAccountId = metaIntegration.accountId;
+        metaAccountId = typeof metaIntegration.accountId === 'number' ? metaIntegration.accountId : parseInt(metaIntegration.accountId as string) || undefined;
       }
 
       // 2. Create or Update using hooks
@@ -661,9 +661,9 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
                 {mediaFiles.length < (isStory ? 1 : 10) && (
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="aspect-square rounded-lg border-2 border-dashed border-zinc-300 bg-white flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-50 transition-colors shadow-sm"
+                    className="aspect-square rounded-lg border-2 border-dashed border-zinc-300 bg-white flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-50 transition-colors shadow-sm group"
                   >
-                    <Plus className="w-5 h-5 text-zinc-400" />
+                    <SquarePlus className="w-5 h-5 text-zinc-400 group-hover:rotate-12 transition-transform" />
                     <span className="text-[10px] font-bold text-zinc-400 uppercase mt-1">Add</span>
                   </div>
                 )}

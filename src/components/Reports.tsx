@@ -14,7 +14,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useIntegrations } from "@/features/DataSources/hooks/useIntegrations";
 import { useSyncStatus } from "@/features/reports/hooks/useSyncStatus";
-import { Loader2 } from "lucide-react";
+import { Loader2, TrendingUp, ArrowRight } from "lucide-react";
 
 const TABLE_HEADERS = [
   "Name",
@@ -107,8 +107,8 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
 
   const isReportAccessLocked = isSyncing || hasPendingOAuthForClient;
 
-  const hasIntegrations =
-    (integrationsData?.integrations?.length ?? 0) > 0;
+  // Broadcast and Blog are now built-in platforms, so we always have at least these data sources available
+  const hasIntegrations = true;
 
   console.log('Reports - Integration check:', {
     clientId: parsedClientId,
@@ -246,7 +246,7 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
         )}
       </div>
 
-      <div className="w-full px-5 pb-10">
+      <div className="w-full px-5 pb-10 space-y-6">
         {isLoading ? (
           <div>Loading templates...</div>
         ) : isError ? (
@@ -258,7 +258,7 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
           />
         ) : (
           <div className="text-center py-10 opacity-60">
-            No report templates found. Create one to get started.
+            No custom report templates yet.
           </div>
         )}
       </div>

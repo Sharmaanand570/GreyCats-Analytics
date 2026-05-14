@@ -57,7 +57,6 @@ import { useBlogSchedulerStore } from '@/store/useBlogSchedulerStore';
 interface BlogCalendarProps {
   clientId: number;
   canPost?: boolean;
-  headerExtra?: React.ReactNode;
 }
 
 interface CalendarGridProps {
@@ -229,7 +228,7 @@ function CalendarGrid({ currentDate, slideDirection, posts, onDateClick }: Calen
   );
 }
 
-export function BlogCalendar({ clientId, canPost, headerExtra }: BlogCalendarProps) {
+export function BlogCalendar({ clientId, canPost }: BlogCalendarProps) {
   const queryClient = useQueryClient();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
@@ -358,24 +357,22 @@ export function BlogCalendar({ clientId, canPost, headerExtra }: BlogCalendarPro
   }, [allPosts]);
 
   const renderHeader = () => (
-    <div className="flex justify-between items-end mb-4">
-      <div className="flex items-end gap-4">
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-3 md:gap-0 mb-4">
+      <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-lg font-semibold text-zinc-900 tracking-tight leading-none">Blog Scheduler</h2>
         {allPosts.length > 0 && renderStatusFilter()}
       </div>
-      <div className="flex items-center gap-2">
-        {headerExtra}
-        <div className="w-px h-6 bg-zinc-200 shrink-0 mx-1" />
-        <div className="flex items-center bg-white border border-zinc-200 rounded-lg shadow-sm h-10 px-1 shrink-0">
-          <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8 hover:bg-zinc-100 rounded-md shrink-0">
-            <ChevronLeft className="h-4 w-4 text-zinc-600" />
+      <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+        <div className="flex items-center bg-white border border-zinc-200 rounded-lg shadow-sm h-9 px-1 shrink-0">
+          <Button variant="ghost" size="icon" onClick={prevMonth} className="h-7 w-7 hover:bg-zinc-100 rounded-md shrink-0">
+            <ChevronLeft className="h-3.5 w-3.5 text-zinc-600" />
           </Button>
 
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant="ghost"
-                className="text-sm font-semibold h-8 px-2 hover:bg-zinc-100 rounded-md flex items-center gap-1.5 min-w-[140px] text-zinc-800 tracking-wide"
+                className="text-xs font-semibold h-7 px-2 hover:bg-zinc-100 rounded-md flex items-center gap-1.5 min-w-[120px] text-zinc-800 tracking-wide"
               >
                 {format(currentDate, 'MMMM yyyy')}
                 <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
@@ -419,8 +416,8 @@ export function BlogCalendar({ clientId, canPost, headerExtra }: BlogCalendarPro
             </PopoverContent>
           </Popover>
 
-          <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8 hover:bg-zinc-100 rounded-md shrink-0">
-            <ChevronRight className="h-4 w-4 text-zinc-600" />
+          <Button variant="ghost" size="icon" onClick={nextMonth} className="h-7 w-7 hover:bg-zinc-100 rounded-md shrink-0">
+            <ChevronRight className="h-3.5 w-3.5 text-zinc-600" />
           </Button>
         </div>
         <Button
@@ -428,13 +425,13 @@ export function BlogCalendar({ clientId, canPost, headerExtra }: BlogCalendarPro
           size="icon"
           onClick={() => setShowUpcoming((prev) => !prev)}
           className={cn(
-            "h-10 w-10 bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50 shadow-sm shrink-0 relative transition-all duration-200 rounded-xl",
+            "h-9 w-9 bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50 shadow-sm shrink-0 relative transition-all duration-200 rounded-xl",
             showUpcoming && "bg-zinc-50 border-zinc-300 ring-2 ring-zinc-100",
             hasTodayBlogPosts && !showUpcoming && "border-blue-200 bg-blue-50/30"
           )}
         >
           <Bell className={cn(
-            "w-4 h-4 transition-colors",
+            "w-3.5 h-3.5 transition-colors",
             hasTodayBlogPosts ? "text-blue-600 fill-blue-600/10" : "text-zinc-500"
           )} />
           {hasTodayBlogPosts && (
@@ -447,9 +444,9 @@ export function BlogCalendar({ clientId, canPost, headerExtra }: BlogCalendarPro
         {canPost && (
           <Button
             onClick={() => openNewPostModal()}
-            className="h-10 bg-zinc-900 hover:bg-zinc-800 text-white shadow-sm shrink-0"
+            className="h-9 text-xs bg-gradient-to-tr from-zinc-900 to-zinc-800 hover:to-zinc-700 text-white shadow-md hover:shadow-lg transition-all duration-200 shrink-0 rounded-xl px-4 hover:scale-[1.02] active:scale-[0.98] group"
           >
-            <PenLine className="w-4 h-4 mr-2" />
+            <PenLine className="w-3.5 h-3.5 mr-2 group-hover:rotate-12 transition-transform" />
             New Blog
           </Button>
         )}
@@ -473,10 +470,10 @@ export function BlogCalendar({ clientId, canPost, headerExtra }: BlogCalendarPro
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button 
-            className="h-10 px-4 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 shadow-sm flex items-center gap-2 rounded-xl transition-all outline-none"
+            className="h-9 px-3 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 shadow-sm flex items-center gap-2 rounded-xl transition-all outline-none"
           >
-            <Filter className="w-4 h-4 text-zinc-400" />
-            <span className="text-sm font-bold">
+            <Filter className="w-3.5 h-3.5 text-zinc-400" />
+            <span className="text-xs font-bold">
               {activeFilter?.label || 'Filter'}
             </span>
             <span className={cn(

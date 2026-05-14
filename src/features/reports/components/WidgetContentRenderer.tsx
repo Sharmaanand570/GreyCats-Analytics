@@ -582,7 +582,9 @@ export const renderWidgetContent = (
         metricConfig?.metricKey === 'meta.facebook.recent_posts' ||
         metricConfig?.metricKey === 'meta.instagram.recent_media' ||
         metricConfig?.metricKey === 'meta.ads.campaign_performance' ||
-        metricConfig?.metricKey === 'google_ads.campaign_performance';
+        metricConfig?.metricKey === 'google_ads.campaign_performance' ||
+        metricConfig?.metricKey === 'broadcast.recent' ||
+        metricConfig?.metricKey === 'blog.recent';
 
       const generateColumnsFromRows = (rows: any[]) => {
         if (!rows.length) return [];
@@ -796,6 +798,8 @@ export const renderWidgetContent = (
               if (metricConfig?.metricKey === 'google_ads.campaign_performance') return "Performance metrics for your Google Ads campaigns.";
               if (metricConfig?.metricKey === 'meta.ads.campaign_performance') return "Performance metrics for your Meta Ads campaigns.";
               if (metricConfig?.metricKey === 'meta.instagram.recent_media') return "Recent media from your Instagram account.";
+              if (metricConfig?.metricKey === 'broadcast.recent') return "Most recent broadcast campaigns for this client.";
+              if (metricConfig?.metricKey === 'blog.recent') return "Most recent scheduled blog posts for this client.";
               return "Recent posts from your Facebook Page.";
             })()
             : "Queue of report deliveries.");
@@ -871,6 +875,25 @@ export const renderWidgetContent = (
                   { name: "Likes", dataKey: "likes" },
                   { name: "Comments", dataKey: "comments" },
                   { name: "Shares", dataKey: "shares" },
+                ];
+              }
+              if (metricConfig?.metricKey === 'broadcast.recent') {
+                return [
+                  { name: "Date", width: "14%", dataKey: "date" },
+                  { name: "Name", width: "30%", dataKey: "name" },
+                  { name: "Channel", width: "12%", dataKey: "channel" },
+                  { name: "Status", width: "12%", dataKey: "status" },
+                  { name: "Sent", width: "8%", dataKey: "sent" },
+                  { name: "Total", width: "8%", dataKey: "total" },
+                  { name: "Failed", width: "8%", dataKey: "failed" },
+                ];
+              }
+              if (metricConfig?.metricKey === 'blog.recent') {
+                return [
+                  { name: "Date", width: "20%", dataKey: "date" },
+                  { name: "Title", width: "40%", dataKey: "title" },
+                  { name: "Platforms", width: "20%", dataKey: "platforms" },
+                  { name: "Status", width: "20%", dataKey: "status" },
                 ];
               }
 
@@ -1268,7 +1291,7 @@ export const renderWidgetContent = (
         if (key.includes(".cpc") || key.includes(".cost") || key.includes(".spend") || key.endsWith(".avgOrderValue") || key.endsWith(".revenue")) {
           displayUnit = "₹";
           isCurrency = true;
-        } else if (key.includes(".ctr") || key.includes(".bounceRate") || key.includes(".conversionRate")) {
+        } else if (key.includes(".ctr") || key.includes(".bounceRate") || key.includes(".conversionRate") || key === "broadcast.successRate") {
           displayUnit = "%";
         }
       }

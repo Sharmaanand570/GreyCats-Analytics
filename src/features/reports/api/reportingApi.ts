@@ -631,12 +631,18 @@ export const fetchUnifiedMetric = (
 
     const series = response.data?.data?.series ?? [];
     const apiTotal = response.data?.data?.total;
+    // Some backend intercepts (e.g. broadcast/blog single-value keys) return
+    // { data: { value, rawCount } } with NO series and NO total — fall back to
+    // `value` so KPI widgets don't render 0 when the backend has the right number.
+    const apiValue = (response.data?.data as any)?.value;
     const total =
       typeof apiTotal === 'number'
         ? apiTotal
-        : series.reduce((acc: number, pt: { x: string; y: number }) => acc + (pt.y ?? 0), 0);
+        : typeof apiValue === 'number'
+          ? apiValue
+          : series.reduce((acc: number, pt: { x: string; y: number }) => acc + (pt.y ?? 0), 0);
 
-    console.log(`[fetchUnifiedMetric] ← ${params.metricKey}: total=${total}, series=${series.length} pts`);
+    console.log(`[fetchUnifiedMetric] ← ${params.metricKey}: total=${total}, series=${series.length} pts, value=${apiValue}`);
 
     // Map {x, y} series to the legacy 'row' shape expected by processWidgetData
     const mappedRows = series.map((pt: { x: string; y: number }, index: number) => ({

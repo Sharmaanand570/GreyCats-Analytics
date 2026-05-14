@@ -31,10 +31,10 @@ const extractError = (error: any, fallback: string): string => {
   );
 };
 
-export const useBroadcasts = () => {
+export const useBroadcasts = (clientId?: number) => {
   return useQuery({
-    queryKey: ['broadcasts'],
-    queryFn: listBroadcasts,
+    queryKey: ['broadcasts', clientId],
+    queryFn: () => listBroadcasts(clientId),
     refetchInterval: (query) => {
       // If any campaign is PROCESSING, poll every 5 seconds
       const hasProcessing = query?.state?.data?.some(b => b.status === 'PROCESSING');
@@ -80,6 +80,7 @@ export const useCreateBroadcastCsv = () => {
       integrationId?: number;
       columnName?: string;
       subject?: string;
+      clientId?: number;
     }) => createBroadcastCsv(
       data.file,
       data.name,
@@ -87,7 +88,8 @@ export const useCreateBroadcastCsv = () => {
       data.templateId,
       data.integrationId,
       data.columnName,
-      data.subject
+      data.subject,
+      data.clientId
     ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['broadcasts'] });
@@ -184,10 +186,10 @@ export const useApproveTemplate = () => {
   });
 };
 
-export const useIntegrations = () => {
+export const useIntegrations = (clientId?: number) => {
   return useQuery({
-    queryKey: ['broadcast-integrations'],
-    queryFn: listIntegrations
+    queryKey: ['broadcast-integrations', clientId],
+    queryFn: () => listIntegrations(clientId)
   });
 };
 

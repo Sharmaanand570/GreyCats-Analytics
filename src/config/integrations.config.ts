@@ -110,6 +110,24 @@ export const INTEGRATION_CONFIG: Record<IntegrationType, IntegrationConfig> = {
     displayNameField: 'name',
     identifierField: 'username',
   },
+  'wordpress': {
+    name: 'WordPress',
+    icon: '📝',
+    color: 'bg-[#21759b] text-white',
+    oauthUrl: '/blog-posts/integrations/wordpress',
+    availableAccountsUrl: '/blog-posts/targets/wordpress',
+    displayNameField: 'name',
+    identifierField: 'url',
+  },
+  'telegram': {
+    name: 'Telegram',
+    icon: '✈️',
+    color: 'bg-[#229ED9] text-white',
+    oauthUrl: '/blog-posts/integrations/telegram',
+    availableAccountsUrl: '/blog-posts/targets/telegram',
+    displayNameField: 'name',
+    identifierField: 'id',
+  },
 };
 
 // Helper functions

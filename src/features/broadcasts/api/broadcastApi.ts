@@ -40,7 +40,8 @@ export const createBroadcastCsv = async (
   templateId: number,
   integrationId?: number,
   columnName?: string,
-  subject?: string
+  subject?: string,
+  clientId?: number
 ): Promise<Broadcast> => {
   const formData = new FormData();
   formData.append('file', file);
@@ -50,6 +51,7 @@ export const createBroadcastCsv = async (
   if (integrationId) formData.append('integrationId', String(integrationId));
   if (columnName) formData.append('columnName', columnName);
   if (subject) formData.append('subject', subject);
+  if (clientId) formData.append('clientId', String(clientId));
 
   const response = await api.post('/broadcasts/csv', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -58,11 +60,13 @@ export const createBroadcastCsv = async (
 };
 
 /**
- * List all broadcast campaigns.
- * GET /broadcasts
+ * List all broadcast campaigns, optionally filtered by clientId.
+ * GET /broadcasts?clientId=:id
  */
-export const listBroadcasts = async (): Promise<Broadcast[]> => {
-  const response = await api.get('/broadcasts');
+export const listBroadcasts = async (clientId?: number): Promise<Broadcast[]> => {
+  const response = await api.get('/broadcasts', {
+    params: clientId ? { clientId } : undefined,
+  });
   return pickList<Broadcast>(response.data, 'broadcasts');
 };
 
@@ -156,11 +160,13 @@ export const createIntegration = async (payload: CreateIntegrationRequest): Prom
 };
 
 /**
- * List all provider integrations.
- * GET /broadcasts/integrations
+ * List all provider integrations, optionally filtered by clientId.
+ * GET /broadcasts/integrations?clientId=:id
  */
-export const listIntegrations = async (): Promise<BroadcastIntegration[]> => {
-  const response = await api.get('/broadcasts/integrations');
+export const listIntegrations = async (clientId?: number): Promise<BroadcastIntegration[]> => {
+  const response = await api.get('/broadcasts/integrations', {
+    params: clientId ? { clientId } : undefined,
+  });
   return pickList<BroadcastIntegration>(response.data, 'integrations');
 };
 

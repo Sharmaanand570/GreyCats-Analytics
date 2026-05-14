@@ -202,9 +202,11 @@ export const getLinkedInTargets = async (): Promise<LinkedInTarget[]> => {
  * Get connected blog integrations.
  * GET /api/blog/integrations
  */
-export const getBlogIntegrations = async (): Promise<BlogIntegration[]> => {
+export const getBlogIntegrations = async (clientId?: number): Promise<BlogIntegration[]> => {
   try {
-    const response = await api.get<BlogIntegrationsResponse>('/blog/integrations');
+    const response = await api.get<BlogIntegrationsResponse>('/blog/integrations', {
+      params: clientId ? { clientId } : undefined,
+    });
     return response.data.integrations;
   } catch (error) {
     throw new Error(extractError(error, 'Failed to fetch blog integrations'));
@@ -273,9 +275,11 @@ export const connectWordPress = async (
  * Fetch connected WordPress targets (sites).
  * GET /api/blog-posts/targets/wordpress
  */
-export const getWordPressTargets = async (): Promise<WordPressTarget[]> => {
+export const getWordPressTargets = async (clientId?: number): Promise<WordPressTarget[]> => {
   try {
-    const response = await api.get<FetchWordPressTargetsResponse>('/blog-posts/targets/wordpress');
+    const response = await api.get<FetchWordPressTargetsResponse>('/blog-posts/targets/wordpress', {
+      params: clientId ? { clientId } : undefined,
+    });
     const data = response.data as any;
     if (data.success === false || data.error) {
       throw new Error(data.message || data.error || 'Failed to fetch WordPress targets');
@@ -311,9 +315,11 @@ export const connectTelegram = async (
  * Fetch connected Telegram targets (channels).
  * GET /api/blog-posts/targets/telegram
  */
-export const getTelegramTargets = async (): Promise<TelegramTarget[]> => {
+export const getTelegramTargets = async (clientId?: number): Promise<TelegramTarget[]> => {
   try {
-    const response = await api.get<FetchTelegramTargetsResponse>('/blog-posts/targets/telegram');
+    const response = await api.get<FetchTelegramTargetsResponse>('/blog-posts/targets/telegram', {
+      params: clientId ? { clientId } : undefined,
+    });
     const data = response.data as any;
     if (data.success === false || data.error) {
       throw new Error(data.message || data.error || 'Failed to fetch Telegram targets');

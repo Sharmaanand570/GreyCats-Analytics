@@ -6,7 +6,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FiSearch, FiPlus, FiActivity, FiServer, FiDollarSign, FiTrash2, FiEdit2, FiClock } from "react-icons/fi";
 import { format } from "date-fns";
 import { useClientContext } from '@/context/ClientContext';
@@ -47,7 +46,7 @@ const getAlertType = (integration: string): 'financial' | 'performance' | 'syste
 // --- Page Component ---
 
 const AlertsPage: React.FC = () => {
-  const { clients, currentClient, setCurrentClient } = useClientContext();
+  const { currentClient } = useClientContext();
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -150,24 +149,11 @@ const AlertsPage: React.FC = () => {
         <div className="w-full h-[4.8em] border-b flex justify-between items-center px-6 bg-white sticky top-0 z-20">
           <div className="flex items-center gap-4">
             <h1 className="font-semibold text-xl text-zinc-900">Alerts Monitor</h1>
-
-            {/* Client Selector */}
-            <Select
-              value={clientId?.toString()}
-              onValueChange={(val) => {
-                const client = clients.find(c => c.id === Number(val));
-                setCurrentClient(client || null);
-              }}
-            >
-              <SelectTrigger className="w-[200px] h-9">
-                <SelectValue placeholder="Select Client" />
-              </SelectTrigger>
-              <SelectContent>
-                {clients.map(c => (
-                  <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {currentClient && (
+              <span className="text-sm text-zinc-500 font-medium px-2.5 py-1 bg-zinc-100 rounded-full">
+                {currentClient.name}
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
@@ -198,8 +184,12 @@ const AlertsPage: React.FC = () => {
         <div className="flex-1 p-6 space-y-8 overflow-y-auto">
 
           {!clientId ? (
-            <div className="flex flex-col items-center justify-center h-64 text-zinc-500">
-              <p>Please select a client to view alerts.</p>
+            <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+              <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mb-5">
+                <FiActivity className="text-zinc-400 text-2xl" />
+              </div>
+              <h3 className="text-zinc-900 font-semibold text-lg mb-1">No Client Selected</h3>
+              <p className="text-zinc-500 text-sm max-w-xs">Select a client from the sidebar to view and manage their alert monitors.</p>
             </div>
           ) : queryError ? (
             <div className="flex flex-col items-center justify-center h-64 text-red-500">

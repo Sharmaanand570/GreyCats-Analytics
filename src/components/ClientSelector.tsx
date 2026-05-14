@@ -19,24 +19,47 @@ import {
 import { useNavigate, useParams } from "react-router-dom"
 import { useClients } from "@/hooks/useClients"
 import { Button } from "@/components/ui/button"
+import { useClientContext } from "@/context/ClientContext"
 
 export function ClientSelector({ isCollapsed }: { isCollapsed?: boolean }) {
     const [open, setOpen] = React.useState(false)
     const navigate = useNavigate()
     const { clientId } = useParams<{ clientId: string }>()
     const { data: clients, isError, refetch } = useClients()
+    const { currentClient, setCurrentClient } = useClientContext()
 
-    const selectedClient = React.useMemo(() =>
-        clients?.find(c => c.id === Number(clientId)),
-        [clients, clientId]
-    );
+    // Keep context in sync with the URL. ClientProvider sits above <Routes>, so its
+    // own useParams() never resolves :clientId — without this sync, currentClient
+    // goes stale the moment the user navigates between routes that have / don't
+    // have a :clientId segment, and the sidebar visibly swaps clients on tab change.
+    React.useEffect(() => {
+        if (!clientId || !clients) return;
+        const client = clients.find(c => c.id === Number(clientId));
+        if (client && currentClient?.id !== client.id) {
+            setCurrentClient(client);
+            localStorage.setItem('lastClientId', String(client.id));
+        }
+    }, [clientId, clients, currentClient?.id, setCurrentClient]);
+
+    const selectedClient = React.useMemo(() => {
+        // Prefer URL param match, fall back to global context client
+        const fromUrl = clients?.find(c => c.id === Number(clientId));
+        return fromUrl || currentClient || null;
+    }, [clients, clientId, currentClient]);
 
     const handleSelectClient = (id: number) => {
+        const client = clients?.find(c => c.id === id)
+        if (client) {
+            setCurrentClient(client)
+            localStorage.setItem('lastClientId', String(id))
+        }
         navigate(`/clients/${id}`)
         setOpen(false)
     }
 
     const handleSelectOverview = () => {
+        setCurrentClient(null)
+        localStorage.removeItem('lastClientId')
         navigate(`/clients`)
         setOpen(false)
     }

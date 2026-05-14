@@ -105,6 +105,8 @@ function normalizeIntegration(widget: ReportWidgetDefinition): string {
   if (metricKey.startsWith("youtube.")) return "youtube";
   if (metricKey.startsWith("twitter.")) return "twitter";
   if (metricKey.startsWith("linkedin.")) return "linkedin";
+  if (metricKey.startsWith("broadcast.")) return "broadcast";
+  if (metricKey.startsWith("blog.")) return "blog";
 
   let normalized = widget.integration.toLowerCase();
 
@@ -162,6 +164,8 @@ const VALID_INTEGRATIONS = [
   "google-ads",
   "twitter",
   "linkedin",
+  "broadcast",
+  "blog",
 ];
 
 function hasValidMetricPrefix(metricKey: string): boolean {
@@ -175,7 +179,9 @@ function hasValidMetricPrefix(metricKey: string): boolean {
     metricKey.startsWith("woo.") ||
     metricKey.startsWith("google_ads.") ||
     metricKey.startsWith("twitter.") ||
-    metricKey.startsWith("linkedin.")
+    metricKey.startsWith("linkedin.") ||
+    metricKey.startsWith("broadcast.") ||
+    metricKey.startsWith("blog.")
   );
 }
 
@@ -192,6 +198,181 @@ async function fetchRawWidgetData(
   shareToken?: string,
   integrationsData?: any
 ): Promise<any> {
+  // --- Broadcast ---
+  if (normalizedInteg === "broadcast") {
+    if (effectiveClientId || shareToken) {
+      try {
+        if (widget.metricKey === "broadcast.recent") {
+          const response = await api.get('/broadcasts', {
+            params: {
+              clientId: effectiveClientId ?? undefined,
+              from: dateFrom,
+              to: dateTo,
+            }
+          });
+          const rows = (response.data?.broadcasts || response.data || []).map((b: any) => ({
+            id: b.id,
+            metricKey: widget.metricKey,
+            integration: "broadcast",
+            name: b.name,
+            channel: b.channel,
+            status: b.status,
+            sent: b.sent ?? b.sentCount ?? 0,
+            failed: b.failed ?? b.failedCount ?? 0,
+            total: b.total ?? b.totalCount ?? 0,
+            date: b.date ?? (b.createdAt ? new Date(b.createdAt).toLocaleDateString() : ""),
+          }));
+          return {
+            success: true,
+            rows,
+            pagination: { page: 1, limit: rows.length, total: rows.length, totalPages: 1 },
+            columns: [
+              { name: "Date", width: "15%", dataKey: "date" },
+              { name: "Name", width: "35%", dataKey: "name" },
+              { name: "Channel", width: "15%", dataKey: "channel" },
+              { name: "Status", width: "15%", dataKey: "status" },
+              { name: "Sent", width: "10%", dataKey: "sent" },
+              { name: "Failed", width: "10%", dataKey: "failed" },
+            ]
+          };
+        } else {
+          const channelFilter = widget.metricKey === "broadcast.sms" ? "SMS" :
+                                widget.metricKey === "broadcast.email" ? "EMAIL" :
+                                widget.metricKey === "broadcast.telegram" ? "TELEGRAM" : undefined;
+                                
+          const response = await api.get('/broadcasts/stats', {
+            params: {
+              clientId: effectiveClientId ?? undefined,
+              channel: channelFilter,
+              from: dateFrom,
+              to: dateTo
+            }
+          });
+          const stats = response.data;
+          
+          if (widget.metricKey === "broadcast.perDay") {
+            const series = (stats.byDay || []).map((day: any) => ({
+              x: day.date,
+              y: day.total || 0,
+              SMS: day.SMS || 0,
+              EMAIL: day.EMAIL || 0,
+              TELEGRAM: day.TELEGRAM || 0
+            }));
+            const total = series.reduce((acc: number, pt: any) => acc + pt.y, 0);
+            return {
+              success: true,
+              series,
+              total,
+              value: total,
+              rows: [],
+              rawCount: series.length
+            };
+          } else if (widget.metricKey === "broadcast.channelSplit") {
+            const series = Object.entries(stats.byChannel || {}).map(([channel, count]) => ({
+              name: channel,
+              value: count
+            }));
+            return {
+              success: true,
+              series,
+              total: stats.total || 0,
+              value: stats.total || 0,
+              rows: [],
+              rawCount: series.length
+            };
+          } else {
+            let value = 0;
+            if (widget.metricKey === "broadcast.total") value = stats.total || 0;
+            else if (widget.metricKey === "broadcast.sent") value = stats.sent || 0;
+            else if (widget.metricKey === "broadcast.failed") value = stats.failed || 0;
+            else if (widget.metricKey === "broadcast.successRate") value = stats.total > 0 ? (stats.sent / stats.total) * 100 : 0;
+            else if (channelFilter) {
+              value = stats.sent || 0;
+            }
+            return {
+              success: true,
+              rows: [],
+              value,
+              total: value,
+              summary: { [widget.metricKey.split('.').pop()!]: value }
+            };
+          }
+        }
+      } catch(err) {
+        console.error("Failed to fetch Broadcast widget data", err);
+      }
+    }
+  }
+
+  // --- Blog ---
+  if (normalizedInteg === "blog") {
+    if (effectiveClientId || shareToken) {
+      try {
+        if (widget.metricKey === "blog.recent") {
+          // Use /blog-posts/posts — same endpoint the Blog Scheduler uses, confirmed
+          // to return posts for a client. (/blog/posts was claimed canonical by
+          // backend but returns empty / 404 in practice.)
+          const response = await api.get('/blog-posts/posts', {
+            params: {
+              clientId: effectiveClientId ?? undefined,
+              from: dateFrom,
+              to: dateTo,
+            }
+          });
+          // A scheduled blog post can target multiple platforms (e.g. WordPress + LinkedIn).
+          // Join all target platforms with " · " into a single label rather than picking one.
+          const PLATFORM_LABELS: Record<string, string> = {
+            wordpress: 'WordPress',
+            linkedin: 'LinkedIn',
+            telegram: 'Telegram',
+            blogger: 'Blogger',
+            reddit: 'Reddit',
+          };
+          const platformLabel = (t: any) => {
+            const key = String(t?.platform ?? '').toLowerCase();
+            return PLATFORM_LABELS[key] ?? key.charAt(0).toUpperCase() + key.slice(1);
+          };
+          const rows = (response.data?.posts || response.data || []).map((p: any) => {
+            // Backend may already supply a joined `platforms` string; if not, build it
+            // from `targets[]` for backwards compatibility with the older /blog/posts shape.
+            const targets = Array.isArray(p.targets) ? p.targets : [];
+            const platforms = p.platforms
+              ?? (targets.length
+                ? Array.from(new Set(targets.map(platformLabel).filter(Boolean))).join(' · ')
+                : (p.platform ? platformLabel({ platform: p.platform }) : '—'));
+            return {
+              id: p.id,
+              metricKey: widget.metricKey,
+              integration: "blog",
+              title: p.title,
+              platforms,
+              status: p.status,
+              date: p.scheduledFor ? new Date(p.scheduledFor).toLocaleDateString() : "",
+            };
+          });
+          return {
+            success: true,
+            rows,
+            pagination: { page: 1, limit: rows.length, total: rows.length, totalPages: 1 },
+            columns: [
+              { name: "Date", width: "20%", dataKey: "date" },
+              { name: "Title", width: "40%", dataKey: "title" },
+              { name: "Platforms", width: "20%", dataKey: "platforms" },
+              { name: "Status", width: "20%", dataKey: "status" },
+            ]
+          };
+        } else {
+          // NOTE: /api/blog/stats does NOT exist on the backend. All non-`blog.recent`
+          // metric keys are served by /api/unified-metrics/data via the backend's
+          // intercept in getUnifiedMetricData. Falling through to the unified path.
+          // (Returning undefined here lets the rest of useWidgetData take over.)
+        }
+      } catch(err) {
+        console.error("Failed to fetch Blog widget data", err);
+      }
+    }
+  }
+
   // --- Shopify ---
   if (normalizedInteg === "shopify") {
     if (effectiveClientId) {

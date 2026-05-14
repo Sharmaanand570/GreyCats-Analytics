@@ -278,6 +278,8 @@ export function buildWidgetsFromTemplate(
       else if (m.startsWith('woo.')) integration = 'woo';
       else if (m.startsWith('twitter.')) integration = 'twitter';
       else if (m.startsWith('linkedin.')) integration = 'linkedin';
+      else if (m.startsWith('broadcast.')) integration = 'broadcast';
+      else if (m.startsWith('blog.')) integration = 'blog';
     }
 
     if (!integration && integrationPlatform) {
@@ -312,6 +314,7 @@ export function buildWidgetsFromTemplate(
       widgetData = {
         label: widgetTemplate.displayName || prettifyMetricLabel(widgetTemplate.metricKey),
         value: 0,
+        unit: widgetTemplate.unit,
         hideDataPoints: true,
       };
     } else if (widgetTemplate.type === 'chart' || widgetTemplate.type === 'line_chart' || widgetTemplate.type === 'bar_chart' || widgetTemplate.type === 'area_chart' || widgetTemplate.type === 'pie_chart') {
@@ -355,7 +358,7 @@ export function buildWidgetsFromTemplate(
         metricKey: widgetTemplate.metricKey,
         integration,
         accountId,
-        groupBy: widgetTemplate.groupBy || (widgetTemplate.type === 'metric' ? 'none' : 'day'),
+        groupBy: widgetTemplate.groupBy || (widgetTemplate.type === 'metric' || widgetTemplate.type === 'table' ? 'none' : 'day'),
         aggregation: widgetTemplate.aggregation || 'sum',
         type: widgetTemplate.type === 'metric' ? 'metric_card' :
           (widgetTemplate.type === 'chart' || widgetTemplate.type === 'line_chart' || widgetTemplate.type === 'bar_chart' || widgetTemplate.type === 'area_chart' || widgetTemplate.type === 'pie_chart') ? 'bar_chart' :

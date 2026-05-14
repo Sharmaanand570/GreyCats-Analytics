@@ -9,12 +9,12 @@ export const blogPostKeys = {
     [...blogPostKeys.lists(), clientId, status] as const,
   details: () => [...blogPostKeys.all, 'detail'] as const,
   detail: (id: number) => [...blogPostKeys.details(), id] as const,
-  integrations: () => ['blog-integrations'] as const,
+  integrations: (clientId?: number) => ['blog-integrations', clientId] as const,
   linkedinTargets: () => ['blog-linkedin-targets'] as const,
   platformDetails: (platform: string, accountId: string) =>
     ['blog-platform-details', platform, accountId] as const,
-  wordpressTargets: () => ['blog-wordpress-targets'] as const,
-  telegramTargets: () => ['blog-telegram-targets'] as const,
+  wordpressTargets: (clientId?: number) => ['blog-wordpress-targets', clientId] as const,
+  telegramTargets: (clientId?: number) => ['blog-telegram-targets', clientId] as const,
 };
 
 export const useBlogPosts = (clientId?: number, status?: BlogPostStatus) => {
@@ -36,10 +36,10 @@ export const useBlogPost = (id: number) => {
   });
 };
 
-export const useBlogIntegrations = () => {
+export const useBlogIntegrations = (clientId?: number) => {
   return useQuery({
-    queryKey: blogPostKeys.integrations(),
-    queryFn: getBlogIntegrations,
+    queryKey: blogPostKeys.integrations(clientId),
+    queryFn: () => getBlogIntegrations(clientId),
     staleTime: 60_000,
   });
 };
@@ -61,10 +61,10 @@ export const usePlatformDetails = (platform: string, accountId: string) => {
   });
 };
 
-export const useWordPressTargets = () => {
+export const useWordPressTargets = (clientId?: number) => {
   return useQuery({
-    queryKey: blogPostKeys.wordpressTargets(),
-    queryFn: getWordPressTargets,
+    queryKey: blogPostKeys.wordpressTargets(clientId),
+    queryFn: () => getWordPressTargets(clientId),
     staleTime: 60_000,
   });
 };
@@ -74,16 +74,16 @@ export const useConnectWordPress = () => {
   return useMutation({
     mutationFn: (payload: ConnectWordPressPayload) => connectWordPress(payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: blogPostKeys.wordpressTargets() });
-      queryClient.invalidateQueries({ queryKey: blogPostKeys.integrations() });
+      queryClient.invalidateQueries({ queryKey: ['blog-wordpress-targets'] });
+      queryClient.invalidateQueries({ queryKey: ['blog-integrations'] });
     },
   });
 };
 
-export const useTelegramTargets = () => {
+export const useTelegramTargets = (clientId?: number) => {
   return useQuery({
-    queryKey: blogPostKeys.telegramTargets(),
-    queryFn: getTelegramTargets,
+    queryKey: blogPostKeys.telegramTargets(clientId),
+    queryFn: () => getTelegramTargets(clientId),
     staleTime: 60_000,
   });
 };
@@ -93,8 +93,8 @@ export const useConnectTelegram = () => {
   return useMutation({
     mutationFn: (payload: ConnectTelegramPayload) => connectTelegram(payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: blogPostKeys.telegramTargets() });
-      queryClient.invalidateQueries({ queryKey: blogPostKeys.integrations() });
+      queryClient.invalidateQueries({ queryKey: ['blog-telegram-targets'] });
+      queryClient.invalidateQueries({ queryKey: ['blog-integrations'] });
     },
   });
 };

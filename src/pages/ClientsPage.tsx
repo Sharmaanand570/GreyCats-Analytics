@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClients, useDeleteClient } from '../hooks/useClients';
+import { useBlogIntegrations, useWordPressTargets, useTelegramTargets } from '../features/blog/hooks/useBlogPosts';
 import { Plus, Building2, Activity, ArrowUpDown, Trash2, Edit2 } from 'lucide-react';
 import { FiSearch, FiBell } from "react-icons/fi";
 import { Button } from '../components/ui/button';
@@ -33,15 +34,16 @@ import { getPlatformConfig } from "@/utils/platformMapping";
 
 // Helper to determine status based on integrations (Simulated logic for demo)
 const getClientHealth = (client: any) => {
-    const totalIntegrations =
-        (client._count?.metaBusinessAccounts || 0) +
-        (client._count?.metaAdsAccounts || 0) +
-        (client._count?.metaInsightsAccounts || 0) +
-        (client._count?.youtubeAccounts || 0) +
-        (client._count?.shopifyAccounts || 0) +
-        (client._count?.woocommerceAccounts || 0) +
-        (client._count?.googleSearchConsoleAccounts || 0) +
-        (client._count?.googleAnalyticsAccounts || 0);
+    const totalIntegrations = client.integrations?.length !== undefined && client.integrations?.length > 0
+        ? client.integrations.length
+        : (client._count?.metaBusinessAccounts || 0) +
+          (client._count?.metaAdsAccounts || 0) +
+          (client._count?.metaInsightsAccounts || 0) +
+          (client._count?.youtubeAccounts || 0) +
+          (client._count?.shopifyAccounts || 0) +
+          (client._count?.woocommerceAccounts || 0) +
+          (client._count?.googleSearchConsoleAccounts || 0) +
+          (client._count?.googleAnalyticsAccounts || 0);
 
     if (totalIntegrations > 3) return 'healthy';
     if (totalIntegrations > 0) return 'warning';
@@ -51,6 +53,9 @@ const getClientHealth = (client: any) => {
 const ClientsPage: React.FC = () => {
     const navigate = useNavigate();
     const { data: clients, isLoading, isError, refetch } = useClients();
+    const { data: blogInts } = useBlogIntegrations();
+    const { data: wpTargets } = useWordPressTargets();
+    const { data: tgTargets } = useTelegramTargets();
     const { mutate: deleteClient } = useDeleteClient();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -65,7 +70,70 @@ const ClientsPage: React.FC = () => {
     const processedClients = useMemo(() => {
         if (!clients) return [];
 
-        let result = clients.filter(client =>
+        let result = clients.map(client => {
+            const enrichedClient = { ...client };
+            const existingIntegrations = Array.isArray(enrichedClient.integrations) ? [...enrichedClient.integrations] : [];
+            const processedKeys = new Set(existingIntegrations.map(i => `${i.integrationType}-${i.accountId}`));
+
+            if (blogInts) {
+                blogInts.forEach((bi) => {
+                    if (bi.clientId === enrichedClient.id && (bi.platform === 'wordpress' || bi.platform === 'telegram')) {
+                        const key = `${bi.platform}-${bi.id || bi.accountId}`;
+                        if (!processedKeys.has(key)) {
+                            existingIntegrations.push({
+                                integrationType: bi.platform,
+                                accountId: bi.id || bi.accountId,
+                                accountName: bi.accountName || bi.platform,
+                                accountIdentifier: bi.accountId || 'unknown',
+                                connectedAt: new Date().toISOString(),
+                            });
+                            processedKeys.add(key);
+                        }
+                    }
+                });
+            }
+
+            if (wpTargets) {
+                wpTargets.forEach((wp) => {
+                    if (wp.clientId === enrichedClient.id) {
+                        const key = `wordpress-${wp.id}`;
+                        if (!processedKeys.has(key)) {
+                            existingIntegrations.push({
+                                integrationType: 'wordpress',
+                                accountId: wp.id,
+                                accountName: wp.name || wp.url || 'WordPress Site',
+                                accountIdentifier: wp.url || 'unknown',
+                                connectedAt: new Date().toISOString(),
+                            });
+                            processedKeys.add(key);
+                        }
+                    }
+                });
+            }
+
+            if (tgTargets) {
+                tgTargets.forEach((tg) => {
+                    if (tg.clientId === enrichedClient.id) {
+                        const key = `telegram-${tg.id}`;
+                        if (!processedKeys.has(key)) {
+                            existingIntegrations.push({
+                                integrationType: 'telegram',
+                                accountId: tg.id,
+                                accountName: tg.name || 'Telegram Channel',
+                                accountIdentifier: tg.id || 'unknown',
+                                connectedAt: new Date().toISOString(),
+                            });
+                            processedKeys.add(key);
+                        }
+                    }
+                });
+            }
+
+            enrichedClient.integrations = existingIntegrations;
+            return enrichedClient;
+        });
+
+        result = result.filter(client =>
             client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             client.description?.toLowerCase().includes(searchQuery.toLowerCase())
         );
@@ -86,8 +154,8 @@ const ClientsPage: React.FC = () => {
         result.sort((a, b) => {
             const healthA = getClientHealth(a);
             const healthB = getClientHealth(b);
-            const integrationsA = (a._count?.metaBusinessAccounts || 0) + (a._count?.metaAdsAccounts || 0); // Simplified for sorting demo
-            const integrationsB = (b._count?.metaBusinessAccounts || 0) + (b._count?.metaAdsAccounts || 0);
+            const integrationsA = (a.integrations?.length || 0) + (a._count?.metaBusinessAccounts || 0); // Simplified for sorting demo
+            const integrationsB = (b.integrations?.length || 0) + (b._count?.metaBusinessAccounts || 0);
 
             switch (sortBy) {
                 case 'name-asc': return a.name.localeCompare(b.name);
@@ -104,10 +172,10 @@ const ClientsPage: React.FC = () => {
         });
 
         return result;
-    }, [clients, searchQuery, sortBy, filterStatus]);
+    }, [clients, searchQuery, sortBy, filterStatus, blogInts, wpTargets, tgTargets]);
 
     return (
-        <div className="w-full h-[2000vh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
+        <div className="w-full min-h-screen flex flex-col overflow-x-hidden bg-white">
             <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
                 <div className="w-full h-full flex flex-col">
                     {/* Header */}
@@ -212,18 +280,13 @@ const ClientsPage: React.FC = () => {
                                         ? client.integrations.length
                                         : countFromStructure;
 
-                                    const status = getClientHealth(client);
 
                                     return (
                                         <div
                                             key={client.id}
                                             onClick={() => handleClientClick(client.id)}
                                             className={cn(
-                                                "group relative flex flex-col justify-between p-5 h-52 border rounded-xl transition-all duration-300 cursor-pointer overflow-hidden",
-                                                // Status Tints
-                                                status === 'healthy' ? "bg-white hover:border-zinc-300" :
-                                                    status === 'warning' ? "bg-amber-50/30 border-amber-100 hover:border-amber-200" :
-                                                        "bg-red-50/20 border-red-100 hover:border-red-200"
+                                                "group relative flex flex-col justify-between p-5 h-52 bg-white border border-zinc-100 rounded-xl transition-all duration-300 cursor-pointer overflow-hidden hover:border-zinc-300 hover:shadow-lg hover:shadow-zinc-200/50"
                                             )}
                                         >
 
@@ -237,12 +300,7 @@ const ClientsPage: React.FC = () => {
                                                                 alt={client.name}
                                                                 className="object-contain"
                                                             />
-                                                            <AvatarFallback className={cn(
-                                                                "rounded-md",
-                                                                status === 'healthy' ? "bg-zinc-50 text-zinc-900 group-hover:bg-zinc-100" :
-                                                                    status === 'warning' ? "bg-amber-100/50 text-amber-700" :
-                                                                        "bg-red-100/50 text-red-700"
-                                                            )}>
+                                                            <AvatarFallback className="rounded-md bg-zinc-50 text-zinc-900 group-hover:bg-zinc-100 transition-colors">
                                                                 <Building2 className="w-5 h-5" />
                                                             </AvatarFallback>
                                                         </Avatar>

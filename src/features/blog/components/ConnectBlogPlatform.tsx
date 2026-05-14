@@ -46,12 +46,6 @@ const blogPlatformOptions: BlogPlatformOption[] = [
     color: "#21759b",
   },
   {
-    id: "telegram",
-    name: "Telegram",
-    icon: SiTelegram,
-    color: "#229ED9",
-  },
-  {
     id: "blogger",
     name: "Blogger",
     icon: SiBlogger,
@@ -186,6 +180,7 @@ export function ConnectBlogPlatform({
         username,
         applicationPassword: appPassword,
         ...(wpSiteName.trim() ? { siteName: wpSiteName.trim() } : {}),
+        ...(clientId ? { clientId } : {}),
       });
       toast.success("WordPress site connected successfully!");
       resetWpForm();
@@ -218,6 +213,7 @@ export function ConnectBlogPlatform({
         botToken,
         chatId,
         ...(displayName ? { displayName } : {}),
+        ...(clientId ? { clientId } : {}),
       });
       toast.success("Telegram channel connected successfully!");
       resetTelegramForm();

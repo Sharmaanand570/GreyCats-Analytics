@@ -1,6 +1,7 @@
 import type { IconType } from "react-icons";
-import { FaCartShopping } from "react-icons/fa6";
-import { SiGoogleanalytics, SiShopify, SiMeta, SiQuora, SiYoutube, SiGooglesearchconsole, SiFacebook, SiInstagram, SiGoogleads, SiX, SiLinkedin } from "react-icons/si";
+import { FaCartShopping, FaWordpress } from "react-icons/fa6";
+import { FaBroadcastTower, FaBlog } from "react-icons/fa";
+import { SiGoogleanalytics, SiShopify, SiMeta, SiQuora, SiYoutube, SiGooglesearchconsole, SiFacebook, SiInstagram, SiGoogleads, SiX, SiLinkedin, SiTelegram } from "react-icons/si";
 
 export type PlatformConfig = {
   name: string;
@@ -121,6 +122,30 @@ const platformMap: Record<string, PlatformConfig> = {
     icon: SiLinkedin,
     link: "/data-sources/linkedin",
     color: "#0A66C2",
+  },
+  wordpress: {
+    name: "WordPress",
+    icon: FaWordpress,
+    link: "/data-sources/wordpress",
+    color: "#21759b",
+  },
+  telegram: {
+    name: "Telegram",
+    icon: SiTelegram,
+    link: "/data-sources/telegram",
+    color: "#229ED9",
+  },
+  broadcast: {
+    name: "Broadcast Outreach",
+    icon: FaBroadcastTower,
+    link: "/broadcasts",
+    color: "#6366F1", // Indigo
+  },
+  blog: {
+    name: "Blog System",
+    icon: FaBlog,
+    link: "/blog/scheduler",
+    color: "#EC4899", // Pink
   },
 };
 

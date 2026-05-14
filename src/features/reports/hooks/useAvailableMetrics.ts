@@ -139,6 +139,31 @@ const LINKEDIN_STATIC_METRICS: Array<{ metricKey: string; displayName: string; c
   { metricKey: 'linkedin.recent_posts', displayName: 'Recent Posts (Table)', category: 'Tables' },
 ];
 
+const BROADCAST_STATIC_METRICS: Array<{ metricKey: string; displayName: string; category: string }> = [
+  { metricKey: 'broadcast.total',       displayName: 'Total Messages',       category: 'Overview' },
+  { metricKey: 'broadcast.sent',        displayName: 'Sent Messages',        category: 'Overview' },
+  { metricKey: 'broadcast.failed',      displayName: 'Failed Messages',      category: 'Overview' },
+  { metricKey: 'broadcast.successRate', displayName: 'Success Rate',         category: 'Overview' },
+  { metricKey: 'broadcast.sms',         displayName: 'SMS Sent',             category: 'Channels' },
+  { metricKey: 'broadcast.email',       displayName: 'Email Sent',           category: 'Channels' },
+  { metricKey: 'broadcast.telegram',    displayName: 'Telegram Sent',        category: 'Channels' },
+  { metricKey: 'broadcast.perDay',      displayName: 'Messages Per Day',     category: 'Overview' },
+  { metricKey: 'broadcast.channelSplit',displayName: 'Channel Split',        category: 'Channels' },
+  { metricKey: 'broadcast.recent',      displayName: 'Recent Campaigns (Table)', category: 'Tables' },
+];
+
+const BLOG_STATIC_METRICS: Array<{ metricKey: string; displayName: string; category: string }> = [
+  { metricKey: 'blog.published',    displayName: 'Published Posts', category: 'Overview' },
+  { metricKey: 'blog.scheduled',    displayName: 'Scheduled Posts', category: 'Overview' },
+  { metricKey: 'blog.failed',       displayName: 'Failed Posts',    category: 'Overview' },
+  { metricKey: 'blog.totalViews',   displayName: 'Total Views',     category: 'Overview' },
+  { metricKey: 'blog.wordpress',    displayName: 'WordPress Posts', category: 'Platforms' },
+  { metricKey: 'blog.linkedin',     displayName: 'LinkedIn Posts',  category: 'Platforms' },
+  { metricKey: 'blog.postingCadence',displayName: 'Posting Cadence',category: 'Overview' },
+  { metricKey: 'blog.postsByPlatform',displayName: 'Posts By Platform',category: 'Platforms' },
+  { metricKey: 'blog.recent',       displayName: 'Recent Posts (Table)', category: 'Tables' },
+];
+
 // Map from normalised integration platform → static metrics + canonical integration key
 const STATIC_METRIC_MAP: Record<string, { integration: string; metrics: Array<{ metricKey: string; displayName: string; category: string }> }> = {
   'google-ads':           { integration: 'google_ads',             metrics: GOOGLE_ADS_STATIC_METRICS },
@@ -153,6 +178,8 @@ const STATIC_METRIC_MAP: Record<string, { integration: string; metrics: Array<{ 
   'woo':                  { integration: 'woo',                     metrics: WOO_STATIC_METRICS },
   'twitter':              { integration: 'twitter',                 metrics: TWITTER_STATIC_METRICS },
   'linkedin':             { integration: 'linkedin',                metrics: LINKEDIN_STATIC_METRICS },
+  'broadcast':            { integration: 'broadcast',               metrics: BROADCAST_STATIC_METRICS },
+  'blog':                 { integration: 'blog',                    metrics: BLOG_STATIC_METRICS },
 };
 
 function injectStaticMetrics(

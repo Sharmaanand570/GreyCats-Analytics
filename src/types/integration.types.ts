@@ -9,7 +9,9 @@ export type IntegrationType =
   | 'meta-ads'
   | 'meta-insights'
   | 'twitter'
-  | 'linkedin';
+  | 'linkedin'
+  | 'wordpress'
+  | 'telegram';
 
 export interface AvailableAccount {
   id: string | number;

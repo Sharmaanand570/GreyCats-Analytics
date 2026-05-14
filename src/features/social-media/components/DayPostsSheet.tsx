@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Pencil, Trash2, Plus, AlertCircle, Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
+import { Pencil, Trash2, SquarePlus, AlertCircle, Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
 import { FaInstagram, FaFacebook, FaLinkedin } from 'react-icons/fa6';
 import { PostStatusBadge } from './PostStatusBadge';
 import type { ScheduledPost, PostPlatform, PostStatus } from '../api/types';
@@ -100,9 +100,9 @@ export function DayPostsSheet({
               <Button
                 size="sm"
                 onClick={onNewPost}
-                className="h-8 shrink-0 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold gap-1.5"
+                className="h-8 shrink-0 bg-gradient-to-tr from-zinc-900 to-zinc-800 hover:to-zinc-700 text-white text-xs font-semibold gap-1.5 rounded-lg hover:scale-[1.02] active:scale-[0.98] transition-all group shadow-sm"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <SquarePlus className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" />
                 New Post
               </Button>
             )}
@@ -223,7 +223,7 @@ export function DayPostsSheet({
                             className="h-8 px-3 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50 gap-1.5 rounded-lg"
                             onClick={() => onRetry(post)}
                           >
-                            <Plus className="w-3.5 h-3.5" />
+                            <SquarePlus className="w-3.5 h-3.5" />
                             Retry Now
                           </Button>
                         )}

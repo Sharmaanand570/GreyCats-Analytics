@@ -203,7 +203,7 @@ function App() {
               <Route path="account-setup" element={<SettingsPage />} />
               <Route path="social-media/scheduler/:clientId?" element={<SocialMediaSchedulerPage />} />
               <Route path="blog/scheduler/:clientId?" element={<BlogSchedulerPage />} />
-              <Route path="broadcasts" element={<BroadcastPage />} />
+              <Route path="broadcasts/:clientId?" element={<BroadcastPage />} />
             </Route>
 
             {/* 404 catch-all for protected area — outside sidebar */}

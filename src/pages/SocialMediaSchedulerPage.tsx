@@ -6,7 +6,6 @@ import {
   Layers,
   Plus,
   CheckCircle2,
-  Link2,
   Clock,
   ArrowLeft,
   ArrowRight,
@@ -16,14 +15,12 @@ import {
   UserPlus,
   Loader2,
   AlertCircle,
-  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { FaInstagram, FaFacebook, FaLinkedin } from 'react-icons/fa6';
-import { SiThreads } from 'react-icons/si';
 import { toast } from 'sonner';
 import { useCreateClient, useDeleteClient, useClient } from '../hooks/useClients';
 import { useClientContext } from '@/context/ClientContext';
@@ -32,6 +29,10 @@ import { loginMetaBusiness } from '@/features/meta/API/metaBusinessApi';
 
 import { getProfileImageUrl } from '@/utils/imageUtils';
 import type { ClientWithIntegrations, AvailableAccount } from '@/types/client.types';
+import {
+  ConnectPlatformsButton,
+  type ConnectedPlatformIcon,
+} from '@/components/scheduler/ConnectPlatformsButton';
 
 function ClientLogo({ logo, size = 'md' }: { logo?: string | null; size?: 'sm' | 'md' | 'lg' }) {
   const [failed, setFailed] = useState(false);
@@ -65,7 +66,6 @@ const PLATFORMS = [
     comingSoon: false,
   },
   { id: 'linkedin', label: 'LinkedIn', sublabel: null, icon: <FaLinkedin className="w-5 h-5 text-blue-700" />, comingSoon: false },
-  { id: 'threads', label: 'Threads', sublabel: null, icon: <SiThreads className="w-5 h-5 text-black" />, comingSoon: true },
 ];
 
 /* ═══════════════════════════════════════════════════
@@ -831,42 +831,112 @@ function StepWorkspace({
 
   return (
     <div className="w-full h-full flex flex-col bg-zinc-50/30">
-      <div className="bg-white border-b border-zinc-200 px-4 py-2 z-10">
-        <div className="max-w-[1400px] mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-8 h-8 rounded-full border border-zinc-200 overflow-hidden flex items-center justify-center bg-zinc-50 shrink-0">
-              <ClientLogo logo={client.logo} size="sm" />
+      <div className="px-5 py-3 border-b border-zinc-100 bg-white/60 backdrop-blur-sm shrink-0">
+        <div className="max-w-[1400px] mx-auto flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl border border-zinc-100 overflow-hidden flex items-center justify-center bg-zinc-50 shrink-0">
+              <ClientLogo logo={client.logo} size="md" />
             </div>
-            <span className="text-sm font-bold text-zinc-900 truncate">{client.name}</span>
-            <div className="w-px h-4 bg-zinc-200 shrink-0" />
-            {/* Connected platform accounts */}
-            {linkedPages.length > 0 && (
-              <div className="flex items-center gap-2 overflow-hidden">
-                {linkedPages.map((page) => (
-                  <div key={page.accountId} className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-50 border border-zinc-100 shrink-0">
-                    <div className="flex items-center -space-x-0.5">
-                      <FaFacebook className="w-3 h-3 text-blue-600" />
-                      <FaInstagram className="w-3 h-3 text-pink-500" />
-                    </div>
-                    <span className="text-[11px] font-semibold text-zinc-600 truncate max-w-[120px]">
-                      {page.accountName || page.accountIdentifier || 'Meta Page'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {linkedLinkedin.length > 0 && (
-              <div className="flex items-center gap-2 overflow-hidden">
-                {linkedLinkedin.map((page) => (
-                  <div key={page.accountId} className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-50 border border-zinc-100 shrink-0">
-                    <FaLinkedin className="w-3 h-3 text-blue-700" />
-                    <span className="text-[11px] font-semibold text-zinc-600 truncate max-w-[120px]">
-                      {page.accountName || page.accountIdentifier || 'LinkedIn Page'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="min-w-0">
+              <h3 className="font-bold text-sm text-zinc-900 truncate leading-tight">{client.name}</h3>
+              <p className="text-[11px] text-zinc-400 font-medium truncate">Social Media Workspace</p>
+            </div>
+            <div className="w-px h-6 bg-zinc-200 shrink-0 mx-1 hidden sm:block" />
+            <Popover>
+              <PopoverTrigger asChild>
+                <ConnectPlatformsButton
+                  connected={(() => {
+                    const list: ConnectedPlatformIcon[] = [];
+                    if (connectedIds.includes('meta')) {
+                      list.push({
+                        id: 'facebook',
+                        name: 'Facebook',
+                        icon: <FaFacebook className="w-3.5 h-3.5 text-blue-600" />,
+                      });
+                      list.push({
+                        id: 'instagram',
+                        name: 'Instagram',
+                        icon: <FaInstagram className="w-3.5 h-3.5 text-pink-600" />,
+                      });
+                    }
+                    if (connectedIds.includes('linkedin')) {
+                      list.push({
+                        id: 'linkedin',
+                        name: 'LinkedIn',
+                        icon: <FaLinkedin className="w-3.5 h-3.5 text-blue-700" />,
+                      });
+                    }
+                    return list;
+                  })()}
+                />
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-80 p-2 bg-white rounded-xl shadow-lg border border-zinc-200/50"
+                align="start"
+                sideOffset={8}
+              >
+                <div className="mb-3 p-2 bg-zinc-50 rounded-lg border border-zinc-100/50">
+                  <h4 className="font-bold text-sm text-zinc-900 tracking-tight leading-none mb-1">Integrations</h4>
+                  <p className="text-[11px] text-zinc-500 font-medium">Link platforms to enable direct posting.</p>
+                </div>
+                <div className="flex flex-col gap-0.5 max-h-[300px] overflow-y-auto nice-scrollbar">
+                  {PLATFORMS.map((p) => {
+                    const isConnected = connectedIds.includes(p.id);
+                    return (
+                      <div
+                        key={p.id}
+                        className="flex items-center justify-between p-2 rounded-lg hover:bg-zinc-50 transition-colors group border border-transparent hover:border-zinc-100"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="shrink-0 bg-white p-1 rounded-md shadow-sm border border-zinc-100">
+                            {p.icon}
+                          </div>
+                          <div>
+                            <span className="text-[13px] font-bold text-zinc-800 tracking-tight">{p.label}</span>
+                            {p.sublabel && (
+                              <p className="text-[10px] text-zinc-400">{p.sublabel}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="shrink-0 flex items-center">
+                          {p.comingSoon ? (
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-zinc-100 border border-zinc-200/50 shadow-sm">
+                              <Clock className="w-3 h-3 text-zinc-400" />
+                              <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest leading-none">
+                                Soon
+                              </span>
+                            </div>
+                          ) : isConnected ? (
+                            <button
+                              onClick={() => handleDisconnect(p.id)}
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-50 border border-green-200/50 shadow-sm hover:bg-red-50 hover:border-red-200 transition-colors group/btn"
+                            >
+                              <span className="text-[9px] font-bold text-green-700 uppercase tracking-widest leading-none group-hover/btn:hidden">
+                                Linked
+                              </span>
+                              <CheckCircle2 className="w-3 h-3 text-green-600 group-hover/btn:hidden" />
+                              <span className="text-[9px] font-bold text-red-600 uppercase tracking-widest leading-none hidden group-hover/btn:inline">
+                                Remove
+                              </span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleConnect(p.id)}
+                              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800 shadow-sm hover:bg-zinc-800 transition-colors"
+                            >
+                              <Plus className="w-3 h-3 text-white" />
+                              <span className="text-[9px] font-bold text-white uppercase tracking-widest leading-none">
+                                Connect
+                              </span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
           <Button
             variant="outline"
@@ -885,100 +955,6 @@ function StepWorkspace({
           <SocialMediaCalendar
             clientId={client.id}
             canPost={connectedIds.length > 0}
-            headerExtra={
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={`h-10 gap-2 shrink-0 transition-colors ${
-                      connectedIds.length < PLATFORMS.filter(p => !p.comingSoon).length
-                        ? 'bg-amber-50 border-amber-300 hover:bg-amber-100 text-amber-800'
-                        : 'bg-white border-zinc-200 hover:bg-zinc-50'
-                    }`}
-                  >
-                    {connectedIds.length < PLATFORMS.filter(p => !p.comingSoon).length ? (
-                      <AlertTriangle className="w-4 h-4 text-amber-600" />
-                    ) : (
-                      <Link2 className="w-4 h-4" />
-                    )}
-                    Connections
-                    <div className={`ml-1 rounded-lg px-2 py-0.5 text-[9px] font-bold leading-none border flex items-center ${
-                      connectedIds.length < PLATFORMS.filter(p => !p.comingSoon).length
-                        ? 'bg-amber-200/60 text-amber-800 border-amber-300'
-                        : 'bg-zinc-100 text-zinc-600 border-zinc-200 shadow-inner'
-                    }`}>
-                      {connectedIds.length}/{PLATFORMS.length}
-                    </div>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-80 p-2 bg-white rounded-xl shadow-lg border border-zinc-200/50"
-                  align="center"
-                  sideOffset={8}
-                >
-                  <div className="mb-3 p-2 bg-zinc-50 rounded-lg border border-zinc-100/50">
-                    <h4 className="font-bold text-sm text-zinc-900 tracking-tight leading-none mb-1">Integrations</h4>
-                    <p className="text-[11px] text-zinc-500 font-medium">Link platforms to enable direct posting.</p>
-                  </div>
-                  <div className="flex flex-col gap-0.5 max-h-[300px] overflow-y-auto nice-scrollbar">
-                    {PLATFORMS.map((p) => {
-                      const isConnected = connectedIds.includes(p.id);
-                      return (
-                        <div
-                          key={p.id}
-                          className="flex items-center justify-between p-2 rounded-lg hover:bg-zinc-50 transition-colors group border border-transparent hover:border-zinc-100"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <div className="shrink-0 bg-white p-1 rounded-md shadow-sm border border-zinc-100">
-                              {p.icon}
-                            </div>
-                            <div>
-                              <span className="text-[13px] font-bold text-zinc-800 tracking-tight">{p.label}</span>
-                              {p.sublabel && (
-                                <p className="text-[10px] text-zinc-400">{p.sublabel}</p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="shrink-0 flex items-center">
-                            {p.comingSoon ? (
-                              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-zinc-100 border border-zinc-200/50 shadow-sm">
-                                <Clock className="w-3 h-3 text-zinc-400" />
-                                <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest leading-none">
-                                  Soon
-                                </span>
-                              </div>
-                            ) : isConnected ? (
-                              <button
-                                onClick={() => handleDisconnect(p.id)}
-                                className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-50 border border-green-200/50 shadow-sm hover:bg-red-50 hover:border-red-200 transition-colors group/btn"
-                              >
-                                <span className="text-[9px] font-bold text-green-700 uppercase tracking-widest leading-none group-hover/btn:hidden">
-                                  Linked
-                                </span>
-                                <CheckCircle2 className="w-3 h-3 text-green-600 group-hover/btn:hidden" />
-                                <span className="text-[9px] font-bold text-red-600 uppercase tracking-widest leading-none hidden group-hover/btn:inline">
-                                  Remove
-                                </span>
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleConnect(p.id)}
-                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800 shadow-sm hover:bg-zinc-800 transition-colors"
-                              >
-                                <Plus className="w-3 h-3 text-white" />
-                                <span className="text-[9px] font-bold text-white uppercase tracking-widest leading-none">
-                                  Connect
-                                </span>
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </PopoverContent>
-              </Popover>
-            }
           />
         </div>
       </div>
@@ -997,16 +973,21 @@ export default function SocialMediaSchedulerPage() {
 
   // Sync URL clientId with state on mount or change
   useEffect(() => {
-    if (urlClientId && allClients.length > 0) {
-      const client = allClients.find(c => String(c.id) === urlClientId);
-      if (client && (!currentClient || currentClient.id !== client.id)) {
-        console.log("DEBUG - Syncing client from URL:", urlClientId);
-        _setCurrentClient(client as ClientWithIntegrations);
-        const hasIntegrations = client.integrations && client.integrations.length > 0;
-        setCurrentStep(hasIntegrations ? 'workspace' : 'connect-platforms');
-      }
+    if (!urlClientId || allClients.length === 0) return;
+    const client = allClients.find(c => String(c.id) === urlClientId);
+    if (!client) return;
+
+    if (!currentClient || currentClient.id !== client.id) {
+      _setCurrentClient(client as ClientWithIntegrations);
     }
-  }, [urlClientId, allClients.length]); // depend on clients.length to ensure list is loaded
+
+    // Always advance past the select-client step when the URL carries a clientId,
+    // even if currentClient already matches (e.g. sidebar pre-selected the same client).
+    if (currentStep === 'select-client') {
+      const hasIntegrations = client.integrations && client.integrations.length > 0;
+      setCurrentStep(hasIntegrations ? 'workspace' : 'connect-platforms');
+    }
+  }, [urlClientId, allClients.length, currentClient?.id, currentStep]);
 
   // Wrap setCurrentClient to persist lastClientId, update URL, and reset the post draft.
   // This ensures no form state bleeds across client switches.
@@ -1141,7 +1122,7 @@ export default function SocialMediaSchedulerPage() {
   };
 
   return (
-    <div className="w-full h-screen flex flex-col overflow-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
+    <div className="w-full h-screen flex flex-col overflow-hidden bg-white">
       <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
         <div className="w-full h-full flex flex-col relative">
           <div className="flex-1 overflow-y-auto relative h-full">

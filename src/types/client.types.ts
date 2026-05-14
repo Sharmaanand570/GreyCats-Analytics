@@ -11,7 +11,9 @@ export type IntegrationType =
   | 'google-analytics'
   | 'google-ads'
   | 'twitter'
-  | 'linkedin';
+  | 'linkedin'
+  | 'wordpress'
+  | 'telegram';
 
 export interface Client {
   id: number;
@@ -74,7 +76,7 @@ export interface AvailableAccount {
 
 export interface ConnectedIntegration {
   integrationType: IntegrationType;
-  accountId: number;
+  accountId: number | string;
   accountName: string;
   accountIdentifier: string;
   connectedAt: string;

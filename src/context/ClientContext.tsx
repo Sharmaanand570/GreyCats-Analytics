@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { useParams } from 'react-router-dom';
 import type { ClientWithIntegrations } from '../types/client.types';
 
 interface ClientContextType {
@@ -21,19 +20,6 @@ export const ClientProvider: React.FC<ClientProviderProps> = ({ children }) => {
     const [currentClient, setCurrentClient] = useState<ClientWithIntegrations | null>(null);
     const [clients, setClients] = useState<ClientWithIntegrations[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const { clientId } = useParams<{ clientId: string }>();
-
-    // Sync current client from URL
-    useEffect(() => {
-        if (clientId && clients.length > 0) {
-            const client = clients.find((c) => c.id === parseInt(clientId));
-            if (client) {
-                setCurrentClient(client);
-                // Persist last selected client
-                localStorage.setItem('lastClientId', clientId);
-            }
-        }
-    }, [clientId, clients]);
 
     // Restore last selected client on mount
     useEffect(() => {

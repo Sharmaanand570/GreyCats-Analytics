@@ -1,6 +1,6 @@
-export type BroadcastChannel = 'SMS' | 'EMAIL';
+export type BroadcastChannel = 'SMS' | 'EMAIL' | 'TELEGRAM';
 export type BroadcastStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'RUNNING';
-export type BroadcastProvider = 'TWILIO' | 'ADBIZZ' | 'MSG91' | 'SHARED' | 'SMTP';
+export type BroadcastProvider = 'TWILIO' | 'ADBIZZ' | 'MSG91' | 'SHARED' | 'SMTP' | 'TELEGRAM';
 export type TemplateStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface BroadcastOwner {
@@ -18,6 +18,7 @@ export interface Broadcast {
   templateId?: number;
   template?: BroadcastTemplate;
   integrationId?: number;
+  clientId?: number | null;
   status: BroadcastStatus;
   sentCount: number;
   failedCount: number;
@@ -45,6 +46,7 @@ export interface BroadcastIntegration {
   provider: BroadcastProvider;
   name: string;
   isDefault: boolean;
+  clientId?: number | null;
   config: Record<string, any>;
   createdAt: string;
   user?: BroadcastOwner; // Only present on admin endpoints
@@ -54,8 +56,12 @@ export interface CreateBroadcastPayload {
   name: string;
   channel: BroadcastChannel;
   subject?: string;
-  templateId: number;
+  /** Required for SMS / EMAIL. Telegram uses `message` instead. */
+  templateId?: number;
   integrationId?: number;
+  clientId?: number;
+  /** Plain-text body used by Telegram broadcasts (no template). */
+  message?: string;
   recipients: string[];
 }
 
@@ -66,6 +72,7 @@ export interface CreateBroadcastCsvPayload {
   subject?: string;
   templateId: number;
   columnName?: string;
+  clientId?: number;
 }
 
 export interface CreateTemplateRequest {
@@ -80,6 +87,7 @@ export interface CreateIntegrationRequest {
   provider: BroadcastProvider;
   name: string;
   isDefault?: boolean;
+  clientId?: number;
   config: Record<string, any>;
 }
 

@@ -235,6 +235,29 @@ export const CURATED_DEFAULTS: Record<string, string[]> = {
     "linkedin.followers",
     "linkedin.recent_posts",
   ],
+  "broadcast": [
+    "broadcast.total",
+    "broadcast.sent",
+    "broadcast.failed",
+    "broadcast.successRate",
+    "broadcast.sms",
+    "broadcast.email",
+    "broadcast.telegram",
+    "broadcast.perDay",
+    "broadcast.channelSplit",
+    "broadcast.recent",
+  ],
+  "blog": [
+    "blog.published",
+    "blog.scheduled",
+    "blog.failed",
+    "blog.totalViews",
+    "blog.wordpress",
+    "blog.linkedin",
+    "blog.postingCadence",
+    "blog.postsByPlatform",
+    "blog.recent",
+  ],
 };
 
 export const MAX_DEFAULT_WIDGETS = 25;
@@ -893,6 +916,94 @@ export const INTEGRATION_TEMPLATES: Record<string, IntegrationTemplate> = {
           ]
         }
       },
+    ]
+  },
+
+  // BROADCAST OUTREACH
+  'broadcast': {
+    widgets: [],
+    slides: [
+      {
+        name: 'Broadcast Outreach',
+        widgets: [
+          // Row 1: Messages Per Day (stacked-by-channel line chart) — full width
+          { type: 'line_chart', metricKey: 'broadcast.perDay', x: 0, y: 0, w: 12, h: 5, displayName: 'Messages Per Day', groupBy: 'day' },
+
+          // Row 2: 4 KPI cards
+          { type: 'metric', metricKey: 'broadcast.total',       x: 0, y: 5, w: 3, h: 3, displayName: 'Total Messages' },
+          { type: 'metric', metricKey: 'broadcast.sent',        x: 3, y: 5, w: 3, h: 3, displayName: 'Sent Messages' },
+          { type: 'metric', metricKey: 'broadcast.failed',      x: 6, y: 5, w: 3, h: 3, displayName: 'Failed Messages' },
+          { type: 'metric', metricKey: 'broadcast.successRate', x: 9, y: 5, w: 3, h: 3, displayName: 'Success Rate', unit: '%' },
+
+          // Row 3: 3 per-channel KPIs + channel split donut
+          { type: 'metric', metricKey: 'broadcast.sms',      x: 0, y: 8, w: 3, h: 4, displayName: 'SMS Sent' },
+          { type: 'metric', metricKey: 'broadcast.email',    x: 3, y: 8, w: 3, h: 4, displayName: 'Email Sent' },
+          { type: 'metric', metricKey: 'broadcast.telegram', x: 6, y: 8, w: 3, h: 4, displayName: 'Telegram Sent' },
+          { type: 'pie_chart', metricKey: 'broadcast.channelSplit', x: 9, y: 8, w: 3, h: 4, displayName: 'Channel Split', chartType: 'pie' },
+
+          // Row 4: Recent campaigns table
+          {
+            type: 'table',
+            metricKey: 'broadcast.recent',
+            x: 0, y: 12, w: 12, h: 7,
+            displayName: 'Recent Campaigns',
+            groupBy: 'none',
+            customConfig: {
+              columns: [
+                { name: 'Date', width: '14%', dataKey: 'date' },
+                { name: 'Name', width: '30%', dataKey: 'name' },
+                { name: 'Channel', width: '12%', dataKey: 'channel' },
+                { name: 'Status', width: '12%', dataKey: 'status' },
+                { name: 'Sent', width: '8%', dataKey: 'sent' },
+                { name: 'Total', width: '8%', dataKey: 'total' },
+                { name: 'Failed', width: '8%', dataKey: 'failed' },
+              ]
+            }
+          },
+        ]
+      }
+    ]
+  },
+
+  // BLOG SYSTEM
+  'blog': {
+    widgets: [],
+    slides: [
+      {
+        name: 'Blog System',
+        widgets: [
+          // Row 1: Posting Cadence — full width
+          { type: 'line_chart', metricKey: 'blog.postingCadence', x: 0, y: 0, w: 12, h: 5, displayName: 'Posting Cadence', groupBy: 'day' },
+
+          // Row 2: 4 KPI cards
+          { type: 'metric', metricKey: 'blog.published',  x: 0, y: 5, w: 3, h: 3, displayName: 'Posts Published' },
+          { type: 'metric', metricKey: 'blog.scheduled',  x: 3, y: 5, w: 3, h: 3, displayName: 'Posts Scheduled' },
+          { type: 'metric', metricKey: 'blog.failed',     x: 6, y: 5, w: 3, h: 3, displayName: 'Posts Failed' },
+          { type: 'metric', metricKey: 'blog.totalViews', x: 9, y: 5, w: 3, h: 3, displayName: 'Total Views' },
+
+          // Row 3: per-platform KPIs + posts-by-platform donut
+          { type: 'metric', metricKey: 'blog.wordpress', x: 0, y: 8, w: 4, h: 4, displayName: 'WordPress Posts' },
+          { type: 'metric', metricKey: 'blog.linkedin',  x: 4, y: 8, w: 4, h: 4, displayName: 'LinkedIn Posts' },
+          { type: 'pie_chart',  metricKey: 'blog.postsByPlatform', x: 8, y: 8, w: 4, h: 4, displayName: 'Posts By Platform', chartType: 'pie' },
+
+          // Row 4: Recent posts table
+          {
+            type: 'table',
+            metricKey: 'blog.recent',
+            x: 0, y: 12, w: 12, h: 7,
+            displayName: 'Recent Posts',
+            groupBy: 'none',
+            customConfig: {
+              columns: [
+                { name: 'Date',      width: '20%', dataKey: 'date' },
+                { name: 'Title',     width: '40%', dataKey: 'title' },
+                { name: 'Platforms', width: '20%', dataKey: 'platforms' },
+                { name: 'Status',    width: '20%', dataKey: 'status' },
+              ]
+            }
+          },
+        ]
+      }
     ]
   },
 

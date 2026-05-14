@@ -102,6 +102,34 @@ function MainSideBar(): React.JSX.Element {
 
   const navigate = useNavigate();
 
+  // Decide whether a sidebar item should appear active for the current path.
+  // Explicit per-item rules so /clients/:id/reports highlights "Reports" (not "Clients").
+  const isItemActive = (itemPath: string, pathname: string): boolean => {
+    if (itemPath === '/clients') {
+      // Clients root, client detail, or client edit-dashboard — but NOT /clients/:id/reports
+      return /^\/clients(\/\d+)?(\/edit-dashboard)?$/.test(pathname);
+    }
+    if (itemPath === '/reports') {
+      return pathname.startsWith('/reports') || /^\/clients\/\d+\/reports/.test(pathname);
+    }
+    if (itemPath === '/alerts') {
+      return pathname.startsWith('/alerts');
+    }
+    if (itemPath === '/social-media/scheduler') {
+      return pathname.startsWith('/social-media');
+    }
+    if (itemPath === '/blog/scheduler') {
+      return pathname.startsWith('/blog');
+    }
+    if (itemPath === '/broadcasts') {
+      return pathname.startsWith('/broadcasts');
+    }
+    if (itemPath === '/admin/dashboard') {
+      return pathname.startsWith('/admin');
+    }
+    return pathname === itemPath || pathname.startsWith(itemPath + '/');
+  };
+
   const handleLogout = () => {
     // 1. Clear React Query Cache (removes all cached data like clients, user profile, etc.)
     queryClient.removeQueries();
@@ -131,7 +159,8 @@ function MainSideBar(): React.JSX.Element {
 
     // Append clientId to scheduler paths if available
     let finalPath = path;
-    if (currentClient?.id && (path.includes("social-media/scheduler") || path.includes("blog/scheduler"))) {
+    const schedulerPaths = ["social-media/scheduler", "blog/scheduler", "broadcasts"];
+    if (currentClient?.id && schedulerPaths.some(p => path.includes(p))) {
       finalPath = `${path}/${currentClient.id}`;
     }
 
@@ -241,10 +270,12 @@ function MainSideBar(): React.JSX.Element {
                 </SidebarGroupLabel>
               </SidebarGroup>
 
-              {/* Client Selector Area */}
-              <div className={`transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] mb-6 ${collabsState ? "px-0 flex justify-center" : "px-2"}`}>
-                <ClientSelector isCollapsed={collabsState} />
-              </div>
+              {/* Client Selector Area — hidden on non-client pages like Broadcasts */}
+              {!location.pathname.startsWith('/broadcasts') && (
+                <div className={`transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] mb-6 ${collabsState ? "px-0 flex justify-center" : "px-2"}`}>
+                  <ClientSelector isCollapsed={collabsState} />
+                </div>
+              )}
 
               {/* Menu Groups */}
               {menuGroups.map((group) => {
@@ -286,9 +317,7 @@ function MainSideBar(): React.JSX.Element {
                             } ${!collabsState
                               ? "px-4"
                               : "flex justify-center items-center"
-                              } ${(item.path !== "/" &&
-                                activeTab.startsWith(item.path)) ||
-                                item.path === activeTab
+                              } ${isItemActive(item.path, activeTab)
                                 ? "bg-zinc-800 text-white"
                                 : "text-zinc-300"
                               }`}
@@ -329,7 +358,7 @@ function MainSideBar(): React.JSX.Element {
                 >
                   <div className="relative flex-shrink-0">
                     <Avatar className="h-9 w-9 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:scale-110">
-                      <AvatarImage src={getProfileImageUrl(user?.profilePicture)} alt={user?.fullName} />
+                      <AvatarImage src={getProfileImageUrl(user?.profilePicture || user?.companyLogo)} alt={user?.fullName} />
                       <AvatarFallback className="bg-zinc-700 text-xs font-medium text-zinc-100">
                         {userInitials}
                       </AvatarFallback>
@@ -440,7 +469,7 @@ function MainSideBar(): React.JSX.Element {
                           onClick={() => handleChangeURL(item.path, (item as any).isComingSoon)}
                           className={`flex items-center justify-between w-full px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:translate-x-1 ${
                             (item as any).isComingSoon ? "opacity-50 cursor-not-allowed" : ""
-                          } ${activeTab === item.path
+                          } ${isItemActive(item.path, activeTab)
                             ? "bg-zinc-800 translate-x-1 text-white"
                             : "text-zinc-300"
                             }`}
@@ -476,7 +505,7 @@ function MainSideBar(): React.JSX.Element {
                   className="flex items-center gap-3 mt-4 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:opacity-80 cursor-pointer"
                 >
                   <Avatar className="h-9 w-9 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-110">
-                    <AvatarImage src={getProfileImageUrl(user?.profilePicture)} alt={user?.fullName} />
+                    <AvatarImage src={getProfileImageUrl(user?.profilePicture || user?.companyLogo)} alt={user?.fullName} />
                     <AvatarFallback className="bg-zinc-600 text-xs font-medium text-white">
                       {userInitials}
                     </AvatarFallback>

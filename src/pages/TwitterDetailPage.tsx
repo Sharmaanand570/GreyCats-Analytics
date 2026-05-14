@@ -42,10 +42,11 @@ const TwitterDetailPage = () => {
     const { data: clientData } = useClient(parsedClientId || null);
     const accountId = clientData?.integrations?.find(i => i.integrationType === 'twitter')?.accountId;
 
+    const parsedAccountId = typeof accountId === 'number' ? accountId : accountId ? parseInt(accountId as string) || undefined : undefined;
     const {
         data: profileResponse,
         isLoading: isLoadingProfile,
-    } = useTwitterProfile(accountId);
+    } = useTwitterProfile(parsedAccountId);
 
     const account = profileResponse?.profile || summaryData?.account;
     const summary = summaryData?.summary;
