@@ -13,7 +13,9 @@ import {
   approveTemplate,
   listIntegrations,
   listAdminIntegrations,
-  createIntegration
+  createIntegration,
+  deleteIntegration,
+  deleteAdminIntegration
 } from '../api/broadcastApi';
 import type { 
   CreateBroadcastPayload, 
@@ -36,9 +38,9 @@ export const useBroadcasts = (clientId?: number) => {
     queryKey: ['broadcasts', clientId],
     queryFn: () => listBroadcasts(clientId),
     refetchInterval: (query) => {
-      // If any campaign is PROCESSING, poll every 5 seconds
-      const hasProcessing = query?.state?.data?.some(b => b.status === 'PROCESSING');
-      return hasProcessing ? 5000 : false;
+      // If any campaign is PROCESSING or RUNNING, poll every 5 seconds
+      const hasActive = query?.state?.data?.some(b => b.status === 'PROCESSING' || b.status === 'RUNNING');
+      return hasActive ? 5000 : 60000; // 5s if active, 60s default
     }
   });
 };
@@ -48,8 +50,8 @@ export const useAdminBroadcasts = () => {
     queryKey: ['broadcasts-admin'],
     queryFn: listAdminBroadcasts,
     refetchInterval: (query) => {
-      const hasProcessing = query?.state?.data?.some(b => b.status === 'PROCESSING');
-      return hasProcessing ? 5000 : false;
+      const hasActive = query?.state?.data?.some(b => b.status === 'PROCESSING' || b.status === 'RUNNING');
+      return hasActive ? 5000 : 60000;
     }
   });
 };
@@ -211,6 +213,36 @@ export const useCreateIntegration = () => {
     },
     onError: (error: any) => {
       toast.error(extractError(error, 'Failed to connect provider'));
+    }
+  });
+};
+
+export const useDeleteIntegration = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteIntegration(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['broadcast-integrations'] });
+      queryClient.invalidateQueries({ queryKey: ['broadcast-integrations-admin'] });
+      toast.success('Provider disconnected successfully');
+    },
+    onError: (error: any) => {
+      toast.error(extractError(error, 'Failed to disconnect provider'));
+    }
+  });
+};
+
+export const useAdminDeleteIntegration = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteAdminIntegration(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['broadcast-integrations'] });
+      queryClient.invalidateQueries({ queryKey: ['broadcast-integrations-admin'] });
+      toast.success('Provider forcefully deleted across the system');
+    },
+    onError: (error: any) => {
+      toast.error(extractError(error, 'Failed to delete provider as admin'));
     }
   });
 };

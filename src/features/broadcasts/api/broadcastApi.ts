@@ -178,3 +178,18 @@ export const listAdminIntegrations = async (): Promise<BroadcastIntegration[]> =
   const response = await api.get('/broadcasts/admin/integrations');
   return pickList<BroadcastIntegration>(response.data, 'integrations');
 };
+/**
+ * Delete a provider integration.
+ * DELETE /broadcasts/integrations/:id
+ */
+export const deleteIntegration = async (id: number): Promise<void> => {
+  await api.delete(`/broadcasts/integrations/${id}`);
+};
+
+/**
+ * Admin: forcefully delete a provider integration.
+ * DELETE /broadcasts/admin/integrations/:id
+ */
+export const deleteAdminIntegration = async (id: number): Promise<void> => {
+  await api.delete(`/broadcasts/admin/integrations/${id}`);
+};

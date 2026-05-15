@@ -272,7 +272,7 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
       _isTelegramTarget: true,
     }));
 
-    const broadcastExtras = (broadcastIntegrations || []).map(b => ({
+    const broadcastExtras = (broadcastIntegrations || []).map((b: any) => ({
       integrationType: b.type === 'SMS' ? 'broadcast-sms' : 'broadcast-email',
       accountId: String(b.id),
       accountName: b.name,

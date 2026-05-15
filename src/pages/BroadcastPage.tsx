@@ -18,13 +18,15 @@ import {
   ArrowRight,
   Trash2,
   Users,
-  UserPlus
+  UserPlus,
+  RefreshCcw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 import { useBroadcasts } from '@/features/broadcasts/hooks/useBroadcasts';
 import { CreateBroadcastModal } from '@/features/broadcasts/components/CreateBroadcastModal';
@@ -34,7 +36,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { useClientContext } from '@/context/ClientContext';
 import { useBroadcastStore } from '@/store/useBroadcastStore';
-import { useCreateClient, useDeleteClient, useClient } from '../hooks/useClients';
+import { useCreateClient, useDeleteClient, useClient, useClients } from '../hooks/useClients';
 import { getProfileImageUrl } from '@/utils/imageUtils';
 import type { ClientWithIntegrations } from '@/types/client.types';
 
@@ -405,7 +407,7 @@ function StepWorkspace({
   client: ClientWithIntegrations;
   onSwitchWorkspace: () => void;
 }) {
-  const { data: broadcasts, isLoading } = useBroadcasts(client.id);
+  const { data: broadcasts, isLoading, refetch, isRefetching } = useBroadcasts(client.id);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -513,10 +515,24 @@ function StepWorkspace({
                       className="w-full pl-11 pr-4 py-3 bg-white border border-zinc-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                     />
                   </div>
-                  <Button variant="outline" className="rounded-xl border-zinc-200 text-zinc-600 font-bold text-xs h-10 px-4">
-                    <Filter className="w-3.5 h-3.5 mr-2" />
-                    Filter
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        toast.info('Refreshing campaigns...');
+                        refetch();
+                      }} 
+                      disabled={isLoading || isRefetching}
+                      className="rounded-xl border-zinc-200 text-zinc-600 font-bold text-xs h-10 px-4 gap-2"
+                    >
+                      <RefreshCcw className={cn("w-3.5 h-3.5", (isLoading || isRefetching) && "animate-spin")} />
+                      {isRefetching ? 'Refetching...' : 'Refresh'}
+                    </Button>
+                    <Button variant="outline" className="rounded-xl border-zinc-200 text-zinc-600 font-bold text-xs h-10 px-4">
+                      <Filter className="w-3.5 h-3.5 mr-2" />
+                      Filter
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -639,7 +655,9 @@ export default function BroadcastPage() {
   const { clientId: urlClientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const { currentStep, setCurrentStep } = useBroadcastStore();
-  const { currentClient, setCurrentClient: _setCurrentClient, clients: allClients, isLoading: isLoadingClients } = useClientContext();
+  const { currentClient, setCurrentClient: _setCurrentClient, clients: allClients, isLoading: isLoadingContext } = useClientContext();
+  const { isLoading: isLoadingClientsFetch } = useClients();
+  const isLoadingClients = isLoadingContext || isLoadingClientsFetch;
 
   const [subStep, setSubStep] = useState<'main' | 'create' | 'existing'>('main');
 

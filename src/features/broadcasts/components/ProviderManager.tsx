@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { useIntegrations, useAdminIntegrations, useCreateIntegration } from '../hooks/useBroadcasts';
+import { 
+  useIntegrations, 
+  useAdminIntegrations, 
+  useCreateIntegration,
+  useDeleteIntegration,
+  useAdminDeleteIntegration
+} from '../hooks/useBroadcasts';
 import { useConnectTelegram, useTelegramTargets } from '@/features/blog/hooks/useBlogPosts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -17,10 +23,10 @@ import {
   AlertCircle,
   X,
   ChevronDown,
-  CheckCircle2,
-  Building2
+  Building2,
+  Trash2
 } from 'lucide-react';
-import type { BroadcastChannel, BroadcastProvider } from '../api/types';
+import type { BroadcastChannel, BroadcastProvider, BroadcastIntegration } from '../api/types';
 import { cn } from '@/lib/utils';
 import { useClientContext } from '@/context/ClientContext';
 
@@ -34,7 +40,10 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
   const userQuery = useIntegrations(clientId);
   const adminQuery = useAdminIntegrations();
   const { data: integrations, isLoading } = admin ? adminQuery : userQuery;
+  
   const createIntegration = useCreateIntegration();
+  const deleteIntegrationMutation = useDeleteIntegration();
+  const adminDeleteIntegrationMutation = useAdminDeleteIntegration();
   const connectTelegramMutation = useConnectTelegram();
   const { data: telegramTargets = [], isLoading: isLoadingTelegram } = useTelegramTargets(
     admin ? undefined : clientId
@@ -65,11 +74,6 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
   const [error, setError] = useState<string | null>(null);
   const smtpFieldsRef = useRef<HTMLDivElement | null>(null);
 
-  const activePreset: 'gmail' | 'outlook' | 'zoho' | null =
-    smtpHost === 'smtp.gmail.com' && smtpPort === '587' && !smtpSecure ? 'gmail' :
-    smtpHost === 'smtp-mail.outlook.com' && smtpPort === '587' && !smtpSecure ? 'outlook' :
-    smtpHost === 'smtp.zoho.com' && smtpPort === '465' && smtpSecure ? 'zoho' :
-    null;
 
   const applyPreset = (preset: 'gmail' | 'outlook' | 'zoho') => {
     if (preset === 'gmail') {
@@ -91,36 +95,67 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
       return;
     }
 
+    // Real-time validation for UI feedback
     if (name && name.length < 3) {
-      setError('Integration name is too short');
+      setError('Integration name must be at least 3 characters');
       return;
     }
 
-    if (provider === 'ADBIZZ') {
-      if (adbizzUser && adbizzUser.length < 3) setError('Invalid Adbizz Username');
+    if (provider === 'TWILIO') {
+      if (twilioSid && !twilioSid.startsWith('AC')) setError('Twilio SID must start with AC');
+      else if (twilioToken && twilioToken.length < 10) setError('Invalid Auth Token length');
+      else setError(null);
+    } else if (provider === 'MSG91') {
+      if (msg91Key && msg91Key.length < 10) setError('Invalid MSG91 Key');
+      else setError(null);
+    } else if (provider === 'ADBIZZ') {
+      if (adbizzUser && adbizzUser.length < 3) setError('Adbizz Username too short');
       else if (adbizzKey && adbizzKey.length < 10) setError('Invalid API Key');
       else setError(null);
     } else if (provider === 'SMTP') {
-      if (smtpHost && !smtpHost.includes('.')) setError('Invalid SMTP Host');
-      else if (smtpPort && isNaN(Number(smtpPort))) setError('Port must be a number');
-      else if (smtpUser && !smtpUser.includes('@')) setError('Username should be an email');
+      if (smtpHost && !smtpHost.includes('.')) setError('Invalid SMTP Host format');
+      else if (smtpPort && isNaN(Number(smtpPort))) setError('Port must be a valid number');
+      else setError(null);
+    } else if (provider === 'TELEGRAM') {
+      if (tgBotToken && !tgBotToken.includes(':')) setError('Invalid Bot Token format');
       else setError(null);
     } else {
       setError(null);
     }
-  }, [name, provider, adbizzUser, adbizzKey, smtpHost, smtpPort, smtpUser, isCreating]);
+  }, [name, provider, twilioSid, twilioToken, adbizzUser, adbizzKey, smtpHost, smtpPort, tgBotToken, isCreating]);
+
+  const validateForm = () => {
+    if (!name.trim() || name.length < 3) { toast.error('Valid integration name is required'); return false; }
+    
+    if (provider === 'TWILIO') {
+      if (!twilioSid.startsWith('AC')) { toast.error('Invalid Twilio SID'); return false; }
+      if (!twilioToken) { toast.error('Twilio Token is required'); return false; }
+      if (!twilioFrom) { toast.error('Twilio From Number is required'); return false; }
+    } else if (provider === 'MSG91') {
+      if (!msg91Key) { toast.error('MSG91 Auth Key is required'); return false; }
+      if (!msg91Sender) { toast.error('MSG91 Sender ID is required'); return false; }
+    } else if (provider === 'ADBIZZ') {
+      if (!adbizzUser) { toast.error('Adbizz Username is required'); return false; }
+      if (!adbizzKey) { toast.error('Adbizz API Key is required'); return false; }
+      if (!adbizzSender) { toast.error('Adbizz Sender name is required'); return false; }
+    } else if (provider === 'SMTP') {
+      if (!smtpHost) { toast.error('SMTP Host is required'); return false; }
+      if (!smtpPort) { toast.error('SMTP Port is required'); return false; }
+      if (!smtpUser) { toast.error('SMTP Username is required'); return false; }
+      if (!smtpPass) { toast.error('SMTP Password is required'); return false; }
+    } else if (provider === 'TELEGRAM') {
+      if (!tgBotToken.includes(':')) { toast.error('Invalid Telegram Bot Token'); return false; }
+      if (!tgChatId) { toast.error('Telegram Channel ID is required'); return false; }
+    }
+    return true;
+  };
 
   const handleSubmit = async () => {
-    if (!name.trim()) {
-      setError('Integration name is required');
-      return;
-    }
+    if (!validateForm()) return;
 
     // Telegram credentials live in the TelegramAccount table on the backend,
     // not in BroadcastIntegration — route through the blog-side endpoint.
     if (provider === 'TELEGRAM') {
-      if (!tgBotToken.trim()) { setError('Bot token is required'); return; }
-      if (!tgChatId.trim()) { setError('Channel ID is required'); return; }
       try {
         await connectTelegramMutation.mutateAsync({
           botToken: tgBotToken.trim(),
@@ -163,7 +198,17 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
   const clientNameById = (id?: number | null) =>
     id ? (clients.find(c => c.id === id)?.name ?? `Client #${id}`) : null;
 
-  const renderIntegrationCard = (i: any) => {
+  const handleDelete = (id: number, name: string) => {
+    if (window.confirm(`Are you sure you want to disconnect "${name}"?`)) {
+      if (admin) {
+        adminDeleteIntegrationMutation.mutate(id);
+      } else {
+        deleteIntegrationMutation.mutate(id);
+      }
+    }
+  };
+
+  const renderIntegrationCard = (i: BroadcastIntegration) => {
     const isSms = i.type === 'SMS';
     const scopedClientName = clientNameById(i.clientId);
     return (
@@ -176,6 +221,14 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
             <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
             Active
           </div>
+
+          <button
+            onClick={() => handleDelete(i.id, i.name)}
+            className="absolute top-10 right-4 w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 hover:rotate-90 transition-all opacity-0 group-hover:opacity-100"
+            title="Disconnect integration"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
 
           <div className="flex items-center gap-6 mb-8 mt-2">
             <div className={cn(
@@ -232,22 +285,30 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
   };
 
   const renderConfigFields = () => {
-    const inputClasses = "w-full px-5 py-4 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all";
-    const labelClasses = "text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-1";
+    const inputClasses = "w-full px-5 py-4 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none";
+    const labelClasses = "text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.2em] ml-1 flex items-center gap-1";
+
+    const errorDisplay = error && (
+      <div className="col-span-full flex items-center gap-2 mb-2 animate-in slide-in-from-top-1 duration-300">
+        <AlertCircle className="w-3.5 h-3.5 text-red-500" />
+        <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">{error}</p>
+      </div>
+    );
 
     if (provider === 'TWILIO') {
       return (
         <>
+          {errorDisplay}
           <div className="space-y-3">
-            <label className={labelClasses}>Account SID</label>
+            <label className={labelClasses}>Account SID <span className="text-red-500">*</span></label>
             <input type="text" value={twilioSid} onChange={e => setTwilioSid(e.target.value)} className={inputClasses} placeholder="AC..." />
           </div>
           <div className="space-y-3">
-            <label className={labelClasses}>Auth Token</label>
+            <label className={labelClasses}>Auth Token <span className="text-red-500">*</span></label>
             <input type="password" value={twilioToken} onChange={e => setTwilioToken(e.target.value)} className={inputClasses} placeholder="••••••••" />
           </div>
           <div className="space-y-3">
-            <label className={labelClasses}>From Number</label>
+            <label className={labelClasses}>From Number <span className="text-red-500">*</span></label>
             <input type="text" value={twilioFrom} onChange={e => setTwilioFrom(e.target.value)} className={inputClasses} placeholder="+1..." />
           </div>
         </>
@@ -256,13 +317,33 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
     if (provider === 'MSG91') {
       return (
         <>
+          {errorDisplay}
           <div className="space-y-3">
-            <label className={labelClasses}>Auth Key</label>
+            <label className={labelClasses}>Auth Key <span className="text-red-500">*</span></label>
             <input type="password" value={msg91Key} onChange={e => setMsg91Key(e.target.value)} className={inputClasses} placeholder="••••••••" />
           </div>
           <div className="space-y-3">
-            <label className={labelClasses}>Sender ID</label>
+            <label className={labelClasses}>Sender ID <span className="text-red-500">*</span></label>
             <input type="text" value={msg91Sender} onChange={e => setMsg91Sender(e.target.value)} className={inputClasses} placeholder="GRYCAT" />
+          </div>
+        </>
+      );
+    }
+    if (provider === 'ADBIZZ') {
+      return (
+        <>
+          {errorDisplay}
+          <div className="space-y-3">
+            <label className={labelClasses}>Adbizz Username <span className="text-red-500">*</span></label>
+            <input type="text" value={adbizzUser} onChange={e => setAdbizzUser(e.target.value)} className={inputClasses} placeholder="Your username" />
+          </div>
+          <div className="space-y-3">
+            <label className={labelClasses}>API Key <span className="text-red-500">*</span></label>
+            <input type="password" value={adbizzKey} onChange={e => setAdbizzKey(e.target.value)} className={inputClasses} placeholder="••••••••" />
+          </div>
+          <div className="space-y-3">
+            <label className={labelClasses}>Sender ID <span className="text-red-500">*</span></label>
+            <input type="text" value={adbizzSender} onChange={e => setAdbizzSender(e.target.value)} className={inputClasses} placeholder="GREYCATS" />
           </div>
         </>
       );
@@ -270,8 +351,9 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
     if (provider === 'TELEGRAM') {
       return (
         <>
+          {errorDisplay}
           <div className="space-y-3">
-            <label className={labelClasses}>Bot Token</label>
+            <label className={labelClasses}>Bot Token <span className="text-red-500">*</span></label>
             <input
               type="password"
               value={tgBotToken}
@@ -281,7 +363,7 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
             />
           </div>
           <div className="space-y-3">
-            <label className={labelClasses}>Channel ID / Username</label>
+            <label className={labelClasses}>Channel ID / Username <span className="text-red-500">*</span></label>
             <input
               type="text"
               value={tgChatId}
@@ -312,154 +394,87 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
     if (provider === 'SMTP') {
       return (
         <div className="space-y-8 col-span-full">
-          <div className="flex items-center flex-wrap gap-3 p-4 bg-indigo-50 dark:bg-indigo-500/5 rounded-2xl border border-indigo-100 dark:border-indigo-500/10">
-            <Button
-              variant={activePreset === 'gmail' ? 'default' : 'outline'}
-              size="sm"
-              className={cn(
-                'rounded-xl font-bold',
-                activePreset === 'gmail' && 'bg-indigo-600 hover:bg-indigo-700 text-white'
-              )}
-              onClick={() => applyPreset('gmail')}
-            >
-              {activePreset === 'gmail' && <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />}
-              Gmail Preset
-            </Button>
-            <Button
-              variant={activePreset === 'outlook' ? 'default' : 'outline'}
-              size="sm"
-              className={cn(
-                'rounded-xl font-bold',
-                activePreset === 'outlook' && 'bg-indigo-600 hover:bg-indigo-700 text-white'
-              )}
-              onClick={() => applyPreset('outlook')}
-            >
-              {activePreset === 'outlook' && <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />}
-              Outlook Preset
-            </Button>
-            <Button
-              variant={activePreset === 'zoho' ? 'default' : 'outline'}
-              size="sm"
-              className={cn(
-                'rounded-xl font-bold',
-                activePreset === 'zoho' && 'bg-indigo-600 hover:bg-indigo-700 text-white'
-              )}
-              onClick={() => applyPreset('zoho')}
-            >
-              {activePreset === 'zoho' && <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />}
-              Zoho Preset
-            </Button>
-            <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-widest ml-auto flex items-center gap-2">
-              <Info className="w-3.5 h-3.5" />
-              Gmail requires an "App Password"
-            </p>
-          </div>
 
-          {/* Quick Reference Table */}
-          <div className="bg-gray-50 dark:bg-black/20 rounded-2xl border border-gray-100 dark:border-white/5 overflow-hidden">
-            <div className="px-5 py-3 bg-gray-100/50 dark:bg-white/5 border-b border-gray-100 dark:border-white/5">
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Common SMTP Settings</p>
-            </div>
-            <div className="p-5 overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 dark:border-white/5">
-                    <th className="pb-3 px-2">Provider</th>
-                    <th className="pb-3 px-2">SMTP Host</th>
-                    <th className="pb-3 px-2">Port</th>
-                    <th className="pb-3 px-2">Password Type</th>
-                  </tr>
-                </thead>
-                <tbody className="text-xs font-bold text-gray-600 dark:text-gray-300">
-                  <tr className="border-b border-gray-50 dark:border-white/5">
-                    <td className="py-3 px-2">Gmail</td>
-                    <td className="py-3 px-2">smtp.gmail.com</td>
-                    <td className="py-3 px-2">587</td>
-                    <td className="py-3 px-2 text-indigo-600">App Password</td>
-                  </tr>
-                  <tr className="border-b border-gray-50 dark:border-white/5">
-                    <td className="py-3 px-2">Outlook</td>
-                    <td className="py-3 px-2">smtp-mail.outlook.com</td>
-                    <td className="py-3 px-2">587</td>
-                    <td className="py-3 px-2 text-indigo-600">App Password</td>
-                  </tr>
-                  <tr className="border-b border-gray-50 dark:border-white/5">
-                    <td className="py-3 px-2">Yahoo</td>
-                    <td className="py-3 px-2">smtp.mail.yahoo.com</td>
-                    <td className="py-3 px-2">587</td>
-                    <td className="py-3 px-2 text-indigo-600">App Password</td>
-                  </tr>
-                  <tr className="border-b border-gray-50 dark:border-white/5">
-                    <td className="py-3 px-2">Zoho</td>
-                    <td className="py-3 px-2">smtp.zoho.com</td>
-                    <td className="py-3 px-2">465 (SSL)</td>
-                    <td className="py-3 px-2 text-indigo-600">App Password</td>
-                  </tr>
-                  <tr>
-                    <td className="py-3 px-2">Custom</td>
-                    <td className="py-3 px-2 italic">Your mail server</td>
-                    <td className="py-3 px-2">587 / 465</td>
-                    <td className="py-3 px-2 text-emerald-600">Standard</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* App Password Instructions */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="p-6 bg-blue-500/5 rounded-2xl border border-blue-500/10">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600">
-                  <Globe className="w-4 h-4" />
+          <div className="bg-indigo-50/30 dark:bg-indigo-500/5 border border-indigo-100/50 dark:border-indigo-500/10 rounded-2xl overflow-hidden transition-all duration-300">
+            <details className="group">
+              <summary className="flex items-center justify-between px-6 py-4 cursor-pointer list-none select-none">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-600/10 flex items-center justify-center text-indigo-600">
+                    <Info className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest leading-none mb-1">Configuration Helper</p>
+                    <h4 className="text-sm font-bold text-zinc-900 dark:text-white">SMTP Guide & Presets</h4>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none mb-1">Provider Setup</p>
-                  <h4 className="text-sm font-bold text-gray-900 dark:text-white">Gmail App Password</h4>
+                <div className="flex items-center gap-3">
+                  <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest group-open:hidden">Show Guide</span>
+                  <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest hidden group-open:block">Hide Guide</span>
+                  <div className="w-8 h-8 rounded-full hover:bg-white/50 flex items-center justify-center transition-all">
+                    <ChevronDown className="w-4 h-4 text-zinc-400 group-open:rotate-180 transition-transform duration-300" />
+                  </div>
+                </div>
+              </summary>
+              
+              <div className="px-6 pb-6 space-y-6 border-t border-indigo-100/50 dark:border-indigo-500/10 pt-6 animate-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center flex-wrap gap-2">
+                  <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest w-full mb-1">Apply Presets:</p>
+                  <Button variant="outline" size="sm" className="rounded-xl text-[10px] h-8 px-4 font-bold border-indigo-200 text-indigo-600 hover:bg-indigo-50" onClick={() => applyPreset('gmail')}>Gmail</Button>
+                  <Button variant="outline" size="sm" className="rounded-xl text-[10px] h-8 px-4 font-bold border-indigo-200 text-indigo-600 hover:bg-indigo-50" onClick={() => applyPreset('outlook')}>Outlook</Button>
+                  <Button variant="outline" size="sm" className="rounded-xl text-[10px] h-8 px-4 font-bold border-indigo-200 text-indigo-600 hover:bg-indigo-50" onClick={() => applyPreset('zoho')}>Zoho</Button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="p-5 bg-white/50 dark:bg-black/20 rounded-2xl border border-indigo-100/50 flex flex-col h-full">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-600">
+                        <Globe className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none mb-1">Step-by-Step</p>
+                        <h4 className="text-sm font-bold text-zinc-900 dark:text-white">Gmail Setup</h4>
+                      </div>
+                    </div>
+                    <ol className="text-[11px] text-zinc-600 dark:text-zinc-400 space-y-2 font-medium list-decimal ml-4">
+                      <li>Go to <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" className="font-bold text-blue-600 hover:underline">App Passwords</a></li>
+                      <li>Create a new password named "Greycats"</li>
+                      <li>Copy the <span className="text-blue-600 font-bold">16-character code</span></li>
+                      <li className="text-[10px] text-zinc-400 italic">Paste code into the password field below</li>
+                    </ol>
+                  </div>
+
+                  <div className="p-5 bg-white/50 dark:bg-black/20 rounded-2xl border border-indigo-100/50 flex flex-col h-full">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-600">
+                        <ShieldCheck className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest leading-none mb-1">Step-by-Step</p>
+                        <h4 className="text-sm font-bold text-zinc-900 dark:text-white">Outlook Setup</h4>
+                      </div>
+                    </div>
+                    <ol className="text-[11px] text-zinc-600 dark:text-zinc-400 space-y-2 font-medium list-decimal ml-4">
+                      <li>Visit <a href="https://mysignins.microsoft.com/security-info" target="_blank" rel="noopener noreferrer" className="font-bold text-indigo-600 hover:underline">Security Info</a></li>
+                      <li>Add <span className="font-bold">App password</span> method</li>
+                      <li>Copy the generated secret</li>
+                      <li className="text-[10px] text-zinc-400 italic">Use this in the password field below</li>
+                    </ol>
+                  </div>
                 </div>
               </div>
-              <ol className="text-[11px] text-gray-600 dark:text-gray-400 space-y-2 font-medium list-decimal ml-4">
-                <li>Go directly to <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" className="font-bold text-blue-600 hover:underline">Google App Passwords</a></li>
-                <li>Confirm your password to reach the creation page</li>
-                <li>Under <span className="font-bold">App passwords</span>, create a new password</li>
-                <li>Copy the generated <span className="text-blue-600 font-bold tracking-wider">16-character</span> code</li>
-                <li className="text-blue-600/80 italic font-bold">Note: Remove any spaces when pasting below</li>
-                <li>Use this code in the password field below</li>
-              </ol>
-            </div>
-
-            <div className="p-6 bg-indigo-500/5 rounded-2xl border border-indigo-500/10">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600">
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest leading-none mb-1">Provider Setup</p>
-                  <h4 className="text-sm font-bold text-gray-900 dark:text-white">Outlook / Microsoft Business</h4>
-                </div>
-              </div>
-              <ol className="text-[11px] text-gray-600 dark:text-gray-400 space-y-2 font-medium list-decimal ml-4">
-                <li>Go to <a href="https://mysignins.microsoft.com/security-info" target="_blank" rel="noopener noreferrer" className="font-bold text-indigo-600 hover:underline">Microsoft Security Info</a></li>
-                <li>Click <span className="font-bold">+ Add sign-in method</span> at the top</li>
-                <li>Select <span className="font-bold">App password</span> from the dropdown</li>
-                <li>Name it (e.g., Greycats) and <span className="font-bold text-indigo-600">copy the password</span></li>
-                <li>Use this password in the password field below</li>
-              </ol>
-              <div className="mt-4 p-3 bg-indigo-500/5 rounded-xl border border-indigo-500/10">
-                <p className="text-[9px] text-indigo-600 dark:text-indigo-400 font-bold leading-relaxed italic">
-                  Note: If you don't see "App password" in the dropdown, your organization's IT Admin may have disabled it for your domain.
-                </p>
-              </div>
-            </div>
+            </details>
           </div>
+
+
+          {errorDisplay}
 
           <div ref={smtpFieldsRef} className="grid grid-cols-1 md:grid-cols-3 gap-6 scroll-mt-24">
             <div className="space-y-3">
-              <label className={labelClasses}>SMTP Host</label>
+              <label className={labelClasses}>SMTP Host <span className="text-red-500">*</span></label>
               <input type="text" value={smtpHost} onChange={e => setSmtpHost(e.target.value)} className={inputClasses} placeholder="smtp.gmail.com" />
             </div>
             <div className="space-y-3">
-              <label className={labelClasses}>Port</label>
+              <label className={labelClasses}>Port <span className="text-red-500">*</span></label>
               <input type="text" value={smtpPort} onChange={e => setSmtpPort(e.target.value)} className={inputClasses} placeholder="587" />
             </div>
             <div className="space-y-3">
@@ -467,11 +482,11 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
               <input type="text" value={smtpFromName} onChange={e => setSmtpFromName(e.target.value)} className={inputClasses} placeholder="Your Name" />
             </div>
             <div className="space-y-3">
-              <label className={labelClasses}>Username / Email</label>
+              <label className={labelClasses}>Username / Email <span className="text-red-500">*</span></label>
               <input type="text" value={smtpUser} onChange={e => setSmtpUser(e.target.value)} className={inputClasses} placeholder="user@gmail.com" />
             </div>
             <div className="space-y-3">
-              <label className={labelClasses}>Password / App Secret</label>
+              <label className={labelClasses}>Password / App Secret <span className="text-red-500">*</span></label>
               <input type="password" value={smtpPass} onChange={e => setSmtpPass(e.target.value)} className={inputClasses} placeholder="••••••••" />
             </div>
             <div className="flex items-center gap-3 pt-8">
@@ -523,12 +538,15 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
           <CardContent className="p-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
               <div className="space-y-3">
-                <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-1">Integration Name</label>
-                <input 
-                  type="text" value={name} onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Adbizz Production Gateway"
-                  className="w-full px-5 py-4 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none"
-                />
+                <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.2em] ml-1">Integration Name <span className="text-red-500">*</span></label>
+                <div className="relative">
+                  <Server className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-300" />
+                  <input 
+                    type="text" value={name} onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Adbizz Production Gateway"
+                    className="w-full pl-12 pr-5 py-4 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none"
+                  />
+                </div>
               </div>
               <div className="space-y-3">
                 <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-1">Channel Type</label>
@@ -570,26 +588,21 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
               </div>
             </div>
 
-            <div className="flex items-center gap-3 p-4 bg-blue-500/5 rounded-xl border border-blue-500/10 mb-8">
-              <Info className="w-4 h-4 text-blue-500" />
-              <p className="text-xs font-medium text-blue-900/60 dark:text-blue-300/60">
+            <div className="flex items-center gap-3 p-3 bg-indigo-500/5 rounded-xl border border-indigo-500/10 mb-6">
+              <Info className="w-3.5 h-3.5 text-indigo-500" />
+              <p className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
                 {type === 'EMAIL'
-                  ? "Connecting your own SMTP allows you to send emails from your own domain. Otherwise, we send via our servers with a Reply-To header."
+                  ? "Connect SMTP to broadcast from your domain. Default routing uses platform servers."
                   : type === 'TELEGRAM'
-                  ? "Once connected, broadcasts to this Telegram channel will activate after backend rolls out the TELEGRAM channel pipeline."
-                  : "Approved SMS templates require a connected provider to execute broadcasts."}
+                  ? "Connect your bot to broadcast directly to your channels."
+                  : "Approved SMS templates require a connected gateway to execute."}
               </p>
             </div>
 
-            {error && (
-              <div className="flex items-center gap-2 p-3 bg-red-500/5 rounded-xl border border-red-500/10 mb-8 animate-in fade-in slide-in-from-top-1">
-                <AlertCircle className="w-4 h-4 text-red-500" />
-                <p className="text-[11px] font-bold text-red-600 uppercase tracking-widest">{error}</p>
+            <div className="pt-8 border-t border-zinc-100 dark:border-white/5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {renderConfigFields()}
               </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-8 border-t border-gray-100 dark:border-white/5">
-              {renderConfigFields()}
             </div>
 
             <div className="flex justify-end pt-8 mt-8 border-t border-gray-100 dark:border-white/5">
@@ -614,7 +627,7 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
             <Loader2 className="w-12 h-12 text-indigo-500 animate-spin mb-4" />
             <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">Scanning Integrations...</p>
           </div>
-        ) : integrations?.length === 0 ? (
+        ) : (integrations as BroadcastIntegration[])?.length === 0 ? (
           <div className="col-span-full py-32 text-center">
              <div className="w-20 h-20 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 border border-dashed border-gray-200 dark:border-white/10">
               <Globe className="w-8 h-8 text-gray-300" />
@@ -637,8 +650,8 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {integrations?.filter(i => i.type === 'EMAIL').map(i => renderIntegrationCard(i))}
-                {integrations?.filter(i => i.type === 'EMAIL').length === 0 && (
+                {(integrations as BroadcastIntegration[])?.filter(i => i.type === 'EMAIL').map(i => renderIntegrationCard(i))}
+                {(integrations as BroadcastIntegration[])?.filter(i => i.type === 'EMAIL').length === 0 && (
                   <button 
                     onClick={() => { setType('EMAIL'); setProvider('SMTP'); setIsCreating(true); }}
                     className="h-[240px] border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 hover:border-indigo-500/30 hover:bg-indigo-500/5 transition-all group"
@@ -668,8 +681,8 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {integrations?.filter(i => i.type === 'SMS').map(i => renderIntegrationCard(i))}
-                {integrations?.filter(i => i.type === 'SMS').length === 0 && (
+                {(integrations as BroadcastIntegration[])?.filter(i => i.type === 'SMS').map(i => renderIntegrationCard(i))}
+                {(integrations as BroadcastIntegration[])?.filter(i => i.type === 'SMS').length === 0 && (
                   <button
                     onClick={() => { setType('SMS'); setProvider('ADBIZZ'); setIsCreating(true); }}
                     className="h-[240px] border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 hover:border-orange-500/30 hover:bg-orange-500/5 transition-all group"
@@ -718,7 +731,7 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
                       </div>
                     </button>
                   ) : (
-                    telegramTargets.map((tg) => {
+                    (telegramTargets as any[]).map((tg) => {
                       const scopedClientName = clientNameById(tg.clientId ?? null);
                       return (
                         <Card key={tg.id} className="group border-gray-200 dark:border-white/10 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden bg-white dark:bg-[#111]">

@@ -183,10 +183,12 @@ export const deleteBlogPost = async (id: number): Promise<void> => {
  * Fetch LinkedIn target profiles and pages.
  * GET /api/blog-posts/targets/linkedin
  */
-export const getLinkedInTargets = async (): Promise<LinkedInTarget[]> => {
+export const getLinkedInTargets = async (clientId?: number): Promise<LinkedInTarget[]> => {
   try {
-    console.log('[Blog API] getLinkedInTargets');
-    const response = await api.get<FetchLinkedInTargetsResponse & { message?: string; error?: string }>('/blog-posts/targets/linkedin');
+    console.log('[Blog API] getLinkedInTargets', clientId);
+    const response = await api.get<FetchLinkedInTargetsResponse & { message?: string; error?: string }>('/blog-posts/targets/linkedin', {
+      params: clientId ? { clientId } : undefined,
+    });
     console.log('[Blog API] getLinkedInTargets RESPONSE:', response.data);
     const data = response.data as any;
     if (data.success === false || data.error || (!data.success && !data.targets)) {

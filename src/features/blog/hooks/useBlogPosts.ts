@@ -10,7 +10,7 @@ export const blogPostKeys = {
   details: () => [...blogPostKeys.all, 'detail'] as const,
   detail: (id: number) => [...blogPostKeys.details(), id] as const,
   integrations: (clientId?: number) => ['blog-integrations', clientId] as const,
-  linkedinTargets: () => ['blog-linkedin-targets'] as const,
+  linkedinTargets: (clientId?: number) => ['blog-linkedin-targets', clientId] as const,
   platformDetails: (platform: string, accountId: string) =>
     ['blog-platform-details', platform, accountId] as const,
   wordpressTargets: (clientId?: number) => ['blog-wordpress-targets', clientId] as const,
@@ -44,10 +44,10 @@ export const useBlogIntegrations = (clientId?: number) => {
   });
 };
 
-export const useLinkedInTargets = () => {
+export const useLinkedInTargets = (clientId?: number) => {
   return useQuery({
-    queryKey: blogPostKeys.linkedinTargets(),
-    queryFn: getLinkedInTargets,
+    queryKey: blogPostKeys.linkedinTargets(clientId),
+    queryFn: () => getLinkedInTargets(clientId),
     staleTime: 60_000,
   });
 };

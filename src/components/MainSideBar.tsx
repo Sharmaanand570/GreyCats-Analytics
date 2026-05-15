@@ -270,12 +270,10 @@ function MainSideBar(): React.JSX.Element {
                 </SidebarGroupLabel>
               </SidebarGroup>
 
-              {/* Client Selector Area — hidden on non-client pages like Broadcasts */}
-              {!location.pathname.startsWith('/broadcasts') && (
-                <div className={`transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] mb-6 ${collabsState ? "px-0 flex justify-center" : "px-2"}`}>
-                  <ClientSelector isCollapsed={collabsState} />
-                </div>
-              )}
+              {/* Client Selector Area */}
+              <div className={`transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] mb-6 ${collabsState ? "px-0 flex justify-center" : "px-2"}`}>
+                <ClientSelector isCollapsed={collabsState} />
+              </div>
 
               {/* Menu Groups */}
               {menuGroups.map((group) => {

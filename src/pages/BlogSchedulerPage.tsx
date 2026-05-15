@@ -23,7 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 import { toast } from 'sonner';
-import { useCreateClient, useDeleteClient, useClient } from '../hooks/useClients';
+import { useCreateClient, useDeleteClient, useClient, useClients } from '../hooks/useClients';
 import { useClientContext } from '@/context/ClientContext';
 import { getProfileImageUrl } from '@/utils/imageUtils';
 import type { ClientWithIntegrations } from '@/types/client.types';
@@ -394,8 +394,8 @@ function StepWorkspace({
   // Match BlogPostModal's behavior (no clientId filter) so the icon list
   // and the modal's platform list stay in sync. Telegram is intentionally
   // excluded — it's a broadcast destination, not a blog destination.
-  const { data: wordpressTargets = [] } = useWordPressTargets();
-  const { data: linkedinTargets = [] } = useLinkedInTargets();
+  const { data: wordpressTargets = [] } = useWordPressTargets(client.id);
+  const { data: linkedinTargets = [] } = useLinkedInTargets(client.id);
 
   const connectedPlatforms: ConnectedPlatformIcon[] = useMemo(() => {
     const result: ConnectedPlatformIcon[] = [];
@@ -463,7 +463,9 @@ export default function BlogSchedulerPage() {
   const { clientId: urlClientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const { currentStep, setCurrentStep, resetDraft } = useBlogSchedulerStore();
-  const { currentClient, setCurrentClient: _setCurrentClient, clients: allClients, isLoading: isLoadingClients } = useClientContext();
+  const { currentClient, setCurrentClient: _setCurrentClient, clients: allClients, isLoading: isLoadingContext } = useClientContext();
+  const { isLoading: isLoadingClientsFetch } = useClients();
+  const isLoadingClients = isLoadingContext || isLoadingClientsFetch;
 
   const setCurrentClient = (client: ClientWithIntegrations | null) => {
     _setCurrentClient(client);

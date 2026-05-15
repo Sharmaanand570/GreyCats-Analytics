@@ -12,6 +12,7 @@ import {
   Sparkles,
   X,
   ArrowRight,
+  ArrowLeft,
   Ban,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -82,6 +83,15 @@ export default function BillingPage() {
     <div className="min-h-screen bg-white text-[#111] font-sans">
       {/* Page Header */}
       <div className={`px-6 py-10 ${isCancelled ? "bg-[#333]" : "bg-[#111]"}`}>
+        <div className="max-w-4xl mx-auto">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 text-xs font-semibold text-white/60 hover:text-white transition-colors mb-6 group"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+            Back
+          </button>
+        </div>
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 text-white/50 text-xs uppercase tracking-widest font-bold">

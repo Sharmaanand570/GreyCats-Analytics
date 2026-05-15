@@ -22,7 +22,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { FaInstagram, FaFacebook, FaLinkedin } from 'react-icons/fa6';
 import { toast } from 'sonner';
-import { useCreateClient, useDeleteClient, useClient } from '../hooks/useClients';
+import { useCreateClient, useDeleteClient, useClient, useClients } from '../hooks/useClients';
 import { useClientContext } from '@/context/ClientContext';
 import { useAvailableAccounts, useAssignAccount, useRemoveAccount } from '@/hooks/useIntegrations';
 import { loginMetaBusiness } from '@/features/meta/API/metaBusinessApi';
@@ -969,7 +969,9 @@ export default function SocialMediaSchedulerPage() {
   const { clientId: urlClientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const { currentStep, setCurrentStep, resetDraft } = useSocialMediaStore();
-  const { currentClient, setCurrentClient: _setCurrentClient, clients: allClients, isLoading: isLoadingClients } = useClientContext();
+  const { currentClient, setCurrentClient: _setCurrentClient, clients: allClients, isLoading: isLoadingContext } = useClientContext();
+  const { isLoading: isLoadingClientsFetch } = useClients();
+  const isLoadingClients = isLoadingContext || isLoadingClientsFetch;
 
   // Sync URL clientId with state on mount or change
   useEffect(() => {

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useClients } from '../hooks/useClients';
 import { useClientContext } from '@/context/ClientContext';
 import { useSyncStatus } from '../features/reports/hooks/useSyncStatus';
-import { FileText, ArrowUpDown, Search, Loader2, TrendingUp, ArrowRight } from 'lucide-react';
+import { FileText, ArrowUpDown, Search, Loader2 } from 'lucide-react';
 import { FiBell } from "react-icons/fi";
 import { getProfileImageUrl } from "@/utils/imageUtils";
 import { Input } from "../components/ui/input";

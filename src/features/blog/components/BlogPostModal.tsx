@@ -29,10 +29,10 @@ import {
   Redo2,
   CheckSquare,
 } from 'lucide-react';
-import { FaLinkedin, FaWordpress } from 'react-icons/fa6';
+import { FaLinkedin, FaWordpress, FaTelegram } from 'react-icons/fa6';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useBlogSchedulerStore } from '@/store/useBlogSchedulerStore';
-import { useLinkedInTargets, useWordPressTargets } from '../hooks/useBlogPosts';
+import { useLinkedInTargets, useWordPressTargets, useTelegramTargets } from '../hooks/useBlogPosts';
 import { useCreateBlogPost } from '../hooks/useCreateBlogPost';
 import { useUpdateBlogPost } from '../hooks/useUpdateBlogPost';
 import type { BlogPost, LinkedInTarget, WordPressTarget } from '../api/types';
@@ -157,10 +157,11 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
   const createMutation = useCreateBlogPost();
   const updateMutation = useUpdateBlogPost();
 
-  const { data: linkedinTargets = [], isLoading: linkedinLoading, isError: linkedinError } = useLinkedInTargets();
-  const { data: wordpressTargets = [], isLoading: wpLoading, isError: wpError } = useWordPressTargets();
-  const targetsLoading = linkedinLoading || wpLoading;
-  const targetsError = linkedinError && wpError;
+  const { data: linkedinTargets = [], isLoading: linkedinLoading, isError: linkedinError } = useLinkedInTargets(clientId);
+  const { data: wordpressTargets = [], isLoading: wpLoading, isError: wpError } = useWordPressTargets(clientId);
+  const { data: telegramTargets = [], isLoading: tgLoading, isError: tgError } = useTelegramTargets(clientId);
+  const targetsLoading = linkedinLoading || wpLoading || tgLoading;
+  const targetsError = linkedinError && wpError && tgError;
 
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -293,6 +294,25 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
           ...targets,
           {
             platform: 'wordpress',
+            targetAccountId: target.id,
+            targetAccountName: target.name,
+          },
+        ],
+      });
+    }
+  };
+
+  const toggleTelegramTarget = (target: any) => {
+    if (isTargeted(target.id, 'telegram')) {
+      updateDraft({
+        targets: targets.filter((t) => !(t.targetAccountId === target.id && t.platform === 'telegram')),
+      });
+    } else {
+      updateDraft({
+        targets: [
+          ...targets,
+          {
+            platform: 'telegram',
             targetAccountId: target.id,
             targetAccountName: target.name,
           },
@@ -551,12 +571,12 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
                 </div>
               )}
               {/* LinkedIn targets */}
-              {!targetsLoading && linkedinTargets.filter((t) => t.type === 'page').length === 0 && wordpressTargets.length === 0 && !targetsError && (
+              {!targetsLoading && linkedinTargets.length === 0 && wordpressTargets.length === 0 && telegramTargets.length === 0 && !targetsError && (
                 <div className="text-center py-6 text-zinc-500 text-sm">
                   No publishing accounts connected. Connect one in Integrations.
                 </div>
               )}
-              {linkedinTargets.filter((t) => t.type === 'page').map((target) => {
+              {linkedinTargets.map((target) => {
                 const selected = isTargeted(target.id, 'linkedin');
 
                 return (
@@ -664,6 +684,48 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
                         </Select>
                       </div>
                     )}
+                  </div>
+                );
+              })}
+
+              {/* Telegram targets */}
+              {telegramTargets.map((target) => {
+                const selected = isTargeted(target.id, 'telegram');
+
+                return (
+                  <div key={`tg-${target.id}`} className="space-y-2">
+                    <div
+                      onClick={() => toggleTelegramTarget(target)}
+                      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                        selected
+                          ? 'bg-zinc-900 text-white border-zinc-900 shadow-md'
+                          : 'bg-white border-zinc-200 hover:border-zinc-300 hover:shadow-sm'
+                      }`}
+                    >
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                        selected ? 'bg-white/10' : 'bg-zinc-100'
+                      }`}>
+                        <FaTelegram className={`w-5 h-5 ${selected ? 'text-white' : 'text-sky-500'}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-semibold flex items-center gap-2 ${selected ? 'text-white' : 'text-zinc-800'}`}>
+                          Telegram
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
+                            selected ? 'bg-white/20' : 'bg-zinc-100 text-zinc-500'
+                          }`}>
+                            Channel
+                          </span>
+                        </p>
+                        <p className={`text-xs truncate ${selected ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                          {target.name}
+                        </p>
+                      </div>
+                      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                        selected ? 'bg-white border-white' : 'border-zinc-300'
+                      }`}>
+                        {selected && <CheckSquare className="w-3.5 h-3.5 text-zinc-900" />}
+                      </div>
+                    </div>
                   </div>
                 );
               })}

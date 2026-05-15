@@ -14,7 +14,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useIntegrations } from "@/features/DataSources/hooks/useIntegrations";
 import { useSyncStatus } from "@/features/reports/hooks/useSyncStatus";
-import { Loader2, TrendingUp, ArrowRight } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 const TABLE_HEADERS = [
   "Name",
