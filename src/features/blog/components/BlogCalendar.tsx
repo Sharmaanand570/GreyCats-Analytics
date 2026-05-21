@@ -28,7 +28,7 @@ import {
   FileText,
   Loader2,
   CalendarPlus,
-  Bell,
+  CalendarClock,
   Filter,
 } from 'lucide-react';
 import { FaWordpress, FaLinkedin, FaReddit } from 'react-icons/fa6';
@@ -430,7 +430,7 @@ export function BlogCalendar({ clientId, canPost }: BlogCalendarProps) {
             hasTodayBlogPosts && !showUpcoming && "border-blue-200 bg-blue-50/30"
           )}
         >
-          <Bell className={cn(
+          <CalendarClock className={cn(
             "w-3.5 h-3.5 transition-colors",
             hasTodayBlogPosts ? "text-blue-600 fill-blue-600/10" : "text-zinc-500"
           )} />

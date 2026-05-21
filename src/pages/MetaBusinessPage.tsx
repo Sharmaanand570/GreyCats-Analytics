@@ -162,7 +162,7 @@ function MetaBusinessPage() {
                   <Instagram size={18} />
                 </div>
               </div>
-              <span className="font-medium text-xl">Meta Business</span>
+              <span className="font-medium text-xl">Facebook</span>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -234,7 +234,7 @@ function MetaBusinessPage() {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Meta Business</BreadcrumbPage>
+                  <BreadcrumbPage>Facebook</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
@@ -254,7 +254,7 @@ function MetaBusinessPage() {
               </div>
             ) : !selectedAccountId ? (
               <div className="text-center py-10 text-muted-foreground">
-                No Meta Business accounts connected. Please connect an account.
+                No Facebook accounts connected. Please connect an account.
               </div>
             ) : (
               <>
@@ -283,7 +283,7 @@ function MetaBusinessPage() {
 
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Instagram Business</CardTitle>
+                      <CardTitle className="text-sm font-medium">Instagram</CardTitle>
                       <Instagram className="h-4 w-4 text-pink-600" />
                     </CardHeader>
                     <CardContent>

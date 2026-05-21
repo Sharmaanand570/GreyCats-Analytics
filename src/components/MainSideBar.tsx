@@ -28,6 +28,9 @@ import {
   CalendarDays,
   PenLine,
   Send,
+  Megaphone,
+  Sparkles,
+  UserSquare,
 } from "lucide-react";
 import { FiMenu } from "react-icons/fi";
 import { useEffect, useState } from "react";
@@ -79,12 +82,14 @@ function MainSideBar(): React.JSX.Element {
     setActive(location.pathname);
   }, [location.pathname]);
 
-  // Initialize collapse state based on current route
+  // Initialize collapse state based on current route.
+  // Collapse only on focus-mode pages: the report builder, the client detail page,
+  // and the edit-dashboard view. Stay expanded on the reports listing.
   const getInitialCollapseState = () => {
-    const isReportBuilder = /^\/reports\/.+/.test(location.pathname);
-    const isClientDetails = /^\/clients\/.+/.test(location.pathname);
-    const isEditDashboard = location.pathname.startsWith("/edit-dashboard");
-    return isReportBuilder || isClientDetails || isEditDashboard;
+    const isReportBuilder = /^\/clients\/\d+\/reports\/(new|\d+)/.test(location.pathname);
+    const isClientDetail = /^\/clients\/\d+$/.test(location.pathname);
+    const isEditDashboard = /^\/clients\/\d+\/edit-dashboard/.test(location.pathname);
+    return isReportBuilder || isClientDetail || isEditDashboard;
   };
 
   const [collabsState, setcollabsState] = useState<boolean>(
@@ -124,6 +129,16 @@ function MainSideBar(): React.JSX.Element {
     if (itemPath === '/broadcasts') {
       return pathname.startsWith('/broadcasts');
     }
+    if (itemPath === '/data-sources/meta-ads/wizard') {
+      return pathname.startsWith('/data-sources/meta-ads/wizard');
+    }
+    if (itemPath === '/data-sources/meta-ads/audiences') {
+      return pathname.startsWith('/data-sources/meta-ads/audiences');
+    }
+    if (itemPath === '/data-sources/meta-ads') {
+      // Match the meta-ads root and /:clientId, but NOT /wizard or /audiences subpaths
+      return /^\/data-sources\/meta-ads(\/\d+)?$/.test(pathname);
+    }
     if (itemPath === '/admin/dashboard') {
       return pathname.startsWith('/admin');
     }
@@ -157,10 +172,17 @@ function MainSideBar(): React.JSX.Element {
       return;
     }
 
-    // Append clientId to scheduler paths if available
+    // Append clientId to scheduler/wizard paths if available
     let finalPath = path;
-    const schedulerPaths = ["social-media/scheduler", "blog/scheduler", "broadcasts"];
-    if (currentClient?.id && schedulerPaths.some(p => path.includes(p))) {
+    const clientScopedPaths = [
+      "social-media/scheduler",
+      "blog/scheduler",
+      "broadcasts",
+      "data-sources/meta-ads/wizard",
+      "data-sources/meta-ads/audiences",
+      "data-sources/meta-ads",
+    ];
+    if (currentClient?.id && clientScopedPaths.some(p => path.includes(p))) {
       finalPath = `${path}/${currentClient.id}`;
     }
 
@@ -169,20 +191,10 @@ function MainSideBar(): React.JSX.Element {
   };
 
   useEffect(() => {
-    const isSideBarOnReportBuilderPage = /^\/reports\/.+/.test(
-      location.pathname
-    );
-    const isSideBarOnClientDetailsPage = /^\/clients\/.+/.test(
-      location.pathname
-    );
-
-    const isUserOnEditDashboard = location.pathname.startsWith("/edit-dashboard");
-
-    const shouldCollapse =
-      isSideBarOnReportBuilderPage ||
-      isSideBarOnClientDetailsPage ||
-      isUserOnEditDashboard;
-    setcollabsState(shouldCollapse);
+    const isReportBuilder = /^\/clients\/\d+\/reports\/(new|\d+)/.test(location.pathname);
+    const isClientDetail = /^\/clients\/\d+$/.test(location.pathname);
+    const isEditDashboard = /^\/clients\/\d+\/edit-dashboard/.test(location.pathname);
+    setcollabsState(isReportBuilder || isClientDetail || isEditDashboard);
   }, [location.pathname]);
   const isAuthPage = /^\/auth\/(login|signup)$/.test(location.pathname);
 
@@ -210,6 +222,15 @@ function MainSideBar(): React.JSX.Element {
         { label: "Social Media", path: "/social-media/scheduler", icon: <CalendarDays /> },
         { label: "Blog", path: "/blog/scheduler", icon: <PenLine /> },
         { label: "Broadcasts", path: "/broadcasts", icon: <Send /> },
+      ],
+    },
+    {
+      label: "Ads Manager",
+      isCollapsible: true,
+      items: [
+        { label: "Create Ad", path: "/data-sources/meta-ads/wizard", icon: <Sparkles /> },
+        { label: "Audiences", path: "/data-sources/meta-ads/audiences", icon: <UserSquare /> },
+        { label: "Meta Ads", path: "/data-sources/meta-ads", icon: <Megaphone /> },
       ],
     },
     {
@@ -247,7 +268,10 @@ function MainSideBar(): React.JSX.Element {
               <SidebarGroup>
                 <SidebarGroupLabel className="p-0 w-full relative justify-between px-2 py-8 pb-4">
                   <div
-                    className={`flex items-center transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${collabsState ? "justify-center w-full" : "justify-center w-full px-4"
+                    onClick={() => navigate("/")}
+                    role="button"
+                    aria-label="Go to home"
+                    className={`flex items-center cursor-pointer transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] hover:opacity-80 ${collabsState ? "justify-center w-full" : "justify-center w-full px-4"
                       }`}
                   >
                     {collabsState ? (
@@ -284,23 +308,23 @@ function MainSideBar(): React.JSX.Element {
                     <div
                       role="button"
                       onClick={() => group.isCollapsible && toggleGroup(group.label)}
-                      className={`flex items-center justify-between w-full h-10 px-3 mt-1 mb-1 rounded-md transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                      className={`flex items-center justify-between w-full h-8 px-3 mt-1 mb-1 rounded-md transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
                         group.isCollapsible ? "cursor-pointer bg-zinc-800/40 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/50 shadow-sm" : "text-zinc-500 font-semibold uppercase text-xs"
                       } ${
                         collabsState ? "opacity-0 max-h-0 overflow-hidden hidden" : "opacity-100 max-h-20 flex"
                       }`}
                     >
                       {group.isCollapsible ? (
-                        <span className="text-[15px] font-medium tracking-wide">
+                        <span className="text-[13px] font-medium tracking-wide">
                           {group.label}
                         </span>
                       ) : (
-                        <span className="text-xs tracking-wider uppercase">
+                        <span className="text-[11px] tracking-wider uppercase">
                           {group.label}
                         </span>
                       )}
                       {group.isCollapsible && (
-                        <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
+                        <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
                       )}
                     </div>
                   )}
@@ -310,15 +334,15 @@ function MainSideBar(): React.JSX.Element {
                         <SidebarMenuItem key={item.path}>
                           <SidebarMenuButton
                             onClick={() => handleChangeURL(item.path, (item as any).isComingSoon)}
-                            className={`group text-[1rem] rounded-[0.5rem] font-normal h-11 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:text-zinc-100 ${
+                            className={`group text-[13px] [&_svg]:w-[18px] [&_svg]:h-[18px] rounded-[0.375rem] font-normal h-9 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:text-zinc-100 ${
                               (item as any).isComingSoon ? "opacity-50 cursor-not-allowed grayscale" : ""
                             } ${!collabsState
-                              ? "px-4"
+                              ? "px-3"
                               : "flex justify-center items-center"
                               } ${isItemActive(item.path, activeTab)
                                 ? "bg-zinc-800 text-white"
                                 : "text-zinc-300"
-                              }`}
+                                }`}
                             style={{
                               transitionDelay: collabsState
                                 ? "0ms"
@@ -442,30 +466,30 @@ function MainSideBar(): React.JSX.Element {
                     }}
                   >
                     <div 
-                      className={`flex items-center justify-between w-full h-11 px-3 mb-2 rounded-md transition-all duration-300 ${
+                      className={`flex items-center justify-between w-full h-8 px-3 mb-2 rounded-md transition-all duration-300 ${
                         group.isCollapsible ? "cursor-pointer bg-zinc-800/40 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/50 shadow-sm" : "text-zinc-500 uppercase text-xs font-semibold"
                       }`}
                       onClick={() => group.isCollapsible && toggleGroup(group.label)}
                     >
                       {group.isCollapsible ? (
-                        <span className="text-[15px] font-medium tracking-wide">
+                        <span className="text-[13px] font-medium tracking-wide">
                           {group.label}
                         </span>
                       ) : (
-                        <h3 className="tracking-wider m-0">
+                        <h3 className="tracking-wider m-0 text-[11px] uppercase">
                           {group.label}
                         </h3>
                       )}
                       {group.isCollapsible && (
-                        <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
+                        <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
                       )}
                     </div>
-                    <div className={`flex flex-col space-y-2 overflow-hidden transition-all duration-300 ${group.isCollapsible && !isOpen ? "max-h-0 opacity-0" : "max-h-[500px] opacity-100"}`}>
+                    <div className={`flex flex-col space-y-1 overflow-hidden transition-all duration-300 ${group.isCollapsible && !isOpen ? "max-h-0 opacity-0" : "max-h-[500px] opacity-100"}`}>
                       {group.items.map((item, itemIndex) => (
                         <button
                           key={item.path}
                           onClick={() => handleChangeURL(item.path, (item as any).isComingSoon)}
-                          className={`flex items-center justify-between w-full px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:translate-x-1 ${
+                          className={`flex items-center justify-between w-full px-3 py-1.5 rounded-md text-[13px] font-normal transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:translate-x-1 [&_svg]:w-[18px] [&_svg]:h-[18px] ${
                             (item as any).isComingSoon ? "opacity-50 cursor-not-allowed" : ""
                           } ${isItemActive(item.path, activeTab)
                             ? "bg-zinc-800 translate-x-1 text-white"

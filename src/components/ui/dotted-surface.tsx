@@ -24,13 +24,13 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 		// Ensure pristine mount for React StrictMode / HMR
 		containerRef.current.innerHTML = '';
 
-		const SEPARATION = 150;
-		const AMOUNTX = 40;
-		const AMOUNTY = 60;
+		const SEPARATION = 60;
+		const AMOUNTX = 100;
+		const AMOUNTY = 120;
 
 		// Scene setup
 		const scene = new THREE.Scene();
-		scene.fog = new THREE.Fog(0xffffff, 4000, 10000);
+		scene.fog = new THREE.Fog(0xffffff, 3000, 8000);
 
 		const camera = new THREE.PerspectiveCamera(
 			60,
@@ -38,8 +38,8 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 			1,
 			10000,
 		);
-		// Raise camera higher for a superior overhead perspective of the 3D waves
-		camera.position.set(0, 600, 1400);
+		// Adjusted camera to better capture the denser grid
+		camera.position.set(0, 500, 1200);
 		camera.lookAt(0, 0, 0);
 
 		const renderer = new THREE.WebGLRenderer({
@@ -68,10 +68,10 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 				positions.push(x, y, z);
 				// Colors in Three.js BufferAttribute must be between 0.0 and 1.0
 				if (theme === 'dark') {
-					colors.push(0.8, 0.8, 0.8);
+					colors.push(0.85, 0.85, 0.85);
 				} else {
-					// Premium GreyCats accent theme: soft grey-blue tint
-					colors.push(0.26, 0.52, 0.96); 
+					// Softer blue-grey for balanced visibility
+					colors.push(0.24, 0.48, 0.85); 
 				}
 			}
 		}
@@ -84,10 +84,10 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 
 		// Create material
 		const material = new THREE.PointsMaterial({
-			size: 16,
+			size: 10,
 			vertexColors: true,
 			transparent: true,
-			opacity: 0.9,
+			opacity: 0.75,
 			sizeAttenuation: true,
 		});
 
@@ -110,10 +110,10 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 				for (let iy = 0; iy < AMOUNTY; iy++) {
 					const index = i * 3;
 
-					// Animate Y position with sine waves
+					// Animate Y position with more balanced, fluid waves
 					positions[index + 1] =
-						Math.sin((ix + count) * 0.3) * 180 +
-						Math.sin((iy + count) * 0.5) * 180;
+						Math.sin((ix + count) * 0.15) * 165 +
+						Math.sin((iy + count) * 0.25) * 165;
 
 					i++;
 				}
@@ -122,7 +122,7 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 			positionAttribute.needsUpdate = true;
 
 			renderer.render(scene, camera);
-			count += 0.04;
+			count += 0.015;
 		};
 
 		// Handle window resize

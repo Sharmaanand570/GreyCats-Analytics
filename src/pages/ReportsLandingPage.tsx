@@ -5,7 +5,7 @@ import { useClients } from '../hooks/useClients';
 import { useClientContext } from '@/context/ClientContext';
 import { useSyncStatus } from '../features/reports/hooks/useSyncStatus';
 import { FileText, ArrowUpDown, Search, Loader2 } from 'lucide-react';
-import { FiBell } from "react-icons/fi";
+import { NotificationsPopover } from '../components/NotificationsPopover';
 import { getProfileImageUrl } from "@/utils/imageUtils";
 import { Input } from "../components/ui/input";
 import { Skeleton } from "../components/ui/skeleton";
@@ -101,9 +101,7 @@ const ReportsLandingPage: React.FC = () => {
                                 />
                             </div>
                             <div className="flex items-center border-l pl-4 gap-3">
-                                <button className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
-                                    <FiBell className="text-lg" />
-                                </button>
+                                <NotificationsPopover />
                             </div>
                         </div>
                     </div>

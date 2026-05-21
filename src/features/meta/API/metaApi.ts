@@ -39,15 +39,31 @@ export type MetaDisconnectResponse = {
   message: string;
 };
 
-export type MetaAccount = {
-  id: string;
-  account_id: string;
+export type MetaAdAccount = {
+  dbId: number;
+  accountId: string;
   name: string;
+  // Business Manager that owns this ad account. Null for personal/unowned
+  // accounts or when Meta's /act_{id}?fields=business call fails — treat
+  // null as "unknown ownership" and skip cross-business comparisons.
+  businessId: string | null;
+  businessName: string | null;
+};
+
+export type MetaPage = {
+  dbId: number;
+  pageId: string;
+  name: string;
+  // Same semantics as MetaAdAccount.businessId — null = personal page or
+  // unknown ownership.
+  businessId: string | null;
+  businessName: string | null;
 };
 
 export type MetaAccountsResponse = {
   success: boolean;
-  accounts: MetaAccount[];
+  adAccounts: MetaAdAccount[];
+  pages: MetaPage[];
 };
 
 export type MetaCampaign = {
@@ -249,6 +265,155 @@ export const getMetaAccounts = async (clientId: number): Promise<MetaAccountsRes
       axiosError.response?.data?.message ||
       axiosError.response?.data?.error ||
       "Failed to load Meta ad accounts"
+    );
+  }
+};
+
+// ==================== AUDIENCES (Round 4) ====================
+
+/**
+ * GET /clients/:clientId/audiences
+ * Returns Custom + Website + Lookalike audiences for the client's ad account.
+ */
+export const getAudiences = async (
+  clientId: number
+): Promise<import("./metaAdsManagerApi").AudiencesResponse> => {
+  try {
+    const response = await api.get<import("./metaAdsManagerApi").AudiencesResponse>(
+      `/clients/${clientId}/audiences`
+    );
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+      axiosError.response?.data?.error ||
+      "Failed to load audiences"
+    );
+  }
+};
+
+/**
+ * POST /clients/:clientId/audiences/customer-list
+ * Backend SHA-256 hashes emails before forwarding to Meta.
+ */
+export const createCustomerListAudience = async (
+  clientId: number,
+  payload: { name: string; emails: string[] }
+): Promise<{ id: string; status: string }> => {
+  try {
+    const response = await api.post<{ id: string; status: string }>(
+      `/clients/${clientId}/audiences/customer-list`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+      axiosError.response?.data?.error ||
+      "Failed to create customer list audience"
+    );
+  }
+};
+
+/**
+ * POST /clients/:clientId/audiences/website-traffic
+ */
+export const createWebsiteTrafficAudience = async (
+  clientId: number,
+  payload: {
+    name: string;
+    pixelId: string;
+    retentionDays: number;
+    rules: { event: string; url?: string }[];
+  }
+): Promise<{ id: string; status: string }> => {
+  try {
+    const response = await api.post<{ id: string; status: string }>(
+      `/clients/${clientId}/audiences/website-traffic`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+      axiosError.response?.data?.error ||
+      "Failed to create website-traffic audience"
+    );
+  }
+};
+
+/**
+ * POST /clients/:clientId/audiences/lookalike
+ */
+export const createLookalikeAudience = async (
+  clientId: number,
+  payload: {
+    name: string;
+    sourceAudienceId: string;
+    country: string;
+    ratio: 0.01 | 0.02 | 0.05 | 0.1;
+  }
+): Promise<{ id: string; status: string }> => {
+  try {
+    const response = await api.post<{ id: string; status: string }>(
+      `/clients/${clientId}/audiences/lookalike`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+      axiosError.response?.data?.error ||
+      "Failed to create lookalike audience"
+    );
+  }
+};
+
+/**
+ * DELETE /clients/:clientId/audiences/:audienceId
+ */
+export const deleteAudience = async (
+  clientId: number,
+  audienceId: string
+): Promise<{ success: boolean }> => {
+  try {
+    const response = await api.delete<{ success: boolean }>(
+      `/clients/${clientId}/audiences/${audienceId}`
+    );
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+      axiosError.response?.data?.error ||
+      "Failed to delete audience"
+    );
+  }
+};
+
+/**
+ * GET /clients/:clientId/meta/pixels
+ * Returns the Meta Pixels attached to the client's ad account. Required for
+ * the Sales-objective conversion-tracking dropdown.
+ */
+export const getMetaPixels = async (
+  clientId: number
+): Promise<import("./metaAdsManagerApi").MetaPixelsResponse> => {
+  try {
+    const response = await api.get<import("./metaAdsManagerApi").MetaPixelsResponse>(
+      `/clients/${clientId}/meta/pixels`
+    );
+    return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    throw new Error(
+      axiosError.response?.data?.message ||
+      axiosError.response?.data?.error ||
+      "Failed to load Meta pixels"
     );
   }
 };

@@ -20,8 +20,46 @@ import {
   MousePointerClick,
   Target,
   Filter,
-  ArrowUpRight
+  Sparkles,
+  MoreHorizontal,
+  Play,
+  Pause,
+  Trash2,
+  Loader2,
+  Pencil,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  useUpdateCampaign,
+  useUpdateCampaignStatus,
+} from "@/features/meta/hooks/useMetaAdsManager";
+import type { CampaignStatus } from "@/features/meta/API/metaAdsManagerApi";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { cn } from "@/lib/utils";
 import { useMetaAdsMeta, useMetaAdsSummary, useMetaAdsCampaigns, useMetaAdsTrends } from "@/features/meta/hooks/useMetaAdsData";
@@ -270,6 +308,47 @@ function MetaDetailPage() {
 
   const isNoAccountAssigned = anyErrorMsg === "No Meta Ads account assigned to this client.";
 
+  const { mutate: changeStatus, isPending: isUpdatingStatus, variables: statusVars } =
+    useUpdateCampaignStatus();
+  const { mutate: editCampaign, isPending: isEditingCampaign } = useUpdateCampaign();
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [editTarget, setEditTarget] = useState<{ id: string; name: string } | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editBudgetType, setEditBudgetType] = useState<"DAILY" | "LIFETIME">("DAILY");
+  const [editBudget, setEditBudget] = useState("");
+
+  const setStatus = (campaignId: string, status: CampaignStatus) => {
+    if (!selectedClientId) return;
+    changeStatus({ campaignId, status, clientId: selectedClientId });
+  };
+
+  const openEdit = (campaign: { id: string; name: string }) => {
+    setEditTarget(campaign);
+    setEditName(campaign.name);
+    setEditBudgetType("DAILY");
+    setEditBudget("");
+  };
+
+  const submitEdit = () => {
+    if (!editTarget || !selectedClientId) return;
+    const payload: { name?: string; dailyBudget?: number; lifetimeBudget?: number } = {};
+    const trimmedName = editName.trim();
+    if (trimmedName && trimmedName !== editTarget.name) payload.name = trimmedName;
+    const budgetNum = Number(editBudget);
+    if (editBudget && budgetNum > 0) {
+      if (editBudgetType === "DAILY") payload.dailyBudget = budgetNum;
+      else payload.lifetimeBudget = budgetNum;
+    }
+    if (Object.keys(payload).length === 0) {
+      setEditTarget(null);
+      return;
+    }
+    editCampaign(
+      { campaignId: editTarget.id, payload, clientId: selectedClientId },
+      { onSuccess: () => setEditTarget(null) }
+    );
+  };
+
   return (
     <div className="w-full h-full flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
       <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd] animate-in fade-in slide-in-from-bottom-2 duration-1000">
@@ -284,7 +363,7 @@ function MetaDetailPage() {
                   </BreadcrumbItem>
                   <BreadcrumbSeparator className="text-slate-300" />
                   <BreadcrumbItem>
-                    <span className="bg-zinc-100 text-zinc-900 px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wider">Meta Business</span>
+                    <span className="bg-zinc-100 text-zinc-900 px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wider">Meta Ads</span>
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
@@ -297,7 +376,7 @@ function MetaDetailPage() {
                   </div>
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold tracking-tight text-slate-900">Meta Business</h1>
+                  <h1 className="text-3xl font-bold tracking-tight text-slate-900">Meta Ads</h1>
                   <p className="text-xs text-slate-500 mt-1 font-bold uppercase tracking-widest">{accountName || "Campaign Insights"}</p>
                 </div>
               </div>
@@ -306,7 +385,17 @@ function MetaDetailPage() {
             <div className="flex items-center gap-4">
               <DataSyncBanner compact={true} />
               <div className="w-[280px]">
-                <Select value={selectedClientId?.toString()} onValueChange={(v: string) => setSelectedClientId(Number(v))}>
+                <Select
+                  value={selectedClientId?.toString()}
+                  onValueChange={(v: string) => {
+                    const next = Number(v);
+                    if (next === selectedClientId) return;
+                    // URL is the single source of truth — the reconcile effect
+                    // below picks up the new param and updates selectedClientId,
+                    // which retriggers all the useQuery hooks.
+                    navigate(`/data-sources/meta-ads/${next}`);
+                  }}
+                >
                   <SelectTrigger className="h-10 bg-white border-slate-200 shadow-sm rounded-xl transition-all focus:ring-slate-200 font-medium text-slate-700">
                     <SelectValue placeholder="Select Client" />
                   </SelectTrigger>
@@ -323,6 +412,20 @@ function MetaDetailPage() {
                 </Select>
               </div>
                <DateRangePicker value={date} onChange={setDate} />
+               <Button
+                 onClick={() =>
+                   navigate(
+                     selectedClientId
+                       ? `/data-sources/meta-ads/wizard/${selectedClientId}`
+                       : "/data-sources/meta-ads/wizard"
+                   )
+                 }
+                 disabled={!selectedClientId}
+                 className="h-10 rounded-xl px-5 gap-2 font-bold bg-gradient-to-r from-[#0866FF] to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md disabled:opacity-50"
+               >
+                 <Sparkles className="w-4 h-4" />
+                 Create Ad
+               </Button>
             </div>
           </div>
 
@@ -557,9 +660,79 @@ function MetaDetailPage() {
                           </TableCell>
                           <TableCell className="text-right text-slate-600 pr-6 py-4">₹{campaign.cpc.toFixed(2)}</TableCell>
                           <TableCell className="py-4">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity hover:text-blue-600">
-                              <ArrowUpRight className="w-4 h-4" />
-                            </Button>
+                            {(() => {
+                              const normalized = (campaign.status || "ACTIVE").toUpperCase();
+                              const isArchived = normalized === "ARCHIVED" || normalized === "DELETED";
+                              const isPaused = normalized === "PAUSED";
+                              const isBusyForRow =
+                                isUpdatingStatus && statusVars?.campaignId === campaign.id;
+                              return (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+                                      disabled={isBusyForRow}
+                                    >
+                                      {isBusyForRow ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <MoreHorizontal className="w-4 h-4" />
+                                      )}
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-44 bg-white border border-slate-200 shadow-lg">
+                                    {isPaused || isArchived ? (
+                                      <DropdownMenuItem
+                                        onSelect={() => setStatus(campaign.id, "ACTIVE")}
+                                      >
+                                        <Play className="w-4 h-4 mr-2 text-emerald-600" />
+                                        Resume
+                                      </DropdownMenuItem>
+                                    ) : (
+                                      <DropdownMenuItem
+                                        onSelect={() => setStatus(campaign.id, "PAUSED")}
+                                      >
+                                        <Pause className="w-4 h-4 mr-2 text-amber-600" />
+                                        Pause
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem
+                                      disabled={isArchived}
+                                      onSelect={() =>
+                                        openEdit({ id: campaign.id, name: campaign.name })
+                                      }
+                                    >
+                                      <Pencil className="w-4 h-4 mr-2 text-slate-600" />
+                                      Quick Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      disabled={isArchived || !selectedClientId}
+                                      onSelect={() =>
+                                        navigate(
+                                          `/data-sources/meta-ads/wizard/${selectedClientId}/edit/${campaign.id}`
+                                        )
+                                      }
+                                    >
+                                      <Sparkles className="w-4 h-4 mr-2 text-blue-600" />
+                                      Full Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="text-rose-600 focus:text-rose-700"
+                                      disabled={isArchived}
+                                      onSelect={() =>
+                                        setDeleteTarget({ id: campaign.id, name: campaign.name })
+                                      }
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              );
+                            })()}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -581,6 +754,134 @@ function MetaDetailPage() {
       )}
         </div>
       </div>
+
+      <Dialog
+        open={!!editTarget}
+        onOpenChange={(open) => {
+          if (!open && !isEditingCampaign) setEditTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Edit campaign</DialogTitle>
+            <DialogDescription>
+              Update the campaign name or change its budget. Leave a field blank to keep the
+              current value. You can only update the budget type the campaign was created with.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="edit-campaign-name" className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                Campaign Name
+              </Label>
+              <Input
+                id="edit-campaign-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="h-11 rounded-xl border-slate-200"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                Budget Type
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                {(["DAILY", "LIFETIME"] as const).map((t) => {
+                  const isActive = editBudgetType === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setEditBudgetType(t)}
+                      className={cn(
+                        "px-3 py-2 rounded-xl border text-sm font-bold transition-all",
+                        isActive
+                          ? "bg-slate-900 text-white border-slate-900"
+                          : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+                      )}
+                    >
+                      {t === "DAILY" ? "Daily" : "Lifetime"}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Must match the type the campaign was created with — Meta won't let you switch.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-campaign-budget" className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                New {editBudgetType === "DAILY" ? "Daily" : "Lifetime"} Budget
+              </Label>
+              <Input
+                id="edit-campaign-budget"
+                type="number"
+                min={1}
+                step={0.5}
+                placeholder="Leave blank to keep current"
+                value={editBudget}
+                onChange={(e) => setEditBudget(e.target.value)}
+                className="h-11 rounded-xl border-slate-200"
+              />
+              <p className="text-[11px] text-slate-400">
+                Enter in standard decimal (e.g. 25.50). Billed in the ad account's currency.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditTarget(null)}
+              disabled={isEditingCampaign}
+              className="h-10 rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={submitEdit}
+              disabled={isEditingCampaign}
+              className="h-10 rounded-xl bg-slate-900 hover:bg-slate-800 text-white gap-2"
+            >
+              {isEditingCampaign && <Loader2 className="w-4 h-4 animate-spin" />}
+              Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this campaign?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget ? (
+                <>
+                  This will permanently delete <span className="font-semibold text-slate-900">{deleteTarget.name}</span> on Meta. Spend and historical data stay in reports, but the campaign can't be reactivated.
+                </>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-600 hover:bg-rose-700 focus:ring-rose-400"
+              onClick={() => {
+                if (deleteTarget) {
+                  setStatus(deleteTarget.id, "DELETED");
+                  setDeleteTarget(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
     ShieldAlert,
     Menu,
     Send,
+    Bell,
     X
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -102,6 +103,12 @@ export default function AdminLayout() {
             title: "Broadcasts",
             href: "/admin/broadcasts",
             icon: Send,
+            roles: ["ADMIN", "SUPER_ADMIN"],
+        },
+        {
+            title: "Notifications",
+            href: "/admin/notifications",
+            icon: Bell,
             roles: ["ADMIN", "SUPER_ADMIN"],
         },
     ];

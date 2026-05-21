@@ -1,4 +1,5 @@
-import { FiBell, FiSearch } from "react-icons/fi";
+import { FiSearch } from "react-icons/fi";
+import { NotificationsPopover } from './NotificationsPopover';
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import DropDownFilter from "./DropDownFilter";
@@ -15,9 +16,8 @@ function Clients() {
               <span className="mx-2 text-lg text-gray-500">
                 <FiSearch />
               </span>
-              <span className="mx-2 text-lg text-gray-500 ">
-                {" "}
-                <FiBell />
+              <span className="mx-2">
+                <NotificationsPopover />
               </span>
               <span className="ml-4">
                 <Button className="rounded-[0.4rem]">Edit Dashboard</Button>

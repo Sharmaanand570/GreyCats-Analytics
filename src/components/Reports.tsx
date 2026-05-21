@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { FiBell, FiSearch } from "react-icons/fi";
+import { FiSearch } from "react-icons/fi";
+import { NotificationsPopover } from './NotificationsPopover';
 import { Button } from "./ui/button";
 import TableComponent from "./TableComponent";
 import { Input } from "./ui/input";
@@ -190,7 +191,9 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
           <span className="font-medium text-xl">Reports</span>
           <div className="flex items-center">
             <span className="mx-2 text-lg text-gray-500"><FiSearch /></span>
-            <span className="mx-2 text-lg text-gray-500 "><FiBell /></span>
+            <span className="mx-2">
+              <NotificationsPopover />
+            </span>
             <span className="ml-4">
               <Button
                 className="rounded-[0.4rem]"

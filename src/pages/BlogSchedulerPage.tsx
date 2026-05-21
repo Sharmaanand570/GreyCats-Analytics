@@ -487,16 +487,16 @@ export default function BlogSchedulerPage() {
     const client = allClients.find(c => String(c.id) === urlClientId);
     if (!client) return;
 
+    let shouldUpdateStep = false;
     if (!currentClient || currentClient.id !== client.id) {
       _setCurrentClient(client as ClientWithIntegrations);
+      shouldUpdateStep = true;
     }
 
-    // Always advance past the select-client step when the URL has a clientId,
-    // even if currentClient already matches.
-    if (currentStep === 'select-client') {
+    if (shouldUpdateStep && currentStep === 'select-client') {
       setCurrentStep('workspace');
     }
-  }, [urlClientId, allClients.length, currentClient?.id, currentStep]);
+  }, [urlClientId, allClients.length]);
 
   const [subStep, setSubStep] = useState<'main' | 'create' | 'existing'>('main');
 

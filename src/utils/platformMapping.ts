@@ -18,7 +18,7 @@ const platformMap: Record<string, PlatformConfig> = {
     color: "#1877F2",    // Meta blue
   },
   "meta-business": {
-    name: "Meta Business",
+    name: "Facebook",
     icon: SiMeta,
     link: "/data-sources/meta-business",
     color: "#1877F2", // Meta blue
@@ -88,7 +88,7 @@ const platformMap: Record<string, PlatformConfig> = {
     color: "#96BF48", // Shopify green
   },
   "meta-ads": {
-    name: "Meta Business",
+    name: "Meta Ads",
     icon: SiMeta,
     link: "/data-sources/meta-ads",
     color: "#0081FB", // Meta blue

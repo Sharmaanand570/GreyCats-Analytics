@@ -163,7 +163,6 @@ function TableComponent({ header, bodyData, backgroundColor, textColor }: TableT
                       >
                         {renderIcon(row.icon, row.name, row.iconColor)}
                         <span>{row.name}</span>
-                        {row.name === "Meta Business" && <span className="text-xs font-light text-gray-500">{"(facebook & instagram)"}</span>}
                       </Link>
                     </td>
                     <td className="pl-2 pr-6 text-sm text-gray-600 whitespace-nowrap">

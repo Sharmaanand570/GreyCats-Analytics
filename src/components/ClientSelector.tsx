@@ -68,16 +68,16 @@ export function ClientSelector({ isCollapsed }: { isCollapsed?: boolean }) {
         return (
             <Popover open={open} onOpenChange={setOpen}>
                 <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-10 w-10 p-0 rounded-full bg-zinc-800 hover:bg-zinc-700">
+                    <Button variant="ghost" size="icon" className="h-9 w-9 p-0 rounded-full bg-zinc-800 hover:bg-zinc-700">
                         {selectedClient ? (
                             <Avatar className="h-5 w-5">
                                 <AvatarImage src={getProfileImageUrl(selectedClient.logo)} className="object-contain" />
-                                <AvatarFallback className="bg-transparent font-bold text-sm text-white">
+                                <AvatarFallback className="bg-transparent font-bold text-[10px] text-white">
                                     {selectedClient.name.substring(0, 2).toUpperCase()}
                                 </AvatarFallback>
                             </Avatar>
                         ) : (
-                            <LayoutGrid className="h-5 w-5 text-zinc-400" />
+                            <LayoutGrid className="h-4 w-4 text-zinc-400" />
                         )}
                     </Button>
                 </PopoverTrigger>
@@ -137,24 +137,24 @@ export function ClientSelector({ isCollapsed }: { isCollapsed?: boolean }) {
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    className="w-full justify-between bg-zinc-900 border-zinc-700 text-zinc-100 hover:bg-zinc-800 hover:text-white"
+                    className="w-full h-9 text-xs px-3 justify-between bg-zinc-900 border-zinc-700 text-zinc-100 hover:bg-zinc-800 hover:text-white"
                 >
                     <div className="flex items-center gap-2 truncate">
                         {selectedClient ? (
                             <Avatar className="h-5 w-5">
                                 <AvatarImage src={getProfileImageUrl(selectedClient.logo)} className="object-contain" />
-                                <AvatarFallback className="bg-primary text-[10px] font-bold text-primary-foreground">
+                                <AvatarFallback className="bg-primary text-[9px] font-bold text-primary-foreground">
                                     {selectedClient.name.substring(0, 2).toUpperCase()}
                                 </AvatarFallback>
                             </Avatar>
                         ) : (
-                            <LayoutGrid className="h-4 w-4 text-zinc-400" />
+                            <LayoutGrid className="h-3.5 w-3.5 text-zinc-400" />
                         )}
                         <span className="truncate">
                             {selectedClient ? selectedClient.name : "Select Client..."}
                         </span>
                     </div>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-zinc-950 border-zinc-800" align="start">

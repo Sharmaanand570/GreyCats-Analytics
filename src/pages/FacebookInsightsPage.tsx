@@ -125,11 +125,11 @@ function FacebookInsightsPage() {
             <Breadcrumb>
               <BreadcrumbList className="text-xs font-medium text-slate-400">
                 <BreadcrumbItem>
-                  <BreadcrumbLink href="/#/data-sources">Data Sources</BreadcrumbLink>
+                  <BreadcrumbLink to="/data-sources">Data Sources</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbLink href="/#/data-sources/meta-business">Meta Business</BreadcrumbLink>
+                  <BreadcrumbLink to="/data-sources/meta-business">Facebook</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
@@ -368,12 +368,9 @@ function FacebookInsightsPage() {
 // --- Internal UI Components ---
 
 function PostInsightsDetail({ postId, databaseId, selectedPost }: any) {
-  const { data: postInsightsData, isLoading } = useFacebookPostInsights(postId, databaseId);
+  const { isLoading } = useFacebookPostInsights(postId, databaseId);
 
   if (isLoading) return <div className="space-y-6 pt-4"><Skeleton className="h-24 w-full rounded-2xl" /><Skeleton className="h-24 w-full rounded-2xl" /><Skeleton className="h-24 w-full rounded-2xl" /></div>;
-
-  const insights = postInsightsData?.insights || [];
-  const findMetric = (name: string) => insights.find((m: any) => m.name === name)?.values?.[0]?.value || 0;
 
   // Manual fallback for engagement from post object if available
   const likes = selectedPost?.likes?.summary?.total_count || 0;
@@ -411,20 +408,6 @@ function PostInsightsDetail({ postId, databaseId, selectedPost }: any) {
                     <span className="text-xs font-bold text-slate-600">Shares</span>
                 </div>
                 <span className="text-lg font-black text-slate-900">{shares.toLocaleString()}</span>
-            </div>
-        </div>
-      </div>
-
-      <div className="pt-8 border-t border-slate-50">
-        <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6">Reach & Impressions</h5>
-        <div className="space-y-4">
-            <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500">Post Impressions</span>
-                <span className="text-sm font-black text-slate-900">{findMetric('post_impressions').toLocaleString()}</span>
-            </div>
-            <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500">Unique Reach</span>
-                <span className="text-sm font-black text-slate-900">{findMetric('post_impressions_unique').toLocaleString()}</span>
             </div>
         </div>
       </div>

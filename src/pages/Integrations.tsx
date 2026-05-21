@@ -1,4 +1,5 @@
-import { FiBell, FiSearch, FiLoader, FiAlertCircle } from "react-icons/fi";
+import { FiSearch, FiLoader, FiAlertCircle } from "react-icons/fi";
+import { NotificationsPopover } from "../components/NotificationsPopover";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import DropDownFilter, { type FilterGroup } from "../components/DropDownFilter";
@@ -485,9 +486,8 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
             <span className="mx-2 text-lg text-gray-500">
               <FiSearch />
             </span>
-            <span className="mx-2 text-lg text-gray-500 ">
-              {" "}
-              <FiBell />
+            <span className="mx-2">
+              <NotificationsPopover />
             </span>
             <span className="ml-4">
               <ConnectDataSource clientId={clientId}>

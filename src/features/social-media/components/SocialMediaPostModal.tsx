@@ -74,8 +74,6 @@ const CAPTION_LIMITS: Record<string, number> = {
   linkedin: 3000,
 };
 
-const FIRST_COMMENT_LIMIT = 2200;
-
 const COMMON_TIMEZONES = [
   { label: 'IST (UTC+5:30)', value: 'Asia/Kolkata' },
   { label: 'EST (UTC-5)', value: 'America/New_York' },
@@ -112,7 +110,7 @@ const VIDEO_SPECS = {
 export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }: SocialMediaPostModalProps) {
   const { currentClient } = useClientContext();
   const { draftPost, updateDraft, resetDraft } = useSocialMediaStore();
-  const { platform, postType, aspectRatio, message: caption, mediaFiles = [], time, firstComment } = draftPost;
+  const { platform, postType, aspectRatio, message: caption, mediaFiles = [], time } = draftPost;
   const isStory = postType === 'STORY';
 
   const createMutation = useCreatePost();
@@ -190,7 +188,6 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
           platform: editingPost.platform,
           postType: editingPost.postType || 'FEED',
           message: editingPost.message || '',
-          firstComment: editingPost.firstComment || '',
           mediaFiles: [],
           clientId,
         });
@@ -380,9 +377,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
 
   const captionLimit = CAPTION_LIMITS[platform || 'instagram'] || 2200;
   const captionLength = caption?.length || 0;
-  const firstCommentLength = firstComment?.length || 0;
   const isCaptionOverLimit = captionLength > captionLimit;
-  const isFirstCommentOverLimit = firstCommentLength > FIRST_COMMENT_LIMIT;
 
   // Accordion — only one section open at a time
   const [expandedSection, setExpandedSection] = useState<string | null>('schedule');
@@ -400,7 +395,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
   const mediaWarning = (isStory || platform === 'instagram' || platform === 'both') && !hasNewMedia && !hasExistingMedia
     ? (isStory ? 'Media required for Stories' : 'Media required for Instagram') : null;
 
-  const captionWarning = isCaptionOverLimit ? 'Caption limit exceeded' : isFirstCommentOverLimit ? 'Comment limit exceeded' : null;
+  const captionWarning = isCaptionOverLimit ? 'Caption limit exceeded' : null;
 
   const renderSectionHeader = (
     id: string, 
@@ -435,7 +430,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
 
   const handleSave = async () => {
     if (!platform) return;
-    if (isCaptionOverLimit || isFirstCommentOverLimit) return;
+    if (isCaptionOverLimit) return;
     if (scheduledForPastError) {
       setUploadError('Scheduled date/time must be in the future.');
       return;
@@ -472,7 +467,6 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
             mediaUrls: mediaFiles.length === 0 ? mediaUrls : undefined,
             ...(isStory ? {} : {
               message: caption || undefined,
-              firstComment: firstComment || undefined,
               userTags: platform === 'instagram' && userTags.length > 0 ? userTags : undefined,
               collaboratorIds:
                 platform === 'instagram' && collaborators.length > 0
@@ -505,7 +499,6 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
             linkedinPortAccountId: platform === 'linkedin' && selectedLinkedinTargetId ? parseInt(selectedLinkedinTargetId) : undefined,
             ...(isStory ? {} : {
               message: caption || undefined,
-              firstComment: firstComment || undefined,
               userTags: platform === 'instagram' && userTags.length > 0 ? userTags : undefined,
               collaboratorIds:
                 platform === 'instagram' && collaborators.length > 0
@@ -540,7 +533,6 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
     !!platform &&
     !uploadError &&
     (!isCaptionOverLimit || isStory) &&
-    (!isFirstCommentOverLimit || isStory) &&
     (isStory
       ? (hasNewMedia || hasExistingMedia) // Stories always require media
       : (platform === 'facebook' || platform === 'linkedin' ? true : hasNewMedia || hasExistingMedia)) &&
@@ -1133,12 +1125,6 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
             <span className="font-semibold mr-2">brand_name</span>
             {caption || <span className="text-zinc-400">Your caption will appear here...</span>}
           </div>
-          {firstComment && (platform === 'instagram' || platform === 'both') && (
-            <div className="text-sm text-zinc-500 break-words whitespace-pre-wrap mt-1">
-              <span className="font-semibold mr-2 text-zinc-700">brand_name</span>
-              {firstComment}
-            </div>
-          )}
         </div>
         )}
       </div>
@@ -1331,7 +1317,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
                       </div>
                       {isStory && (
                         <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-md px-2.5 py-1.5 font-medium mt-2">
-                          Stories are media-only. Caption, first comment, location, tags, and collaborators are not supported.
+                          Stories are media-only. Caption, location, tags, and collaborators are not supported.
                         </p>
                       )}
                     </div>
@@ -1443,36 +1429,6 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
                     )}
                   </div>
 
-                  {/* First Comment (Instagram only) */}
-                  {(platform === 'instagram' || platform === 'both') && (
-                    <div>
-                      <div className="flex justify-between items-end mb-2">
-                        <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider block">
-                          First Comment <span className="text-zinc-400 normal-case">(optional)</span>
-                        </label>
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-widest ${
-                          isFirstCommentOverLimit
-                            ? 'bg-red-100 text-red-600'
-                            : firstCommentLength > FIRST_COMMENT_LIMIT * 0.9
-                            ? 'bg-amber-100 text-amber-600'
-                            : 'bg-zinc-100 text-zinc-400'
-                        }`}>
-                          {firstCommentLength.toLocaleString()}/{FIRST_COMMENT_LIMIT.toLocaleString()}
-                        </span>
-                      </div>
-                      <Textarea
-                        placeholder="Add hashtags or a first comment..."
-                        className={`min-h-[70px] resize-none focus-visible:ring-zinc-900 ${isFirstCommentOverLimit ? 'border-red-300 focus-visible:ring-red-500' : ''}`}
-                        value={firstComment}
-                        onChange={(e) => updateDraft({ firstComment: e.target.value })}
-                      />
-                      {isFirstCommentOverLimit && (
-                        <p className="text-[11px] text-red-500 mt-1 font-medium">
-                          First comment exceeds {FIRST_COMMENT_LIMIT.toLocaleString()} character limit.
-                        </p>
-                      )}
-                    </div>
-                  )}
                 </div>
               )}
             </div>

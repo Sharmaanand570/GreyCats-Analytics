@@ -5,7 +5,8 @@ import { DateRangePicker } from "./DateRangePicker";
 import { type DateRange } from "react-day-picker";
 import { useMemo, useState, useEffect, useCallback } from "react";
 // Icons
-import { FiSearch, FiBell } from "react-icons/fi";
+import { FiSearch } from "react-icons/fi";
+import { NotificationsPopover } from "./NotificationsPopover";
 import { LayoutGrid, Building2, Activity } from "lucide-react";
 // Components
 import { MetricCard } from "./dashboard/MetricCard";
@@ -1938,7 +1939,7 @@ function Dashboard({
         ) : dashboardWidgets.length === 0 ? (
           <div className="w-full px-5 py-24 text-center text-zinc-500 bg-white/50 backdrop-blur-sm rounded-3xl border border-dashed border-zinc-200 flex flex-col items-center justify-center transition-all hover:bg-white/80">
             <div className="p-5 rounded-full bg-zinc-50 mb-6 shadow-sm">
-              <FiBell className="text-4xl text-zinc-300" />
+              <LayoutGrid className="text-4xl text-zinc-300" />
             </div>
             <h3 className="text-2xl font-bold text-zinc-800 mb-3 tracking-tight">Dashboard is Empty</h3>
             <p className="mb-8 max-w-sm text-zinc-500 font-medium">Start by customizing your executive dashboard.</p>
@@ -2120,9 +2121,7 @@ function Dashboard({
               <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-zinc-600">
                 <FiSearch className="text-lg" />
               </Button>
-              <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-zinc-600">
-                <FiBell className="text-lg" />
-              </Button>
+              <NotificationsPopover />
             </div>
             {clientId && (
               <DateRangePicker

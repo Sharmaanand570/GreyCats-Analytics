@@ -244,7 +244,7 @@ function MetaBusinessDetailPage() {
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="text-slate-300" />
                                 <BreadcrumbItem>
-                                    <span className="bg-zinc-100 text-zinc-900 px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wider">Meta Business</span>
+                                    <span className="bg-zinc-100 text-zinc-900 px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wider">Facebook</span>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
                         </Breadcrumb>
@@ -257,7 +257,7 @@ function MetaBusinessDetailPage() {
                                 </div>
                             </div>
                             <div>
-                                <h1 className="text-3xl font-bold tracking-tight text-slate-900">Meta Business Suite</h1>
+                                <h1 className="text-3xl font-bold tracking-tight text-slate-900">Facebook Suite</h1>
                                 <p className="text-xs text-slate-500 mt-1 font-bold uppercase tracking-widest">Facebook & Instagram Insights</p>
                             </div>
                         </div>
@@ -311,7 +311,7 @@ function MetaBusinessDetailPage() {
                 {/* --- 2. Accounts Overview Grid --- */}
                 {selectedClientId && clientData && !hasMetaBusinessIntegration ? (
                     <PlatformNotConnected
-                        platformName="Meta Business (Facebook & Instagram)"
+                        platformName="Facebook"
                         icon={<SiMeta className="h-10 w-10 text-blue-500" />}
                         clientName={clientData.name}
                     />
@@ -319,7 +319,7 @@ function MetaBusinessDetailPage() {
                     <div className="space-y-6">
                         {pages.length === 0 ? (
                             <PlatformNotConnected
-                                platformName="Meta Business (Facebook & Instagram)"
+                                platformName="Facebook"
                                 icon={<SiMeta className="h-10 w-10 text-blue-500" />}
                                 clientName={clientData?.name}
                             />
@@ -430,7 +430,7 @@ function MetaBusinessDetailPage() {
                                                         <div className="flex items-center gap-2 mt-1">
                                                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
                                                                 <SiInstagram className="w-3.5 h-3.5 text-pink-600/80 saturate-50" />
-                                                                <span className="hidden sm:inline">Instagram Business</span>
+                                                                <span className="hidden sm:inline">Instagram</span>
                                                             </div>
                                                         </div>
                                                     </div>

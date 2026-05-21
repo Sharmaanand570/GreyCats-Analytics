@@ -126,11 +126,11 @@ function InstagramInsightsPage() {
             <Breadcrumb>
               <BreadcrumbList className="text-xs font-medium text-slate-400">
                 <BreadcrumbItem>
-                  <BreadcrumbLink href="/#/data-sources">Data Sources</BreadcrumbLink>
+                  <BreadcrumbLink to="/data-sources">Data Sources</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbLink href="/#/data-sources/meta-business">Meta Business</BreadcrumbLink>
+                  <BreadcrumbLink to="/data-sources/meta-business">Facebook</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
@@ -426,14 +426,6 @@ function MediaInsightsDetail({ mediaId, clientId, accountId, selectedMedia }: an
         <div className="pt-8 border-t border-slate-50">
             <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6">Reach & Discoverability</h5>
             <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-500">Impressions</span>
-                    <span className="text-sm font-black text-slate-900">{findMetric('impressions').toLocaleString()}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-500">Total Reach</span>
-                    <span className="text-sm font-black text-slate-900">{findMetric('reach').toLocaleString()}</span>
-                </div>
                 <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-500">Saves</span>
                     <span className="text-sm font-black text-slate-900">{findMetric('saved').toLocaleString()}</span>

@@ -114,13 +114,13 @@ const dataSourceOptions: DataSourceOption[] = [
   },
   {
     id: "meta-business",
-    name: "Meta Business",
+    name: "Facebook",
     icon: SiMeta,
     color: getPlatformConfig("meta-business")?.color,
   },
   {
     id: "instagram-business",
-    name: "Instagram Business",
+    name: "Instagram",
     icon: SiInstagram,
     color: getPlatformConfig("instagram")?.color || "#E1306C",
   },
@@ -460,15 +460,16 @@ mutations.meta.isPending ||
     <div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>{children}</DialogTrigger>
-        <DialogContent className="w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-4">
-          <DialogHeader>
+        <DialogContent className="w-full max-w-2xl max-h-[90vh] mx-4 flex flex-col gap-4 overflow-hidden">
+          <DialogHeader className="shrink-0">
             <DialogTitle className="text-base sm:text-lg md:text-xl lg:text-2xl">Select a Data Source</DialogTitle>
             <DialogDescription className="text-xs sm:text-sm md:text-base">
               Select an integration to connect and track your metrics
             </DialogDescription>
           </DialogHeader>
           {Next === null ? (
-            <form 
+            <form
+              className="flex flex-col flex-1 min-h-0 gap-4"
               onSubmit={(e) => { e.preventDefault(); handleSelectSourceNext(); }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -480,7 +481,7 @@ mutations.meta.isPending ||
               }}
             >
               {/* Search Bar */}
-              <div className="mt-3 sm:mt-4 md:mt-5">
+              <div className="shrink-0">
                 <Input
                   id="search-integration"
                   placeholder="Search integrations..."
@@ -491,7 +492,7 @@ mutations.meta.isPending ||
               </div>
 
               {/* Integrations List */}
-              <div className="mt-4 border rounded-lg">
+              <div className="border rounded-lg flex-1 min-h-0 overflow-y-auto">
                 {filteredDataSources.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-gray-500">
                     <p className="text-sm sm:text-base">No integrations found</p>
@@ -542,7 +543,6 @@ mutations.meta.isPending ||
                           )}
                           <div className="flex items-center gap-2">
                             <span className="text-base font-medium">{option.name}</span>
-                            {option.name === "Meta Business" && <span className="text-xs text-gray-400 font-light">(facebook & instagram)</span>}
                           </div>
                         </div>
                       </div>
@@ -552,7 +552,7 @@ mutations.meta.isPending ||
               </div>
 
               {/* Footer */}
-              <DialogFooter className="mt-6 flex-col sm:flex-row gap-2">
+              <DialogFooter className="shrink-0 flex-col sm:flex-row gap-2">
                 <DialogClose asChild>
                   <Button variant="outline" className="w-full sm:w-auto">
                     Cancel
@@ -573,8 +573,8 @@ mutations.meta.isPending ||
               </DialogFooter>
             </form>
           ) : Next === "woocommerce" ? (
-            <div>
-              <div>
+            <div className="flex flex-col flex-1 min-h-0">
+              <div className="flex-1 min-h-0 overflow-y-auto">
                 <div className="w-full flex justify-center flex-col items-center">
                   <div className="flex items-center gap-1.5 sm:gap-2 md:gap-2.5 py-3 sm:py-4 md:py-5 lg:py-6">
                     {SelectedSource.icon &&
@@ -659,7 +659,7 @@ mutations.meta.isPending ||
               </div>
 
               {/* Footer */}
-              <DialogFooter className="mt-3 sm:mt-3 md:mt-4 flex flex-col sm:flex-row justify-between w-full gap-2 sm:gap-2 md:gap-0">
+              <DialogFooter className="shrink-0 mt-3 sm:mt-3 md:mt-4 flex flex-col sm:flex-row justify-between w-full gap-2 sm:gap-2 md:gap-0">
                 <Button
                   onClick={() => setNext(null)}
                   variant="outline"
@@ -698,8 +698,8 @@ mutations.meta.isPending ||
               </DialogFooter>
             </div>
           ) : Next === "wordpress" ? (
-            <div>
-              <div className="w-full flex justify-center flex-col items-center">
+            <div className="flex flex-col flex-1 min-h-0">
+              <div className="flex-1 min-h-0 overflow-y-auto w-full flex justify-center flex-col items-center">
                 <div className="flex items-center gap-2 py-4">
                   {SelectedSource.icon && typeof SelectedSource.icon !== "string" && (
                     <SelectedSource.icon
@@ -770,7 +770,7 @@ mutations.meta.isPending ||
                 </div>
               </div>
 
-              <DialogFooter className="mt-4 flex flex-col sm:flex-row justify-between w-full gap-2">
+              <DialogFooter className="shrink-0 mt-4 flex flex-col sm:flex-row justify-between w-full gap-2">
                 <Button onClick={() => setNext(null)} variant="outline" className="w-full sm:w-auto">Back</Button>
                 <Button
                   isLoading={isConnecting}
@@ -789,8 +789,8 @@ mutations.meta.isPending ||
               </DialogFooter>
             </div>
           ) : Next === "telegram" ? (
-            <div>
-              <div className="w-full flex justify-center flex-col items-center">
+            <div className="flex flex-col flex-1 min-h-0">
+              <div className="flex-1 min-h-0 overflow-y-auto w-full flex justify-center flex-col items-center">
                 <div className="flex items-center gap-2 py-4">
                   {SelectedSource.icon && typeof SelectedSource.icon !== "string" && (
                     <SelectedSource.icon
@@ -848,7 +848,7 @@ mutations.meta.isPending ||
                 </div>
               </div>
 
-              <DialogFooter className="mt-4 flex flex-col sm:flex-row justify-between w-full gap-2">
+              <DialogFooter className="shrink-0 mt-4 flex flex-col sm:flex-row justify-between w-full gap-2">
                 <Button onClick={() => setNext(null)} variant="outline" className="w-full sm:w-auto">Back</Button>
                 <Button
                   isLoading={isConnecting}

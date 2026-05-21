@@ -13,7 +13,7 @@ import { AccountSelectionModal } from '../components/clients/AccountSelectionMod
 import type { IntegrationType } from '../types/integration.types';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Loader2, LayoutDashboard, FileBarChart, Database, CalendarDays, Edit2 } from 'lucide-react';
-import { FiBell } from "react-icons/fi";
+import { NotificationsPopover } from '../components/NotificationsPopover';
 import { ReportSchedules } from '../components/ReportSchedules';
 import { useSyncStatus } from '@/features/reports/hooks/useSyncStatus';
 import ClientFormModal from '../components/clients/ClientFormModal';
@@ -187,9 +187,7 @@ const ClientDetailPage: React.FC = () => {
                                 </>
                             )}
                             <div className="flex items-center border-l pl-4 gap-3">
-                                <button className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
-                                    <FiBell className="text-lg" />
-                                </button>
+                                <NotificationsPopover />
                             </div>
                         </div>
                     </div>

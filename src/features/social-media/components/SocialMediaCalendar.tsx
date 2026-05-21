@@ -15,7 +15,7 @@ import {
   compareAsc,
   parseISO,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, SquarePlus, X, Image as ImageIcon, Video as VideoIcon, ChevronDown, Pencil, Trash2, AlertCircle, CalendarPlus, Filter, Bell, Share2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, SquarePlus, X, Image as ImageIcon, Video as VideoIcon, ChevronDown, Pencil, Trash2, AlertCircle, CalendarPlus, Filter, CalendarClock, Share2 } from 'lucide-react';
 import { FaInstagram, FaFacebook, FaLinkedin } from 'react-icons/fa6';
 import { gsap } from 'gsap';
 import { Button } from '@/components/ui/button';
@@ -460,7 +460,7 @@ export function SocialMediaCalendar({ clientId, canPost }: SocialMediaCalendarPr
             hasTodayPosts && !showUpcoming && "border-blue-200 bg-blue-50/30"
           )}
         >
-          <Bell className={cn(
+          <CalendarClock className={cn(
             "w-3.5 h-3.5 transition-colors",
             hasTodayPosts ? "text-blue-600 fill-blue-600/10" : "text-zinc-500"
           )} />

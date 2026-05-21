@@ -38,6 +38,8 @@ const GoogleConsoleDetailPage = lazy(
   () => import("./pages/GoogleConsoleDetailPage")
 );
 const MetaDetailPage = lazy(() => import("./pages/MetaDetailPage"));
+const MetaAdsWizardPage = lazy(() => import("./pages/MetaAdsWizardPage"));
+const MetaAudiencesPage = lazy(() => import("./pages/MetaAudiencesPage"));
 const MetaBusinessDetailPage = lazy(() => import("./pages/MetaBusinessDetailPage"));
 const FacebookInsightsPage = lazy(() => import("./pages/FacebookInsightsPage"));
 const InstagramInsightsPage = lazy(
@@ -111,6 +113,7 @@ const ActivityTimelinePage = lazy(() => import("./features/admin/pages/ActivityT
 const IntegrationHealthPage = lazy(() => import("./features/admin/pages/IntegrationHealthPage"));
 const SystemConfigPage = lazy(() => import("./features/admin/pages/SystemConfigPage"));
 const AdminBroadcastPage = lazy(() => import("./features/admin/pages/AdminBroadcastPage"));
+const AdminNotificationsPage = lazy(() => import("./features/admin/pages/AdminNotificationsPage"));
 const RoleGuard = lazy(() => import("./components/RoleGuard"));
 
 const LoadingFallback = () => (
@@ -175,7 +178,16 @@ function App() {
                   path="google-console/:clientId?"
                   element={<GoogleConsoleDetailPage />}
                 />
-                <Route path="meta-ads/:clientId?" element={<MetaDetailPage />} />
+                <Route path="meta-ads">
+                  <Route index element={<MetaDetailPage />} />
+                  <Route path="wizard/:clientId?" element={<MetaAdsWizardPage />} />
+                  <Route
+                    path="wizard/:clientId/edit/:campaignId"
+                    element={<MetaAdsWizardPage />}
+                  />
+                  <Route path="audiences/:clientId?" element={<MetaAudiencesPage />} />
+                  <Route path=":clientId" element={<MetaDetailPage />} />
+                </Route>
                 <Route path="meta-business/:clientId?" element={<MetaBusinessDetailPage />} />
                 <Route path="meta-facebook/:clientId?" element={<FacebookInsightsPage />} />
                 <Route
@@ -226,6 +238,7 @@ function App() {
                 <Route path="monitoring/activity" element={<ActivityTimelinePage />} />
                 <Route path="monitoring/integrations" element={<IntegrationHealthPage />} />
                 <Route path="broadcasts" element={<AdminBroadcastPage />} />
+                <Route path="notifications" element={<AdminNotificationsPage />} />
                 <Route path="system" element={<SystemConfigPage />} />
                 <Route path="*" element={<Navigate to="dashboard" replace />} />
               </Route>

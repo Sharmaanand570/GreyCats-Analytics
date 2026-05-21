@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useClients, useDeleteClient } from '../hooks/useClients';
 import { useBlogIntegrations, useWordPressTargets, useTelegramTargets } from '../features/blog/hooks/useBlogPosts';
 import { Plus, Building2, Activity, ArrowUpDown, Trash2, Edit2 } from 'lucide-react';
-import { FiSearch, FiBell } from "react-icons/fi";
+import { FiSearch } from "react-icons/fi";
+import { NotificationsPopover } from '../components/NotificationsPopover';
 import { Button } from '../components/ui/button';
 import { Input } from "../components/ui/input";
 import { Skeleton } from "../components/ui/skeleton";
@@ -212,9 +213,7 @@ const ClientsPage: React.FC = () => {
                                 />
                             </div>
                             <div className="flex items-center border-l pl-4 gap-3">
-                                <button className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
-                                    <FiBell className="text-lg" />
-                                </button>
+                                <NotificationsPopover />
                                 <Button
                                     onClick={() => {
                                         setEditingClient(null);
