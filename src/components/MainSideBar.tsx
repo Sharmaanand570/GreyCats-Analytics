@@ -29,8 +29,6 @@ import {
   PenLine,
   Send,
   Megaphone,
-  Sparkles,
-  UserSquare,
 } from "lucide-react";
 import { FiMenu } from "react-icons/fi";
 import { SiGoogleads } from "react-icons/si";

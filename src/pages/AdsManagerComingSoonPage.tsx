@@ -1,5 +1,6 @@
 "use client";
 
+import type { IconType } from "react-icons";
 import { useNavigate } from "react-router-dom";
 import { SiMeta, SiGoogleads } from "react-icons/si";
 import { RiAdvertisementLine } from "react-icons/ri";
@@ -20,8 +21,8 @@ const CONTENT: Record<
     gradientFrom: string;
     gradientTo: string;
     glow: string;
-    smallIcon: React.ComponentType<{ className?: string }>;
-    bigIcon: React.ComponentType<{ className?: string }>;
+    smallIcon: IconType;
+    bigIcon: IconType;
   }
 > = {
   "meta-ads": {
