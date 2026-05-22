@@ -37,15 +37,13 @@ const GoogleAnalyticsDetailPage = lazy(
 const GoogleConsoleDetailPage = lazy(
   () => import("./pages/GoogleConsoleDetailPage")
 );
-const MetaDetailPage = lazy(() => import("./pages/MetaDetailPage"));
-const MetaAdsWizardPage = lazy(() => import("./pages/MetaAdsWizardPage"));
-const MetaAudiencesPage = lazy(() => import("./pages/MetaAudiencesPage"));
+const AdsManagerComingSoonPage = lazy(() => import("./pages/AdsManagerComingSoonPage"));
 const MetaBusinessDetailPage = lazy(() => import("./pages/MetaBusinessDetailPage"));
 const FacebookInsightsPage = lazy(() => import("./pages/FacebookInsightsPage"));
 const InstagramInsightsPage = lazy(
   () => import("./pages/InstagramInsightsPage")
 );
-const GoogleAdsDetailPage = lazy(() => import("./pages/GoogleAdsDetailPage"));
+
 const GoogleAdsConnectPage = lazy(() => import("./pages/GoogleAdsConnectPage"));
 const ReportsLandingPage = lazy(() => import("./pages/ReportsLandingPage"));
 
@@ -179,14 +177,16 @@ function App() {
                   element={<GoogleConsoleDetailPage />}
                 />
                 <Route path="meta-ads">
-                  <Route index element={<MetaDetailPage />} />
-                  <Route path="wizard/:clientId?" element={<MetaAdsWizardPage />} />
+                  <Route index element={<AdsManagerComingSoonPage activeTab="meta-ads" />} />
+                  <Route path="wizard" element={<AdsManagerComingSoonPage activeTab="meta-ads" />} />
+                  <Route path="wizard/:clientId" element={<AdsManagerComingSoonPage activeTab="meta-ads" />} />
                   <Route
                     path="wizard/:clientId/edit/:campaignId"
-                    element={<MetaAdsWizardPage />}
+                    element={<AdsManagerComingSoonPage activeTab="meta-ads" />}
                   />
-                  <Route path="audiences/:clientId?" element={<MetaAudiencesPage />} />
-                  <Route path=":clientId" element={<MetaDetailPage />} />
+                  <Route path="audiences" element={<AdsManagerComingSoonPage activeTab="meta-ads" />} />
+                  <Route path="audiences/:clientId" element={<AdsManagerComingSoonPage activeTab="meta-ads" />} />
+                  <Route path=":clientId" element={<AdsManagerComingSoonPage activeTab="meta-ads" />} />
                 </Route>
                 <Route path="meta-business/:clientId?" element={<MetaBusinessDetailPage />} />
                 <Route path="meta-facebook/:clientId?" element={<FacebookInsightsPage />} />
@@ -194,7 +194,7 @@ function App() {
                   path="meta-instagram/:clientId?"
                   element={<InstagramInsightsPage />}
                 />
-                <Route path="google-ads/:clientId?" element={<GoogleAdsDetailPage />} />
+                <Route path="google-ads/:clientId?" element={<AdsManagerComingSoonPage activeTab="google-ads" />} />
                 <Route path="twitter/:clientId?" element={<TwitterDetailPage />} />
                 <Route path="linkedin/:clientId?" element={<LinkedinDetailPage />} />
                 <Route path="*" element={<NotFoundPage />} />

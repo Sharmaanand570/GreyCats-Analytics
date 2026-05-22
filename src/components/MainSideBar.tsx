@@ -33,6 +33,7 @@ import {
   UserSquare,
 } from "lucide-react";
 import { FiMenu } from "react-icons/fi";
+import { SiGoogleads } from "react-icons/si";
 import { useEffect, useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
@@ -139,6 +140,9 @@ function MainSideBar(): React.JSX.Element {
       // Match the meta-ads root and /:clientId, but NOT /wizard or /audiences subpaths
       return /^\/data-sources\/meta-ads(\/\d+)?$/.test(pathname);
     }
+    if (itemPath === '/data-sources/google-ads') {
+      return pathname.startsWith('/data-sources/google-ads');
+    }
     if (itemPath === '/admin/dashboard') {
       return pathname.startsWith('/admin');
     }
@@ -181,6 +185,7 @@ function MainSideBar(): React.JSX.Element {
       "data-sources/meta-ads/wizard",
       "data-sources/meta-ads/audiences",
       "data-sources/meta-ads",
+      "data-sources/google-ads",
     ];
     if (currentClient?.id && clientScopedPaths.some(p => path.includes(p))) {
       finalPath = `${path}/${currentClient.id}`;
@@ -228,9 +233,8 @@ function MainSideBar(): React.JSX.Element {
       label: "Ads Manager",
       isCollapsible: true,
       items: [
-        { label: "Create Ad", path: "/data-sources/meta-ads/wizard", icon: <Sparkles /> },
-        { label: "Audiences", path: "/data-sources/meta-ads/audiences", icon: <UserSquare /> },
         { label: "Meta Ads", path: "/data-sources/meta-ads", icon: <Megaphone /> },
+        { label: "Google Ads", path: "/data-sources/google-ads", icon: <SiGoogleads className="w-[18px] h-[18px]" /> },
       ],
     },
     {
