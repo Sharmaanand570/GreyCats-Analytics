@@ -20,9 +20,13 @@ import {
   Hash,
   Type,
   Users,
-  Zap
+  Sparkles,
+  Zap,
+  X as XIcon
 } from 'lucide-react';
 import { SiTelegram } from 'react-icons/si';
+import { toast } from 'sonner';
+import { creativeApi } from '@/api/creativeApi';
 import { useCreateBroadcast, useCreateBroadcastCsv, useTemplates, useIntegrations } from '../hooks/useBroadcasts';
 import { useTelegramTargets } from '@/features/blog/hooks/useBlogPosts';
 import type { BroadcastChannel, BroadcastIntegration } from '../api/types';
@@ -45,6 +49,7 @@ export function CreateBroadcastModal({ isOpen, onClose, clientId }: CreateBroadc
   const [channel, setChannel] = useState<BroadcastChannel>('SMS');
   const [name, setName] = useState('');
   const [subject, setSubject] = useState('');
+  const [aiSubjectLoading, setAiSubjectLoading] = useState(false);
   const [templateId, setTemplateId] = useState<number | null>(null);
   const [integrationId, setIntegrationId] = useState<number | null>(null);
   const [recipientMode, setRecipientMode] = useState<'manual' | 'csv'>('manual');
@@ -275,8 +280,24 @@ export function CreateBroadcastModal({ isOpen, onClose, clientId }: CreateBroadc
                       placeholder="Enter subject line..."
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
-                      className="h-14 pl-12 rounded-[18px] border-zinc-200 bg-zinc-50/50 focus:bg-white text-base font-medium transition-all"
+                      className="h-14 pl-12 pr-12 rounded-[18px] border-zinc-200 bg-zinc-50/50 focus:bg-white text-base font-medium transition-all"
                     />
+                    <button
+                      type="button"
+                      title={subject ? "Rewrite subject with AI" : "Generate subject with AI"}
+                      disabled={aiSubjectLoading}
+                      onClick={() => {
+                        const topic = subject.trim() || name.trim();
+                        if (!topic) { toast.error('Enter a subject or broadcast name first'); return; }
+                        setAiSubjectLoading(true);
+                        creativeApi.generateCaptions({ clientId: 0, platform: 'linkedin', goal: 'engagement', topic: `Write a catchy email subject line about: ${topic}`, count: 1 })
+                          .then((res) => { const t = res.data.data.captions[0]?.text; if (t) { setSubject(t.replace(/^["']|["']$/g, '').slice(0, 200)); toast.success('Subject generated!'); } })
+                          .catch(() => toast.error('Failed')).finally(() => setAiSubjectLoading(false));
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg bg-gray-200/60 hover:bg-gray-900 hover:text-white text-gray-400 transition-all"
+                    >
+                      {aiSubjectLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
                 </div>
               )}

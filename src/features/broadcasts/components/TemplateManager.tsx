@@ -2,15 +2,15 @@ import { useState, useEffect } from 'react';
 import { useTemplates, useAdminTemplates, useCreateTemplate, useCreateSystemTemplate, useDeleteTemplate, useApproveTemplate } from '../hooks/useBroadcasts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { 
-  FileText, 
-  Plus, 
-  CheckCircle2, 
-  Clock, 
-  XCircle, 
-  Loader2, 
-  Trash2, 
-  Check, 
+import {
+  FileText,
+  Plus,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  Loader2,
+  Trash2,
+  Check,
   X,
   ShieldCheck,
   Layout,
@@ -18,8 +18,11 @@ import {
   Mail as MailIcon,
   Search,
   Info,
-  AlertCircle
+  AlertCircle,
+  Sparkles
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { creativeApi } from '@/api/creativeApi';
 import type { BroadcastChannel } from '../api/types';
 import { useUserStore } from '@/utils/useUserStore';
 import { cn } from '@/lib/utils';
@@ -39,6 +42,9 @@ export function TemplateManager() {
   const [channel, setChannel] = useState<BroadcastChannel>('SMS');
   const [content, setContent] = useState('');
   const [externalId, setExternalId] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [showAiInput, setShowAiInput] = useState(false);
+  const [aiTopic, setAiTopic] = useState('');
   const [isSystemTemplate, setIsSystemTemplate] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [editingExternalIds, setEditingExternalIds] = useState<Record<number, string>>({});
@@ -180,11 +186,79 @@ export function TemplateManager() {
             
             <div className="space-y-3 mb-4">
               <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-1">Message Content</label>
-              <textarea 
-                value={content} onChange={(e) => setContent(e.target.value)}
-                placeholder="Craft your message here. Use {{name}} for dynamic tags..." rows={5}
-                className="w-full px-5 py-4 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none leading-relaxed outline-none"
-              />
+              <div className="relative">
+                <textarea
+                  value={content} onChange={(e) => setContent(e.target.value)}
+                  placeholder="Craft your message here. Use {{name}} for dynamic tags..." rows={5}
+                  className="w-full px-5 py-4 pr-12 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none leading-relaxed outline-none"
+                />
+                <button
+                  type="button"
+                  title={content ? "Rewrite with AI" : "Write with AI"}
+                  disabled={aiLoading}
+                  onClick={() => {
+                    if (content.trim()) {
+                      setAiLoading(true);
+                      if (channel === 'SMS') {
+                        creativeApi.generateCaptions({ clientId: 0, platform: 'linkedin', goal: 'engagement', topic: `Rewrite this SMS message to be more engaging (max 160 chars): ${content}`, count: 1 })
+                          .then((res) => { const t = res.data.data.captions[0]?.text; if (t) { setContent(t.slice(0, 160)); toast.success('SMS improved!'); } })
+                          .catch(() => toast.error('Failed')).finally(() => setAiLoading(false));
+                      } else {
+                        creativeApi.generateContent({ clientId: 0, contentType: 'article', topic: `Rewrite and improve this email as clean, responsive HTML email template with inline styles. Keep it professional. Original: ${content.slice(0, 500)}`, platform: 'linkedin' })
+                          .then((res) => { if (res.data.data.content) { setContent(res.data.data.content); toast.success('Email template improved!'); } })
+                          .catch(() => toast.error('Failed')).finally(() => setAiLoading(false));
+                      }
+                    } else {
+                      setShowAiInput(true);
+                    }
+                  }}
+                  className="absolute top-3 right-3 p-1.5 rounded-lg bg-gray-200/60 hover:bg-gray-900 hover:text-white text-gray-400 transition-all"
+                >
+                  {aiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                </button>
+                {showAiInput && (
+                  <div className="absolute top-0 left-0 right-0 z-10 bg-white dark:bg-zinc-900 rounded-2xl border border-gray-300 shadow-lg p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-700 dark:text-gray-300">What's the message about?</span>
+                      <button type="button" onClick={() => setShowAiInput(false)} className="text-gray-400 hover:text-gray-600"><X className="w-3.5 h-3.5" /></button>
+                    </div>
+                    <input autoFocus type="text" value={aiTopic} onChange={(e) => setAiTopic(e.target.value)}
+                      placeholder={channel === 'SMS' ? 'e.g. Appointment reminder, Promo offer...' : 'e.g. Newsletter update, Welcome email...'}
+                      className="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-gray-400"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && aiTopic.trim()) {
+                          e.preventDefault(); setAiLoading(true); setShowAiInput(false);
+                          if (channel === 'SMS') {
+                            creativeApi.generateCaptions({ clientId: 0, platform: 'linkedin', goal: 'engagement', topic: `Write a short SMS message (max 160 chars) about: ${aiTopic.trim()}`, count: 1 })
+                              .then((res) => { const t = res.data.data.captions[0]?.text; if (t) { setContent(t.slice(0, 160)); toast.success('SMS generated!'); } })
+                              .catch(() => toast.error('Failed')).finally(() => { setAiLoading(false); setAiTopic(''); });
+                          } else {
+                            creativeApi.generateContent({ clientId: 0, contentType: 'article', topic: `Write a clean, responsive HTML email template with inline styles about: ${aiTopic.trim()}. Include a header, body with paragraphs, and a call-to-action button. Use professional styling.`, platform: 'linkedin' })
+                              .then((res) => { if (res.data.data.content) { setContent(res.data.data.content); toast.success('Email template generated!'); } })
+                              .catch(() => toast.error('Failed')).finally(() => { setAiLoading(false); setAiTopic(''); });
+                          }
+                        } else if (e.key === 'Escape') { setShowAiInput(false); }
+                      }}
+                    />
+                    <div className="flex justify-end">
+                      <button type="button" disabled={!aiTopic.trim()} onClick={() => {
+                        setAiLoading(true); setShowAiInput(false);
+                        if (channel === 'SMS') {
+                          creativeApi.generateCaptions({ clientId: 0, platform: 'linkedin', goal: 'engagement', topic: `Write a short SMS message (max 160 chars) about: ${aiTopic.trim()}`, count: 1 })
+                            .then((res) => { const t = res.data.data.captions[0]?.text; if (t) { setContent(t.slice(0, 160)); toast.success('SMS generated!'); } })
+                            .catch(() => toast.error('Failed')).finally(() => { setAiLoading(false); setAiTopic(''); });
+                        } else {
+                          creativeApi.generateContent({ clientId: 0, contentType: 'article', topic: `Write a clean, responsive HTML email template with inline styles about: ${aiTopic.trim()}. Include a header, body with paragraphs, and a call-to-action button. Use professional styling.`, platform: 'linkedin' })
+                            .then((res) => { if (res.data.data.content) { setContent(res.data.data.content); toast.success('Email template generated!'); } })
+                            .catch(() => toast.error('Failed')).finally(() => { setAiLoading(false); setAiTopic(''); });
+                        }
+                      }} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gray-900 text-white text-xs font-bold disabled:opacity-50 hover:bg-gray-800 transition-all">
+                        <Sparkles className="w-3 h-3" /> Generate
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
               {channel === 'SMS' && (
                 <div className="flex justify-end pr-2">
                   <span className={cn("text-[9px] font-black uppercase tracking-widest", content.length > 160 ? "text-red-500" : "text-gray-400")}>

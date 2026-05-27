@@ -7,6 +7,7 @@ import PersonalInformation from "@/components/settings/PersonalInformation";
 import ReportSettings from "@/components/settings/ReportSettings";
 import SecuritySettings from "@/components/settings/SecuritySettings";
 import { ProviderManager } from "@/features/broadcasts/components/ProviderManager";
+import AISettings from "@/components/settings/AISettings";
 
 
 export default function SettingsPage() {
@@ -25,6 +26,8 @@ export default function SettingsPage() {
         return <SecuritySettings />;
       case "broadcast-settings":
         return <ProviderManager />;
+      case "ai-settings":
+        return <AISettings />;
       default:
         return <PersonalInformation />;
     }

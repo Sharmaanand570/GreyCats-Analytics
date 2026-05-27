@@ -27,6 +27,12 @@ export default function SettingSideBar({ activeTab, setActive }: SettingSideBarP
         { id: "broadcast-settings", label: "Broadcast Channels" },
       ]
     },
+    {
+      category: "AI",
+      items: [
+        { id: "ai-settings", label: "AI Configuration" },
+      ]
+    },
   ];
 
   return (

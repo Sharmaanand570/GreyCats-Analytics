@@ -12,11 +12,14 @@ import Reports from '../components/Reports';
 import { AccountSelectionModal } from '../components/clients/AccountSelectionModal';
 import type { IntegrationType } from '../types/integration.types';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Loader2, LayoutDashboard, FileBarChart, Database, CalendarDays, Edit2 } from 'lucide-react';
+import { ChevronLeft, Loader2, LayoutDashboard, FileBarChart, Database, CalendarDays, Edit2, Sparkles, Palette } from 'lucide-react';
 import { NotificationsPopover } from '../components/NotificationsPopover';
 import { ReportSchedules } from '../components/ReportSchedules';
 import { useSyncStatus } from '@/features/reports/hooks/useSyncStatus';
 import ClientFormModal from '../components/clients/ClientFormModal';
+import BrandSettings from '../components/clients/BrandSettings';
+import ContentCalendar from '../components/calendar/ContentCalendar';
+import CreativeSuite from '../components/creative/CreativeSuite';
 import { getProfileImageUrl } from "@/utils/imageUtils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -222,6 +225,10 @@ const ClientDetailPage: React.FC = () => {
                                     <Database className="w-4 h-4 mr-2" />
                                     Data Sources
                                 </TabsTrigger>
+                                <TabsTrigger value="brand-ai" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                                    <Sparkles className="w-4 h-4 mr-2" />
+                                    Brand AI
+                                </TabsTrigger>
                             </TabsList>
                             {isReportAccessLocked && (
                                 <p className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
@@ -264,6 +271,14 @@ const ClientDetailPage: React.FC = () => {
                                             withLayout={false}
                                             hideHeader={true}
                                         />
+                                    )}
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="brand-ai" className="space-y-4 focus-visible:outline-none">
+                                <div className="min-h-[500px]">
+                                    {parsedClientId && (
+                                        <BrandSettings clientId={parsedClientId} />
                                     )}
                                 </div>
                             </TabsContent>

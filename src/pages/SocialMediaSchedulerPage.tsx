@@ -15,6 +15,8 @@ import {
   UserPlus,
   Loader2,
   AlertCircle,
+  AlertTriangle,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +30,7 @@ import { useAvailableAccounts, useAssignAccount, useRemoveAccount } from '@/hook
 import { loginMetaBusiness } from '@/features/meta/API/metaBusinessApi';
 
 import { getProfileImageUrl } from '@/utils/imageUtils';
+import { AISuggestionsPanel, useAISuggestionsCount } from '@/features/social-media/components/AISuggestionsPanel';
 import type { ClientWithIntegrations, AvailableAccount } from '@/types/client.types';
 import {
   ConnectPlatformsButton,
@@ -758,6 +761,8 @@ function StepWorkspace({
   onSwitchWorkspace: () => void;
 }) {
   const removeAccount = useRemoveAccount();
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const suggestionsCount = useAISuggestionsCount(client.id);
 
   const linkedPages = (client.integrations || []).filter(
     (i) => i.integrationType === 'meta-business'
@@ -955,6 +960,129 @@ function StepWorkspace({
           <SocialMediaCalendar
             clientId={client.id}
             canPost={connectedIds.length > 0}
+            headerExtra={
+              <>
+              {/* Content Suggestions Button */}
+              <Button
+                variant="outline"
+                className={`h-10 gap-2 shrink-0 transition-colors ${
+                  (suggestionsCount.data ?? 0) > 0
+                    ? 'bg-violet-50 border-violet-300 hover:bg-violet-100 text-violet-800'
+                    : 'bg-white border-zinc-200 hover:bg-zinc-50'
+                }`}
+                onClick={() => setAiPanelOpen(true)}
+              >
+                <Sparkles className="w-4 h-4" />
+                Suggestions
+                {(suggestionsCount.data ?? 0) > 0 && (
+                  <div className="ml-1 rounded-full px-2 py-0.5 text-[9px] font-bold leading-none bg-violet-600 text-white min-w-[18px] text-center">
+                    {suggestionsCount.data}
+                  </div>
+                )}
+              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={`h-10 gap-2 shrink-0 transition-colors ${
+                      connectedIds.length < PLATFORMS.filter(p => !p.comingSoon).length
+                        ? 'bg-amber-50 border-amber-300 hover:bg-amber-100 text-amber-800'
+                        : 'bg-white border-zinc-200 hover:bg-zinc-50'
+                    }`}
+                  >
+                    {connectedIds.length < PLATFORMS.filter(p => !p.comingSoon).length ? (
+                      <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    ) : (
+                      <Link2 className="w-4 h-4" />
+                    )}
+                    Connections
+                    <div className={`ml-1 rounded-lg px-2 py-0.5 text-[9px] font-bold leading-none border flex items-center ${
+                      connectedIds.length < PLATFORMS.filter(p => !p.comingSoon).length
+                        ? 'bg-amber-200/60 text-amber-800 border-amber-300'
+                        : 'bg-zinc-100 text-zinc-600 border-zinc-200 shadow-inner'
+                    }`}>
+                      {connectedIds.length}/{PLATFORMS.length}
+                    </div>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-80 p-2 bg-white rounded-xl shadow-lg border border-zinc-200/50"
+                  align="center"
+                  sideOffset={8}
+                >
+                  <div className="mb-3 p-2 bg-zinc-50 rounded-lg border border-zinc-100/50">
+                    <h4 className="font-bold text-sm text-zinc-900 tracking-tight leading-none mb-1">Integrations</h4>
+                    <p className="text-[11px] text-zinc-500 font-medium">Link platforms to enable direct posting.</p>
+                  </div>
+                  <div className="flex flex-col gap-0.5 max-h-[300px] overflow-y-auto nice-scrollbar">
+                    {PLATFORMS.map((p) => {
+                      const isConnected = connectedIds.includes(p.id);
+                      return (
+                        <div
+                          key={p.id}
+                          className="flex items-center justify-between p-2 rounded-lg hover:bg-zinc-50 transition-colors group border border-transparent hover:border-zinc-100"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="shrink-0 bg-white p-1 rounded-md shadow-sm border border-zinc-100">
+                              {p.icon}
+                            </div>
+                            <div>
+                              <span className="text-[13px] font-bold text-zinc-800 tracking-tight">{p.label}</span>
+                              {p.sublabel && (
+                                <p className="text-[10px] text-zinc-400">{p.sublabel}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="shrink-0 flex items-center">
+                            {p.comingSoon ? (
+                              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-zinc-100 border border-zinc-200/50 shadow-sm">
+                                <Clock className="w-3 h-3 text-zinc-400" />
+                                <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest leading-none">
+                                  Soon
+                                </span>
+                              </div>
+                            ) : isConnected ? (
+                              <button
+                                onClick={() => handleDisconnect(p.id)}
+                                className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-50 border border-green-200/50 shadow-sm hover:bg-red-50 hover:border-red-200 transition-colors group/btn"
+                              >
+                                <span className="text-[9px] font-bold text-green-700 uppercase tracking-widest leading-none group-hover/btn:hidden">
+                                  Linked
+                                </span>
+                                <CheckCircle2 className="w-3 h-3 text-green-600 group-hover/btn:hidden" />
+                                <span className="text-[9px] font-bold text-red-600 uppercase tracking-widest leading-none hidden group-hover/btn:inline">
+                                  Remove
+                                </span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleConnect(p.id)}
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800 shadow-sm hover:bg-zinc-800 transition-colors"
+                              >
+                                <Plus className="w-3 h-3 text-white" />
+                                <span className="text-[9px] font-bold text-white uppercase tracking-widest leading-none">
+                                  Connect
+                                </span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <AISuggestionsPanel
+                clientId={client.id}
+                isOpen={aiPanelOpen}
+                onClose={() => setAiPanelOpen(false)}
+                onPostCreated={() => {
+                  // Refetch calendar data
+                  setAiPanelOpen(false);
+                }}
+              />
+              </>
+            }
           />
         </div>
       </div>

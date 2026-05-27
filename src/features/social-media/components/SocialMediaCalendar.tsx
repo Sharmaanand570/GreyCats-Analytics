@@ -173,31 +173,54 @@ function CalendarGrid({ currentDate, slideDirection, posts, onDateClick }: Calen
               );
             })()}
           </div>
-          <div className={`mt-2 flex flex-col gap-1.5 overflow-hidden ${isPast ? 'opacity-60' : ''}`}>
+          <div className={`mt-1.5 flex flex-col gap-1 overflow-hidden ${isPast ? 'opacity-50' : ''}`}>
             {dayPosts.slice(0, 3).map((post) => {
               const isStoryPost = post.postType === 'STORY';
+              const hasMedia = post.mediaUrls && post.mediaUrls.length > 0;
+              const postTime = format(parseISO(post.scheduledFor), 'h:mm a');
+              const caption = post.message || (isStoryPost ? 'Story' : 'No caption');
+              const platformColor = platformColors[post.platform as PostPlatform] || 'bg-zinc-50 border-zinc-200';
+              const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || '';
+
               return (
                 <div
                   key={post.id}
-                  className={`text-[11px] font-medium px-2 py-1.5 rounded-md truncate border flex items-center gap-1.5 shadow-sm ${
-                    isStoryPost
-                      ? 'bg-gradient-to-r from-pink-50 to-orange-50 border-pink-200/60 text-pink-900'
-                      : 'bg-white/80 backdrop-blur-sm border-zinc-200/50 text-zinc-800'
-                  }`}
+                  className={`rounded-lg border overflow-hidden transition-all hover:shadow-md hover:scale-[1.02] ${platformColor}`}
+                  title={`${postTime} · ${post.platform}${post.message ? '\n' + post.message.slice(0, 200) : ''}`}
                 >
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusDotColors[post.status as PostStatus]}`} />
-                  {platformIcons[post.platform as PostPlatform]}
-                  {isStoryPost && (
-                    <span className="text-[8px] font-bold uppercase tracking-wider bg-pink-100 text-pink-600 px-1 py-0 rounded shrink-0">
-                      Story
-                    </span>
+                  {/* Image thumbnail */}
+                  {hasMedia && (
+                    <div className="h-12 w-full overflow-hidden bg-zinc-100">
+                      <img
+                        src={post.mediaUrls[0].startsWith('http') ? post.mediaUrls[0] : `${baseUrl}${post.mediaUrls[0]}`}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    </div>
                   )}
-                  <span className="truncate">{isStoryPost ? (post.mediaUrls?.length ? 'Media story' : 'Story') : (post.message || 'No caption')}</span>
+                  <div className="px-1.5 py-1">
+                    {/* Platform + time row */}
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1">
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusDotColors[post.status as PostStatus]}`} />
+                        {platformIcons[post.platform as PostPlatform]}
+                        {isStoryPost && (
+                          <span className="text-[7px] font-bold uppercase tracking-wider bg-pink-100 text-pink-600 px-1 rounded shrink-0">S</span>
+                        )}
+                      </div>
+                      <span className="text-[9px] text-zinc-400 font-medium shrink-0">{postTime}</span>
+                    </div>
+                    {/* Caption preview */}
+                    <p className="text-[10px] font-medium leading-tight mt-0.5 line-clamp-2">{caption}</p>
+                  </div>
                 </div>
               );
             })}
             {dayPosts.length > 3 && (
-              <span className="text-[10px] text-zinc-400 font-semibold pl-1">+{dayPosts.length - 3} more</span>
+              <div className="text-[9px] text-zinc-400 font-semibold text-center py-0.5 bg-zinc-50 rounded border border-dashed border-zinc-200">
+                +{dayPosts.length - 3} more
+              </div>
             )}
           </div>
         </div>

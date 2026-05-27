@@ -11,6 +11,8 @@ import { format } from 'date-fns';
 import { Sparkles, Image as ImageIcon, CheckCircle2, SquarePlus, ChevronLeft, ChevronRight, Upload, Globe, Info, Tag, Users2, X as XIcon, Search, UserPlus, AlertCircle, Calendar, FileText, ChevronDown, ChevronUp, MapPin, Building2 } from 'lucide-react';
 import { FaInstagram, FaFacebook, FaLinkedin } from 'react-icons/fa6';
 import { useSocialMediaStore } from '@/store/useSocialMediaStore';
+import { toast } from 'sonner';
+import { creativeApi } from '@/api/creativeApi';
 
 import { useClientContext } from '@/context/ClientContext';
 import { useCreatePost } from '../hooks/useCreatePost';
@@ -121,6 +123,9 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [mode, setMode] = useState<'manual' | 'ai'>('manual');
   const [timezone, setTimezone] = useState<string>(getBrowserTimezone);
+  const [aiCaptionLoading, setAiCaptionLoading] = useState(false);
+  const [aiCaptionTopic, setAiCaptionTopic] = useState('');
+  const [showAiCaptionInput, setShowAiCaptionInput] = useState(false);
 
   // Photo tagging
   const [userTags, setUserTags] = useState<UserTag[]>([]);
@@ -1158,17 +1163,28 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
               Manual Post <CheckCircle2 className="w-4 h-4 inline-block ml-1 text-zinc-900" />
             </button>
             <button
-              disabled
-              className="flex-1 py-2 text-sm font-medium rounded-md text-zinc-400 cursor-not-allowed opacity-70 flex items-center justify-center gap-1.5"
+              onClick={() => setMode('ai')}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all flex items-center justify-center gap-1.5 ${
+                mode === 'ai' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
+              }`}
             >
               <Sparkles className="w-4 h-4" /> Automate with AI
-              <span className="text-[10px] bg-zinc-200 text-zinc-600 px-1.5 py-0.5 rounded leading-none uppercase font-bold tracking-wider ml-1">
-                Soon
-              </span>
             </button>
           </div>
 
-          <div className="flex flex-col gap-3">
+          {mode === 'ai' && (
+            <AIGeneratePanel
+              clientId={clientId}
+              platform={platform || 'instagram'}
+              onGenerated={(caption, imageUrl) => {
+                updateDraft({ message: caption });
+                setMode('manual');
+                toast.success('Content generated! Review and schedule.');
+              }}
+            />
+          )}
+
+          <div className="flex flex-col gap-3" style={{ display: mode === 'manual' ? undefined : 'none' }}>
             {/* --- 1. Schedule & Platform --- */}
             <div className="border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
               {renderSectionHeader('schedule', 'Schedule & Platform', <Calendar className="w-4 h-4 text-zinc-500" />, scheduleWarning)}
@@ -1416,12 +1432,114 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
                         {captionLength.toLocaleString()}/{captionLimit.toLocaleString()}
                       </span>
                     </div>
-                    <Textarea
-                      placeholder="Write your caption here..."
-                      className={`min-h-[100px] resize-none focus-visible:ring-zinc-900 ${isCaptionOverLimit ? 'border-red-300 focus-visible:ring-red-500' : ''}`}
-                      value={caption}
-                      onChange={(e) => updateDraft({ message: e.target.value })}
-                    />
+                    <div className="relative">
+                      <Textarea
+                        placeholder="Write your caption here..."
+                        className={`min-h-[100px] resize-none focus-visible:ring-zinc-900 pr-10 ${isCaptionOverLimit ? 'border-red-300 focus-visible:ring-red-500' : ''}`}
+                        value={caption}
+                        onChange={(e) => updateDraft({ message: e.target.value })}
+                      />
+                      <button
+                        type="button"
+                        title={caption ? "Rewrite with AI" : "Write with AI"}
+                        disabled={aiCaptionLoading}
+                        onClick={() => {
+                          if (caption) {
+                            // Has text → rewrite directly
+                            setAiCaptionLoading(true);
+                            creativeApi.generateCaptions({
+                              clientId,
+                              platform: platform || 'instagram',
+                              goal: 'engagement',
+                              topic: `Rewrite and improve this caption: ${caption.slice(0, 200)}`,
+                              count: 1,
+                            }).then((res) => {
+                              const cap = res.data.data.captions[0];
+                              if (cap) {
+                                const text = cap.text + (cap.hashtags?.length ? '\n\n' + cap.hashtags.join(' ') : '');
+                                updateDraft({ message: text });
+                                toast.success('Caption improved!');
+                              }
+                            }).catch(() => toast.error('Failed to generate')).finally(() => setAiCaptionLoading(false));
+                          } else {
+                            // Empty → show topic input
+                            setShowAiCaptionInput(true);
+                          }
+                        }}
+                        className="absolute top-2 right-2 p-1.5 rounded-md bg-zinc-100 hover:bg-zinc-900 hover:text-white text-zinc-400 transition-all"
+                      >
+                        {aiCaptionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                      </button>
+
+                      {/* AI topic input popover */}
+                      {showAiCaptionInput && (
+                        <div className="absolute top-0 left-0 right-0 z-10 bg-white rounded-lg border border-zinc-300 shadow-lg p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-zinc-700">What should the caption be about?</span>
+                            <button type="button" onClick={() => setShowAiCaptionInput(false)} className="text-zinc-400 hover:text-zinc-600">
+                              <XIcon className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <input
+                            autoFocus
+                            type="text"
+                            value={aiCaptionTopic}
+                            onChange={(e) => setAiCaptionTopic(e.target.value)}
+                            placeholder="e.g. Summer sale, Hotel room tour, Guest testimonial..."
+                            className="w-full text-sm border border-zinc-200 rounded-md px-3 py-2 focus:outline-none focus:border-zinc-400"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && aiCaptionTopic.trim()) {
+                                e.preventDefault();
+                                setAiCaptionLoading(true);
+                                setShowAiCaptionInput(false);
+                                creativeApi.generateCaptions({
+                                  clientId,
+                                  platform: platform || 'instagram',
+                                  goal: 'engagement',
+                                  topic: aiCaptionTopic.trim(),
+                                  count: 1,
+                                }).then((res) => {
+                                  const cap = res.data.data.captions[0];
+                                  if (cap) {
+                                    updateDraft({ message: cap.text + (cap.hashtags?.length ? '\n\n' + cap.hashtags.join(' ') : '') });
+                                    toast.success('Caption generated!');
+                                  }
+                                }).catch(() => toast.error('Failed to generate')).finally(() => { setAiCaptionLoading(false); setAiCaptionTopic(''); });
+                              } else if (e.key === 'Escape') {
+                                setShowAiCaptionInput(false);
+                              }
+                            }}
+                          />
+                          <div className="flex justify-end">
+                            <button
+                              type="button"
+                              disabled={!aiCaptionTopic.trim() || aiCaptionLoading}
+                              onClick={() => {
+                                setAiCaptionLoading(true);
+                                setShowAiCaptionInput(false);
+                                creativeApi.generateCaptions({
+                                  clientId,
+                                  platform: platform || 'instagram',
+                                  goal: 'engagement',
+                                  topic: aiCaptionTopic.trim(),
+                                  count: 1,
+                                }).then((res) => {
+                                  const cap = res.data.data.captions[0];
+                                  if (cap) {
+                                    updateDraft({ message: cap.text + (cap.hashtags?.length ? '\n\n' + cap.hashtags.join(' ') : '') });
+                                    toast.success('Caption generated!');
+                                  }
+                                }).catch(() => toast.error('Failed to generate')).finally(() => { setAiCaptionLoading(false); setAiCaptionTopic(''); });
+                              }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-900 text-white text-xs font-medium disabled:opacity-50 hover:bg-zinc-800 transition-all"
+                            >
+                              <Sparkles className="w-3 h-3" />
+                              Generate
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                     {isCaptionOverLimit && (
                       <p className="text-[11px] text-red-500 mt-1 font-medium">
                         Caption exceeds {captionLimit.toLocaleString()} character limit for {platform === 'both' ? 'Instagram' : platform}.
@@ -1465,5 +1583,182 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
         {renderPreview()}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ─────────────────────────────────────────────
+// AI Generate Panel — shown when mode is "ai"
+// ─────────────────────────────────────────────
+
+function AIGeneratePanel({
+  clientId,
+  platform,
+  onGenerated,
+}: {
+  clientId: number;
+  platform: string;
+  onGenerated: (caption: string, imageUrl?: string) => void;
+}) {
+  const [topic, setTopic] = useState('');
+  const [goal, setGoal] = useState('engagement');
+  const [contentType, setContentType] = useState('caption');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedCaptions, setGeneratedCaptions] = useState<any[]>([]);
+  const [generatedArticle, setGeneratedArticle] = useState<string | null>(null);
+
+  const handleGenerate = async () => {
+    if (!topic.trim()) return;
+    setIsGenerating(true);
+    setGeneratedCaptions([]);
+    setGeneratedArticle(null);
+
+    try {
+      if (contentType === 'article' || contentType === 'script') {
+        const res = await creativeApi.generateContent({
+          clientId,
+          contentType,
+          topic: topic.trim(),
+          platform,
+        });
+        setGeneratedArticle(res.data.data.content);
+        toast.success(`${contentType === 'article' ? 'Article' : 'Script'} generated! (${res.data.data.wordCount} words)`);
+      } else {
+        const res = await creativeApi.generateCaptions({
+          clientId,
+          platform,
+          goal,
+          topic: topic.trim(),
+          count: 3,
+        });
+        setGeneratedCaptions(res.data.data.captions);
+        toast.success(`${res.data.data.captions.length} captions generated!`);
+      }
+    } catch {
+      toast.error('Generation failed');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Content type selector */}
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-zinc-600">What do you want to create?</label>
+        <div className="flex gap-2">
+          {[
+            { id: 'caption', label: 'Caption' },
+            { id: 'article', label: 'Article' },
+            { id: 'script', label: 'Video Script' },
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setContentType(t.id)}
+              className={`px-3 py-1.5 text-xs rounded-lg border transition-all ${
+                contentType === t.id
+                  ? 'bg-zinc-900 text-white border-zinc-900'
+                  : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Topic input */}
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium text-zinc-600">Topic / Idea</label>
+        <textarea
+          value={topic}
+          onChange={(e) => setTopic(e.target.value)}
+          placeholder="e.g. Summer sale announcement, Behind the scenes of our hotel, Travel tips for guests..."
+          rows={2}
+          className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus:outline-none resize-none"
+        />
+      </div>
+
+      {/* Goal selector (for captions only) */}
+      {contentType === 'caption' && (
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-zinc-600">Goal</label>
+          <div className="flex gap-2">
+            {['awareness', 'engagement', 'conversion', 'product_launch'].map((g) => (
+              <button
+                key={g}
+                onClick={() => setGoal(g)}
+                className={`px-2.5 py-1 text-[11px] rounded-md border transition-all capitalize ${
+                  goal === g
+                    ? 'bg-zinc-100 border-zinc-400 text-zinc-900 font-medium'
+                    : 'bg-white text-zinc-500 border-zinc-200 hover:border-zinc-300'
+                }`}
+              >
+                {g.replace('_', ' ')}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Generate button */}
+      <button
+        onClick={handleGenerate}
+        disabled={isGenerating || !topic.trim()}
+        className="w-full py-2.5 rounded-lg bg-zinc-900 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+      >
+        {isGenerating ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <Sparkles className="w-4 h-4" />
+        )}
+        {isGenerating ? 'Generating...' : 'Generate Content'}
+      </button>
+
+      {/* Results — captions */}
+      {generatedCaptions.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-zinc-500">Pick a caption:</p>
+          {generatedCaptions.map((cap: any, i: number) => (
+            <button
+              key={i}
+              onClick={() => {
+                const text = cap.text + (cap.hashtags?.length ? '\n\n' + cap.hashtags.join(' ') : '');
+                onGenerated(text);
+              }}
+              className="w-full text-left p-3 rounded-lg border border-zinc-200 hover:border-zinc-400 hover:bg-zinc-50 transition-all group"
+            >
+              <p className="text-sm text-zinc-800 whitespace-pre-wrap">{cap.text}</p>
+              {cap.hashtags?.length > 0 && (
+                <p className="text-xs text-blue-500 mt-1">{cap.hashtags.join(' ')}</p>
+              )}
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-[10px] text-zinc-400">{cap.characterCount} chars · {cap.tone}</span>
+                <span className="text-[10px] text-zinc-400 group-hover:text-zinc-700 font-medium">Click to use →</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Results — article/script */}
+      {generatedArticle && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-zinc-500">
+              {contentType === 'article' ? 'Generated Article' : 'Generated Script'}
+            </p>
+            <button
+              onClick={() => onGenerated(generatedArticle)}
+              className="text-xs text-zinc-900 font-medium hover:underline"
+            >
+              Use this →
+            </button>
+          </div>
+          <div className="p-3 rounded-lg border border-zinc-200 bg-zinc-50 max-h-60 overflow-y-auto">
+            <pre className="text-xs text-zinc-700 whitespace-pre-wrap font-sans">{generatedArticle}</pre>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

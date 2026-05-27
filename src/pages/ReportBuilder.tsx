@@ -152,7 +152,8 @@ import { useBatchDashboardData } from "@/hooks/metrics/useBatchDashboardData";
 import { useBatchDemographicsData } from "@/hooks/metrics/useBatchDemographicsData";
 import { renderWidgetContent } from "@/features/reports/components/WidgetContentRenderer";
 import { useSyncStatus } from "@/features/reports/hooks/useSyncStatus";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
+import ReportChatbot from "@/components/ai/ReportChatbot";
 
 // Re-export for external use
 export type {
@@ -308,6 +309,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
   // Mobile Sidebar States
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(false);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Use appropriate grid config based on screen size
   const currentGridConfig = isMobile ? {
@@ -5739,6 +5741,14 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
             )}
           </div>
           <Button
+            variant="outline"
+            onClick={() => setIsChatOpen(true)}
+            className="flex items-center gap-1.5 py-1.5 md:py-2 px-3 md:px-4 rounded-[0.6rem] text-xs md:text-sm whitespace-nowrap"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            <span className="hidden md:inline">Ask AI</span>
+          </Button>
+          <Button
             onClick={handleGeneratePdf}
             className="bg-accent-foreground text-white py-1.5 md:py-2 px-3 md:px-4 rounded-[0.6rem] text-xs md:text-sm hover:cursor-pointer whitespace-nowrap disabled:opacity-60"
             isLoading={isGeneratingPdf}
@@ -6506,6 +6516,21 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
           </>
         )}
       </div>
+
+      {/* AI Report Chatbot Panel */}
+      <Sheet open={isChatOpen} onOpenChange={setIsChatOpen}>
+        <SheetContent side="right" className="p-0 !w-[720px] !max-w-[720px] flex flex-col [&>button]:hidden">
+          {isChatOpen && templateId && dateRange?.from && dateRange?.to && (
+            <ReportChatbot
+              templateId={templateId}
+              clientId={params.clientId ? Number(params.clientId) : null}
+              dateFrom={dateRange.from}
+              dateTo={dateRange.to}
+              onClose={() => setIsChatOpen(false)}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
