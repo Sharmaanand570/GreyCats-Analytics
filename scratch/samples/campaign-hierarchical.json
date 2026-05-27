@@ -1,0 +1,146 @@
+{
+  "success": true,
+  "data": {
+    "campaign": {
+      "id": "1202020202",
+      "name": "Summer Sale Campaign",
+      "status": "PAUSED",
+      "effective_status": "PAUSED",
+      "objective": "OUTCOME_SALES",
+      "special_ad_categories": ["NONE"],
+      "buying_type": "AUCTION",
+      "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+      "daily_budget": 50,
+      "lifetime_budget": null,
+      "spend_cap": null,
+      "start_time": "2026-06-01T00:00:00-0700",
+      "stop_time": null,
+      "account_id": "act_123456789",
+      "recommendations": [],
+      "issues_info": [],
+      "dsa_beneficiary": "Acme Corp",
+      "dsa_payor": "Acme Corp",
+      "is_cbo": true,
+      "etag": "1a2b3c4d5e",
+      "last_synced_at": "2026-05-25T12:00:00Z"
+    },
+    "adSets": [
+      {
+        "id": "1202020203",
+        "name": "Broad Audience Ad Set",
+        "status": "PAUSED",
+        "effective_status": "PAUSED",
+        "optimization_goal": "CONVERSIONS",
+        "billing_event": "IMPRESSIONS",
+        "bid_amount": 0,
+        "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+        "daily_budget": 5000,
+        "lifetime_budget": null,
+        "start_time": "2026-06-01T00:00:00-0700",
+        "end_time": null,
+        "targeting": {
+          "geo_locations": { "countries": ["US"] },
+          "age_min": 18,
+          "age_max": 65,
+          "genders": [1, 2]
+        },
+        "attribution_spec": [
+          { "event_type": "CLICK_THROUGH", "window_days": 7 },
+          { "event_type": "VIEW_THROUGH", "window_days": 1 }
+        ],
+        "promoted_object": {
+          "pixel_id": "987654321",
+          "custom_event_type": "PURCHASE"
+        },
+        "is_dynamic_creative": false,
+        "placement_positions": ["facebook_feed", "instagram_feed"],
+        "recommendations": [],
+        "issues_info": [],
+        "learning_stage_info": { "status": "ACTIVE" },
+        "ads": [
+          {
+            "id": "1202020204",
+            "name": "Summer Sale Video Ad",
+            "status": "PAUSED",
+            "effective_status": "PAUSED",
+            "creative": {
+              "id": "543210",
+              "name": "Video Creative",
+              "object_story_spec": {
+                "page_id": "123123123",
+                "video_data": {
+                  "video_id": "456456456",
+                  "image_url": "https://scontent.xx.fbcdn.net/v/t1.0-9/video_thumb.jpg",
+                  "title": "Huge Summer Sale!",
+                  "message": "Get 50% off all items today.",
+                  "call_to_action": {
+                    "type": "SHOP_NOW",
+                    "value": { "link": "https://example.com/sale" }
+                  }
+                }
+              }
+            },
+            "tracking_specs": [{ "action.type": ["offsite_conversion"], "fb_pixel": ["987654321"] }],
+            "conversion_specs": [{ "action.type": ["offsite_conversion"] }],
+            "recommendations": [],
+            "issues_info": [],
+            "disapproval_reason": null
+          },
+          {
+            "id": "1202020205",
+            "name": "Summer Sale Carousel Ad",
+            "status": "PAUSED",
+            "effective_status": "PAUSED",
+            "creative": {
+              "id": "543211",
+              "name": "Carousel Creative",
+              "object_story_spec": {
+                "page_id": "123123123",
+                "link_data": {
+                  "child_attachments": [
+                    {
+                      "link": "https://example.com/product1",
+                      "image_url": "https://scontent.xx.fbcdn.net/v/t1.0-9/prod1.jpg",
+                      "name": "Product 1",
+                      "call_to_action": { "type": "SHOP_NOW" }
+                    },
+                    {
+                      "link": "https://example.com/product2",
+                      "image_url": "https://scontent.xx.fbcdn.net/v/t1.0-9/prod2.jpg",
+                      "name": "Product 2",
+                      "call_to_action": { "type": "SHOP_NOW" }
+                    }
+                  ],
+                  "link": "https://example.com",
+                  "message": "Browse our summer collection!"
+                }
+              }
+            },
+            "recommendations": [],
+            "issues_info": [],
+            "disapproval_reason": null
+          }
+        ]
+      }
+    ],
+    "legacy": {
+      "campaignName": "Summer Sale Campaign",
+      "status": "PAUSED",
+      "objective": "OUTCOME_SALES",
+      "specialAdCategory": "NONE",
+      "accountId": "act_123456789",
+      "adSetId": "1202020203",
+      "adId": "1202020204",
+      "dailyBudget": 50,
+      "lifetimeBudget": null,
+      "startTime": "2026-06-01T00:00:00-0700",
+      "endTime": null,
+      "targeting": {
+        "geo_locations": { "countries": ["US"] },
+        "age_min": 18,
+        "age_max": 65,
+        "genders": [1, 2]
+      }
+    }
+  }
+}

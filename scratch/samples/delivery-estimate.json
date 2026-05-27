@@ -1,0 +1,11 @@
+{
+  "success": true,
+  "data": {
+    "daily_outcomes_curve": [
+      { "spend": 1000, "reach": 5000, "impressions": 6500, "actions": 45 },
+      { "spend": 2000, "reach": 9500, "impressions": 12000, "actions": 85 }
+    ],
+    "estimate_mau": 12000000,
+    "estimate_ready": true
+  }
+}

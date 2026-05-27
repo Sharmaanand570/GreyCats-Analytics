@@ -1,0 +1,29 @@
+{
+  "success": true,
+  "data": [
+    {
+      "campaign_id": "1202020202",
+      "age": "18-24",
+      "gender": "female",
+      "impressions": "15000",
+      "clicks": "350",
+      "spend": "45.50",
+      "reach": "12000",
+      "actions": [
+        { "action_type": "offsite_conversion.fb_pixel_purchase", "value": "15" }
+      ]
+    },
+    {
+      "campaign_id": "1202020202",
+      "age": "25-34",
+      "gender": "female",
+      "impressions": "25000",
+      "clicks": "550",
+      "spend": "85.20",
+      "reach": "21000",
+      "actions": [
+        { "action_type": "offsite_conversion.fb_pixel_purchase", "value": "45" }
+      ]
+    }
+  ]
+}

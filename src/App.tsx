@@ -37,7 +37,13 @@ const GoogleAnalyticsDetailPage = lazy(
 const GoogleConsoleDetailPage = lazy(
   () => import("./pages/GoogleConsoleDetailPage")
 );
-const AdsManagerComingSoonPage = lazy(() => import("./pages/AdsManagerComingSoonPage"));
+const MetaAdsWizardPage = lazy(() => import("./pages/MetaAdsWizardPage"));
+const MetaDetailPage = lazy(() => import("./pages/MetaDetailPage"));
+const MetaAudiencesPage = lazy(() => import("./pages/MetaAudiencesPage"));
+const MetaAutomationPage = lazy(() => import("./pages/MetaAutomationPage"));
+const MetaCompliancePage = lazy(() => import("./pages/MetaCompliancePage"));
+const MetaPixelsPage = lazy(() => import("./pages/MetaPixelsPage"));
+const MetaMediaLibraryPage = lazy(() => import("./pages/MetaMediaLibraryPage"));
 const MetaBusinessDetailPage = lazy(() => import("./pages/MetaBusinessDetailPage"));
 const FacebookInsightsPage = lazy(() => import("./pages/FacebookInsightsPage"));
 const InstagramInsightsPage = lazy(
@@ -45,6 +51,7 @@ const InstagramInsightsPage = lazy(
 );
 
 const GoogleAdsConnectPage = lazy(() => import("./pages/GoogleAdsConnectPage"));
+const GoogleAdsWizardPage = lazy(() => import("./pages/GoogleAdsWizardPage"));
 const ReportsLandingPage = lazy(() => import("./pages/ReportsLandingPage"));
 
 const Reports = lazy(() => import("./components/Reports"));
@@ -176,17 +183,30 @@ function App() {
                   path="google-console/:clientId?"
                   element={<GoogleConsoleDetailPage />}
                 />
+                {/* Meta Ads — gate flipped 2026-05-25. AdsManagerComingSoonPage
+                    is kept for google-ads (still unbuilt) but removed from
+                    Meta routes. The wizard, detail, and audiences pages were
+                    built earlier and previously orphaned behind this gate. */}
                 <Route path="meta-ads">
-                  <Route index element={<AdsManagerComingSoonPage activeTab="meta-ads" />} />
-                  <Route path="wizard" element={<AdsManagerComingSoonPage activeTab="meta-ads" />} />
-                  <Route path="wizard/:clientId" element={<AdsManagerComingSoonPage activeTab="meta-ads" />} />
+                  <Route index element={<MetaDetailPage />} />
+                  <Route path="wizard" element={<MetaAdsWizardPage />} />
+                  <Route path="wizard/:clientId" element={<MetaAdsWizardPage />} />
                   <Route
                     path="wizard/:clientId/edit/:campaignId"
-                    element={<AdsManagerComingSoonPage activeTab="meta-ads" />}
+                    element={<MetaAdsWizardPage />}
                   />
-                  <Route path="audiences" element={<AdsManagerComingSoonPage activeTab="meta-ads" />} />
-                  <Route path="audiences/:clientId" element={<AdsManagerComingSoonPage activeTab="meta-ads" />} />
-                  <Route path=":clientId" element={<AdsManagerComingSoonPage activeTab="meta-ads" />} />
+                  <Route path="audiences" element={<MetaAudiencesPage />} />
+                  <Route path="audiences/:clientId" element={<MetaAudiencesPage />} />
+                  {/* PR G — automation rules + compliance (approvals/audit) */}
+                  <Route path="automation" element={<MetaAutomationPage />} />
+                  <Route path="automation/:clientId" element={<MetaAutomationPage />} />
+                  <Route path="compliance" element={<MetaCompliancePage />} />
+                  <Route path="compliance/:clientId" element={<MetaCompliancePage />} />
+                  <Route path="pixels" element={<MetaPixelsPage />} />
+                  <Route path="pixels/:clientId" element={<MetaPixelsPage />} />
+                  <Route path="media" element={<MetaMediaLibraryPage />} />
+                  <Route path="media/:clientId" element={<MetaMediaLibraryPage />} />
+                  <Route path=":clientId" element={<MetaDetailPage />} />
                 </Route>
                 <Route path="meta-business/:clientId?" element={<MetaBusinessDetailPage />} />
                 <Route path="meta-facebook/:clientId?" element={<FacebookInsightsPage />} />
@@ -194,7 +214,17 @@ function App() {
                   path="meta-instagram/:clientId?"
                   element={<InstagramInsightsPage />}
                 />
-                <Route path="google-ads/:clientId?" element={<AdsManagerComingSoonPage activeTab="google-ads" />} />
+                {/* Google Ads — Campaign Publisher Wizard live 2026-05-26.
+                    The wizard mirrors the Meta Ads flow with a 6-step
+                    objective → settings → bidding → ad group → creative →
+                    review pipeline. Until a dashboard/listing page ships,
+                    every Google Ads route lands directly in the wizard. */}
+                <Route path="google-ads">
+                  <Route index element={<GoogleAdsWizardPage />} />
+                  <Route path="wizard" element={<GoogleAdsWizardPage />} />
+                  <Route path="wizard/:clientId" element={<GoogleAdsWizardPage />} />
+                  <Route path=":clientId" element={<GoogleAdsWizardPage />} />
+                </Route>
                 <Route path="twitter/:clientId?" element={<TwitterDetailPage />} />
                 <Route path="linkedin/:clientId?" element={<LinkedinDetailPage />} />
                 <Route path="*" element={<NotFoundPage />} />

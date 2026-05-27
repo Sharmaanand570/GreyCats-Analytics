@@ -34,13 +34,12 @@ import { Step2Audience } from "@/features/meta/components/adsWizard/Step2Audienc
 import { Step3Creative } from "@/features/meta/components/adsWizard/Step3Creative";
 import { Step4Review } from "@/features/meta/components/adsWizard/Step4Review";
 import {
-  INITIAL_FORM_STATE,
-  type WizardFormState,
+  INITIAL_STATE,
+  type WizardState,
 } from "@/features/meta/components/adsWizard/types";
-import { toWizardFormState } from "@/features/meta/components/adsWizard/fromCampaignDetails";
 import {
   useAudiences,
-  useCampaignDetails,
+  useCampaignWizardState,
   usePublishAd,
   useUpdateCampaign,
 } from "@/features/meta/hooks/useMetaAdsManager";
@@ -60,7 +59,7 @@ const withActPrefix = (id: string) => (id.startsWith("act_") ? id : `act_${id}`)
 
 // Bucket locations into { included, excluded } by their `excluded` flag,
 // then split each bucket by Meta's geo node type (country / city / region).
-const splitGeoLocations = (locations: WizardFormState["locations"]) => {
+const splitGeoLocations = (locations: WizardState["adSet"]["locations"]) => {
   const bucket = (excluded: boolean) => {
     const list = locations.filter((l) => !!l.excluded === excluded);
     const countries = Array.from(
@@ -91,20 +90,21 @@ const toGeoBlock = (g: { countries: string[]; cities: { key: string; name?: stri
   };
 };
 
-const buildPayload = (form: WizardFormState): PublishAdPayload => {
-  const { included, excluded } = splitGeoLocations(form.locations);
+const buildPayload = (form: WizardState): PublishAdPayload => {
+  const c = form.campaign;
+  const s = form.adSet;
+  const a = form.ad;
+
+  const { included, excluded } = splitGeoLocations(s.locations);
   const geoIncluded = toGeoBlock(included);
   const geoExcluded = toGeoBlock(excluded);
 
-  const includedInterests = form.interests.filter((i) => !i.excluded).map((i) => ({ id: i.id, name: i.name }));
-  const excludedInterests = form.interests.filter((i) => i.excluded).map((i) => ({ id: i.id, name: i.name }));
+  const includedInterests = s.interests.filter((i) => !i.excluded).map((i) => ({ id: i.id, name: i.name }));
+  const excludedInterests = s.interests.filter((i) => i.excluded).map((i) => ({ id: i.id, name: i.name }));
 
-  const includedAudiences = form.customAudiences.filter((a) => !a.excluded).map((a) => ({ id: a.id }));
-  const excludedAudiences = form.customAudiences.filter((a) => a.excluded).map((a) => ({ id: a.id }));
+  const includedAudiences = s.customAudiences.filter((aud) => !aud.excluded).map((aud) => ({ id: aud.id }));
+  const excludedAudiences = s.customAudiences.filter((aud) => aud.excluded).map((aud) => ({ id: aud.id }));
 
-  // Group detailed targeting by Meta's targeting node. Behaviors / demographics /
-  // life_events go as flat arrays; work_* and education_* get bundled into
-  // their own arrays with a `type` discriminator.
   const dtBuckets = {
     behaviors: [] as { id: string; name: string }[],
     demographics: [] as { id: string; name: string }[],
@@ -112,89 +112,60 @@ const buildPayload = (form: WizardFormState): PublishAdPayload => {
     work: [] as { id: string; name: string; type: "employer" | "position" | "industry" }[],
     education: [] as { id: string; name: string; type: "school" | "field_of_study" }[],
   };
-  for (const item of form.detailedTargeting) {
+  for (const item of s.detailedTargeting) {
     const base = { id: item.id, name: item.name };
     switch (item.type) {
-      case "behaviors":
-        dtBuckets.behaviors.push(base);
-        break;
-      case "demographics":
-        dtBuckets.demographics.push(base);
-        break;
-      case "life_events":
-        dtBuckets.life_events.push(base);
-        break;
-      case "work_employers":
-        dtBuckets.work.push({ ...base, type: "employer" });
-        break;
-      case "work_positions":
-        dtBuckets.work.push({ ...base, type: "position" });
-        break;
-      case "education_schools":
-        dtBuckets.education.push({ ...base, type: "school" });
-        break;
-      case "education_majors":
-        dtBuckets.education.push({ ...base, type: "field_of_study" });
-        break;
+      case "behaviors": dtBuckets.behaviors.push(base); break;
+      case "demographics": dtBuckets.demographics.push(base); break;
+      case "life_events": dtBuckets.life_events.push(base); break;
+      case "work_employers": dtBuckets.work.push({ ...base, type: "employer" }); break;
+      case "work_positions": dtBuckets.work.push({ ...base, type: "position" }); break;
+      case "education_schools": dtBuckets.education.push({ ...base, type: "school" }); break;
+      case "education_majors": dtBuckets.education.push({ ...base, type: "field_of_study" }); break;
     }
   }
 
   const hasAnyTargeting =
-    !!geoIncluded ||
-    !!geoExcluded ||
-    includedInterests.length > 0 ||
-    excludedInterests.length > 0 ||
-    dtBuckets.behaviors.length > 0 ||
-    dtBuckets.demographics.length > 0 ||
-    dtBuckets.life_events.length > 0 ||
-    dtBuckets.work.length > 0 ||
-    dtBuckets.education.length > 0 ||
-    includedAudiences.length > 0 ||
+    !!geoIncluded || !!geoExcluded ||
+    includedInterests.length > 0 || excludedInterests.length > 0 ||
+    dtBuckets.behaviors.length > 0 || dtBuckets.demographics.length > 0 ||
+    dtBuckets.life_events.length > 0 || dtBuckets.work.length > 0 ||
+    dtBuckets.education.length > 0 || includedAudiences.length > 0 ||
     excludedAudiences.length > 0;
 
-  // Only send ageRange if user narrowed from the 18–65 defaults — otherwise
-  // let Meta apply its own default and keep the payload minimal.
-  const ageRangeChanged = form.ageMin !== 18 || form.ageMax !== 65;
+  const isAbTest = a.publishMode === "AB_TEST";
+  const isCarousel = !isAbTest && a.format === "CAROUSEL";
+  const isVideo = !isAbTest && a.format === "SINGLE_IMAGE_VIDEO" && !!a.videos?.[0];
 
-  const isLifetime = form.budgetType === "LIFETIME";
-  const isAbTest = form.publishMode === "AB_TEST";
-  const isCarousel = !isAbTest && form.adType === "CAROUSEL";
-  const isVideo = !isAbTest && form.adType === "VIDEO";
-
-  const cleanedVariants = form.adVariants.map((v) => ({
+  const cleanedVariants = a.adVariants?.map((v) => ({
     adHeadline: v.adHeadline,
     adText: v.adText,
     imageUrl: v.imageUrl,
-    ctaButton: v.ctaButton,
+    ctaButton: v.ctaButton as any,
     ...(v.description?.trim() ? { description: v.description.trim() } : {}),
-  }));
+  })) ?? [];
 
-  // Strip blank optional fields off carousel cards so we don't send empty
-  // strings to Meta (which it'll treat as "no fallback" and render literal "").
-  const cleanedCards = form.carouselCards.map((c) => ({
-    imageUrl: c.imageUrl,
-    link: c.link,
-    ...(c.headline?.trim() ? { headline: c.headline.trim() } : {}),
-    ...(c.description?.trim() ? { description: c.description.trim() } : {}),
-  }));
+  const cleanedCards = a.carouselCards?.map((cd) => ({
+    imageUrl: cd.imageUrl,
+    link: cd.link,
+    ...(cd.headline?.trim() ? { headline: cd.headline.trim() } : {}),
+    ...(cd.description?.trim() ? { description: cd.description.trim() } : {}),
+  })) ?? [];
 
   return {
-    accountId: withActPrefix(form.accountId),
-    pageId: form.pageId,
-    campaignName: form.campaignName,
-    publishMode: form.publishMode,
-    // Branch creative fields by publish mode + ad type — keeps the payload
-    // minimal and unambiguous for the backend's discriminators. In AB_TEST
-    // mode, adText/ctaButton live inside each variant; in SINGLE_AD mode
-    // they're top-level shared across the single creative.
+    accountId: withActPrefix(c.accountId),
+    pageId: c.pageId,
+    campaignName: c.name,
+    publishMode: a.publishMode as any,
+
     ...(isAbTest
       ? {
-          adLink: form.adLink,
+          adLink: a.websiteUrl,
           adVariants: cleanedVariants,
         }
       : {
-          adText: form.adText,
-          ctaButton: form.ctaButton,
+          adText: a.primaryTexts[0] || "",
+          ctaButton: a.callToAction as any,
           ...(isCarousel
             ? {
                 adType: "CAROUSEL" as const,
@@ -203,42 +174,66 @@ const buildPayload = (form: WizardFormState): PublishAdPayload => {
             : isVideo
               ? {
                   adType: "VIDEO" as const,
-                  adHeadline: form.adHeadline,
-                  adLink: form.adLink,
-                  videoUrl: form.videoUrl,
-                  ...(form.videoThumbnailUrl ? { videoThumbnailUrl: form.videoThumbnailUrl } : {}),
-                  ...(form.captionsUrl ? { captionsUrl: form.captionsUrl } : {}),
+                  adHeadline: a.headlines[0] || "",
+                  adLink: a.websiteUrl,
+                  videoUrl: a.videos[0] || "",
+                  ...(a.videoThumbnailUrl ? { videoThumbnailUrl: a.videoThumbnailUrl } : {}),
+                  ...(a.captionsUrl ? { captionsUrl: a.captionsUrl } : {}),
                 }
               : {
                   adType: "SINGLE_IMAGE" as const,
-                  adHeadline: form.adHeadline,
-                  adLink: form.adLink,
-                  imageUrl: form.imageUrl,
+                  adHeadline: a.headlines[0] || "",
+                  adLink: a.websiteUrl,
+                  imageUrl: a.images[0] || "",
                 }),
         }),
-    objective: form.objective,
-    // R2 additions
-    budgetType: form.budgetType,
-    ...(isLifetime
-      ? { lifetimeBudget: form.lifetimeBudget }
-      : { dailyBudget: form.dailyBudget }),
-    ...(form.specialAdCategory !== "NONE"
-      ? { specialAdCategory: form.specialAdCategory }
+    objective: c.objective,
+    budgetType: (c.isCboEnabled ? (c.lifetimeBudget ? "LIFETIME" : "DAILY") : (s.lifetimeBudget ? "LIFETIME" : "DAILY")) as "LIFETIME" | "DAILY",
+    ...(c.isCboEnabled && c.lifetimeBudget ? { lifetimeBudget: c.lifetimeBudget } : {}),
+    ...(c.isCboEnabled && c.dailyBudget ? { dailyBudget: c.dailyBudget } : {}),
+    ...(s.lifetimeBudget && !c.isCboEnabled ? { lifetimeBudget: s.lifetimeBudget } : {}),
+    ...(s.dailyBudget && !c.isCboEnabled ? { dailyBudget: s.dailyBudget } : {}),
+
+    ...(c.specialAdCategories.length > 0 ? { specialAdCategory: c.specialAdCategories[0] } : {}),
+    ...(s.scheduleStart ? { startTime: new Date(s.scheduleStart).toISOString() } : {}),
+    ...(s.scheduleEnd ? { endTime: new Date(s.scheduleEnd).toISOString() } : {}),
+    ...(a.descriptions[0]?.trim() ? { description: a.descriptions[0].trim() } : {}),
+
+    ...(c.objective === "OUTCOME_SALES" && s.pixelId ? { pixelId: s.pixelId } : {}),
+    ...(c.objective === "OUTCOME_SALES" && s.conversionEvent ? { conversionEvent: s.conversionEvent as any } : {}),
+
+    // Meta UX parity additions.
+    ...(c.campaignSpendingLimit ? { campaignSpendingLimit: c.campaignSpendingLimit } : {}),
+    ...(c.abTestEnabled ? { abTestEnabled: true } : {}),
+    ...(!c.isCboEnabled && c.budgetRebalanceFlag ? { budgetRebalanceFlag: true } : {}),
+    // App promotion: backend reads the App ID from promotedObject.application_id.
+    ...(c.objective === "OUTCOME_APP_PROMOTION" && c.ios14CampaignEnabled && c.ios14AppId
+      ? { promotedObject: { application_id: c.ios14AppId } }
       : {}),
-    ...(form.startTime ? { startTime: new Date(form.startTime).toISOString() } : {}),
-    ...(form.endTime ? { endTime: new Date(form.endTime).toISOString() } : {}),
-    ...(form.description.trim() ? { description: form.description.trim() } : {}),
-    // R3a — pixel + conversion event are only meaningful when objective is SALES
-    ...(form.objective === "OUTCOME_SALES" && form.pixelId
-      ? { pixelId: form.pixelId }
+
+    // Step 2 ad-set additions.
+    ...(s.name ? { adSetName: s.name } : {}),
+    ...(s.performanceGoal ? { optimizationGoal: s.performanceGoal } : {}),
+    ...(s.costPerResultGoal ? { costPerResultGoal: s.costPerResultGoal } : {}),
+    // Frequency control — only sent when user picked Cap mode (Meta's
+    // frequency_control_specs expects a max-frequency value).
+    ...(s.frequencyControl && s.frequencyControl.mode === "CAP"
+      ? {
+          frequencyControlSpecs: [
+            {
+              event: "IMPRESSIONS" as const,
+              interval_days: s.frequencyControl.days,
+              max_frequency: s.frequencyControl.count,
+            },
+          ],
+        }
       : {}),
-    ...(form.objective === "OUTCOME_SALES" && form.conversionEvent
-      ? { conversionEvent: form.conversionEvent }
-      : {}),
-    // Tier-1
-    ...(ageRangeChanged ? { ageRange: { min: form.ageMin, max: form.ageMax } } : {}),
-    ...(form.gender !== "ALL" ? { gender: form.gender } : {}),
-    ...(form.placements.length > 0 ? { placements: form.placements } : {}),
+    ...(s.dynamicCreative ? { dynamicCreative: true } : {}),
+
+    ...(s.ageMin !== 18 || s.ageMax !== 65 ? { ageRange: { min: s.ageMin, max: s.ageMax } } : {}),
+    ...(s.genders[0] !== "ALL" ? { gender: s.genders[0] as any } : {}),
+    ...(s.placementStrategy === "MANUAL" && s.manualPlatforms.length > 0 ? { placements: s.manualPlatforms as any[] } : {}),
+
     targeting: hasAnyTargeting
       ? {
           ...(geoIncluded ? { geo_locations: geoIncluded } : {}),
@@ -271,7 +266,7 @@ function MetaAdsWizardPage() {
   const clients = clientsData || [];
 
   const [step, setStep] = useState(0);
-  const [form, setForm] = useState<WizardFormState>(INITIAL_FORM_STATE);
+  const [form, setForm] = useState<WizardState>(INITIAL_STATE);
   const [prefilled, setPrefilled] = useState(false);
   // Per-step flag: flipped when the user clicks "Continue" with invalid
   // input so the child step can light up every required-field error at once
@@ -305,14 +300,13 @@ function MetaAdsWizardPage() {
     isLoading: isLoadingDetails,
     isError: isDetailsError,
     error: detailsError,
-  } = useCampaignDetails(campaignId, clientId);
+  } = useCampaignWizardState(campaignId, clientId);
 
   // Prefill the wizard once details arrive in edit mode. The `prefilled` guard
   // prevents user edits from being clobbered if the query refetches.
   useEffect(() => {
     if (isEditMode && campaignDetails && !prefilled) {
-      const next = toWizardFormState(campaignDetails);
-      setForm(next);
+      setForm(campaignDetails);
       setPrefilled(true);
       // Just hydrated from backend — not a user-driven change.
       setIsDirty(false);
@@ -327,7 +321,7 @@ function MetaAdsWizardPage() {
     if (!list || list.length === 0) return;
     setForm((f) => {
       let changed = false;
-      const next = f.customAudiences.map((a) => {
+      const next = f.adSet.customAudiences.map((a) => {
         const match = list.find((x) => x.id === a.id);
         if (!match) return a;
         const wantsName = a.name === a.id;
@@ -340,7 +334,7 @@ function MetaAdsWizardPage() {
           audienceType: match.type,
         };
       });
-      return changed ? { ...f, customAudiences: next } : f;
+      return changed ? { ...f, adSet: { ...f.adSet, customAudiences: next } } : f;
     });
   }, [audiencesData]);
 
@@ -352,11 +346,8 @@ function MetaAdsWizardPage() {
     if (isEditMode) return;
     setForm((f) => ({
       ...f,
-      accountId: "",
-      pageId: "",
-      pixelId: "",
-      conversionEvent: "",
-      customAudiences: [],
+      campaign: { ...f.campaign, accountId: "", pageId: "" },
+      adSet: { ...f.adSet, pixelId: "", conversionEvent: "", customAudiences: [] },
     }));
   }, [clientId, isEditMode]);
 
@@ -376,7 +367,7 @@ function MetaAdsWizardPage() {
   // Wrap setForm so any user-driven change flips `isDirty`. We deliberately
   // do NOT flip it in the prefill effect (that's not a user change).
   const setFormDirty = useCallback(
-    (updater: (prev: WizardFormState) => WizardFormState) => {
+    (updater: (prev: WizardState) => WizardState) => {
       setForm(updater);
       setIsDirty(true);
     },
@@ -405,32 +396,39 @@ function MetaAdsWizardPage() {
   const canAdvance = useMemo(() => {
     if (step === 0) {
       const basics =
-        !!form.accountId &&
-        !!form.pageId &&
-        form.campaignName.trim().length > 0;
+        !!form.campaign.accountId &&
+        !!form.campaign.pageId &&
+        form.campaign.name.trim().length > 0;
+      // Budget is set on Step 1 only when CBO is on (campaign-level budget) AND
+      // we're on Auction. Reservation has no budget input on Step 1, and when
+      // CBO is off the budget moves to the ad-set step.
       const budgetOk =
-        form.budgetType === "DAILY"
-          ? form.dailyBudget >= 1
-          : form.lifetimeBudget >= 1 && !!form.endTime;
+        form.campaign.buyingType === "RESERVATION"
+          ? true
+          : form.campaign.isCboEnabled
+            ? (form.campaign.lifetimeBudget ? "LIFETIME" : "DAILY") === "DAILY"
+              ? (form.campaign.dailyBudget ?? 0) >= 1
+              : (form.campaign.lifetimeBudget ?? 0) >= 1 && !!form.adSet.scheduleEnd
+            : true;
       // Schedule consistency — if both are set, end must be after start.
       // Otherwise Meta rejects the publish (and lifetime budgets become unbillable).
       const scheduleOk =
-        !form.startTime || !form.endTime || new Date(form.endTime) > new Date(form.startTime);
+        !form.adSet.scheduleStart || !form.adSet.scheduleEnd || new Date(form.adSet.scheduleEnd) > new Date(form.adSet.scheduleStart);
       // Sales objective demands a pixel + a conversion event — backend
       // rejects the publish otherwise, so gate it at Step 1.
       const conversionOk =
-        form.objective === "OUTCOME_SALES"
-          ? !!form.pixelId && !!form.conversionEvent
+        form.campaign.objective === "OUTCOME_SALES"
+          ? !!form.adSet.pixelId && !!form.adSet.conversionEvent
           : true;
       return basics && budgetOk && scheduleOk && conversionOk;
     }
     if (step === 1) return true; // targeting is optional
     if (step === 2) {
-      if (form.publishMode === "AB_TEST") {
+      if (form.ad.publishMode === "AB_TEST") {
         // Shared destination URL + 2–5 variants, each with image + headline + adText.
-        if (form.adLink.trim().length === 0) return false;
-        if (form.adVariants.length < 2) return false;
-        return form.adVariants.every(
+        if (form.ad.websiteUrl.trim().length === 0) return false;
+        if ((form.ad.adVariants || []).length < 2) return false;
+        return (form.ad.adVariants || []).every(
           (v) =>
             v.imageUrl.trim().length > 0 &&
             v.adHeadline.trim().length > 0 &&
@@ -438,26 +436,26 @@ function MetaAdsWizardPage() {
         );
       }
       // SINGLE_AD modes — primary text + CTA are shared and required either way.
-      if (form.adText.trim().length === 0) return false;
-      if (form.adType === "CAROUSEL") {
+      if ((form.ad.primaryTexts[0] || "").trim().length === 0) return false;
+      if (form.ad.format === "CAROUSEL") {
         // Need 2–10 cards, each with a non-empty image and link.
-        if (form.carouselCards.length < 2) return false;
-        return form.carouselCards.every(
+        if (form.ad.carouselCards.length < 2) return false;
+        return form.ad.carouselCards.every(
           (c) => c.imageUrl.trim().length > 0 && c.link.trim().length > 0
         );
       }
-      if (form.adType === "VIDEO") {
+      if (form.ad.format === "SINGLE_IMAGE_VIDEO" && !!form.ad.videos?.[0]) {
         return (
-          form.adHeadline.trim().length > 0 &&
-          form.adLink.trim().length > 0 &&
-          form.videoUrl.trim().length > 0
+          (form.ad.headlines[0] || "").trim().length > 0 &&
+          form.ad.websiteUrl.trim().length > 0 &&
+          form.ad.videos[0].trim().length > 0
         );
       }
       // SINGLE_IMAGE — original validation
       return (
-        form.adHeadline.trim().length > 0 &&
-        form.adLink.trim().length > 0 &&
-        form.imageUrl.trim().length > 0
+        (form.ad.headlines[0] || "").trim().length > 0 &&
+        form.ad.websiteUrl.trim().length > 0 &&
+        (form.ad.images[0] || "").trim().length > 0
       );
     }
     return true;
@@ -766,12 +764,12 @@ function MetaAdsWizardPage() {
             <AlertDialogTitle>Publish this ad to Meta?</AlertDialogTitle>
             <AlertDialogDescription>
               This sends the campaign to Meta and begins billing under{" "}
-              <span className="font-semibold text-slate-900">{form.campaignName || "—"}</span>{" "}
+              <span className="font-semibold text-slate-900">{form.campaign.name || "—"}</span>{" "}
               at{" "}
               <span className="font-semibold text-slate-900">
-                {form.budgetType === "DAILY"
-                  ? `${form.dailyBudget.toFixed(2)} / day`
-                  : `${form.lifetimeBudget.toFixed(2)} lifetime`}
+                {(form.campaign.isCboEnabled ? (form.campaign.lifetimeBudget ? "LIFETIME" : "DAILY") : (form.adSet.lifetimeBudget ? "LIFETIME" : "DAILY")) === "DAILY"
+                  ? `${(form.campaign.isCboEnabled ? form.campaign.dailyBudget : form.adSet.dailyBudget)?.toFixed(2)} / day`
+                  : `${(form.campaign.isCboEnabled ? form.campaign.lifetimeBudget : form.adSet.lifetimeBudget)?.toFixed(2)} lifetime`}
               </span>
               . You can pause it from Meta Ads Manager afterwards, but the publish itself
               can't be undone.

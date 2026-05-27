@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Link } from "react-router-dom";
 import {
   MapPin,
@@ -17,6 +19,10 @@ import {
   Sparkles,
   UserSquare,
   ExternalLink,
+  Target,
+  Wallet,
+  ShieldAlert,
+  Facebook as FacebookIcon,
 } from "lucide-react";
 import {
   useAudiences,
@@ -24,14 +30,25 @@ import {
   useSearchInterests,
   useSearchLocations,
 } from "@/features/meta/hooks/useMetaAdsManager";
+import { useMetaAccounts } from "@/features/meta/hooks/useMetaData";
 import {
+  ATTRIBUTION_MODEL_OPTIONS,
+  CONVERSION_LOCATIONS_BY_OBJECTIVE,
+  DEFAULT_CONVERSION_LOCATION,
+  DEFAULT_PERFORMANCE_GOAL,
   DETAILED_TARGETING_OPTIONS,
   MAX_DETAILED_TARGETING,
+  OBJECTIVE_OPTIONS,
+  PERFORMANCE_GOALS_BY_OBJECTIVE,
   PLACEMENT_OPTIONS,
+  STEP2_OBJECTIVE_CARD_TITLE,
   AGE_MIN_FLOOR,
   AGE_MAX_CEILING,
   toSelectedInterest,
   toSelectedLocation,
+  type AttributionModel,
+  type ConversionLocation,
+  type PerformanceGoal,
   type StepProps,
 } from "./types";
 import type {
@@ -70,6 +87,10 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
   const [intInput, setIntInput] = useState("");
   const [dtType, setDtType] = useState<DetailedTargetingType>("behaviors");
   const [dtInput, setDtInput] = useState("");
+  // UI-only: toggles for the "Show more options" collapse inside the objective card.
+  const [showObjectiveAdvanced, setShowObjectiveAdvanced] = useState(false);
+  // UI-only: Account controls collapse inside the Placements card.
+  const [showAccountControls, setShowAccountControls] = useState(false);
 
   const locQuery = useDebouncedValue(locInput);
   const intQuery = useDebouncedValue(intInput);
@@ -79,40 +100,72 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
   const { data: intResults, isFetching: isFetchingInt } = useSearchInterests(intQuery);
   const { data: dtResults, isFetching: isFetchingDt } = useBrowseTargeting(dtType, dtQuery);
   const { data: audiencesData, isLoading: isLoadingAudiences } = useAudiences(clientId);
+  const { data: accountsData } = useMetaAccounts(clientId);
   const allAudiences = audiencesData?.audiences ?? [];
+  const pages = useMemo(() => accountsData?.pages ?? [], [accountsData]);
+
+  // Objective drives the Performance goal options and the card title.
+  const objective = form.campaign.objective;
+  const objectiveLabel =
+    OBJECTIVE_OPTIONS.find((o) => o.value === objective)?.label ?? "Performance";
+  const objectiveCardTitle = STEP2_OBJECTIVE_CARD_TITLE[objective] ?? "Performance";
+  const performanceGoalOptions = PERFORMANCE_GOALS_BY_OBJECTIVE[objective] ?? [];
+  const currentPerformanceGoal: PerformanceGoal =
+    form.adSet.performanceGoal ?? DEFAULT_PERFORMANCE_GOAL[objective];
+  const frequencyControl =
+    form.adSet.frequencyControl ?? { mode: "CAP" as const, count: 2, days: 7 };
+
+  // Conversion location picker — only non-Awareness objectives.
+  const conversionLocationOptions = CONVERSION_LOCATIONS_BY_OBJECTIVE[objective] ?? [];
+  const showConversionLocation = conversionLocationOptions.length > 0;
+  const currentConversionLocation: ConversionLocation =
+    form.adSet.conversionLocationType ??
+    (DEFAULT_CONVERSION_LOCATION[objective] as ConversionLocation) ??
+    "WEBSITE";
+  // Attribution model: Traffic / Leads / Sales / App promotion show this picker.
+  const showAttributionModel =
+    objective === "OUTCOME_TRAFFIC" ||
+    objective === "OUTCOME_LEADS" ||
+    objective === "OUTCOME_SALES" ||
+    objective === "OUTCOME_APP_PROMOTION";
+
+  // India warning + policy declaration trigger when the audience includes India.
+  const targetsIndia = form.adSet.locations.some(
+    (l) => l.country_code === "IN" || l.name?.toLowerCase() === "india"
+  );
 
   const toggleAudience = (id: string, name: string, audienceType: "CUSTOM" | "WEBSITE" | "LOOKALIKE") =>
     setForm((f) => {
-      const existing = f.customAudiences.find((a) => a.id === id);
+      const existing = f.adSet.customAudiences.find((a) => a.id === id);
       if (existing) {
-        return { ...f, customAudiences: f.customAudiences.filter((a) => a.id !== id) };
+        return { ...f, adSet: { ...f.adSet, customAudiences: f.adSet.customAudiences.filter((a) => a.id !== id) } };
       }
-      return { ...f, customAudiences: [...f.customAudiences, { id, name, audienceType }] };
+      return { ...f, adSet: { ...f.adSet, customAudiences: [...f.adSet.customAudiences, { id, name, audienceType }] } };
     });
 
   const toggleAudienceExcluded = (id: string) =>
     setForm((f) => ({
       ...f,
-      customAudiences: f.customAudiences.map((a) =>
+      customAudiences: f.adSet.customAudiences.map((a) =>
         a.id === id ? { ...a, excluded: !a.excluded } : a
       ),
     }));
 
   const removeAudience = (id: string) =>
-    setForm((f) => ({ ...f, customAudiences: f.customAudiences.filter((a) => a.id !== id) }));
+    setForm((f) => ({ ...f, adSet: { ...f.adSet, customAudiences: f.adSet.customAudiences.filter((a) => a.id !== id) } }));
 
-  const dtAtCap = form.detailedTargeting.length >= MAX_DETAILED_TARGETING;
+  const dtAtCap = form.adSet.detailedTargeting.length >= MAX_DETAILED_TARGETING;
 
   const addDetailedTargeting = (
     item: { id: string; name: string },
     type: DetailedTargetingType
   ) => {
     setForm((f) => {
-      if (f.detailedTargeting.find((x) => x.id === item.id && x.type === type)) return f;
-      if (f.detailedTargeting.length >= MAX_DETAILED_TARGETING) return f;
+      if (f.adSet.detailedTargeting.find((x) => x.id === item.id && x.type === type)) return f;
+      if (f.adSet.detailedTargeting.length >= MAX_DETAILED_TARGETING) return f;
       return {
         ...f,
-        detailedTargeting: [...f.detailedTargeting, { id: item.id, name: item.name, type }],
+        detailedTargeting: [...f.adSet.detailedTargeting, { id: item.id, name: item.name, type }],
       };
     });
     setDtInput("");
@@ -121,48 +174,48 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
   const removeDetailedTargeting = (id: string, type: DetailedTargetingType) =>
     setForm((f) => ({
       ...f,
-      detailedTargeting: f.detailedTargeting.filter((x) => !(x.id === id && x.type === type)),
+      detailedTargeting: f.adSet.detailedTargeting.filter((x) => !(x.id === id && x.type === type)),
     }));
 
-  const locationsAtCap = form.locations.length >= MAX_LOCATIONS;
-  const interestsAtCap = form.interests.length >= MAX_INTERESTS;
+  const locationsAtCap = form.adSet.locations.length >= MAX_LOCATIONS;
+  const interestsAtCap = form.adSet.interests.length >= MAX_INTERESTS;
 
   const addLocation = (loc: ReturnType<typeof toSelectedLocation>) => {
     setForm((f) => {
-      if (f.locations.find((l) => l.key === loc.key)) return f;
-      if (f.locations.length >= MAX_LOCATIONS) return f;
-      return { ...f, locations: [...f.locations, loc] };
+      if (f.adSet.locations.find((l) => l.key === loc.key)) return f;
+      if (f.adSet.locations.length >= MAX_LOCATIONS) return f;
+      return { ...f, adSet: { ...f.adSet, locations: [...f.adSet.locations, loc] } };
     });
     setLocInput("");
   };
 
   const removeLocation = (key: string) =>
-    setForm((f) => ({ ...f, locations: f.locations.filter((l) => l.key !== key) }));
+    setForm((f) => ({ ...f, adSet: { ...f.adSet, locations: f.adSet.locations.filter((l) => l.key !== key) } }));
 
   const toggleLocationExcluded = (key: string) =>
     setForm((f) => ({
       ...f,
-      locations: f.locations.map((l) =>
+      locations: f.adSet.locations.map((l) =>
         l.key === key ? { ...l, excluded: !l.excluded } : l
       ),
     }));
 
   const addInterest = (i: { id: string; name: string }) => {
     setForm((f) => {
-      if (f.interests.find((x) => x.id === i.id)) return f;
-      if (f.interests.length >= MAX_INTERESTS) return f;
-      return { ...f, interests: [...f.interests, i] };
+      if (f.adSet.interests.find((x) => x.id === i.id)) return f;
+      if (f.adSet.interests.length >= MAX_INTERESTS) return f;
+      return { ...f, adSet: { ...f.adSet, interests: [...f.adSet.interests, i] } };
     });
     setIntInput("");
   };
 
   const removeInterest = (id: string) =>
-    setForm((f) => ({ ...f, interests: f.interests.filter((x) => x.id !== id) }));
+    setForm((f) => ({ ...f, adSet: { ...f.adSet, interests: f.adSet.interests.filter((x) => x.id !== id) } }));
 
   const toggleInterestExcluded = (id: string) =>
     setForm((f) => ({
       ...f,
-      interests: f.interests.map((x) =>
+      interests: f.adSet.interests.map((x) =>
         x.id === id ? { ...x, excluded: !x.excluded } : x
       ),
     }));
@@ -177,7 +230,518 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
       </div>
 
       <div className="px-8 py-2 divide-y divide-slate-100">
-        
+
+        {/* Ad set name */}
+        <FormSection title="Ad set name" description="A label for this ad set within the campaign." icon={Target}>
+          <Input
+            value={form.adSet.name}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, adSet: { ...f.adSet, name: e.target.value } }))
+            }
+            placeholder={`New ${objectiveLabel} ad set`}
+            className="h-11 rounded-xl border-slate-200 bg-white"
+          />
+        </FormSection>
+
+        {/* {Objective} performance goal card. Title is "Conversion" for most
+            objectives, "Awareness" for Awareness, "App" for App promotion. */}
+        <FormSection
+          title={objectiveCardTitle}
+          description="Choose where to send people and the goal Meta should optimize for."
+          icon={Sparkles}
+        >
+          {/* Conversion location — hidden for Awareness (no conversion picker). */}
+          {showConversionLocation && (
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                Conversion location
+              </label>
+              <p className="text-[11px] text-slate-500">
+                Choose where you want to drive {objective === "OUTCOME_TRAFFIC" ? "traffic" : "conversions"}.{" "}
+                <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
+                  About conversion locations
+                </a>
+              </p>
+              <div className="space-y-2">
+                {conversionLocationOptions.map((opt) => {
+                  const active = currentConversionLocation === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() =>
+                        setForm((f) => ({
+                          ...f,
+                          adSet: { ...f.adSet, conversionLocationType: opt.value },
+                        }))
+                      }
+                      className={cn(
+                        "w-full text-left flex gap-3 rounded-xl border px-4 py-3 transition-all",
+                        active
+                          ? "border-slate-900 bg-slate-50"
+                          : "border-slate-200 bg-white hover:border-slate-300"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "mt-0.5 w-4 h-4 rounded-full border-2 shrink-0",
+                          active
+                            ? "border-slate-900 bg-slate-900 ring-2 ring-white ring-inset"
+                            : "border-slate-300"
+                        )}
+                      />
+                      <div>
+                        <div className="text-sm font-bold text-slate-900">{opt.label}</div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">{opt.hint}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
+              Performance goal
+            </label>
+            <p className="text-[11px] text-slate-500">
+              How you measure success for your ads.{" "}
+              <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
+                About performance goals
+              </a>
+            </p>
+            <Select
+              value={currentPerformanceGoal}
+              onValueChange={(v) =>
+                setForm((f) => ({
+                  ...f,
+                  adSet: { ...f.adSet, performanceGoal: v as PerformanceGoal },
+                }))
+              }
+            >
+              <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {performanceGoalOptions.map((opt) =>
+                  opt.group ? (
+                    <div
+                      key={opt.value}
+                      className="px-2 pt-3 pb-1 text-[11px] font-bold uppercase tracking-widest text-slate-400 cursor-default select-none"
+                    >
+                      {opt.group}
+                    </div>
+                  ) : (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      <div className="flex flex-col items-start gap-0.5">
+                        <span className="font-semibold text-sm text-slate-900">
+                          {opt.label}
+                        </span>
+                        <span className="text-[11px] text-slate-500">{"hint" in opt ? opt.hint : ""}</span>
+                      </div>
+                    </SelectItem>
+                  )
+                )}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-slate-400">
+              To help us improve delivery, we may survey a small section of your audience.
+            </p>
+          </div>
+
+          {/* Facebook Page */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
+              Facebook Page
+            </label>
+            <p className="text-[11px] text-slate-500">
+              Choose the Page that you want to promote.
+            </p>
+            <Select
+              value={form.adSet.pageId ?? form.campaign.pageId ?? ""}
+              onValueChange={(v) =>
+                setForm((f) => ({ ...f, adSet: { ...f.adSet, pageId: v } }))
+              }
+            >
+              <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
+                <SelectValue placeholder="Select Page" />
+              </SelectTrigger>
+              <SelectContent>
+                {pages.map((p) => (
+                  <SelectItem key={p.pageId} value={p.pageId}>
+                    <div className="flex items-center gap-2">
+                      <FacebookIcon className="w-3.5 h-3.5 text-[#1877F2]" />
+                      <span className="font-semibold">{p.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Cost per result goal */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-1">
+              Cost per result goal{" "}
+              <span className="text-slate-300 font-normal normal-case">· Optional</span>
+            </label>
+            <Input
+              type="number"
+              min={0}
+              step={0.01}
+              value={form.adSet.costPerResultGoal ?? ""}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  adSet: {
+                    ...f.adSet,
+                    costPerResultGoal: e.target.value ? Number(e.target.value) : undefined,
+                  },
+                }))
+              }
+              placeholder="₹X.XX"
+              className="h-11 rounded-xl border-slate-200 bg-white"
+            />
+            <p className="text-[11px] text-slate-500">
+              Meta will aim to spend your entire budget and get the most results using the
+              highest-volume bid strategy. If keeping the average cost per result around a certain
+              amount is important, enter a cost per result goal.
+            </p>
+          </div>
+
+          {/* Attribution model — Traffic / Leads / Sales / App promotion. */}
+          {showAttributionModel && (
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-1">
+                Attribution model
+              </label>
+              <Select
+                value={form.adSet.attributionModel ?? "STANDARD"}
+                onValueChange={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    adSet: { ...f.adSet, attributionModel: v as AttributionModel },
+                  }))
+                }
+              >
+                <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ATTRIBUTION_MODEL_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      <div className="flex flex-col items-start">
+                        <span className="font-semibold text-sm text-slate-900">{opt.label}</span>
+                        <span className="text-[11px] text-slate-500">{opt.hint}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Frequency control */}
+          <div className="space-y-3">
+            <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
+              Frequency control
+            </label>
+            <div className="space-y-2">
+              {(["TARGET", "CAP"] as const).map((mode) => {
+                const active = frequencyControl.mode === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        adSet: {
+                          ...f.adSet,
+                          frequencyControl: {
+                            ...(f.adSet.frequencyControl ?? { count: 2, days: 7 }),
+                            mode,
+                          },
+                        },
+                      }))
+                    }
+                    className={cn(
+                      "w-full text-left flex gap-3 rounded-xl border px-4 py-3 transition-all",
+                      active
+                        ? "border-slate-900 bg-slate-50"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "mt-0.5 w-4 h-4 rounded-full border-2 shrink-0",
+                        active
+                          ? "border-slate-900 bg-slate-900 ring-2 ring-white ring-inset"
+                          : "border-slate-300"
+                      )}
+                    />
+                    <div>
+                      <div className="text-sm font-bold text-slate-900">
+                        {mode === "TARGET" ? "Target" : "Cap"}
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">
+                        {mode === "TARGET"
+                          ? "The average number of times that you want people to see your ads"
+                          : "The maximum number of times that you want people to see your ads"}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Input
+                type="number"
+                min={1}
+                value={frequencyControl.count}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    adSet: {
+                      ...f.adSet,
+                      frequencyControl: {
+                        ...(f.adSet.frequencyControl ?? { mode: "CAP", days: 7 }),
+                        count: Number(e.target.value) || 1,
+                      },
+                    },
+                  }))
+                }
+                className="h-10 w-20 rounded-xl border-slate-200 bg-white"
+              />
+              <span className="text-slate-700 font-semibold">times every</span>
+              <Input
+                type="number"
+                min={1}
+                value={frequencyControl.days}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    adSet: {
+                      ...f.adSet,
+                      frequencyControl: {
+                        ...(f.adSet.frequencyControl ?? { mode: "CAP", count: 2 }),
+                        days: Number(e.target.value) || 1,
+                      },
+                    },
+                  }))
+                }
+                className="h-10 w-20 rounded-xl border-slate-200 bg-white"
+              />
+              <span className="text-slate-700 font-semibold">days</span>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              As a {frequencyControl.mode === "CAP" ? "maximum" : "target"}, we'll aim to stay
+              {frequencyControl.mode === "CAP" ? " under" : " around"} {frequencyControl.count}{" "}
+              impressions every {frequencyControl.days} days.
+            </p>
+          </div>
+
+          {/* Show more options inside Objective card */}
+          <button
+            type="button"
+            onClick={() => setShowObjectiveAdvanced((v) => !v)}
+            className="inline-flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-blue-700"
+          >
+            {showObjectiveAdvanced ? "Hide settings" : "Show more options"}
+          </button>
+          {showObjectiveAdvanced && (
+            <div className="pl-4 ml-2 border-l-2 border-slate-100 space-y-3 py-2">
+              <div>
+                <div className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                  Value rules
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Tell us how much more certain audiences, conversion locations and placements are
+                  worth to your business. Our system will optimise for outcomes based on these
+                  rules.{" "}
+                  <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
+                    About value rules
+                  </a>
+                </p>
+                <button
+                  type="button"
+                  className="mt-2 inline-flex items-center gap-1 text-sm font-bold text-slate-700 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Create a rule set
+                </button>
+              </div>
+            </div>
+          )}
+        </FormSection>
+
+        {/* Dynamic creative — top-level card */}
+        <FormSection
+          title="Dynamic creative"
+          description="Meta automatically combines your media and text to find the best-performing combinations."
+          icon={Sparkles}
+          rightSlot={
+            <Switch
+              checked={!!form.adSet.dynamicCreative}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  adSet: { ...f.adSet, dynamicCreative: e.target.checked },
+                }))
+              }
+            />
+          }
+        >
+          <p className="text-xs text-slate-500">
+            We'll automatically create combinations of your media and text that your audience is
+            likely to respond to.{" "}
+            <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
+              About dynamic creative
+            </a>
+          </p>
+        </FormSection>
+
+        {/* Budget & schedule — addresses the ad-set budget gap left from Step 1 */}
+        <FormSection
+          title="Budget & schedule"
+          description="Set how much to spend on this ad set and when it should run."
+          icon={Wallet}
+        >
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-1">
+              Budget
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <Select
+                value={form.adSet.lifetimeBudget ? "LIFETIME" : "DAILY"}
+                onValueChange={(v) =>
+                  setForm((f) => {
+                    if (v === "DAILY") {
+                      return {
+                        ...f,
+                        adSet: { ...f.adSet, lifetimeBudget: undefined },
+                      };
+                    }
+                    return {
+                      ...f,
+                      adSet: {
+                        ...f.adSet,
+                        dailyBudget: undefined,
+                        lifetimeBudget: f.adSet.lifetimeBudget ?? 0,
+                      },
+                    };
+                  })
+                }
+              >
+                <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DAILY">Daily budget</SelectItem>
+                  <SelectItem value="LIFETIME">Lifetime budget</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                min={1}
+                value={
+                  form.adSet.lifetimeBudget
+                    ? (form.adSet.lifetimeBudget ?? "")
+                    : (form.adSet.dailyBudget ?? "")
+                }
+                onChange={(e) =>
+                  setForm((f) => {
+                    const v = Number(e.target.value) || 0;
+                    return f.adSet.lifetimeBudget
+                      ? { ...f, adSet: { ...f.adSet, lifetimeBudget: v } }
+                      : { ...f, adSet: { ...f.adSet, dailyBudget: v } };
+                  })
+                }
+                placeholder="₹0.00"
+                className="h-11 rounded-xl border-slate-200 bg-white"
+              />
+            </div>
+            <p className="text-[11px] text-slate-500">
+              {form.adSet.lifetimeBudget
+                ? "Total amount spent across the run of the ad set."
+                : "Average daily spend. Some days may spend up to 75% more, others less."}
+              {" "}
+              <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
+                About budgets
+              </a>
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                Start <span className="text-slate-300 font-normal normal-case">(optional)</span>
+              </label>
+              <Input
+                type="datetime-local"
+                value={form.adSet.scheduleStart}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    adSet: { ...f.adSet, scheduleStart: e.target.value },
+                  }))
+                }
+                className="h-11 rounded-xl border-slate-200 mt-1 bg-white"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                End{" "}
+                {form.adSet.lifetimeBudget ? (
+                  <span className="text-rose-500 font-bold">*</span>
+                ) : (
+                  <span className="text-slate-300 font-normal normal-case">(optional)</span>
+                )}
+              </label>
+              <Input
+                type="datetime-local"
+                value={form.adSet.scheduleEnd ?? ""}
+                min={form.adSet.scheduleStart || undefined}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    adSet: { ...f.adSet, scheduleEnd: e.target.value },
+                  }))
+                }
+                className="h-11 rounded-xl border-slate-200 mt-1 bg-white"
+              />
+            </div>
+          </div>
+        </FormSection>
+
+        {/* Audience controls — pre-existing audience criteria + India warning */}
+        <FormSection
+          title="Audience controls"
+          description="Set criteria for where ads for this campaign can be delivered."
+          icon={ShieldAlert}
+        >
+          <p className="text-xs text-slate-500">
+            <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
+              Set audience controls for all campaigns
+            </a>{" "}
+            in Advertiser settings, or use a saved audience.
+          </p>
+          {targetsIndia && (
+            <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-sm font-bold text-amber-900">
+                  Policy and regulatory requirements (India)
+                </p>
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  To run ads in India, you need to declare if your ads are related to securities and
+                  investments.
+                </p>
+              </div>
+            </div>
+          )}
+        </FormSection>
+
         {/* Geography */}
         <FormSection title="Geography" description="Search for locations. Leave empty to default to entire US." icon={MapPin}>
           <div className="space-y-3">
@@ -192,13 +756,13 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
                   : "text-[10px] font-mono text-slate-400"
               }
             >
-              {form.locations.length} / {MAX_LOCATIONS}
+              {form.adSet.locations.length} / {MAX_LOCATIONS}
             </span>
           </div>
 
-          {form.locations.length > 0 && (
+          {form.adSet.locations.length > 0 && (
             <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-              {form.locations.map((l) => (
+              {form.adSet.locations.map((l) => (
                 <Badge
                   key={l.key}
                   variant="outline"
@@ -320,13 +884,13 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
                   : "text-[10px] font-mono text-slate-400"
               }
             >
-              {form.interests.length} / {MAX_INTERESTS}
+              {form.adSet.interests.length} / {MAX_INTERESTS}
             </span>
           </div>
 
-          {form.interests.length > 0 && (
+          {form.adSet.interests.length > 0 && (
             <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-              {form.interests.map((i) => (
+              {form.adSet.interests.map((i) => (
                 <Badge
                   key={i.id}
                   variant="outline"
@@ -433,13 +997,13 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
                   : "text-[10px] font-mono text-slate-400"
               }
             >
-              {form.detailedTargeting.length} / {MAX_DETAILED_TARGETING}
+              {form.adSet.detailedTargeting.length} / {MAX_DETAILED_TARGETING}
             </span>
           </div>
 
-          {form.detailedTargeting.length > 0 && (
+          {form.adSet.detailedTargeting.length > 0 && (
             <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-              {form.detailedTargeting.map((item) => {
+              {form.adSet.detailedTargeting.map((item) => {
                 const typeLabel = DETAILED_TARGETING_OPTIONS.find((o) => o.value === item.type)?.label ?? item.type;
                 return (
                   <Badge
@@ -542,7 +1106,7 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
             </label>
             <div className="flex items-center gap-3">
               <span className="text-[10px] font-mono text-slate-400">
-                {form.customAudiences.length} selected
+                {form.adSet.customAudiences.length} selected
               </span>
               {clientId && (
                 <Link
@@ -557,9 +1121,9 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
           </div>
 
           {/* Chips for currently-selected audiences */}
-          {form.customAudiences.length > 0 && (
+          {form.adSet.customAudiences.length > 0 && (
             <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-              {form.customAudiences.map((a) => (
+              {form.adSet.customAudiences.map((a) => (
                 <Badge
                   key={a.id}
                   variant="outline"
@@ -634,7 +1198,7 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
           ) : (
             <div className="border border-slate-100 rounded-xl bg-white max-h-64 overflow-y-auto">
               {allAudiences.map((a) => {
-                const selected = form.customAudiences.find((sel) => sel.id === a.id);
+                const selected = form.adSet.customAudiences.find((sel) => sel.id === a.id);
                 return (
                   <button
                     key={a.id}
@@ -693,14 +1257,14 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
                   <Input
                     type="number"
                     min={AGE_MIN_FLOOR}
-                    max={form.ageMax}
-                    value={form.ageMin}
+                    max={form.adSet.ageMax}
+                    value={form.adSet.ageMin}
                     onChange={(e) => {
                       const next = Math.max(
                         AGE_MIN_FLOOR,
-                        Math.min(form.ageMax, Number(e.target.value) || AGE_MIN_FLOOR)
+                        Math.min(form.adSet.ageMax, Number(e.target.value) || AGE_MIN_FLOOR)
                       );
-                      setForm((f) => ({ ...f, ageMin: next }));
+                      setForm((f) => ({ ...f, adSet: { ...f.adSet, ageMin: next } }));
                     }}
                     className="h-11 rounded-xl border-slate-200 mt-1"
                   />
@@ -712,22 +1276,22 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
                   </label>
                   <Input
                     type="number"
-                    min={form.ageMin}
+                    min={form.adSet.ageMin}
                     max={AGE_MAX_CEILING}
-                    value={form.ageMax}
+                    value={form.adSet.ageMax}
                     onChange={(e) => {
                       const next = Math.min(
                         AGE_MAX_CEILING,
-                        Math.max(form.ageMin, Number(e.target.value) || form.ageMin)
+                        Math.max(form.adSet.ageMin, Number(e.target.value) || form.adSet.ageMin)
                       );
-                      setForm((f) => ({ ...f, ageMax: next }));
+                      setForm((f) => ({ ...f, adSet: { ...f.adSet, ageMax: next } }));
                     }}
                     className="h-11 rounded-xl border-slate-200 mt-1"
                   />
                 </div>
               </div>
               <p className="text-xs text-slate-400">
-                Meta requires {AGE_MIN_FLOOR}+ minimum. {form.ageMax === AGE_MAX_CEILING ? `${AGE_MAX_CEILING} = 65+ (no upper bound).` : ""}
+                Meta requires {AGE_MIN_FLOOR}+ minimum. {form.adSet.ageMax === AGE_MAX_CEILING ? `${AGE_MAX_CEILING} = 65+ (no upper bound).` : ""}
               </p>
             </div>
 
@@ -738,12 +1302,12 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {(["ALL", "MEN", "WOMEN"] as Gender[]).map((g) => {
-                  const isActive = form.gender === g;
+                  const isActive = form.adSet.genders[0] === g;
                   return (
                     <button
                       key={g}
                       type="button"
-                      onClick={() => setForm((f) => ({ ...f, gender: g }))}
+                      onClick={() => setForm((f) => ({ ...f, adSet: { ...f.adSet, genders: [g] } }))}
                       className={cn(
                         "h-11 rounded-xl text-sm font-bold transition-all border",
                         isActive
@@ -768,7 +1332,7 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
             </label>
             <div className="grid grid-cols-2 gap-2">
               {PLACEMENT_OPTIONS.map((opt) => {
-                const isActive = form.placements.includes(opt.value);
+                const isActive = form.adSet.manualPlatforms.includes(opt.value);
                 return (
                   <button
                     key={opt.value}
@@ -777,8 +1341,8 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
                       setForm((f) => ({
                         ...f,
                         placements: isActive
-                          ? f.placements.filter((p) => p !== opt.value)
-                          : ([...f.placements, opt.value] as Placement[]),
+                          ? f.adSet.manualPlatforms.filter((p) => p !== opt.value)
+                          : ([...f.adSet.manualPlatforms, opt.value] as Placement[]),
                       }))
                     }
                     className={cn(
@@ -795,12 +1359,106 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
               })}
             </div>
             <p className="text-xs text-slate-400">
-              {form.placements.length === 0
+              {form.adSet.manualPlatforms.length === 0
                 ? "Auto placements — Meta decides where the ad appears (recommended for new advertisers)."
-                : `Restricted to ${form.placements.length} placement${form.placements.length === 1 ? "" : "s"}.`}
+                : `Restricted to ${form.adSet.manualPlatforms.length} placement${form.adSet.manualPlatforms.length === 1 ? "" : "s"}.`}
             </p>
           </div>
+
+          {/* WhatsApp status callout (Meta surfaces this for placements that include
+              WhatsApp Updates / Status). Auto-placements pick it up by default. */}
+          {form.adSet.useAdvantagePlusPlacements && (
+            <div className="flex items-start gap-2.5 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+              <Sparkles className="w-4 h-4 shrink-0 text-blue-600 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="text-sm font-bold text-blue-900">WhatsApp status included</p>
+                <p className="text-xs text-blue-800 leading-relaxed">
+                  To help you reach new audiences, we've included the WhatsApp status placement.
+                  Statuses are vertical photos and videos on the WhatsApp Updates tab that disappear
+                  after 24 hours.{" "}
+                  <a className="font-semibold underline" href="#" onClick={(e) => e.preventDefault()}>
+                    About ads in WhatsApp status
+                  </a>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Account controls collapse */}
+          <div className="rounded-xl border border-slate-100 bg-slate-50/40">
+            <button
+              type="button"
+              onClick={() => setShowAccountControls((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 text-sm font-bold text-slate-700"
+            >
+              Account controls
+              <span className="text-slate-400 text-xs">
+                {showAccountControls ? "Hide" : "Show"}
+              </span>
+            </button>
+            {showAccountControls && (
+              <div className="px-4 pb-4 space-y-2">
+                <div className="text-xs text-slate-600">
+                  <span className="font-bold">Excluded placements:</span>{" "}
+                  {(form.adSet.excludedPlacements?.length ?? 0) === 0
+                    ? "None"
+                    : form.adSet.excludedPlacements?.join(", ")}
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Account controls let you limit where your ads appear across all campaigns for this
+                  ad account.
+                </p>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-sm font-bold text-slate-700 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50"
+                >
+                  Edit placement controls
+                </button>
+              </div>
+            )}
+          </div>
         </FormSection>
+
+        {/* Policy and regulatory requirements — India only for now */}
+        {targetsIndia && (
+          <FormSection
+            title="Policy and regulatory requirements (India)"
+            description="Provide required information about your ads, yourself or your organisation."
+            icon={ShieldAlert}
+          >
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <Checkbox
+                id="india-securities"
+                checked={!!form.adSet.policyDeclarations?.securitiesAndInvestments}
+                onCheckedChange={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    adSet: {
+                      ...f.adSet,
+                      policyDeclarations: {
+                        ...f.adSet.policyDeclarations,
+                        securitiesAndInvestments: !!v,
+                      },
+                    },
+                  }))
+                }
+                className="mt-0.5"
+              />
+              <div>
+                <div className="text-sm font-semibold text-slate-800">
+                  This ad set includes ads related to securities and investments
+                </div>
+                <a
+                  href="#"
+                  onClick={(e) => e.preventDefault()}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  About verification requirements
+                </a>
+              </div>
+            </label>
+          </FormSection>
+        )}
 
       </div>
     </Card>

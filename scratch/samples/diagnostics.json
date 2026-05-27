@@ -1,0 +1,23 @@
+{
+  "success": true,
+  "data": {
+    "account_status": "ACTIVE",
+    "disable_reason": 0,
+    "is_prepay_account": false,
+    "balance": "0",
+    "spend_cap": "100000",
+    "amount_spent": "45000",
+    "funding_source_details": {
+      "display_string": "Visa *1234",
+      "id": "1234567890123"
+    },
+    "issues": [
+      {
+        "level": "ADSET",
+        "id": "1202020203",
+        "title": "Learning Phase Limited",
+        "description": "This ad set is not getting enough optimization events."
+      }
+    ]
+  }
+}

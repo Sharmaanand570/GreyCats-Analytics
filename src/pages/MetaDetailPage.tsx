@@ -66,7 +66,18 @@ import { useMetaAdsMeta, useMetaAdsSummary, useMetaAdsCampaigns, useMetaAdsTrend
 import { useClients, useClient } from "@/hooks/useClients";
 import { DataSyncBanner } from "@/components/DataSyncBanner";
 import { PlatformNotConnected } from "@/components/PlatformNotConnected";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, RefreshCw, BarChart3, Copy, ShieldCheck, Images } from "lucide-react";
+import { AccountDiagnosticsCard } from "@/features/meta/components/detail/AccountDiagnosticsCard";
+import { SyncStatusBanner } from "@/features/meta/components/detail/SyncStatusBanner";
+import { InsightsBreakdownDrawer } from "@/features/meta/components/detail/InsightsBreakdownDrawer";
+import { CampaignVersionsDrawer } from "@/features/meta/components/detail/CampaignVersionsDrawer";
+import { CampaignHierarchyPanel } from "@/features/meta/components/detail/CampaignHierarchyPanel";
+import { useDuplicateCampaign } from "@/features/meta/hooks/useMetaAdsDetail";
+import {
+  useHardDeleteCampaign,
+  useSubmitForApproval,
+} from "@/features/meta/hooks/useMetaAdsManager";
+import { History, Layers, Send } from "lucide-react";
 
 // --- Components ---
 
@@ -313,6 +324,15 @@ function MetaDetailPage() {
   const { mutate: editCampaign, isPending: isEditingCampaign } = useUpdateCampaign();
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [editTarget, setEditTarget] = useState<{ id: string; name: string } | null>(null);
+  // PR F — breakdown drawer (per-campaign analytics dive) + duplicate mutation
+  const [breakdownTarget, setBreakdownTarget] = useState<{ id: string; name: string } | null>(null);
+  // PR G — version history drawer
+  const [versionsTarget, setVersionsTarget] = useState<{ id: string; name: string } | null>(null);
+  // PR H — hierarchy panel (adsets + ads tree) + submit-for-approval mutation
+  const [hierarchyTarget, setHierarchyTarget] = useState<{ id: string; name: string } | null>(null);
+  const { mutate: duplicate, isPending: isDuplicating } = useDuplicateCampaign();
+  const { mutate: hardDelete, isPending: isHardDeleting } = useHardDeleteCampaign();
+  const { mutate: submitApproval, isPending: isSubmittingApproval } = useSubmitForApproval();
   const [editName, setEditName] = useState("");
   const [editBudgetType, setEditBudgetType] = useState<"DAILY" | "LIFETIME">("DAILY");
   const [editBudget, setEditBudget] = useState("");
@@ -351,7 +371,7 @@ function MetaDetailPage() {
 
   return (
     <div className="w-full h-full flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
-      <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd] animate-in fade-in slide-in-from-bottom-2 duration-1000">
+      <div className="w-full rounded-l-2xl overflow-hidden h-full bg-[#fdfdfd] animate-in fade-in slide-in-from-bottom-2 duration-1000">
         <div className="w-full h-full flex flex-col">
           {/* --- 1. Top Navigation Bar --- */}
           <div className="w-full border-b flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-8 py-6 bg-white/80 backdrop-blur-md sticky top-0 z-20 border-slate-200/60 shadow-sm rounded-t-[32px] mb-6">
@@ -412,6 +432,42 @@ function MetaDetailPage() {
                 </Select>
               </div>
                <DateRangePicker value={date} onChange={setDate} />
+               {/* Quick-nav to the ancillary Meta Ads pages.
+                   Pixels + Rules buttons are hidden 2026-05-26 — those
+                   backend endpoints aren't in the latest reference table.
+                   Pages still exist at /pixels and /automation for deep
+                   links and can be re-enabled by un-commenting the buttons
+                   once backend confirms the routes. */}
+               <Button
+                 variant="outline"
+                 onClick={() =>
+                   navigate(
+                     selectedClientId
+                       ? `/data-sources/meta-ads/media/${selectedClientId}`
+                       : "/data-sources/meta-ads/media"
+                   )
+                 }
+                 disabled={!selectedClientId}
+                 className="h-10 rounded-xl px-3 gap-2 font-bold text-indigo-700 border-indigo-200 hover:bg-indigo-50 disabled:opacity-50"
+               >
+                 <Images className="w-4 h-4" />
+                 Media
+               </Button>
+               <Button
+                 variant="outline"
+                 onClick={() =>
+                   navigate(
+                     selectedClientId
+                       ? `/data-sources/meta-ads/compliance/${selectedClientId}`
+                       : "/data-sources/meta-ads/compliance"
+                   )
+                 }
+                 disabled={!selectedClientId}
+                 className="h-10 rounded-xl px-3 gap-2 font-bold text-emerald-700 border-emerald-200 hover:bg-emerald-50 disabled:opacity-50"
+               >
+                 <ShieldCheck className="w-4 h-4" />
+                 Compliance
+               </Button>
                <Button
                  onClick={() =>
                    navigate(
@@ -443,7 +499,16 @@ function MetaDetailPage() {
           clientName={clientData?.name}
         />
       ) : (
-          <div className="w-full px-8 py-4 space-y-8">
+          <div className="w-full px-8 py-4 space-y-6">
+
+          {/* PR F — Account health + sync freshness at the top so the user
+              sees problems before scanning campaigns. Both render to null
+              when no data is available (no flash of empty cards). */}
+          <SyncStatusBanner clientId={selectedClientId} />
+          <AccountDiagnosticsCard
+            clientId={selectedClientId}
+            accountId={metaData?.accountId ?? null}
+          />
 
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
@@ -718,6 +783,55 @@ function MetaDetailPage() {
                                       <Sparkles className="w-4 h-4 mr-2 text-blue-600" />
                                       Full Edit
                                     </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onSelect={() =>
+                                        setBreakdownTarget({ id: campaign.id, name: campaign.name })
+                                      }
+                                    >
+                                      <BarChart3 className="w-4 h-4 mr-2 text-emerald-600" />
+                                      View Breakdowns
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onSelect={() =>
+                                        setVersionsTarget({ id: campaign.id, name: campaign.name })
+                                      }
+                                    >
+                                      <History className="w-4 h-4 mr-2 text-slate-600" />
+                                      Version History
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onSelect={() =>
+                                        setHierarchyTarget({ id: campaign.id, name: campaign.name })
+                                      }
+                                    >
+                                      <Layers className="w-4 h-4 mr-2 text-blue-600" />
+                                      Ad Sets & Ads
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      disabled={isSubmittingApproval || !selectedClientId}
+                                      onSelect={() =>
+                                        submitApproval({
+                                          campaignId: campaign.id,
+                                          clientId: selectedClientId as number,
+                                        })
+                                      }
+                                    >
+                                      <Send className="w-4 h-4 mr-2 text-emerald-600" />
+                                      Submit for Approval
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      disabled={isDuplicating || !selectedClientId}
+                                      onSelect={() =>
+                                        duplicate({
+                                          campaignId: campaign.id,
+                                          clientId: selectedClientId as number,
+                                          deep: true,
+                                        })
+                                      }
+                                    >
+                                      <Copy className="w-4 h-4 mr-2 text-violet-600" />
+                                      Duplicate
+                                    </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem
                                       className="text-rose-600 focus:text-rose-700"
@@ -849,6 +963,37 @@ function MetaDetailPage() {
         </DialogContent>
       </Dialog>
 
+      {/* PR F — Insights breakdown drawer. Opens from the campaign row
+          dropdown. Inherits the page's selected date range so the slice
+          matches what the user already sees in the KPI cards. */}
+      <InsightsBreakdownDrawer
+        open={!!breakdownTarget}
+        onOpenChange={(o) => !o && setBreakdownTarget(null)}
+        clientId={selectedClientId}
+        campaignId={breakdownTarget?.id ?? null}
+        campaignName={breakdownTarget?.name}
+        startDate={apiParams.startDate}
+        endDate={apiParams.endDate}
+      />
+
+      {/* PR H — Hierarchy panel (ad sets + ads tree) */}
+      <CampaignHierarchyPanel
+        open={!!hierarchyTarget}
+        onOpenChange={(o) => !o && setHierarchyTarget(null)}
+        clientId={selectedClientId}
+        campaignId={hierarchyTarget?.id ?? null}
+        campaignName={hierarchyTarget?.name}
+      />
+
+      {/* PR G — Version history drawer */}
+      <CampaignVersionsDrawer
+        open={!!versionsTarget}
+        onOpenChange={(o) => !o && setVersionsTarget(null)}
+        clientId={selectedClientId}
+        campaignId={versionsTarget?.id ?? null}
+        campaignName={versionsTarget?.name}
+      />
+
       <AlertDialog
         open={!!deleteTarget}
         onOpenChange={(open) => {
@@ -866,8 +1011,10 @@ function MetaDetailPage() {
               ) : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="gap-2">
             <AlertDialogCancel>Cancel</AlertDialogCancel>
+            {/* Soft delete first — keeps the campaign in Meta with status=DELETED.
+                Most users want this; spend history stays viewable in reports. */}
             <AlertDialogAction
               className="bg-rose-600 hover:bg-rose-700 focus:ring-rose-400"
               onClick={() => {
@@ -877,7 +1024,24 @@ function MetaDetailPage() {
                 }
               }}
             >
-              Delete
+              Delete (keep history)
+            </AlertDialogAction>
+            {/* Hard delete — removes the campaign from Meta entirely. Use only
+                when the campaign was created in error or contains sensitive data. */}
+            <AlertDialogAction
+              disabled={isHardDeleting}
+              className="bg-slate-900 hover:bg-slate-800 focus:ring-slate-400"
+              onClick={() => {
+                if (deleteTarget && selectedClientId) {
+                  hardDelete({
+                    campaignId: deleteTarget.id,
+                    clientId: selectedClientId,
+                  });
+                  setDeleteTarget(null);
+                }
+              }}
+            >
+              Delete permanently
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

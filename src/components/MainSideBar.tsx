@@ -138,8 +138,12 @@ function MainSideBar(): React.JSX.Element {
       // Match the meta-ads root and /:clientId, but NOT /wizard or /audiences subpaths
       return /^\/data-sources\/meta-ads(\/\d+)?$/.test(pathname);
     }
+    if (itemPath === '/data-sources/google-ads/wizard') {
+      return pathname.startsWith('/data-sources/google-ads/wizard');
+    }
     if (itemPath === '/data-sources/google-ads') {
-      return pathname.startsWith('/data-sources/google-ads');
+      // Match the google-ads root and /:clientId, but NOT /wizard subpath.
+      return /^\/data-sources\/google-ads(\/\d+)?$/.test(pathname);
     }
     if (itemPath === '/admin/dashboard') {
       return pathname.startsWith('/admin');
@@ -183,6 +187,7 @@ function MainSideBar(): React.JSX.Element {
       "data-sources/meta-ads/wizard",
       "data-sources/meta-ads/audiences",
       "data-sources/meta-ads",
+      "data-sources/google-ads/wizard",
       "data-sources/google-ads",
     ];
     if (currentClient?.id && clientScopedPaths.some(p => path.includes(p))) {
@@ -550,12 +555,17 @@ function MainSideBar(): React.JSX.Element {
       )}
 
       {/* ---------- PAGE CONTENT ---------- */}
-      <main className="flex-1 bg-[#F9FAFB] overflow-y-auto transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]">
-        <TrialExpiryBanner />
-        <ImpersonationBanner />
-        <GlobalOAuthHandler />
-        <Outlet />
-      </main>
+      {/* Dark-gradient shell: the sidebar background bleeds into this area so
+          the page content appears as a floating rounded panel lifted off the
+          sidebar. Each page's own bg class then fills the inner panel. */}
+      <div className="flex-1 flex flex-col bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] py-4">
+        <main className="flex-1 rounded-l-2xl overflow-y-auto bg-[#F9FAFB]">
+          <TrialExpiryBanner />
+          <ImpersonationBanner />
+          <GlobalOAuthHandler />
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

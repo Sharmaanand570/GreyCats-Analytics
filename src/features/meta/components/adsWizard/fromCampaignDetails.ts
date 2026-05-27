@@ -1,17 +1,26 @@
 import type {
-  CampaignDetails,
+  CampaignHierarchicalData,
   FlexibleSpecGroup,
 } from "../../API/metaAdsManagerApi";
 import {
-  INITIAL_FORM_STATE,
+  INITIAL_STATE,
+  type AdFormat,
+  type DestinationType,
   type SelectedDetailedTargeting,
-  type SelectedInterest,
   type SelectedLocation,
-  type WizardFormState,
+  type WizardState,
 } from "./types";
 
 const flattenGeo = (
-  block: NonNullable<NonNullable<CampaignDetails["targeting"]>["geo_locations"]> | undefined,
+  block:
+    | {
+        countries?: string[];
+        cities?: { key: string; name?: string }[];
+        regions?: { key: string; name?: string }[];
+        zips?: { key: string; name?: string }[];
+        custom_locations?: { key: string; name?: string }[];
+      }
+    | undefined,
   excluded: boolean
 ): SelectedLocation[] => {
   if (!block) return [];
@@ -25,12 +34,10 @@ const flattenGeo = (
   (block.regions ?? []).forEach((r) => {
     out.push({ key: r.key, name: r.name ?? r.key, type: "region", excluded });
   });
+  // Note: zips and custom_locations are stored on WizardState directly as arrays of strings.
   return out;
 };
 
-// Collapse Meta's flexible_spec[] (AND of OR-groups) into a single list of
-// items per category. The wizard's UI doesn't model AND-groups, so we just
-// union everything across groups.
 const collectSpec = (groups: FlexibleSpecGroup[] | undefined): FlexibleSpecGroup => {
   const merged: Required<FlexibleSpecGroup> = {
     interests: [],
@@ -51,12 +58,6 @@ const collectSpec = (groups: FlexibleSpecGroup[] | undefined): FlexibleSpecGroup
   return merged;
 };
 
-const flattenInterests = (
-  list: { id: string; name: string }[] | undefined,
-  excluded: boolean
-): SelectedInterest[] =>
-  (list ?? []).map((i) => ({ id: i.id, name: i.name, excluded }));
-
 const flattenDetailedTargeting = (spec: FlexibleSpecGroup): SelectedDetailedTargeting[] => {
   const out: SelectedDetailedTargeting[] = [];
   (spec.behaviors ?? []).forEach((b) => out.push({ id: b.id, name: b.name, type: "behaviors" }));
@@ -67,10 +68,6 @@ const flattenDetailedTargeting = (spec: FlexibleSpecGroup): SelectedDetailedTarg
     out.push({ id: e.id, name: e.name, type: "life_events" })
   );
   (spec.work ?? []).forEach((w) => {
-    // The wizard only models employers + positions. "industry" entries get
-    // skipped on round trip — preserving them as employers would corrupt the
-    // payload when the user re-saves (Meta would reject or mis-target). The
-    // user can re-add them via the picker if needed.
     if (w.type === "employer") {
       out.push({ id: w.id, name: w.name, type: "work_employers" });
     } else if (w.type === "position") {
@@ -84,88 +81,169 @@ const flattenDetailedTargeting = (spec: FlexibleSpecGroup): SelectedDetailedTarg
   return out;
 };
 
-// Convert a Meta-style CampaignDetails response into the wizard's flat state.
-// Targeting may arrive in either the modern flexible_spec format (what GET
-// /campaigns/:id returns) or the legacy flat fields — we merge both so the
-// adapter is shape-agnostic. Missing fields fall back to INITIAL_FORM_STATE.
-export const toWizardFormState = (details: CampaignDetails): WizardFormState => {
-  const targeting = details.targeting;
+export const toWizardState = (data: CampaignHierarchicalData): WizardState => {
+  const { campaign, adSets } = data;
+  const adSet = adSets?.[0];
+  const ad = adSet?.ads?.[0];
+  const creative = ad?.creative;
+  const targeting = adSet?.targeting;
 
   const includedSpec = collectSpec(targeting?.flexible_spec);
-  const excludedSpec = collectSpec(targeting?.exclusions ? [targeting.exclusions] : undefined);
-
-  // The targeting block only returns audience IDs — no name or type. We
-  // populate placeholder values here and the wizard page reconciles them
-  // against the /audiences list once it loads (see useAudiences effect in
-  // MetaAdsWizardPage). Until then the id renders as the label.
   const customAudiences = (targeting?.custom_audiences ?? []).map((a) => ({
     id: a.id,
-    name: a.id,
+    name: (a as any).name ?? a.id,
     audienceType: "CUSTOM" as const,
   }));
   const excludedAudiences = (targeting?.excluded_custom_audiences ?? []).map((a) => ({
     id: a.id,
-    name: a.id,
+    name: (a as any).name ?? a.id,
     audienceType: "CUSTOM" as const,
     excluded: true,
   }));
 
+  // Ad Format detection
+  let format: AdFormat = INITIAL_STATE.ad.format;
+  if (creative?.object_story_spec?.link_data?.child_attachments?.length) {
+    format = "CAROUSEL";
+  } else if (creative?.object_story_spec?.video_data) {
+    format = "SINGLE_IMAGE_VIDEO";
+  }
+
+  // Placements detection
+  const isAdvantagePlusPlacements = data.legacy?.placementStrategy === "ADVANTAGE" || (!adSet?.placement_positions?.length && !adSet?.user_connection_types?.length);
+  const manualPlatforms = isAdvantagePlusPlacements ? [] : ((data.legacy as any)?.placements ?? []);
+
+  const legacy = data.legacy as any;
+
+  // Advantage+ objectives carry their budget at the campaign level (CBO).
+  const objective = campaign?.objective ?? INITIAL_STATE.campaign.objective;
+  const isAdvantagePlusObjective =
+    objective === "OUTCOME_LEADS" ||
+    objective === "OUTCOME_SALES" ||
+    objective === "OUTCOME_APP_PROMOTION";
+  const isCbo = campaign?.is_cbo ?? false;
+  // App promotion: backend stores app id in promoted_object on the ad set.
+  const ios14AppId = (adSet?.promoted_object as any)?.application_id as string | undefined;
+
   return {
-    ...INITIAL_FORM_STATE,
-    // Identity + campaign
-    accountId: details.accountId ?? "",
-    pageId: details.pageId ?? "",
-    campaignName: details.name ?? "",
-    objective: details.objective ?? INITIAL_FORM_STATE.objective,
-    specialAdCategory: details.specialAdCategory ?? INITIAL_FORM_STATE.specialAdCategory,
-    // Budget + schedule
-    budgetType: details.budgetType ?? (details.lifetimeBudget ? "LIFETIME" : "DAILY"),
-    dailyBudget: details.dailyBudget ?? INITIAL_FORM_STATE.dailyBudget,
-    lifetimeBudget: details.lifetimeBudget ?? INITIAL_FORM_STATE.lifetimeBudget,
-    startTime: details.startTime ?? "",
-    endTime: details.endTime ?? "",
-    // Sales objective extras
-    pixelId: details.pixelId ?? "",
-    conversionEvent: details.conversionEvent ?? "",
-    // Targeting (flattened from both flexible_spec and legacy flat fields)
-    locations: [
-      ...flattenGeo(targeting?.geo_locations, false),
-      ...flattenGeo(targeting?.excluded_geo_locations, true),
-    ],
-    interests: [
-      ...flattenInterests(includedSpec.interests, false),
-      ...flattenInterests(targeting?.interests, false),
-      ...flattenInterests(excludedSpec.interests, true),
-      ...flattenInterests(targeting?.excluded_interests, true),
-    ],
-    detailedTargeting: [
-      ...flattenDetailedTargeting(includedSpec),
-      // Legacy flat fields — covered by collectSpec when flexible_spec is used,
-      // but we keep this fallback so older responses still hydrate.
-      ...flattenDetailedTargeting({
-        behaviors: targeting?.behaviors,
-        demographics: targeting?.demographics,
-        life_events: targeting?.life_events,
-        work: targeting?.work,
-        education: targeting?.education,
-      }),
-    ],
-    customAudiences: [...customAudiences, ...excludedAudiences],
-    ageMin: details.ageRange?.min ?? INITIAL_FORM_STATE.ageMin,
-    ageMax: details.ageRange?.max ?? INITIAL_FORM_STATE.ageMax,
-    gender: details.gender ?? INITIAL_FORM_STATE.gender,
-    placements: details.placements ?? [],
-    // Creative
-    adType: details.adType ?? INITIAL_FORM_STATE.adType,
-    adHeadline: details.adHeadline ?? "",
-    adText: details.adText ?? "",
-    description: details.description ?? "",
-    adLink: details.adLink ?? "",
-    imageUrl: details.imageUrl ?? "",
-    ctaButton: details.ctaButton ?? INITIAL_FORM_STATE.ctaButton,
-    carouselCards: details.carouselCards ?? [],
-    videoUrl: details.videoUrl ?? "",
-    videoThumbnailUrl: details.videoThumbnailUrl ?? "",
-    captionsUrl: details.captionsUrl ?? "",
+    campaign: {
+      ...INITIAL_STATE.campaign,
+      accountId: campaign?.account_id ?? "",
+      pageId: creative?.object_story_spec?.page_id ?? "",
+      name: campaign?.name ?? "",
+      buyingType: (campaign?.buying_type === "RESERVED" ? "RESERVATION" : "AUCTION") as any,
+      objective,
+      specialAdCategories: campaign?.special_ad_categories ?? [],
+      isCboEnabled: isCbo,
+      // Strategy radio mirrors CBO for Advantage+ objectives; otherwise stays AD_SET.
+      budgetStrategy: isAdvantagePlusObjective && isCbo ? "CAMPAIGN" : "AD_SET",
+      abTestEnabled:
+        campaign?.execution_options?.includes("include_in_ab_test") ??
+        campaign?.ab_test_enabled ??
+        false,
+      campaignSpendingLimit: campaign?.spend_cap ? campaign.spend_cap / 100 : undefined,
+      dailyBudget: campaign?.daily_budget ? campaign.daily_budget / 100 : undefined,
+      lifetimeBudget: campaign?.lifetime_budget ? campaign.lifetime_budget / 100 : undefined,
+      bidStrategy: campaign?.bid_strategy,
+      budgetRebalanceFlag: campaign?.budget_rebalance_flag ?? false,
+      dsaBeneficiary: campaign?.dsa_beneficiary ?? undefined,
+      dsaPayor: campaign?.dsa_payor ?? undefined,
+      ios14CampaignEnabled: objective === "OUTCOME_APP_PROMOTION" && !!ios14AppId,
+      ios14AppId,
+    },
+    adSet: {
+      ...INITIAL_STATE.adSet,
+      name: adSet?.name ?? "",
+      destinationType: (adSet?.destination_type as DestinationType) ?? "WEBSITE",
+      conversionLocation: adSet?.destination_type ?? "WEBSITE",
+      optimizationGoal: adSet?.optimization_goal ?? INITIAL_STATE.adSet.optimizationGoal,
+      // Performance goal mirrors optimization_goal (Meta uses the same enum
+      // both names refer to). Falls back to the objective's default.
+      performanceGoal: (adSet?.optimization_goal as any) ?? INITIAL_STATE.adSet.performanceGoal,
+      pageId: (adSet?.promoted_object as any)?.page_id ?? undefined,
+      costPerResultGoal: (adSet as any)?.bid_amount
+        ? Number((adSet as any).bid_amount) / 100
+        : undefined,
+      // Hydrate frequency control from the first freq spec, if present.
+      frequencyControl: (adSet as any)?.frequency_control_specs?.[0]
+        ? {
+            mode: "CAP" as const,
+            count: (adSet as any).frequency_control_specs[0].max_frequency ?? 2,
+            days: (adSet as any).frequency_control_specs[0].interval_days ?? 7,
+          }
+        : INITIAL_STATE.adSet.frequencyControl,
+      billingEvent: adSet?.billing_event ?? INITIAL_STATE.adSet.billingEvent,
+      deliveryType: adSet?.pacing_type?.[0]?.toUpperCase(),
+      dailyBudget: adSet?.daily_budget ? adSet.daily_budget / 100 : undefined,
+      lifetimeBudget: adSet?.lifetime_budget ? adSet.lifetime_budget / 100 : undefined,
+      scheduleStart: adSet?.start_time ?? "",
+      scheduleEnd: adSet?.end_time ?? undefined,
+      useAdvantagePlusAudience: adSet?.targeting_optimization === "expansion_all",
+      audienceMode: adSet?.targeting_optimization === "expansion_all" ? "ADVANTAGE_PLUS" : "MANUAL",
+      locations: [
+        ...flattenGeo(targeting?.geo_locations as any, false),
+        ...flattenGeo(targeting?.excluded_geo_locations as any, true),
+      ],
+      ageMin: targeting?.age_min ?? 18,
+      ageMax: targeting?.age_max ?? 65,
+      genders: targeting?.genders?.includes(1) && !targeting?.genders?.includes(2) ? ["MEN"] : targeting?.genders?.includes(2) && !targeting?.genders?.includes(1) ? ["WOMEN"] : ["ALL"],
+      detailedTargeting: [
+        ...flattenDetailedTargeting(includedSpec),
+        ...flattenDetailedTargeting({
+          behaviors: targeting?.behaviors,
+          demographics: targeting?.demographics,
+          life_events: targeting?.life_events,
+          work: targeting?.work,
+          education: targeting?.education,
+        }),
+      ],
+      customAudiences,
+      excludedCustomAudiences: excludedAudiences,
+      useAdvantagePlusPlacements: isAdvantagePlusPlacements,
+      placementStrategy: isAdvantagePlusPlacements ? "ADVANTAGE_PLUS" : "MANUAL",
+      manualPlatforms,
+      manualPositions: adSet?.placement_positions ?? [],
+      dynamicCreative: adSet?.is_dynamic_creative ?? false,
+      adSetSpendLimitEnabled: !!(adSet?.daily_min_spend_target || adSet?.daily_spend_cap),
+      minDailySpend: adSet?.daily_min_spend_target ? adSet.daily_min_spend_target / 100 : undefined,
+      maxDailySpend: adSet?.daily_spend_cap ? adSet.daily_spend_cap / 100 : undefined,
+      inventoryFilter: adSet?.brand_safety_content_filter_levels?.[0]?.replace("_INVENTORY", ""),
+      blockLists: adSet?.publisher_block_list ?? [],
+      contentTypeExclusions: adSet?.content_delivery_preferences?.feed_mobile_component_exclusions ?? [],
+    },
+    ad: {
+      ...INITIAL_STATE.ad,
+      name: ad?.name ?? "",
+      format,
+      publishMode: legacy?.publishMode ?? "SINGLE_AD",
+      instagramAccountId: creative?.instagram_actor_id ?? undefined,
+      isPartnershipAd: !!creative?.branded_content_sponsor_page_id,
+      partnershipAdCode: creative?.branded_content_sponsor_page_id,
+      advantageCreative: creative?.degrees_of_freedom_spec?.creative_features_spec?.standard_enhancements?.enroll_status === "OPT_IN",
+      primaryTexts: creative?.asset_feed_spec?.bodies?.map((b) => b.text) ?? (creative?.body ? [creative.body] : [""]),
+      headlines: creative?.asset_feed_spec?.titles?.map((t) => t.text) ?? (creative?.title ? [creative.title] : [""]),
+      descriptions: creative?.asset_feed_spec?.descriptions?.map((d) => d.text) ?? [""],
+      callToAction: (creative?.asset_feed_spec?.call_to_action_types?.[0] as any) ?? creative?.call_to_action_type ?? "LEARN_MORE",
+      images: [legacy?.imageUrl ?? ""], // Keep legacy mapping for image/video URLs
+      videos: [legacy?.videoUrl ?? ""],
+      videoThumbnailUrl: legacy?.videoThumbnailUrl ?? "",
+      captionsUrl: legacy?.captionsUrl ?? "",
+      carouselCards: legacy?.carouselCards ?? [],
+      adVariants: legacy?.adVariants ?? [],
+      websiteUrl: legacy?.adLink ?? "",
+      displayLink: creative?.object_story_spec?.link_data?.caption ?? "",
+      urlParameters: creative?.url_tags ?? "",
+      trackingAppEvents: !!ad?.tracking_specs?.some((s) => Object.values(s).flat().some((v) => v?.toString().toLowerCase().includes("mobile_app_install"))),
+      offlineEvents: !!ad?.tracking_specs?.some((s) => Object.values(s).flat().some((v) => v?.toString().toLowerCase().includes("offline_conversion"))),
+      thirdPartyPixelIds: (() => {
+        const ids: string[] = [];
+        ad?.tracking_specs?.forEach((s) => {
+          if (Array.isArray(s.fb_pixel)) ids.push(...(s.fb_pixel as string[]));
+        });
+        return ids;
+      })(),
+    },
+    adSetId: adSet?.id ?? legacy?.adSetId,
+    adId: ad?.id ?? legacy?.adId,
   };
 };

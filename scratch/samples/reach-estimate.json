@@ -1,0 +1,13 @@
+{
+  "success": true,
+  "data": {
+    "users": 2500000,
+    "bid_estimations": [
+      {
+        "cpa_bid": 150,
+        "location": 200,
+        "curve": []
+      }
+    ]
+  }
+}

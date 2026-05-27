@@ -30,7 +30,7 @@ import {
   OBJECTIVE_OPTIONS,
   PLACEMENT_OPTIONS,
   SPECIAL_AD_CATEGORY_OPTIONS,
-  type WizardFormState,
+  type WizardState,
 } from "./types";
 
 const formatDateTime = (iso: string) => {
@@ -43,7 +43,7 @@ const formatDateTime = (iso: string) => {
 };
 
 type Props = {
-  form: WizardFormState;
+  form: WizardState;
   publishError: string | null;
 };
 
@@ -83,10 +83,10 @@ export function Step4Review({ form, publishError }: Props) {
   // bucket that narrows the audience: locations, interests, detailed
   // targeting, and custom audiences.
   const targetingEmpty =
-    form.locations.length === 0 &&
-    form.interests.length === 0 &&
-    form.detailedTargeting.length === 0 &&
-    form.customAudiences.length === 0;
+    form.adSet.locations.length === 0 &&
+    form.adSet.interests.length === 0 &&
+    form.adSet.detailedTargeting.length === 0 &&
+    form.adSet.customAudiences.length === 0;
 
   return (
     <div className="space-y-6">
@@ -131,41 +131,41 @@ export function Step4Review({ form, publishError }: Props) {
               icon={<Briefcase className="w-4 h-4" />}
               label="Ad Account"
               value={
-                form.accountId
-                  ? form.accountId.startsWith("act_")
-                    ? form.accountId
-                    : `act_${form.accountId}`
+                form.campaign.accountId
+                  ? form.campaign.accountId.startsWith("act_")
+                    ? form.campaign.accountId
+                    : `act_${form.campaign.accountId}`
                   : "—"
               }
-              empty={!form.accountId}
+              empty={!form.campaign.accountId}
             />
             <Field
               icon={<FacebookIcon className="w-4 h-4" />}
               label="Facebook Page"
-              value={form.pageId || "—"}
-              empty={!form.pageId}
+              value={form.campaign.pageId || "—"}
+              empty={!form.campaign.pageId}
             />
             <Field
               icon={<CheckCircle2 className="w-4 h-4" />}
               label="Campaign Name"
-              value={form.campaignName || "—"}
-              empty={!form.campaignName}
+              value={form.campaign.name || "—"}
+              empty={!form.campaign.name}
             />
             <Field
               icon={<Target className="w-4 h-4" />}
               label="Objective"
               value={
-                OBJECTIVE_OPTIONS.find((o) => o.value === form.objective)?.label ??
-                form.objective
+                OBJECTIVE_OPTIONS.find((o) => o.value === form.campaign.objective)?.label ??
+                form.campaign.objective
               }
             />
-            {form.specialAdCategory !== "NONE" && (
+            {((form.campaign.specialAdCategories && form.campaign.specialAdCategories[0]) || "NONE") !== "NONE" && (
               <Field
                 icon={<ShieldAlert className="w-4 h-4" />}
                 label="Special Ad Category"
                 value={
-                  SPECIAL_AD_CATEGORY_OPTIONS.find((o) => o.value === form.specialAdCategory)?.label ??
-                  form.specialAdCategory
+                  SPECIAL_AD_CATEGORY_OPTIONS.find((o) => o.value === ((form.campaign.specialAdCategories && form.campaign.specialAdCategories[0]) || "NONE"))?.label ??
+                  ((form.campaign.specialAdCategories && form.campaign.specialAdCategories[0]) || "NONE")
                 }
               />
             )}
@@ -173,41 +173,41 @@ export function Step4Review({ form, publishError }: Props) {
               icon={<Wallet className="w-4 h-4" />}
               label="Budget"
               value={
-                form.budgetType === "LIFETIME"
-                  ? `${form.lifetimeBudget.toFixed(2)} lifetime`
-                  : `${form.dailyBudget.toFixed(2)} / day`
+                (form.campaign.isCboEnabled ? (form.campaign.lifetimeBudget ? "LIFETIME" : "DAILY") : (form.adSet.lifetimeBudget ? "LIFETIME" : "DAILY")) === "LIFETIME"
+                  ? `${(form.campaign.isCboEnabled ? form.campaign.lifetimeBudget ?? 0 : form.adSet.lifetimeBudget ?? 0).toFixed(2)} lifetime`
+                  : `${(form.campaign.isCboEnabled ? form.campaign.dailyBudget ?? 0 : form.adSet.dailyBudget ?? 0).toFixed(2)} / day`
               }
             />
-            {(form.startTime || form.endTime) && (
+            {(form.adSet.scheduleStart || form.adSet.scheduleEnd) && (
               <Field
                 icon={<CalendarClock className="w-4 h-4" />}
                 label="Schedule"
                 value={
                   <span>
-                    {form.startTime ? formatDateTime(form.startTime) : "Now"}
+                    {form.adSet.scheduleStart ? formatDateTime(form.adSet.scheduleStart) : "Now"}
                     <span className="text-slate-400 mx-2">→</span>
-                    {form.endTime ? formatDateTime(form.endTime) : "No end date"}
+                    {form.adSet.scheduleEnd ? formatDateTime(form.adSet.scheduleEnd) : "No end date"}
                   </span>
                 }
               />
             )}
-            {form.objective === "OUTCOME_SALES" && (
+            {form.campaign.objective === "OUTCOME_SALES" && (
               <Field
                 icon={<Crosshair className="w-4 h-4" />}
                 label="Conversion Tracking"
                 value={
-                  form.pixelId && form.conversionEvent ? (
+                  form.adSet.pixelId && form.adSet.conversionEvent ? (
                     <span>
-                      Pixel <span className="font-mono text-xs text-slate-500">{form.pixelId}</span>
+                      Pixel <span className="font-mono text-xs text-slate-500">{form.adSet.pixelId}</span>
                       <span className="text-slate-400 mx-2">·</span>
-                      {CONVERSION_EVENT_OPTIONS.find((o) => o.value === form.conversionEvent)?.label ??
-                        form.conversionEvent}
+                      {CONVERSION_EVENT_OPTIONS.find((o) => o.value === form.adSet.conversionEvent)?.label ??
+                        form.adSet.conversionEvent}
                     </span>
                   ) : (
                     "Not configured"
                   )
                 }
-                empty={!form.pixelId || !form.conversionEvent}
+                empty={!form.adSet.pixelId || !form.adSet.conversionEvent}
               />
             )}
           </CardContent>
@@ -225,11 +225,11 @@ export function Step4Review({ form, publishError }: Props) {
               icon={<MapPin className="w-4 h-4" />}
               label="Locations"
               value={
-                form.locations.length === 0 ? (
+                form.adSet.locations.length === 0 ? (
                   "Default: entire US"
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
-                    {form.locations.map((l) => (
+                    {form.adSet.locations.map((l) => (
                       <Badge
                         key={l.key}
                         variant="outline"
@@ -252,11 +252,11 @@ export function Step4Review({ form, publishError }: Props) {
               icon={<Heart className="w-4 h-4" />}
               label="Interests"
               value={
-                form.interests.length === 0 ? (
+                form.adSet.interests.length === 0 ? (
                   "None"
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
-                    {form.interests.map((i) => (
+                    {form.adSet.interests.map((i) => (
                       <Badge
                         key={i.id}
                         variant="outline"
@@ -273,15 +273,15 @@ export function Step4Review({ form, publishError }: Props) {
                   </div>
                 )
               }
-              empty={form.interests.length === 0}
+              empty={form.adSet.interests.length === 0}
             />
-            {form.detailedTargeting.length > 0 && (
+            {form.adSet.detailedTargeting.length > 0 && (
               <Field
                 icon={<Sparkles className="w-4 h-4" />}
                 label="Detailed Targeting"
                 value={
                   <div className="flex flex-wrap gap-1.5">
-                    {form.detailedTargeting.map((item) => {
+                    {form.adSet.detailedTargeting.map((item) => {
                       const typeLabel =
                         DETAILED_TARGETING_OPTIONS.find((o) => o.value === item.type)?.label ??
                         item.type;
@@ -302,13 +302,13 @@ export function Step4Review({ form, publishError }: Props) {
                 }
               />
             )}
-            {form.customAudiences.length > 0 && (
+            {form.adSet.customAudiences.length > 0 && (
               <Field
                 icon={<UserSquare className="w-4 h-4" />}
                 label="Custom Audiences"
                 value={
                   <div className="flex flex-wrap gap-1.5">
-                    {form.customAudiences.map((a) => (
+                    {form.adSet.customAudiences.map((a) => (
                       <Badge
                         key={a.id}
                         variant="outline"
@@ -333,25 +333,25 @@ export function Step4Review({ form, publishError }: Props) {
               icon={<Users className="w-4 h-4" />}
               label="Age Range"
               value={
-                form.ageMax === 65
-                  ? `${form.ageMin} – 65+`
-                  : `${form.ageMin} – ${form.ageMax}`
+                form.adSet.ageMax === 65
+                  ? `${form.adSet.ageMin} – 65+`
+                  : `${form.adSet.ageMin} – ${form.adSet.ageMax}`
               }
             />
             <Field
               icon={<Users className="w-4 h-4" />}
               label="Gender"
-              value={form.gender === "ALL" ? "All genders" : form.gender === "MEN" ? "Men" : "Women"}
+              value={form.adSet.genders[0] === "ALL" ? "All genders" : form.adSet.genders[0] === "MEN" ? "Men" : "Women"}
             />
             <Field
               icon={<LayoutGrid className="w-4 h-4" />}
               label="Placements"
               value={
-                form.placements.length === 0 ? (
+                form.adSet.manualPlatforms.length === 0 ? (
                   "Auto (Meta decides)"
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
-                    {form.placements.map((p) => (
+                    {form.adSet.manualPlatforms.map((p) => (
                       <Badge
                         key={p}
                         variant="outline"
@@ -382,60 +382,60 @@ export function Step4Review({ form, publishError }: Props) {
               icon={<Layers className="w-4 h-4" />}
               label="Publish Mode"
               value={
-                form.publishMode === "AB_TEST"
-                  ? `A/B Test (${form.adVariants.length} variants)`
+                form.ad.publishMode === "AB_TEST"
+                  ? `A/B Test (${form.ad.adVariants.length} variants)`
                   : "Single Ad"
               }
             />
-            {form.publishMode !== "AB_TEST" && (
+            {form.ad.publishMode !== "AB_TEST" && (
               <Field
                 icon={<Layers className="w-4 h-4" />}
                 label="Ad Format"
                 value={
-                  form.adType === "CAROUSEL"
-                    ? `Carousel (${form.carouselCards.length} cards)`
-                    : form.adType === "VIDEO"
+                  form.ad.format === "CAROUSEL"
+                    ? `Carousel (${form.ad.carouselCards.length} cards)`
+                    : form.ad.format === "SINGLE_IMAGE_VIDEO"
                       ? "Video"
                       : "Single Image"
                 }
               />
             )}
-            {form.publishMode !== "AB_TEST" && form.adType !== "CAROUSEL" && (
+            {form.ad.publishMode !== "AB_TEST" && form.ad.format !== "CAROUSEL" && (
               <Field
                 icon={<CheckCircle2 className="w-4 h-4" />}
                 label="Headline"
-                value={form.adHeadline || "—"}
-                empty={!form.adHeadline}
+                value={(form.ad.headlines[0] || "") || "—"}
+                empty={!(form.ad.headlines[0] || "")}
               />
             )}
-            {form.publishMode !== "AB_TEST" && (
+            {form.ad.publishMode !== "AB_TEST" && (
               <Field
                 icon={<CheckCircle2 className="w-4 h-4" />}
                 label="Primary Text"
-                value={form.adText || "—"}
-                empty={!form.adText}
+                value={(form.ad.primaryTexts[0] || "") || "—"}
+                empty={!(form.ad.primaryTexts[0] || "")}
               />
             )}
-            {form.publishMode !== "AB_TEST" && form.adType !== "CAROUSEL" && form.description.trim() && (
+            {form.ad.publishMode !== "AB_TEST" && form.ad.format !== "CAROUSEL" && (form.ad.descriptions[0] || "").trim() && (
               <Field
                 icon={<Type className="w-4 h-4" />}
                 label="Description"
-                value={form.description}
+                value={(form.ad.descriptions[0] || "")}
               />
             )}
-            {form.adType !== "CAROUSEL" && (
+            {form.ad.format !== "CAROUSEL" && (
               <Field
                 icon={<LinkIcon className="w-4 h-4" />}
                 label="Destination URL"
-                value={form.adLink || "—"}
-                empty={!form.adLink}
+                value={form.ad.websiteUrl || "—"}
+                empty={!form.ad.websiteUrl}
               />
             )}
-            {form.publishMode !== "AB_TEST" && (
+            {form.ad.publishMode !== "AB_TEST" && (
               <Field
                 icon={<MousePointerClick className="w-4 h-4" />}
                 label="CTA Button"
-                value={CTA_OPTIONS.find((o) => o.value === form.ctaButton)?.label ?? form.ctaButton}
+                value={CTA_OPTIONS.find((o) => o.value === form.ad.callToAction)?.label ?? form.ad.callToAction}
               />
             )}
           </div>
@@ -445,33 +445,33 @@ export function Step4Review({ form, publishError }: Props) {
               Media Preview
             </div>
 
-            {form.publishMode !== "AB_TEST" && form.adType === "VIDEO" && (
+            {form.ad.publishMode !== "AB_TEST" && form.ad.format === "SINGLE_IMAGE_VIDEO" && (
               <div className="space-y-3">
-                {form.videoUrl ? (
+                {(form.ad.videos[0] || "") ? (
                   <div className="space-y-2">
                     <video
-                      src={form.videoUrl}
+                      src={(form.ad.videos[0] || "")}
                       controls
                       preload="metadata"
-                      poster={form.videoThumbnailUrl || undefined}
+                      poster={form.ad.videoThumbnailUrl || undefined}
                       className="rounded-xl max-h-56 bg-black w-full"
                       onError={(e) => {
                         (e.target as HTMLVideoElement).style.display = "none";
                       }}
                     />
                     <div className="font-mono text-[11px] text-slate-500 break-all bg-slate-50 p-2 rounded-lg border border-slate-100">
-                      {form.videoUrl}
+                      {(form.ad.videos[0] || "")}
                     </div>
-                    {form.videoThumbnailUrl && (
+                    {form.ad.videoThumbnailUrl && (
                       <div className="text-[11px] text-slate-600 bg-slate-50/50 p-2 rounded-lg border border-slate-50 flex items-center gap-2">
                         <span className="font-bold text-[9px] uppercase tracking-wider text-slate-400 shrink-0">Thumbnail:</span>
-                        <span className="font-mono truncate">{form.videoThumbnailUrl}</span>
+                        <span className="font-mono truncate">{form.ad.videoThumbnailUrl}</span>
                       </div>
                     )}
-                    {form.captionsUrl && (
+                    {form.ad.captionsUrl && (
                       <div className="text-[11px] text-slate-600 bg-slate-50/50 p-2 rounded-lg border border-slate-50 flex items-center gap-2">
                         <span className="font-bold text-[9px] uppercase tracking-wider text-slate-400 shrink-0">Captions:</span>
-                        <span className="font-mono truncate">{form.captionsUrl}</span>
+                        <span className="font-mono truncate">{form.ad.captionsUrl}</span>
                       </div>
                     )}
                   </div>
@@ -483,9 +483,9 @@ export function Step4Review({ form, publishError }: Props) {
               </div>
             )}
 
-            {form.publishMode !== "AB_TEST" && form.adType === "CAROUSEL" && (
+            {form.ad.publishMode !== "AB_TEST" && form.ad.format === "CAROUSEL" && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {form.carouselCards.map((c, i) => (
+                {form.ad.carouselCards.map((c, i) => (
                   <div
                     key={i}
                     className="rounded-xl border border-slate-100 bg-slate-50/30 overflow-hidden shadow-sm"
@@ -527,12 +527,12 @@ export function Step4Review({ form, publishError }: Props) {
               </div>
             )}
 
-            {form.publishMode !== "AB_TEST" && form.adType === "SINGLE_IMAGE" && (
+            {form.ad.publishMode !== "AB_TEST" && form.ad.format === "SINGLE_IMAGE_VIDEO" && (
               <div className="space-y-3">
-                {form.imageUrl ? (
+                {(form.ad.images[0] || "") ? (
                   <div className="space-y-2">
                     <img
-                      src={form.imageUrl}
+                      src={(form.ad.images[0] || "")}
                       alt="Ad preview"
                       className="rounded-xl max-h-56 object-cover w-full border border-slate-100 bg-slate-50"
                       onError={(e) => {
@@ -540,7 +540,7 @@ export function Step4Review({ form, publishError }: Props) {
                       }}
                     />
                     <div className="font-mono text-[11px] text-slate-500 break-all bg-slate-50 p-2 rounded-lg border border-slate-100">
-                      {form.imageUrl}
+                      {(form.ad.images[0] || "")}
                     </div>
                   </div>
                 ) : (
@@ -551,9 +551,9 @@ export function Step4Review({ form, publishError }: Props) {
               </div>
             )}
 
-            {form.publishMode === "AB_TEST" && (
+            {form.ad.publishMode === "AB_TEST" && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {form.adVariants.map((v, i) => (
+                {form.ad.adVariants.map((v, i) => (
                   <div
                     key={i}
                     className="rounded-xl border border-slate-100 bg-slate-50/30 overflow-hidden shadow-sm"

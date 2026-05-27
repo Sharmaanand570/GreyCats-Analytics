@@ -39,7 +39,6 @@ import {
   type StepProps,
 } from "./types";
 import type {
-  AdType,
   AdVariant,
   CarouselCard,
   CtaButton,
@@ -75,7 +74,7 @@ const MAX_CAPTIONS_BYTES = 5 * 1024 * 1024;     // 5 MB
 const formatMb = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
 
 // Inline helper — only show the "invalid URL" hint once the field is non-empty.
-const urlInvalid = (v: string) => v.trim().length > 0 && !isValidHttpUrl(v);
+const urlInvalid = (v: string | undefined | null) => !!v && v.trim().length > 0 && !isValidHttpUrl(v);
 
 type UploadTarget =
   | "main"
@@ -103,29 +102,29 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
 
   // Auto-seed two blank cards the first time the user picks CAROUSEL.
   useEffect(() => {
-    if (form.adType === "CAROUSEL" && form.carouselCards.length === 0) {
+    if (form.ad.format === "CAROUSEL" && form.ad.carouselCards.length === 0) {
       setForm((f) => ({
         ...f,
         carouselCards: [blankCarouselCard(), blankCarouselCard()],
       }));
     }
-  }, [form.adType, form.carouselCards.length, setForm]);
+  }, [form.ad.format, form.ad.carouselCards.length, setForm]);
 
   // Auto-seed two blank variants the first time the user picks AB_TEST.
   useEffect(() => {
-    if (form.publishMode === "AB_TEST" && form.adVariants.length === 0) {
-      setForm((f) => ({ ...f, adVariants: [blankVariant(), blankVariant()] }));
+    if (form.ad.publishMode === "AB_TEST" && form.ad.adVariants.length === 0) {
+      setForm((f) => ({ ...f, ad: { ...f.ad, adVariants: [blankVariant(), blankVariant()] } }));
     }
-  }, [form.publishMode, form.adVariants.length, setForm]);
+  }, [form.ad.publishMode, form.ad.adVariants.length, setForm]);
 
   // Switching ad type discards the fields that belong only to the other type
   // so they don't leak into the published payload (and so the review tab
   // doesn't show stale media). We only clear when there's something to clear,
   // avoiding an infinite render loop.
   useEffect(() => {
-    if (form.publishMode === "AB_TEST") return;
-    if (form.adType === "SINGLE_IMAGE") {
-      if (form.carouselCards.length > 0 || form.videoUrl || form.videoThumbnailUrl || form.captionsUrl) {
+    if (form.ad.publishMode === "AB_TEST") return;
+    if ((form.ad.format === "SINGLE_IMAGE_VIDEO" && mediaType === "IMAGE")) {
+      if (form.ad.carouselCards.length > 0 || (form.ad.videos[0] || "") || form.ad.videoThumbnailUrl || form.ad.captionsUrl) {
         setForm((f) => ({
           ...f,
           carouselCards: [],
@@ -134,8 +133,8 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
           captionsUrl: "",
         }));
       }
-    } else if (form.adType === "CAROUSEL") {
-      if (form.imageUrl || form.videoUrl || form.videoThumbnailUrl || form.captionsUrl) {
+    } else if (form.ad.format === "CAROUSEL") {
+      if ((form.ad.images[0] || "") || (form.ad.videos[0] || "") || form.ad.videoThumbnailUrl || form.ad.captionsUrl) {
         setForm((f) => ({
           ...f,
           imageUrl: "",
@@ -144,19 +143,19 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
           captionsUrl: "",
         }));
       }
-    } else if (form.adType === "VIDEO") {
-      if (form.imageUrl || form.carouselCards.length > 0) {
-        setForm((f) => ({ ...f, imageUrl: "", carouselCards: [] }));
+    } else if ((form.ad.format === "SINGLE_IMAGE_VIDEO" && mediaType === "VIDEO")) {
+      if ((form.ad.images[0] || "") || form.ad.carouselCards.length > 0) {
+        setForm((f) => ({ ...f, ad: { ...f.ad, images: [""], carouselCards: [] } }));
       }
     }
   }, [
-    form.adType,
-    form.publishMode,
-    form.imageUrl,
-    form.videoUrl,
-    form.videoThumbnailUrl,
-    form.captionsUrl,
-    form.carouselCards.length,
+    form.ad.format,
+    form.ad.publishMode,
+    (form.ad.images[0] || ""),
+    (form.ad.videos[0] || ""),
+    form.ad.videoThumbnailUrl,
+    form.ad.captionsUrl,
+    form.ad.carouselCards.length,
     setForm,
   ]);
 
@@ -200,18 +199,18 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
       const url = urls[0];
       if (!url) return;
       if (target === "main") {
-        setForm((f) => ({ ...f, imageUrl: url }));
+        setForm((f) => ({ ...f, ad: { ...f.ad, images: [url] } }));
       } else if (target === "video") {
-        setForm((f) => ({ ...f, videoUrl: url }));
+        setForm((f) => ({ ...f, ad: { ...f.ad, videos: [url] } }));
       } else if (target === "video-thumb") {
-        setForm((f) => ({ ...f, videoThumbnailUrl: url }));
+        setForm((f) => ({ ...f, ad: { ...f.ad, videoThumbnailUrl: url } }));
       } else if (target === "captions") {
-        setForm((f) => ({ ...f, captionsUrl: url }));
+        setForm((f) => ({ ...f, ad: { ...f.ad, captionsUrl: url } }));
       } else if (typeof target === "string" && target.startsWith("card-")) {
         const idx = Number(target.slice("card-".length));
         setForm((f) => ({
           ...f,
-          carouselCards: f.carouselCards.map((c, i) =>
+          carouselCards: f.ad.carouselCards.map((c, i) =>
             i === idx ? { ...c, imageUrl: url } : c
           ),
         }));
@@ -219,7 +218,7 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
         const idx = Number(target.slice("variant-".length));
         setForm((f) => ({
           ...f,
-          adVariants: f.adVariants.map((v, i) =>
+          adVariants: f.ad.adVariants.map((v, i) =>
             i === idx ? { ...v, imageUrl: url } : v
           ),
         }));
@@ -260,65 +259,66 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
   // Carousel helpers
   const addCard = () =>
     setForm((f) => {
-      if (f.carouselCards.length >= MAX_CAROUSEL_CARDS) return f;
-      return { ...f, carouselCards: [...f.carouselCards, blankCarouselCard()] };
+      if (f.ad.carouselCards.length >= MAX_CAROUSEL_CARDS) return f;
+      return { ...f, carouselCards: [...f.ad.carouselCards, blankCarouselCard()] };
     });
 
   const removeCard = (idx: number) =>
     setForm((f) => {
-      if (f.carouselCards.length <= MIN_CAROUSEL_CARDS) return f;
+      if (f.ad.carouselCards.length <= MIN_CAROUSEL_CARDS) return f;
       return {
         ...f,
-        carouselCards: f.carouselCards.filter((_, i) => i !== idx),
+        carouselCards: f.ad.carouselCards.filter((_, i) => i !== idx),
       };
     });
 
   const updateCard = (idx: number, patch: Partial<CarouselCard>) =>
     setForm((f) => ({
       ...f,
-      carouselCards: f.carouselCards.map((c, i) =>
+      carouselCards: f.ad.carouselCards.map((c, i) =>
         i === idx ? { ...c, ...patch } : c
       ),
     }));
 
-  const isCarousel = form.adType === "CAROUSEL";
-  const isVideo = form.adType === "VIDEO";
-  const isAbTest = form.publishMode === "AB_TEST";
+  const isCarousel = form.ad.format === "CAROUSEL";
+  const [mediaType, setMediaType] = useState<"IMAGE" | "VIDEO">("IMAGE");
+  const isVideo = form.ad.format === "SINGLE_IMAGE_VIDEO" && mediaType === "VIDEO";
+  const isAbTest = form.ad.publishMode === "AB_TEST";
 
   // Field-level error flags. `showAllErrors` lights up everything required
   // when the user mashes Continue with empty fields; otherwise we only complain
   // about URLs the user typed that don't parse.
-  const adTextRequiredMiss = showAllErrors && !form.adText.trim();
-  const adHeadlineRequiredMiss = !isAbTest && !isCarousel && showAllErrors && !form.adHeadline.trim();
+  const adTextRequiredMiss = showAllErrors && !(form.ad.primaryTexts[0] || "").trim();
+  const adHeadlineRequiredMiss = !isAbTest && !isCarousel && showAllErrors && !(form.ad.headlines[0] || "").trim();
   const adLinkRequiredMiss =
-    (!isCarousel || isAbTest) && showAllErrors && !form.adLink.trim();
-  const adLinkUrlInvalid = urlInvalid(form.adLink);
+    (!isCarousel || isAbTest) && showAllErrors && !form.ad.websiteUrl.trim();
+  const adLinkUrlInvalid = urlInvalid(form.ad.websiteUrl);
   const imageUrlRequiredMiss =
-    !isAbTest && !isCarousel && !isVideo && showAllErrors && !form.imageUrl.trim();
-  const imageUrlInvalid = urlInvalid(form.imageUrl);
-  const videoUrlRequiredMiss = !isAbTest && isVideo && showAllErrors && !form.videoUrl.trim();
-  const videoUrlInvalid = urlInvalid(form.videoUrl);
-  const videoThumbUrlInvalid = urlInvalid(form.videoThumbnailUrl);
-  const captionsUrlInvalid = urlInvalid(form.captionsUrl);
-  const abTestUrlInvalid = urlInvalid(form.adLink);
+    !isAbTest && !isCarousel && !isVideo && showAllErrors && !(form.ad.images[0] || "").trim();
+  const imageUrlInvalid = urlInvalid((form.ad.images[0] || ""));
+  const videoUrlRequiredMiss = !isAbTest && isVideo && showAllErrors && !(form.ad.videos[0] || "").trim();
+  const videoUrlInvalid = urlInvalid((form.ad.videos[0] || ""));
+  const videoThumbUrlInvalid = urlInvalid(form.ad.videoThumbnailUrl);
+  const captionsUrlInvalid = urlInvalid(form.ad.captionsUrl);
+  const abTestUrlInvalid = urlInvalid(form.ad.websiteUrl);
 
   // Variant helpers
   const addVariant = () =>
     setForm((f) => {
-      if (f.adVariants.length >= MAX_VARIANTS) return f;
-      return { ...f, adVariants: [...f.adVariants, blankVariant()] };
+      if (f.ad.adVariants.length >= MAX_VARIANTS) return f;
+      return { ...f, adVariants: [...f.ad.adVariants, blankVariant()] };
     });
 
   const removeVariant = (idx: number) =>
     setForm((f) => {
-      if (f.adVariants.length <= MIN_VARIANTS) return f;
-      return { ...f, adVariants: f.adVariants.filter((_, i) => i !== idx) };
+      if (f.ad.adVariants.length <= MIN_VARIANTS) return f;
+      return { ...f, adVariants: f.ad.adVariants.filter((_, i) => i !== idx) };
     });
 
   const updateVariant = (idx: number, patch: Partial<AdVariant>) =>
     setForm((f) => ({
       ...f,
-      adVariants: f.adVariants.map((v, i) => (i === idx ? { ...v, ...patch } : v)),
+      adVariants: f.ad.adVariants.map((v, i) => (i === idx ? { ...v, ...patch } : v)),
     }));
 
   return (
@@ -344,16 +344,16 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
           <div className="grid grid-cols-2 gap-2">
             <PublishModeOption
               value="SINGLE_AD"
-              current={form.publishMode}
-              onClick={() => setForm((f) => ({ ...f, publishMode: "SINGLE_AD" }))}
+              current={form.ad.publishMode}
+              onClick={() => setForm((f) => ({ ...f, ad: { ...f.ad, publishMode: "SINGLE_AD" } }))}
               icon={<Square className="w-4 h-4" />}
               label="Single Ad"
               hint="One creative to one ad set"
             />
             <PublishModeOption
               value="AB_TEST"
-              current={form.publishMode}
-              onClick={() => setForm((f) => ({ ...f, publishMode: "AB_TEST" }))}
+              current={form.ad.publishMode}
+              onClick={() => setForm((f) => ({ ...f, ad: { ...f.ad, publishMode: "AB_TEST" } }))}
               icon={<Layers className="w-4 h-4" />}
               label="A/B Test"
               hint={`${MIN_VARIANTS}–${MAX_VARIANTS} variants in one ad set`}
@@ -374,25 +374,25 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
             </label>
             <div className="grid grid-cols-3 gap-2">
               <AdTypeOption
-                value="SINGLE_IMAGE"
-                current={form.adType}
-                onClick={() => setForm((f) => ({ ...f, adType: "SINGLE_IMAGE" }))}
+                value="image"
+                current={form.ad.format === "SINGLE_IMAGE_VIDEO" && mediaType === "IMAGE" ? "image" : form.ad.format === "CAROUSEL" ? "CAROUSEL" : "video"}
+                onClick={() => { setMediaType("IMAGE"); setForm((f) => ({ ...f, ad: { ...f.ad, format: "SINGLE_IMAGE_VIDEO" } })); }}
                 icon={<Square className="w-4 h-4" />}
                 label="Single Image"
                 hint="One image, one link"
               />
               <AdTypeOption
                 value="CAROUSEL"
-                current={form.adType}
-                onClick={() => setForm((f) => ({ ...f, adType: "CAROUSEL" }))}
+                current={form.ad.format === "SINGLE_IMAGE_VIDEO" && mediaType === "IMAGE" ? "image" : form.ad.format === "CAROUSEL" ? "CAROUSEL" : "video"}
+                onClick={() => setForm((f) => ({ ...f, ad: { ...f.ad, format: "CAROUSEL" } }))}
                 icon={<Layers className="w-4 h-4" />}
                 label="Carousel"
                 hint={`${MIN_CAROUSEL_CARDS}–${MAX_CAROUSEL_CARDS} swipeable cards`}
               />
               <AdTypeOption
-                value="VIDEO"
-                current={form.adType}
-                onClick={() => setForm((f) => ({ ...f, adType: "VIDEO" }))}
+                value="video"
+                current={form.ad.format === "SINGLE_IMAGE_VIDEO" && mediaType === "IMAGE" ? "image" : form.ad.format === "CAROUSEL" ? "CAROUSEL" : "video"}
+                onClick={() => { setMediaType("VIDEO"); setForm((f) => ({ ...f, ad: { ...f.ad, format: "SINGLE_IMAGE_VIDEO" } })); }}
                 icon={<Film className="w-4 h-4" />}
                 label="Video"
                 hint="One video creative"
@@ -414,13 +414,13 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
               <AlignLeft className="w-3.5 h-3.5" /> Primary Text <RequiredMark />
             </label>
             <span className="text-[10px] text-slate-400 font-mono">
-              {form.adText.length}/{TEXT_MAX}
+              {(form.ad.primaryTexts[0] || "").length}/{TEXT_MAX}
             </span>
           </div>
           <textarea
-            value={form.adText}
+            value={(form.ad.primaryTexts[0] || "")}
             onChange={(e) =>
-              setForm((f) => ({ ...f, adText: e.target.value.slice(0, TEXT_MAX) }))
+              setForm((f) => ({ ...f, ad: { ...f.ad, primaryTexts: [e.target.value.slice(0, TEXT_MAX)] } }))
             }
             placeholder="Check out our amazing summer discounts! Up to 50% off on all items."
             rows={3}
@@ -443,8 +443,8 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
             <MousePointerClick className="w-3.5 h-3.5" /> Call-to-action button
           </label>
           <Select
-            value={form.ctaButton}
-            onValueChange={(v) => setForm((f) => ({ ...f, ctaButton: v as CtaButton }))}
+            value={form.ad.callToAction}
+            onValueChange={(v) => setForm((f) => ({ ...f, ad: { ...f.ad, callToAction: v as CtaButton as any } }))}
           >
             <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
               <SelectValue placeholder="Pick a CTA" />
@@ -474,11 +474,11 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
                   <Type className="w-3.5 h-3.5" /> Headline <RequiredMark />
                 </label>
                 <span className="text-[10px] text-slate-400 font-mono">
-                  {form.adHeadline.length}/{HEADLINE_MAX}
+                  {(form.ad.headlines[0] || "").length}/{HEADLINE_MAX}
                 </span>
               </div>
               <Input
-                value={form.adHeadline}
+                value={(form.ad.headlines[0] || "")}
                 onChange={(e) =>
                   setForm((f) => ({
                     ...f,
@@ -504,11 +504,11 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
                   </span>
                 </label>
                 <span className="text-[10px] text-slate-400 font-mono">
-                  {form.description.length}/{DESCRIPTION_MAX}
+                  {(form.ad.descriptions[0] || "").length}/{DESCRIPTION_MAX}
                 </span>
               </div>
               <Input
-                value={form.description}
+                value={(form.ad.descriptions[0] || "")}
                 onChange={(e) =>
                   setForm((f) => ({
                     ...f,
@@ -527,8 +527,8 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
               </label>
               <Input
                 type="url"
-                value={form.adLink}
-                onChange={(e) => setForm((f) => ({ ...f, adLink: e.target.value }))}
+                value={form.ad.websiteUrl}
+                onChange={(e) => setForm((f) => ({ ...f, ad: { ...f.ad, websiteUrl: e.target.value } }))}
                 placeholder="https://www.yourwebsite.com/sale"
                 className={cn(
                   "h-11 rounded-xl border-slate-200",
@@ -549,12 +549,12 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
                     <Film className="w-3.5 h-3.5" /> Video <RequiredMark />
                   </label>
                   <VideoSlot
-                    videoUrl={form.videoUrl}
+                    videoUrl={(form.ad.videos[0] || "")}
                     isUploading={uploadingFor === "video"}
                     progress={progress}
                     onUploadClick={() => triggerUpload("video")}
-                    onClear={() => setForm((f) => ({ ...f, videoUrl: "" }))}
-                    onUrlChange={(v) => setForm((f) => ({ ...f, videoUrl: v }))}
+                    onClear={() => setForm((f) => ({ ...f, ad: { ...f.ad, videos: [""] } }))}
+                    onUrlChange={(v) => setForm((f) => ({ ...f, ad: { ...f.ad, videos: [v] } }))}
                     hasError={videoUrlRequiredMiss || videoUrlInvalid}
                   />
                   {videoUrlRequiredMiss && <FieldError message="Video is required." />}
@@ -574,12 +574,12 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
                     </span>
                   </label>
                   <ImageSlot
-                    imageUrl={form.videoThumbnailUrl}
+                    imageUrl={form.ad.videoThumbnailUrl || ""}
                     isUploading={uploadingFor === "video-thumb"}
                     progress={progress}
                     onUploadClick={() => triggerUpload("video-thumb")}
-                    onClear={() => setForm((f) => ({ ...f, videoThumbnailUrl: "" }))}
-                    onUrlChange={(v) => setForm((f) => ({ ...f, videoThumbnailUrl: v }))}
+                    onClear={() => setForm((f) => ({ ...f, ad: { ...f.ad, videoThumbnailUrl: "" } }))}
+                    onUrlChange={(v) => setForm((f) => ({ ...f, ad: { ...f.ad, videoThumbnailUrl: v } }))}
                     hasError={videoThumbUrlInvalid}
                   />
                   {videoThumbUrlInvalid && (
@@ -598,12 +598,12 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
                     </span>
                   </label>
                   <CaptionsSlot
-                    captionsUrl={form.captionsUrl}
+                    captionsUrl={form.ad.captionsUrl || ""}
                     isUploading={uploadingFor === "captions"}
                     progress={progress}
                     onUploadClick={() => triggerUpload("captions")}
-                    onClear={() => setForm((f) => ({ ...f, captionsUrl: "" }))}
-                    onUrlChange={(v) => setForm((f) => ({ ...f, captionsUrl: v }))}
+                    onClear={() => setForm((f) => ({ ...f, ad: { ...f.ad, captionsUrl: "" } }))}
+                    onUrlChange={(v) => setForm((f) => ({ ...f, ad: { ...f.ad, captionsUrl: v } }))}
                     hasError={captionsUrlInvalid}
                   />
                   {captionsUrlInvalid && (
@@ -620,12 +620,12 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
                   <ImageIcon className="w-3.5 h-3.5" /> Ad Image <RequiredMark />
                 </label>
                 <ImageSlot
-                  imageUrl={form.imageUrl}
+                  imageUrl={(form.ad.images[0] || "")}
                   isUploading={uploadingFor === "main"}
                   progress={progress}
                   onUploadClick={() => triggerUpload("main")}
-                  onClear={() => setForm((f) => ({ ...f, imageUrl: "" }))}
-                  onUrlChange={(v) => setForm((f) => ({ ...f, imageUrl: v }))}
+                  onClear={() => setForm((f) => ({ ...f, ad: { ...f.ad, images: [""] } }))}
+                  onUrlChange={(v) => setForm((f) => ({ ...f, ad: { ...f.ad, images: [v] } }))}
                   largeDropzone
                   hasError={imageUrlRequiredMiss || imageUrlInvalid}
                 />
@@ -647,18 +647,18 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
               </label>
               <span
                 className={
-                  form.carouselCards.length >= MAX_CAROUSEL_CARDS
+                  form.ad.carouselCards.length >= MAX_CAROUSEL_CARDS
                     ? "text-[10px] font-bold text-amber-600 font-mono"
                     : "text-[10px] font-mono text-slate-400"
                 }
               >
-                {form.carouselCards.length} / {MAX_CAROUSEL_CARDS}
+                {form.ad.carouselCards.length} / {MAX_CAROUSEL_CARDS}
               </span>
             </div>
 
             <div className="space-y-3">
-              {form.carouselCards.map((card, idx) => {
-                const canRemove = form.carouselCards.length > MIN_CAROUSEL_CARDS;
+              {form.ad.carouselCards.map((card, idx) => {
+                const canRemove = form.ad.carouselCards.length > MIN_CAROUSEL_CARDS;
                 const cardImageMiss = showAllErrors && !card.imageUrl.trim();
                 const cardImageBadUrl = urlInvalid(card.imageUrl);
                 const cardLinkMiss = showAllErrors && !card.link.trim();
@@ -778,7 +778,7 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
               type="button"
               variant="outline"
               onClick={addCard}
-              disabled={form.carouselCards.length >= MAX_CAROUSEL_CARDS}
+              disabled={form.ad.carouselCards.length >= MAX_CAROUSEL_CARDS}
               className="w-full h-11 rounded-xl border-dashed border-slate-300 text-slate-600 hover:bg-slate-50 gap-2"
             >
               <Plus className="w-4 h-4" />
@@ -808,18 +808,18 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
               </label>
               <Input
                 type="url"
-                value={form.adLink}
-                onChange={(e) => setForm((f) => ({ ...f, adLink: e.target.value }))}
+                value={form.ad.websiteUrl}
+                onChange={(e) => setForm((f) => ({ ...f, ad: { ...f.ad, websiteUrl: e.target.value } }))}
                 placeholder="https://www.yourwebsite.com/sale"
                 className={cn(
                   "h-11 rounded-xl border-slate-200",
-                  (!form.adLink.trim() || abTestUrlInvalid) && "border-rose-300"
+                  (!form.ad.websiteUrl.trim() || abTestUrlInvalid) && "border-rose-300"
                 )}
               />
-              {!form.adLink.trim() && (
+              {!form.ad.websiteUrl.trim() && (
                 <FieldError message="Required — every variant clicks through to this URL." />
               )}
-              {form.adLink.trim() && abTestUrlInvalid && (
+              {form.ad.websiteUrl.trim() && abTestUrlInvalid && (
                 <FieldError message="Enter a full URL starting with http:// or https://" />
               )}
             </div>
@@ -827,7 +827,7 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
             {/* Variant list */}
             <div className="space-y-3">
               {(() => {
-                const incomplete = form.adVariants
+                const incomplete = form.ad.adVariants
                   .map((v, i) => {
                     const missing: string[] = [];
                     if (!v.imageUrl.trim()) missing.push("image");
@@ -857,18 +857,18 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
                 </label>
                 <span
                   className={
-                    form.adVariants.length >= MAX_VARIANTS
+                    form.ad.adVariants.length >= MAX_VARIANTS
                       ? "text-[10px] font-bold text-amber-600 font-mono"
                       : "text-[10px] font-mono text-slate-400"
                   }
                 >
-                  {form.adVariants.length} / {MAX_VARIANTS}
+                  {form.ad.adVariants.length} / {MAX_VARIANTS}
                 </span>
               </div>
 
               <div className="space-y-3">
-                {form.adVariants.map((variant, idx) => {
-                  const canRemoveVariant = form.adVariants.length > MIN_VARIANTS;
+                {form.ad.adVariants.map((variant, idx) => {
+                  const canRemoveVariant = form.ad.adVariants.length > MIN_VARIANTS;
                   return (
                     <div
                       key={idx}
@@ -995,7 +995,7 @@ export function Step3Creative({ form, setForm, showAllErrors }: Step3Props) {
                 type="button"
                 variant="outline"
                 onClick={addVariant}
-                disabled={form.adVariants.length >= MAX_VARIANTS}
+                disabled={form.ad.adVariants.length >= MAX_VARIANTS}
                 className="w-full h-11 rounded-xl border-dashed border-slate-300 text-slate-600 hover:bg-slate-50 gap-2"
               >
                 <Plus className="w-4 h-4" />
@@ -1073,8 +1073,8 @@ function AdTypeOption({
   hint,
   disabled,
 }: {
-  value: AdType;
-  current: AdType;
+  value: string;
+  current: string;
   onClick: () => void;
   icon: React.ReactNode;
   label: string;

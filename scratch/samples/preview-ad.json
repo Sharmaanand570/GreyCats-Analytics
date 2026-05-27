@@ -1,0 +1,8 @@
+{
+  "success": true,
+  "data": [
+    {
+      "body": "<iframe src=\"https://www.facebook.com/ads/api/preview_iframe.php?d=123456789&t=token\" width=\"500\" height=\"800\" scrolling=\"yes\" frameborder=\"0\"></iframe>"
+    }
+  ]
+}
