@@ -4,6 +4,15 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Link } from "react-router-dom";
 import {
   MapPin,
@@ -91,6 +100,12 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
   const [showObjectiveAdvanced, setShowObjectiveAdvanced] = useState(false);
   // UI-only: Account controls collapse inside the Placements card.
   const [showAccountControls, setShowAccountControls] = useState(false);
+  // UI-only: Audience controls "Show options" expand + modal state.
+  const [showAudienceControlsOptions, setShowAudienceControlsOptions] = useState(false);
+  const [audienceControlsModalOpen, setAudienceControlsModalOpen] = useState(false);
+  const [audienceControlsModalShowOptions, setAudienceControlsModalShowOptions] =
+    useState(false);
+  const [excludeAudienceSearch, setExcludeAudienceSearch] = useState("");
 
   const locQuery = useDebouncedValue(locInput);
   const intQuery = useDebouncedValue(intInput);
@@ -714,7 +729,9 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
           </div>
         </FormSection>
 
-        {/* Audience controls — pre-existing audience criteria + India warning */}
+        {/* Audience controls — info callout opens account-level modal; card
+            summarises criteria (saved audience, locations, age/exclusions/langs).
+            Matches Meta's Step 2 "Audience controls" block. */}
         <FormSection
           title="Audience controls"
           description="Set criteria for where ads for this campaign can be delivered."
@@ -722,25 +739,362 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
         >
           <p className="text-xs text-slate-500">
             <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
-              Set audience controls for all campaigns
-            </a>{" "}
-            in Advertiser settings, or use a saved audience.
+              Learn more
+            </a>
           </p>
+
+          {/* Account-level controls callout */}
+          <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <ShieldAlert className="w-4 h-4 shrink-0 text-slate-500 mt-0.5" />
+            <div className="space-y-1">
+              <p className="text-xs text-slate-700 leading-relaxed">
+                You can set audience controls for this ad account to apply to all campaigns.
+              </p>
+              <button
+                type="button"
+                onClick={() => setAudienceControlsModalOpen(true)}
+                className="text-xs font-bold text-blue-600 hover:underline"
+              >
+                Set audience controls for all campaigns
+              </button>
+            </div>
+          </div>
+
+          {/* Use a saved audience */}
+          <div className="space-y-2">
+            <Select
+              value={form.adSet.savedAudienceId ?? "__none__"}
+              onValueChange={(v) =>
+                setForm((f) => ({
+                  ...f,
+                  adSet: { ...f.adSet, savedAudienceId: v === "__none__" ? undefined : v },
+                }))
+              }
+            >
+              <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
+                <SelectValue placeholder="Use a saved audience" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Use a saved audience</SelectItem>
+                {allAudiences.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Locations summary */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-1">
+              <span className="text-rose-500">*</span> Locations
+            </label>
+            {form.adSet.locations.length === 0 ? (
+              <p className="text-xs text-slate-500">
+                No locations selected — add cities, regions or countries in the Geography section
+                below.
+              </p>
+            ) : (
+              <div className="text-xs text-slate-700 space-y-1">
+                <div className="font-semibold">
+                  Included location{form.adSet.locations.filter((l) => !l.excluded).length === 1 ? "" : "s"}:
+                </div>
+                <ul className="list-disc pl-5 space-y-0.5">
+                  {form.adSet.locations
+                    .filter((l) => !l.excluded)
+                    .map((l) => (
+                      <li key={l.key}>{l.name}</li>
+                    ))}
+                </ul>
+                {form.adSet.locations.some((l) => l.excluded) && (
+                  <>
+                    <div className="font-semibold pt-1">Excluded:</div>
+                    <ul className="list-disc pl-5 space-y-0.5">
+                      {form.adSet.locations
+                        .filter((l) => l.excluded)
+                        .map((l) => (
+                          <li key={l.key}>{l.name}</li>
+                        ))}
+                    </ul>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* India policy declaration prompt */}
           {targetsIndia && (
-            <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <div className="flex items-start gap-2.5 rounded-xl border-l-4 border-amber-400 bg-amber-50/70 px-4 py-3">
               <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
-              <div className="space-y-1">
-                <p className="text-sm font-bold text-amber-900">
-                  Policy and regulatory requirements (India)
-                </p>
-                <p className="text-xs text-amber-800 leading-relaxed">
+              <div className="space-y-2 flex-1">
+                <p className="text-xs text-amber-900 leading-relaxed">
                   To run ads in India, you need to declare if your ads are related to securities and
                   investments.
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setForm((f) => ({
+                      ...f,
+                      adSet: {
+                        ...f.adSet,
+                        policyDeclarations: {
+                          ...f.adSet.policyDeclarations,
+                          securitiesAndInvestments:
+                            !f.adSet.policyDeclarations?.securitiesAndInvestments,
+                        },
+                      },
+                    }))
+                  }
+                  className="text-xs font-bold text-slate-900 border border-slate-300 bg-white rounded-lg px-3 py-1.5 hover:bg-slate-50"
+                >
+                  {form.adSet.policyDeclarations?.securitiesAndInvestments
+                    ? "Declaration: Securities & Investments"
+                    : "Review requirements"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Show / Hide options */}
+          <button
+            type="button"
+            onClick={() => setShowAudienceControlsOptions((v) => !v)}
+            className="inline-flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-blue-700"
+          >
+            {showAudienceControlsOptions ? "Hide options" : "Show options"}
+          </button>
+
+          {showAudienceControlsOptions && (
+            <div className="space-y-5 pt-2">
+              {/* Minimum age */}
+              <div className="space-y-1">
+                <div className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                  Minimum age
+                </div>
+                <ul className="list-disc pl-5 text-xs text-slate-700 space-y-0.5">
+                  <li>{form.adSet.ageMin}</li>
+                  <li>Unknown age on WhatsApp: Excluded</li>
+                </ul>
+              </div>
+
+              {/* Exclude these custom audiences */}
+              <div className="space-y-2">
+                <div className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                  Exclude these custom audiences
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    value={excludeAudienceSearch}
+                    onChange={(e) => setExcludeAudienceSearch(e.target.value)}
+                    placeholder="Search existing audiences"
+                    className="h-11 pl-10 rounded-xl border-slate-200"
+                  />
+                </div>
+                {excludeAudienceSearch.trim().length >= 1 && allAudiences.length > 0 && (
+                  <div className="border border-slate-100 rounded-xl bg-white max-h-44 overflow-y-auto">
+                    {allAudiences
+                      .filter((a) =>
+                        a.name.toLowerCase().includes(excludeAudienceSearch.toLowerCase())
+                      )
+                      .map((a) => {
+                        const alreadyExcluded = form.adSet.customAudiences.find(
+                          (sel) => sel.id === a.id && sel.excluded
+                        );
+                        return (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => {
+                              setForm((f) => {
+                                const existing = f.adSet.customAudiences.find((x) => x.id === a.id);
+                                if (existing) {
+                                  return {
+                                    ...f,
+                                    adSet: {
+                                      ...f.adSet,
+                                      customAudiences: f.adSet.customAudiences.map((x) =>
+                                        x.id === a.id ? { ...x, excluded: true } : x
+                                      ),
+                                    },
+                                  };
+                                }
+                                return {
+                                  ...f,
+                                  adSet: {
+                                    ...f.adSet,
+                                    customAudiences: [
+                                      ...f.adSet.customAudiences,
+                                      {
+                                        id: a.id,
+                                        name: a.name,
+                                        audienceType: a.type,
+                                        excluded: true,
+                                      },
+                                    ],
+                                  },
+                                };
+                              });
+                              setExcludeAudienceSearch("");
+                            }}
+                            disabled={!!alreadyExcluded}
+                            className={cn(
+                              "w-full text-left px-4 py-2 hover:bg-rose-50 border-b border-slate-50 last:border-0 flex items-center justify-between text-sm",
+                              alreadyExcluded && "opacity-50 cursor-not-allowed"
+                            )}
+                          >
+                            <span className="font-semibold text-slate-900">{a.name}</span>
+                            <span className="text-[10px] text-rose-600 font-bold uppercase">
+                              {alreadyExcluded ? "Excluded" : "Exclude"}
+                            </span>
+                          </button>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+
+              {/* Languages */}
+              <div className="space-y-1">
+                <div className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                  Languages
+                </div>
+                <p className="text-xs text-slate-700">
+                  {(form.adSet.languages?.length ?? 0) === 0
+                    ? "All languages"
+                    : `${form.adSet.languages?.length} language${form.adSet.languages?.length === 1 ? "" : "s"}`}
                 </p>
               </div>
             </div>
           )}
         </FormSection>
+
+        {/* Audience controls modal — account-scoped toggles */}
+        <Dialog open={audienceControlsModalOpen} onOpenChange={setAudienceControlsModalOpen}>
+          <DialogContent className="max-w-xl rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-black text-slate-900">
+                Audience controls for this ad account
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-500 leading-relaxed">
+                Location and age controls apply to all campaigns. Brand protection and employee
+                controls do not currently apply to Advantage+ app and Advantage+ shopping
+                campaigns. You can make them more specific for individual campaigns (except
+                Advantage+ shopping campaigns).{" "}
+                <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
+                  Learn more
+                </a>{" "}
+                about audience limitations in Special Ad Categories campaigns.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2">
+              <AudienceControlRow
+                label="My business can only advertise in specific locations"
+                checked={!!form.adSet.audienceControls?.specificLocationsOnly}
+                onChange={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    adSet: {
+                      ...f.adSet,
+                      audienceControls: {
+                        ...f.adSet.audienceControls,
+                        specificLocationsOnly: v,
+                      },
+                    },
+                  }))
+                }
+              />
+              <AudienceControlRow
+                label="My business advertises age-restricted goods or services"
+                checked={!!form.adSet.audienceControls?.ageRestrictedGoods}
+                onChange={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    adSet: {
+                      ...f.adSet,
+                      audienceControls: {
+                        ...f.adSet.audienceControls,
+                        ageRestrictedGoods: v,
+                      },
+                    },
+                  }))
+                }
+              />
+              <AudienceControlRow
+                label="My business restricts advertising to some audiences to protect its brand"
+                checked={!!form.adSet.audienceControls?.brandProtection}
+                onChange={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    adSet: {
+                      ...f.adSet,
+                      audienceControls: {
+                        ...f.adSet.audienceControls,
+                        brandProtection: v,
+                      },
+                    },
+                  }))
+                }
+              />
+
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setAudienceControlsModalShowOptions((v) => !v)}
+                  className="text-xs font-bold text-blue-600 hover:underline"
+                >
+                  {audienceControlsModalShowOptions ? "Hide options" : "Show options"}
+                </button>
+              </div>
+              {audienceControlsModalShowOptions && (
+                <AudienceControlRow
+                  label="My business doesn't show ads to its own employees"
+                  checked={!!form.adSet.audienceControls?.excludeEmployees}
+                  onChange={(v) =>
+                    setForm((f) => ({
+                      ...f,
+                      adSet: {
+                        ...f.adSet,
+                        audienceControls: {
+                          ...f.adSet.audienceControls,
+                          excludeEmployees: v,
+                        },
+                      },
+                    }))
+                  }
+                />
+              )}
+            </div>
+
+            <DialogFooter className="flex sm:justify-between items-center w-full">
+              <a
+                href="#"
+                onClick={(e) => e.preventDefault()}
+                className="text-xs font-bold text-blue-600 hover:underline"
+              >
+                See controls in advertising settings
+              </a>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setAudienceControlsModalOpen(false)}
+                  className="h-9 rounded-lg"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => setAudienceControlsModalOpen(false)}
+                  className="h-9 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Review changes
+                </Button>
+              </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Geography */}
         <FormSection title="Geography" description="Search for locations. Leave empty to default to entire US." icon={MapPin}>
@@ -1462,5 +1816,27 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
 
       </div>
     </Card>
+  );
+}
+
+// Row inside the Audience controls modal — left-aligned toggle, right-aligned
+// label. Native checkbox-based Switch (not Radix).
+function AudienceControlRow({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex items-start gap-3 cursor-pointer">
+      <Switch
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <span className="text-sm text-slate-800 leading-snug">{label}</span>
+    </label>
   );
 }

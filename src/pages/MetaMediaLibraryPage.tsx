@@ -40,6 +40,86 @@ const formatDuration = (secs: number) => {
   return `${m}:${String(s).padStart(2, "0")}`;
 };
 
+/**
+ * Renders a video thumbnail. Priority order:
+ * 1. API-provided thumbnail_url (fastest, no extra work)
+ * 2. Client-side canvas snapshot from the video source URL (works for most CDN videos)
+ * 3. Film icon placeholder (CORS-blocked or no source)
+ */
+function VideoThumbnail({ thumbnailUrl, sourceUrl, name }: {
+  thumbnailUrl?: string;
+  sourceUrl?: string;
+  name?: string;
+}) {
+  const [canvasThumb, setCanvasThumb] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    // Already have a proper thumbnail from the API — nothing to do.
+    if (thumbnailUrl || !sourceUrl || failed) return;
+
+    let cancelled = false;
+    const video = document.createElement("video");
+    video.crossOrigin = "anonymous";
+    video.preload = "metadata";
+    video.muted = true;
+    video.src = sourceUrl;
+
+    const capture = () => {
+      if (cancelled) return;
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth || 320;
+        canvas.height = video.videoHeight || 180;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+        // Blank canvas (all black / transparent) means the draw didn't work.
+        if (dataUrl !== "data:,") setCanvasThumb(dataUrl);
+      } catch {
+        // drawImage fails if the resource is CORS-blocked — ignore silently.
+        setFailed(true);
+      } finally {
+        video.src = "";
+      }
+    };
+
+    video.addEventListener("loadedmetadata", () => {
+      // Seek to 0.1s so we get a real frame instead of a blank first-frame.
+      video.currentTime = 0.1;
+    });
+    video.addEventListener("seeked", capture, { once: true });
+    video.addEventListener("error", () => {
+      if (!cancelled) setFailed(true);
+    });
+
+    return () => {
+      cancelled = true;
+      video.src = "";
+    };
+  }, [thumbnailUrl, sourceUrl, failed]);
+
+  const src = thumbnailUrl || canvasThumb;
+
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={name ?? "Video thumbnail"}
+        className="w-full h-full object-cover"
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+
+  return (
+    <div className="w-full h-full flex items-center justify-center bg-slate-100">
+      <Film className="w-8 h-8 text-slate-300" />
+    </div>
+  );
+}
+
 function MetaMediaLibraryPage() {
   const navigate = useNavigate();
   const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
@@ -326,17 +406,11 @@ function MetaMediaLibraryPage() {
                           : "border-slate-200 hover:border-indigo-400"
                       )}
                     >
-                      {vid.thumbnail_url ? (
-                        <img
-                          src={vid.thumbnail_url}
-                          alt={vid.name ?? vid.video_id}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Film className="w-8 h-8 text-slate-300" />
-                        </div>
-                      )}
+                      <VideoThumbnail
+                        thumbnailUrl={vid.thumbnail_url}
+                        sourceUrl={vid.source}
+                        name={vid.name ?? vid.video_id}
+                      />
 
                       {/* Status badge for in-progress encoding */}
                       {vid.status && vid.status !== "ready" && (

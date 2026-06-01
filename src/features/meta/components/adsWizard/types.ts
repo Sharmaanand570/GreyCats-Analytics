@@ -104,6 +104,16 @@ export interface PolicyDeclarations {
   securitiesAndInvestments?: boolean;
 }
 
+// Account-level audience controls. Meta scopes these to the ad account and
+// applies them across all campaigns (except Advantage+ shopping). They surface
+// in the "Audience controls for this ad account" modal on Step 2.
+export interface AudienceControls {
+  specificLocationsOnly?: boolean;
+  ageRestrictedGoods?: boolean;
+  brandProtection?: boolean;
+  excludeEmployees?: boolean;
+}
+
 // Conversion location — where traffic / engagement / leads / sales are sent.
 // Available choices depend on the campaign objective.
 export type ConversionLocation =
@@ -179,6 +189,12 @@ export interface AdSetState {
   frequencyControl?: FrequencyControl;
   // Per-ad-set policy declarations (e.g., India securities & investments).
   policyDeclarations?: PolicyDeclarations;
+  // Account-level audience controls (location/age-restricted goods/brand
+  // protection/employee exclusions). Stored on the ad set for the wizard's
+  // form-state round-trip; backend persistence is at the account level.
+  audienceControls?: AudienceControls;
+  // Languages used to restrict who sees the ad. Empty = "All languages".
+  languages?: number[];
   // Account-level / ad-set-level placements the user has explicitly excluded.
   excludedPlacements?: string[];
   dailyBudget?: number;
@@ -229,23 +245,54 @@ export interface AdSetState {
   messagingApps?: string[];
 }
 
+// Identity profiles used in the ad. Threads + WhatsApp are recent additions to
+// Meta's Identity card; the wizard surfaces them but keeps them optional.
+export interface AdIdentity {
+  threadsProfileId?: string;
+  whatsappPhoneNumber?: string;
+}
+
+// Per-ad event details (Meta's "Event details" card on Step 3). When present,
+// the ad surfaces a title + reminder button so the audience can subscribe to
+// reminders about the event.
+export interface AdEventDetails {
+  title: string;
+  startsAt?: string;
+  endsAt?: string;
+  notifications?: string;
+  timeMode?: "START" | "END";
+}
+
+// Per-ad language translation policy. When `auto` is true Meta auto-translates
+// the ad text; `manual` carries any user-supplied translations.
+export interface AdLanguages {
+  enabled: boolean;
+  auto?: boolean;
+  manual?: Record<string, { primaryText?: string; headline?: string; description?: string }>;
+}
+
 export interface AdState {
   name: string;
   format: AdFormat;
   publishMode: PublishMode;
-  
+
   // Identity
   instagramAccountId?: string;
   isPartnershipAd: boolean;
   partnershipAdCode?: string;
-  
+  threadsProfileId?: string;
+  whatsappPhoneNumber?: string;
+
   // Creative
   advantageCreative: boolean;
   primaryTexts: string[];
   headlines: string[];
   descriptions: string[];
   callToAction: CtaButton;
-  
+  // When true, the ad can appear alongside other advertisers' ads inside a
+  // single ad unit (Meta's "Multi-advertiser ads" checkbox).
+  multiAdvertiserAds?: boolean;
+
   // Media
   images: string[];
   videos: string[];
@@ -264,6 +311,16 @@ export interface AdState {
   phoneNumber?: string;
   objectStoreUrl?: string;
   applicationId?: string;
+  // Top-level destination picker on Step 3 — "Instant Experience" or
+  // "Website". When WEBSITE the user fills in websiteUrl + displayLink and
+  // optionally picks a browser add-on. (Distinct from AdSetState.destinationType,
+  // which is the ad-set-level conversion location.)
+  destinationKind?: "INSTANT_EXPERIENCE" | "WEBSITE";
+  // Browser add-on: an extra button rendered on the ad alongside the CTA.
+  browserAddOn?: "NONE" | "WHATSAPP" | "CALL" | "MESSAGING_APPS";
+  whatsappLinkNumber?: string;
+  messagingAppsTarget?: string;
+  mobileAppId?: string;
 
   // Tracking
   pixelId?: string;
@@ -272,6 +329,25 @@ export interface AdState {
   offlineEvents: boolean;
   thirdPartyPixelIds: string[];
   urlParameters?: string;
+  // Whether website-event tracking is enabled for this ad.
+  websiteEvents?: boolean;
+  // Whether the user has connected a third-party reporting tool (e.g. Google
+  // Analytics conversion import).
+  thirdPartyReportingConnected?: boolean;
+
+  // Creative testing — when enabled, Meta runs a test comparing up to 5
+  // creative variants and reports which performs best.
+  creativeTestingEnabled?: boolean;
+
+  // Adds a non-clickable "map card" at the end of a carousel that shows the
+  // advertiser's business location pulled from the Facebook Page.
+  showMapCard?: boolean;
+
+  // Event details (Add event button on the "Event details" card).
+  eventDetails?: AdEventDetails;
+
+  // Language translation card.
+  languages?: AdLanguages;
 }
 
 export interface WizardState {
@@ -358,11 +434,15 @@ export const blankVariant = (): AdVariant => ({
 export const MIN_CAROUSEL_CARDS = 2;
 export const MAX_CAROUSEL_CARDS = 10;
 
-export const blankCarouselCard = (): CarouselCard => ({
+export const blankCarouselCard = (
+  mediaType: "IMAGE" | "VIDEO" = "IMAGE"
+): CarouselCard => ({
   imageUrl: "",
   headline: "",
   description: "",
   link: "",
+  mediaType,
+  videoUrl: "",
 });
 
 export const DETAILED_TARGETING_OPTIONS: { value: DetailedTargetingType; label: string; hint: string }[] = [
@@ -735,6 +815,7 @@ export const AB_TEST_METRIC_BY_OBJECTIVE: Record<CampaignObjective, AbTestMetric
 };
 
 export const CTA_OPTIONS: { value: CtaButton; label: string }[] = [
+  { value: "NO_BUTTON", label: "No button" },
   { value: "LEARN_MORE", label: "Learn More" },
   { value: "SHOP_NOW", label: "Shop Now" },
   { value: "SIGN_UP", label: "Sign Up" },

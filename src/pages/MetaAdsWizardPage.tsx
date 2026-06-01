@@ -620,7 +620,7 @@ function MetaAdsWizardPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto px-8 py-8 scrollbar-hide">
-          <div className="max-w-3xl mx-auto space-y-8">
+          <div className={`mx-auto space-y-8 transition-all duration-300 ${step === 2 ? "max-w-7xl w-full" : "max-w-3xl"}`}>
             {/* Stepper */}
             <div className="bg-white border border-slate-100 rounded-[20px] p-6 shadow-sm">
               <Stepper current={step} />
@@ -660,6 +660,7 @@ function MetaAdsWizardPage() {
                     form={form}
                     setForm={setFormDirty}
                     showAllErrors={!!showStepErrors[2]}
+                    clientId={clientId}
                   />
                 )}
                 {step === 3 && <Step4Review form={form} publishError={reviewError} />}

@@ -102,6 +102,10 @@ export type CarouselCard = {
   headline?: string;
   description?: string;
   link: string;
+  // When "VIDEO", the card uses videoUrl as its media (imageUrl falls back to
+  // a poster frame). Defaults to "IMAGE" if unset, preserving the legacy shape.
+  mediaType?: "IMAGE" | "VIDEO";
+  videoUrl?: string;
 };
 
 // Round 4c ΓÇö A/B testing
@@ -160,8 +164,11 @@ export type CampaignObjective =
   | "OUTCOME_ENGAGEMENT"
   | "OUTCOME_APP_PROMOTION";
 
-// Most common call-to-action button values Meta supports
+// Most common call-to-action button values Meta supports.
+// "NO_BUTTON" is a UI-only marker; backend should omit the call_to_action field
+// when this value is sent (Meta defaults to "Learn more" on FB/IG/WhatsApp).
 export type CtaButton =
+  | "NO_BUTTON"
   | "LEARN_MORE"
   | "SHOP_NOW"
   | "SIGN_UP"
