@@ -21,8 +21,7 @@ import {
   Type,
   Users,
   Sparkles,
-  Zap,
-  X as XIcon
+  Zap
 } from 'lucide-react';
 import { SiTelegram } from 'react-icons/si';
 import { toast } from 'sonner';

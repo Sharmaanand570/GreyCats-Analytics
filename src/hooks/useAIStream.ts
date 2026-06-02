@@ -133,6 +133,32 @@ export function useAIStream(): UseAIStreamReturn {
         }
       }
 
+      // If there is any remaining buffer, process it now
+      if (buffer.trim() && !abortRef.current) {
+        const { events } = parseSSEBuffer(buffer + "\n");
+        for (const event of events) {
+          if (event.type === "done") {
+            if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+            fullResponse = event.fullResponse;
+            const clean = fullResponse.replace(/<!-- ACTIONS -->[\s\S]*?<!-- \/ACTIONS -->/g, "").trim();
+            const assistantMsg: ChatMessage = {
+              id: event.messageId,
+              role: "assistant",
+              content: clean,
+              createdAt: new Date().toISOString(),
+            };
+            setMessages((prev) => [...prev, assistantMsg]);
+            setStreamingContent("");
+            setStatus("done");
+            fullResponse = "";
+          } else if (event.type === "actions") {
+            setActions(event.items || []);
+          } else if (event.type === "followups") {
+            setFollowups(event.items || []);
+          }
+        }
+      }
+
       // If loop ends without a "done" event (rare edge case), finalize
       if (fullResponse && !abortRef.current) {
         const assistantMsg: ChatMessage = {

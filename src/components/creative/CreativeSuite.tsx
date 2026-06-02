@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, memo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { creativeApi, type CaptionItem, type CreativeAsset, IMAGE_GEN_TIMEOUT_MS, IMAGE_GEN_POLL_MS } from "@/api/creativeApi";
@@ -547,7 +547,6 @@ function GalleryAssetCard({
   const first = assets[0];
   const isImage = first.type === "image";
   const imageAssets = isImage ? assets.filter((a) => a.imageUrl) : [];
-  const captions = (!isImage && first.captions) ? (first.captions as CaptionItem[]) : [];
   const allCaptions = !isImage ? assets.flatMap((a) => (a.captions as CaptionItem[]) || []) : [];
   const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace("/api", "") || "";
 

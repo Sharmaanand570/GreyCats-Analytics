@@ -42,6 +42,7 @@ import { retryScheduledPost } from '../api/scheduledPostsApi';
 interface SocialMediaCalendarProps {
   clientId: number;
   canPost?: boolean;
+  headerExtra?: React.ReactNode;
 }
 
 interface CalendarGridProps {
@@ -257,7 +258,7 @@ function CalendarGrid({ currentDate, slideDirection, posts, onDateClick }: Calen
   );
 }
 
-export function SocialMediaCalendar({ clientId, canPost }: SocialMediaCalendarProps) {
+export function SocialMediaCalendar({ clientId, canPost, headerExtra }: SocialMediaCalendarProps) {
   const queryClient = useQueryClient();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
@@ -416,6 +417,7 @@ export function SocialMediaCalendar({ clientId, canPost }: SocialMediaCalendarPr
         {allPosts.length > 0 && renderStatusFilter()}
       </div>
       <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+        {headerExtra}
         <div className="flex items-center bg-white border border-zinc-200 rounded-lg shadow-sm h-9 px-1 shrink-0">
           <Button variant="ghost" size="icon" onClick={prevMonth} className="h-7 w-7 hover:bg-zinc-100 rounded-md shrink-0">
             <ChevronLeft className="h-3.5 w-3.5 text-zinc-600" />

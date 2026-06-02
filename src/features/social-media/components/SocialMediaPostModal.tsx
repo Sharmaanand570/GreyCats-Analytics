@@ -1176,7 +1176,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
             <AIGeneratePanel
               clientId={clientId}
               platform={platform || 'instagram'}
-              onGenerated={(caption, imageUrl) => {
+              onGenerated={(caption) => {
                 updateDraft({ message: caption });
                 setMode('manual');
                 toast.success('Content generated! Review and schedule.');
@@ -1633,8 +1633,9 @@ function AIGeneratePanel({
         setGeneratedCaptions(res.data.data.captions);
         toast.success(`${res.data.data.captions.length} captions generated!`);
       }
-    } catch {
-      toast.error('Generation failed');
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.message || err?.message || 'Generation failed';
+      toast.error(errMsg);
     } finally {
       setIsGenerating(false);
     }

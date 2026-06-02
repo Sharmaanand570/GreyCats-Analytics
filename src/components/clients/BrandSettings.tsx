@@ -32,7 +32,6 @@ import {
   Sparkles,
   Save,
   Globe,
-  Palette,
   Target,
   MessageSquare,
   Shield,

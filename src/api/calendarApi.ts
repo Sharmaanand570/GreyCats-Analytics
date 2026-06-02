@@ -107,4 +107,11 @@ export const calendarApi = {
       "/ai/calendar/entry/from-chat",
       payload
     ),
+
+  // 3.7 — Convert a calendar entry into a real ScheduledPost in the scheduler
+  convertToScheduledPost: (entryId: string, payload?: { scheduledAt?: string }) =>
+    api.post<{ success: boolean; data: { postId: string }; message: string }>(
+      `/ai/calendar/entry/${entryId}/schedule`,
+      payload ?? {}
+    ),
 };

@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Eye, EyeOff, Zap, Trash2, CheckCircle, XCircle, Loader2, Info } from "lucide-react";
 import { toast } from "sonner";
@@ -20,6 +19,7 @@ const TEXT_PROVIDERS = [
     id: "anthropic",
     label: "Anthropic Claude",
     requiresBaseUrl: false,
+    defaultBaseUrl: "",
     models: ["claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5-20251001"],
     placeholder: "sk-ant-...",
     docsUrl: "https://console.anthropic.com/",
@@ -91,6 +91,7 @@ const TEXT_PROVIDERS = [
     id: "google",
     label: "Google Gemini",
     requiresBaseUrl: false,
+    defaultBaseUrl: "",
     models: ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
     placeholder: "AIza...",
     docsUrl: "https://aistudio.google.com/",

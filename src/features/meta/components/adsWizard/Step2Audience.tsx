@@ -21,6 +21,7 @@ import {
   Loader2,
   Search,
   AlertTriangle,
+  AlertCircle,
   Users,
   LayoutGrid,
   Ban,
@@ -74,6 +75,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { FormSection } from "./FormSection";
+import { MOCK_APPS } from "./Step1Settings";
 
 // Meta's Marketing API caps targeting lists, and very long lists make ad sets
 // unwieldy + harder for the user to scan. Soft-cap below Meta's hard limits.
@@ -89,7 +91,7 @@ const useDebouncedValue = <T,>(value: T, delay = 300): T => {
   return debounced;
 };
 
-type Props = StepProps & { clientId: number | null };
+type Props = StepProps & { clientId: number | null; setStep?: (s: number) => void };
 
 export function Step2Audience({ form, setForm, clientId }: Props) {
   const [locInput, setLocInput] = useState("");
@@ -107,6 +109,21 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
     useState(false);
   const [excludeAudienceSearch, setExcludeAudienceSearch] = useState("");
 
+  const [appSearch, setAppSearch] = useState("");
+  const [appDropdownOpen, setAppDropdownOpen] = useState(false);
+  const selectedApp = useMemo(() => {
+    return MOCK_APPS.find((a) => a.id === form.campaign.ios14AppId);
+  }, [form.campaign.ios14AppId]);
+  const [selectedStore, setSelectedStore] = useState<"Apple App Store" | "Google Play Store">(() => {
+    const app = MOCK_APPS.find((a) => a.id === form.campaign.ios14AppId);
+    return app?.store === "Google Play Store" ? "Google Play Store" : "Apple App Store";
+  });
+  useEffect(() => {
+    if (selectedApp) {
+      setSelectedStore(selectedApp.store as "Apple App Store" | "Google Play Store");
+    }
+  }, [selectedApp]);
+
   const locQuery = useDebouncedValue(locInput);
   const intQuery = useDebouncedValue(intInput);
   const dtQuery = useDebouncedValue(dtInput);
@@ -121,6 +138,7 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
 
   // Objective drives the Performance goal options and the card title.
   const objective = form.campaign.objective;
+  const isAppPromotion = objective === "OUTCOME_APP_PROMOTION";
   const objectiveLabel =
     OBJECTIVE_OPTIONS.find((o) => o.value === objective)?.label ?? "Performance";
   const objectiveCardTitle = STEP2_OBJECTIVE_CARD_TITLE[objective] ?? "Performance";
@@ -260,34 +278,521 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
 
         {/* {Objective} performance goal card. Title is "Conversion" for most
             objectives, "Awareness" for Awareness, "App" for App promotion. */}
-        <FormSection
-          title={objectiveCardTitle}
-          description="Choose where to send people and the goal Meta should optimize for."
-          icon={Sparkles}
-        >
-          {/* Conversion location — hidden for Awareness (no conversion picker). */}
-          {showConversionLocation && (
+        {/* App promotion performance goal card */}
+        {isAppPromotion ? (
+          <FormSection
+            title="App promotion"
+            description="Choose the app to promote and optimization settings."
+            icon={Sparkles}
+          >
+            <div className="space-y-4">
+              {/* Mobile app store */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                  Mobile app store
+                </label>
+                <Select
+                  value={selectedStore}
+                  onValueChange={(v) => {
+                    const store = v as "Apple App Store" | "Google Play Store";
+                    setSelectedStore(store);
+                    // Clear selected app if it doesn't belong to the newly selected store
+                    if (selectedApp && selectedApp.store !== store) {
+                      setForm((f) => ({
+                        ...f,
+                        campaign: { ...f.campaign, ios14AppId: undefined },
+                      }));
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Google Play Store">Google Play Store</SelectItem>
+                    <SelectItem value="Apple App Store">Apple App Store</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* App name search autocomplete */}
+              <div className="space-y-2 relative">
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                  App name
+                </label>
+                
+                <div className="relative">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    value={appSearch}
+                    onFocus={() => setAppDropdownOpen(true)}
+                    onChange={(e) => {
+                      setAppSearch(e.target.value);
+                      setAppDropdownOpen(true);
+                    }}
+                    placeholder="Enter app name, app ID or exact app store URL"
+                    className="h-11 pl-10 pr-10 rounded-xl border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 text-sm w-full"
+                  />
+                  {appDropdownOpen && (
+                    <div className="absolute top-full left-0 w-full mt-1.5 border border-slate-100 rounded-xl bg-white shadow-xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-50">
+                      {MOCK_APPS.filter(app =>
+                        app.store === selectedStore &&
+                        (app.name.toLowerCase().includes(appSearch.toLowerCase()) ||
+                         app.id.toLowerCase().includes(appSearch.toLowerCase()))
+                      ).length === 0 ? (
+                        <div className="p-4 text-xs text-slate-400 text-center font-medium">
+                          No apps found matching "{appSearch}"
+                        </div>
+                      ) : (
+                        MOCK_APPS.filter(app =>
+                          app.store === selectedStore &&
+                          (app.name.toLowerCase().includes(appSearch.toLowerCase()) ||
+                           app.id.toLowerCase().includes(appSearch.toLowerCase()))
+                        ).map((app) => (
+                          <button
+                            key={app.id}
+                            type="button"
+                            onClick={() => {
+                              setForm((f) => ({
+                                ...f,
+                                campaign: { ...f.campaign, ios14AppId: app.id },
+                              }));
+                              setAppSearch("");
+                              setAppDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-4 py-3 hover:bg-slate-50/80 flex items-center gap-3 transition-colors group"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100/60 border border-slate-200/50 flex items-center justify-center text-base shadow-sm group-hover:scale-95 transition-transform shrink-0">
+                              {app.icon}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-bold text-slate-900 leading-none flex items-center gap-1.5">
+                                {app.name}
+                                <span className="inline-flex text-[9px] font-black uppercase tracking-wider text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-md">
+                                  {app.platform}
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-slate-400 truncate mt-1">
+                                {app.id} · {app.category}
+                              </div>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Dropdown Overlay to close it */}
+                {appDropdownOpen && (
+                  <div 
+                    className="fixed inset-0 z-40 bg-transparent" 
+                    onClick={() => setAppDropdownOpen(false)}
+                  />
+                )}
+
+                {/* Selected App Display Details Card */}
+                {form.campaign.ios14AppId && selectedApp && (
+                  <div className="flex items-center justify-between gap-4 p-4 rounded-2xl border border-slate-100 bg-slate-50/40 shadow-sm mt-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-[14px] bg-gradient-to-tr from-slate-100 to-white border border-slate-200/60 flex items-center justify-center text-2xl shadow-sm">
+                        {selectedApp.icon}
+                      </div>
+                      <div>
+                        <div className="text-sm font-black text-slate-900">{selectedApp.name}</div>
+                        <div className="text-[11px] text-slate-400 font-mono mt-0.5">{selectedApp.id}</div>
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                          <span className="inline-flex items-center text-[10px] font-bold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-md shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                            {selectedApp.store}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium">· {selectedApp.category}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm((f) => ({
+                          ...f,
+                          campaign: { ...f.campaign, ios14AppId: undefined },
+                        }));
+                      }}
+                      className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"
+                      title="Remove app"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Country Selection Checkbox helper */}
+              <div className="flex items-center gap-2.5 pl-1 py-1">
+                <Checkbox id="country-specific" />
+                <label htmlFor="country-specific" className="text-xs text-slate-500 font-medium cursor-pointer leading-none">
+                  Find your app by selecting a country where it's available.
+                </label>
+              </div>
+
+              {/* Performance goal */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                  Performance goal
+                </label>
+                <p className="text-[11px] text-slate-500">
+                  How you measure success for your ads.
+                </p>
+                <Select
+                  value={currentPerformanceGoal}
+                  onValueChange={(v) =>
+                    setForm((f) => ({
+                      ...f,
+                      adSet: { ...f.adSet, performanceGoal: v as PerformanceGoal },
+                    }))
+                  }
+                >
+                  <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {performanceGoalOptions.map((opt) =>
+                      opt.group ? (
+                        <div
+                          key={opt.value}
+                          className="px-2 pt-3 pb-1 text-[11px] font-bold uppercase tracking-widest text-slate-400 cursor-default select-none"
+                        >
+                          {opt.group}
+                        </div>
+                      ) : (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          <div className="flex flex-col items-start gap-0.5">
+                            <span className="font-semibold text-sm text-slate-900">
+                              {opt.label}
+                            </span>
+                            <span className="text-[11px] text-slate-500">{"hint" in opt ? opt.hint : ""}</span>
+                          </div>
+                        </SelectItem>
+                      )
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Info Callout block */}
+              <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm">
+                <AlertCircle className="w-4 h-4 shrink-0 text-slate-600 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-slate-800">
+                    In-app ad impression and in-app purchase now available
+                  </p>
+                  <p className="text-[11px] text-slate-505 leading-relaxed">
+                    To reach people who may drive higher in-app ad value, choose{" "}
+                    <span className="font-bold text-slate-700">Maximise value of conversions</span>.
+                  </p>
+                </div>
+              </div>
+
+              {/* Cost per result goal */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                  Cost per result goal
+                </label>
+                <div className="flex items-center bg-white rounded-xl border border-slate-200 px-3 py-1 shadow-sm">
+                  <span className="text-slate-400 mr-1 text-sm font-bold">₹</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.adSet.costPerResultGoal ?? ""}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        adSet: {
+                          ...f.adSet,
+                          costPerResultGoal: e.target.value ? Number(e.target.value) : undefined,
+                        },
+                      }))
+                    }
+                    placeholder="None"
+                    className="h-8 p-0 border-0 bg-transparent focus-visible:ring-0 text-sm font-semibold text-slate-800 w-full animate-none"
+                  />
+                </div>
+              </div>
+
+              {/* Value rules info block */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-1">
+                  Value rules
+                  <AlertCircle className="w-3.5 h-3.5 text-slate-400" />
+                </label>
+                <div className="text-xs text-slate-600 mt-1 font-semibold">
+                  Enabled: <span className="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md">No</span>
+                </div>
+              </div>
+
+              {/* Attribution model & Advanced Toggle */}
+              <button
+                type="button"
+                onClick={() => setShowObjectiveAdvanced((v) => !v)}
+                className="inline-flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-blue-700 mt-1"
+              >
+                {showObjectiveAdvanced ? "Hide settings" : "Show more settings"}
+              </button>
+              
+              {showObjectiveAdvanced && (
+                <div className="pl-4 ml-2 border-l-2 border-slate-100 space-y-4 py-2">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                      Attribution model
+                    </label>
+                    <Select
+                      value={form.adSet.attributionModel ?? "STANDARD"}
+                      onValueChange={(v) =>
+                        setForm((f) => ({
+                          ...f,
+                          adSet: { ...f.adSet, attributionModel: v as AttributionModel },
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ATTRIBUTION_MODEL_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            <div className="flex flex-col items-start">
+                              <span className="font-semibold text-sm text-slate-900">{opt.label}</span>
+                              <span className="text-[11px] text-slate-505">{opt.hint}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </div>
+          </FormSection>
+        ) : (
+          <FormSection
+            title={objectiveCardTitle}
+            description="Choose where to send people and the goal Meta should optimize for."
+            icon={Sparkles}
+          >
+            {/* Conversion location — hidden for Awareness (no conversion picker). */}
+            {showConversionLocation && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                  Conversion location
+                </label>
+                <p className="text-[11px] text-slate-500">
+                  Choose where you want to drive {objective === "OUTCOME_TRAFFIC" ? "traffic" : "conversions"}.{" "}
+                  <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
+                    About conversion locations
+                  </a>
+                </p>
+                <div className="space-y-2">
+                  {conversionLocationOptions.map((opt) => {
+                    const active = currentConversionLocation === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            adSet: { ...f.adSet, conversionLocationType: opt.value },
+                          }))
+                        }
+                        className={cn(
+                          "w-full text-left flex gap-3 rounded-xl border px-4 py-3 transition-all",
+                          active
+                            ? "border-slate-900 bg-slate-50"
+                            : "border-slate-200 bg-white hover:border-slate-300"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "mt-0.5 w-4 h-4 rounded-full border-2 shrink-0",
+                            active
+                              ? "border-slate-900 bg-slate-900 ring-2 ring-white ring-inset"
+                              : "border-slate-300"
+                          )}
+                        />
+                        <div>
+                          <div className="text-sm font-bold text-slate-900">{opt.label}</div>
+                          <div className="text-[11px] text-slate-505 mt-0.5">{opt.hint}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
-                Conversion location
+                Performance goal
               </label>
               <p className="text-[11px] text-slate-500">
-                Choose where you want to drive {objective === "OUTCOME_TRAFFIC" ? "traffic" : "conversions"}.{" "}
+                How you measure success for your ads.{" "}
                 <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
-                  About conversion locations
+                  About performance goals
                 </a>
               </p>
+              <Select
+                value={currentPerformanceGoal}
+                onValueChange={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    adSet: { ...f.adSet, performanceGoal: v as PerformanceGoal },
+                  }))
+                }
+              >
+                <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {performanceGoalOptions.map((opt) =>
+                    opt.group ? (
+                      <div
+                        key={opt.value}
+                        className="px-2 pt-3 pb-1 text-[11px] font-bold uppercase tracking-widest text-slate-400 cursor-default select-none"
+                      >
+                        {opt.group}
+                      </div>
+                    ) : (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        <div className="flex flex-col items-start gap-0.5">
+                          <span className="font-semibold text-sm text-slate-900">
+                            {opt.label}
+                          </span>
+                          <span className="text-[11px] text-slate-505">{"hint" in opt ? opt.hint : ""}</span>
+                        </div>
+                      </SelectItem>
+                    )
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-slate-400">
+                To help us improve delivery, we may survey a small section of your audience.
+              </p>
+            </div>
+
+            {/* Facebook Page */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                Facebook Page
+              </label>
+              <p className="text-[11px] text-slate-500">
+                Choose the Page that you want to promote.
+              </p>
+              <Select
+                value={form.adSet.pageId ?? form.campaign.pageId ?? ""}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, adSet: { ...f.adSet, pageId: v } }))
+                }
+              >
+                <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
+                  <SelectValue placeholder="Select Page" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pages.map((p) => (
+                    <SelectItem key={p.pageId} value={p.pageId}>
+                      <div className="flex items-center gap-2">
+                        <FacebookIcon className="w-3.5 h-3.5 text-[#1877F2]" />
+                        <span className="font-semibold">{p.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Cost per result goal */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-1">
+                Cost per result goal{" "}
+                <span className="text-slate-300 font-normal normal-case">· Optional</span>
+              </label>
+              <Input
+                type="number"
+                min={0}
+                step={0.01}
+                value={form.adSet.costPerResultGoal ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    adSet: {
+                      ...f.adSet,
+                      costPerResultGoal: e.target.value ? Number(e.target.value) : undefined,
+                    },
+                  }))
+                }
+                placeholder="₹X.XX"
+                className="h-11 rounded-xl border-slate-200 bg-white"
+              />
+              <p className="text-[11px] text-slate-500">
+                Meta will aim to spend your entire budget and get the most results using the
+                highest-volume bid strategy. If keeping the average cost per result around a certain
+                amount is important, enter a cost per result goal.
+              </p>
+            </div>
+
+            {/* Attribution model — Traffic / Leads / Sales / App promotion. */}
+            {showAttributionModel && (
               <div className="space-y-2">
-                {conversionLocationOptions.map((opt) => {
-                  const active = currentConversionLocation === opt.value;
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-1">
+                  Attribution model
+                </label>
+                <Select
+                  value={form.adSet.attributionModel ?? "STANDARD"}
+                  onValueChange={(v) =>
+                    setForm((f) => ({
+                      ...f,
+                      adSet: { ...f.adSet, attributionModel: v as AttributionModel },
+                    }))
+                  }
+                >
+                  <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ATTRIBUTION_MODEL_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        <div className="flex flex-col items-start">
+                          <span className="font-semibold text-sm text-slate-900">{opt.label}</span>
+                          <span className="text-[11px] text-slate-505">{opt.hint}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Frequency control */}
+            <div className="space-y-3">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                Frequency control
+              </label>
+              <div className="space-y-2">
+                {(["TARGET", "CAP"] as const).map((mode) => {
+                  const active = frequencyControl.mode === mode;
                   return (
                     <button
-                      key={opt.value}
+                      key={mode}
                       type="button"
                       onClick={() =>
                         setForm((f) => ({
                           ...f,
-                          adSet: { ...f.adSet, conversionLocationType: opt.value },
+                          adSet: {
+                            ...f.adSet,
+                            frequencyControl: {
+                              ...(f.adSet.frequencyControl ?? { count: 2, days: 7 }),
+                              mode,
+                            },
+                          },
                         }))
                       }
                       className={cn(
@@ -306,289 +811,99 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
                         )}
                       />
                       <div>
-                        <div className="text-sm font-bold text-slate-900">{opt.label}</div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">{opt.hint}</div>
+                        <div className="text-sm font-bold text-slate-900">
+                          {mode === "TARGET" ? "Target" : "Cap"}
+                        </div>
+                        <div className="text-[11px] text-slate-505 mt-0.5">
+                          {mode === "TARGET"
+                            ? "The average number of times that you want people to see your ads"
+                            : "The maximum number of times that you want people to see your ads"}
+                        </div>
                       </div>
                     </button>
                   );
                 })}
               </div>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
-              Performance goal
-            </label>
-            <p className="text-[11px] text-slate-500">
-              How you measure success for your ads.{" "}
-              <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
-                About performance goals
-              </a>
-            </p>
-            <Select
-              value={currentPerformanceGoal}
-              onValueChange={(v) =>
-                setForm((f) => ({
-                  ...f,
-                  adSet: { ...f.adSet, performanceGoal: v as PerformanceGoal },
-                }))
-              }
-            >
-              <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {performanceGoalOptions.map((opt) =>
-                  opt.group ? (
-                    <div
-                      key={opt.value}
-                      className="px-2 pt-3 pb-1 text-[11px] font-bold uppercase tracking-widest text-slate-400 cursor-default select-none"
-                    >
-                      {opt.group}
-                    </div>
-                  ) : (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      <div className="flex flex-col items-start gap-0.5">
-                        <span className="font-semibold text-sm text-slate-900">
-                          {opt.label}
-                        </span>
-                        <span className="text-[11px] text-slate-500">{"hint" in opt ? opt.hint : ""}</span>
-                      </div>
-                    </SelectItem>
-                  )
-                )}
-              </SelectContent>
-            </Select>
-            <p className="text-[11px] text-slate-400">
-              To help us improve delivery, we may survey a small section of your audience.
-            </p>
-          </div>
-
-          {/* Facebook Page */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
-              Facebook Page
-            </label>
-            <p className="text-[11px] text-slate-500">
-              Choose the Page that you want to promote.
-            </p>
-            <Select
-              value={form.adSet.pageId ?? form.campaign.pageId ?? ""}
-              onValueChange={(v) =>
-                setForm((f) => ({ ...f, adSet: { ...f.adSet, pageId: v } }))
-              }
-            >
-              <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
-                <SelectValue placeholder="Select Page" />
-              </SelectTrigger>
-              <SelectContent>
-                {pages.map((p) => (
-                  <SelectItem key={p.pageId} value={p.pageId}>
-                    <div className="flex items-center gap-2">
-                      <FacebookIcon className="w-3.5 h-3.5 text-[#1877F2]" />
-                      <span className="font-semibold">{p.name}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Cost per result goal */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-1">
-              Cost per result goal{" "}
-              <span className="text-slate-300 font-normal normal-case">· Optional</span>
-            </label>
-            <Input
-              type="number"
-              min={0}
-              step={0.01}
-              value={form.adSet.costPerResultGoal ?? ""}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  adSet: {
-                    ...f.adSet,
-                    costPerResultGoal: e.target.value ? Number(e.target.value) : undefined,
-                  },
-                }))
-              }
-              placeholder="₹X.XX"
-              className="h-11 rounded-xl border-slate-200 bg-white"
-            />
-            <p className="text-[11px] text-slate-500">
-              Meta will aim to spend your entire budget and get the most results using the
-              highest-volume bid strategy. If keeping the average cost per result around a certain
-              amount is important, enter a cost per result goal.
-            </p>
-          </div>
-
-          {/* Attribution model — Traffic / Leads / Sales / App promotion. */}
-          {showAttributionModel && (
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-1">
-                Attribution model
-              </label>
-              <Select
-                value={form.adSet.attributionModel ?? "STANDARD"}
-                onValueChange={(v) =>
-                  setForm((f) => ({
-                    ...f,
-                    adSet: { ...f.adSet, attributionModel: v as AttributionModel },
-                  }))
-                }
-              >
-                <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ATTRIBUTION_MODEL_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      <div className="flex flex-col items-start">
-                        <span className="font-semibold text-sm text-slate-900">{opt.label}</span>
-                        <span className="text-[11px] text-slate-500">{opt.hint}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Frequency control */}
-          <div className="space-y-3">
-            <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
-              Frequency control
-            </label>
-            <div className="space-y-2">
-              {(["TARGET", "CAP"] as const).map((mode) => {
-                const active = frequencyControl.mode === mode;
-                return (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() =>
-                      setForm((f) => ({
-                        ...f,
-                        adSet: {
-                          ...f.adSet,
-                          frequencyControl: {
-                            ...(f.adSet.frequencyControl ?? { count: 2, days: 7 }),
-                            mode,
-                          },
+              <div className="flex items-center gap-2 text-sm">
+                <Input
+                  type="number"
+                  min={1}
+                  value={frequencyControl.count}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      adSet: {
+                        ...f.adSet,
+                        frequencyControl: {
+                          ...(f.adSet.frequencyControl ?? { mode: "CAP", days: 7 }),
+                          count: Number(e.target.value) || 1,
                         },
-                      }))
-                    }
-                    className={cn(
-                      "w-full text-left flex gap-3 rounded-xl border px-4 py-3 transition-all",
-                      active
-                        ? "border-slate-900 bg-slate-50"
-                        : "border-slate-200 bg-white hover:border-slate-300"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "mt-0.5 w-4 h-4 rounded-full border-2 shrink-0",
-                        active
-                          ? "border-slate-900 bg-slate-900 ring-2 ring-white ring-inset"
-                          : "border-slate-300"
-                      )}
-                    />
-                    <div>
-                      <div className="text-sm font-bold text-slate-900">
-                        {mode === "TARGET" ? "Target" : "Cap"}
-                      </div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">
-                        {mode === "TARGET"
-                          ? "The average number of times that you want people to see your ads"
-                          : "The maximum number of times that you want people to see your ads"}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Input
-                type="number"
-                min={1}
-                value={frequencyControl.count}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    adSet: {
-                      ...f.adSet,
-                      frequencyControl: {
-                        ...(f.adSet.frequencyControl ?? { mode: "CAP", days: 7 }),
-                        count: Number(e.target.value) || 1,
                       },
-                    },
-                  }))
-                }
-                className="h-10 w-20 rounded-xl border-slate-200 bg-white"
-              />
-              <span className="text-slate-700 font-semibold">times every</span>
-              <Input
-                type="number"
-                min={1}
-                value={frequencyControl.days}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    adSet: {
-                      ...f.adSet,
-                      frequencyControl: {
-                        ...(f.adSet.frequencyControl ?? { mode: "CAP", count: 2 }),
-                        days: Number(e.target.value) || 1,
+                    }))
+                  }
+                  className="h-10 w-20 rounded-xl border-slate-200 bg-white"
+                />
+                <span className="text-slate-700 font-semibold">times every</span>
+                <Input
+                  type="number"
+                  min={1}
+                  value={frequencyControl.days}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      adSet: {
+                        ...f.adSet,
+                        frequencyControl: {
+                          ...(f.adSet.frequencyControl ?? { mode: "CAP", count: 2 }),
+                          days: Number(e.target.value) || 1,
+                        },
                       },
-                    },
-                  }))
-                }
-                className="h-10 w-20 rounded-xl border-slate-200 bg-white"
-              />
-              <span className="text-slate-700 font-semibold">days</span>
-            </div>
-            <p className="text-[11px] text-slate-500">
-              As a {frequencyControl.mode === "CAP" ? "maximum" : "target"}, we'll aim to stay
-              {frequencyControl.mode === "CAP" ? " under" : " around"} {frequencyControl.count}{" "}
-              impressions every {frequencyControl.days} days.
-            </p>
-          </div>
-
-          {/* Show more options inside Objective card */}
-          <button
-            type="button"
-            onClick={() => setShowObjectiveAdvanced((v) => !v)}
-            className="inline-flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-blue-700"
-          >
-            {showObjectiveAdvanced ? "Hide settings" : "Show more options"}
-          </button>
-          {showObjectiveAdvanced && (
-            <div className="pl-4 ml-2 border-l-2 border-slate-100 space-y-3 py-2">
-              <div>
-                <div className="text-xs font-bold uppercase tracking-widest text-slate-600">
-                  Value rules
-                </div>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Tell us how much more certain audiences, conversion locations and placements are
-                  worth to your business. Our system will optimise for outcomes based on these
-                  rules.{" "}
-                  <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
-                    About value rules
-                  </a>
-                </p>
-                <button
-                  type="button"
-                  className="mt-2 inline-flex items-center gap-1 text-sm font-bold text-slate-700 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Create a rule set
-                </button>
+                    }))
+                  }
+                  className="h-10 w-20 rounded-xl border-slate-200 bg-white"
+                />
+                <span className="text-slate-700 font-semibold">days</span>
               </div>
+              <p className="text-[11px] text-slate-505">
+                As a {frequencyControl.mode === "CAP" ? "maximum" : "target"}, we'll aim to stay
+                {frequencyControl.mode === "CAP" ? " under" : " around"} {frequencyControl.count}{" "}
+                impressions every {frequencyControl.days} days.
+              </p>
             </div>
-          )}
-        </FormSection>
+
+            {/* Show more options inside Objective card */}
+            <button
+              type="button"
+              onClick={() => setShowObjectiveAdvanced((v) => !v)}
+              className="inline-flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-blue-700"
+            >
+              {showObjectiveAdvanced ? "Hide settings" : "Show more options"}
+            </button>
+            {showObjectiveAdvanced && (
+              <div className="pl-4 ml-2 border-l-2 border-slate-100 space-y-3 py-2">
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                    Value rules
+                  </div>
+                  <p className="text-[11px] text-slate-505 mt-1">
+                    Tell us how much more certain audiences, conversion locations and placements are
+                    worth to your business. Our system will optimise for outcomes based on these
+                    rules.{" "}
+                    <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
+                      About value rules
+                    </a>
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-2 inline-flex items-center gap-1 text-sm font-bold text-slate-700 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Create a rule set
+                  </button>
+                </div>
+              </div>
+            )}
+          </FormSection>
+        )}
 
         {/* Dynamic creative — top-level card */}
         <FormSection
@@ -616,76 +931,109 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
           </p>
         </FormSection>
 
+
+
         {/* Budget & schedule — addresses the ad-set budget gap left from Step 1 */}
         <FormSection
           title="Budget & schedule"
           description="Set how much to spend on this ad set and when it should run."
           icon={Wallet}
         >
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-1">
-              Budget
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <Select
-                value={form.adSet.lifetimeBudget ? "LIFETIME" : "DAILY"}
-                onValueChange={(v) =>
-                  setForm((f) => {
-                    if (v === "DAILY") {
+          {form.campaign.isCboEnabled ? (
+            <div className="space-y-4 pt-1 mb-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-1">
+                  Budget strategy
+                  <AlertCircle className="w-3.5 h-3.5 text-slate-400" />
+                </label>
+                <p className="text-[12px] text-slate-600 leading-relaxed">
+                  Your campaign budget automatically distributes your daily budget of{" "}
+                  <span className="font-bold text-slate-800">
+                    ₹{(form.campaign.dailyBudget || form.campaign.lifetimeBudget || 8000).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>{" "}
+                  across ad sets to get the best performance. You can set spending limits for each ad
+                  set.{" "}
+                  <a className="text-blue-600 hover:underline font-semibold" href="#" onClick={(e) => e.preventDefault()}>
+                    About spending limits
+                  </a>
+                </p>
+              </div>
+
+              <div className="space-y-1 pt-1">
+                <div className="text-xs font-bold text-slate-700">
+                  Ad set spending limits
+                </div>
+                <div className="text-[12px] text-slate-500 font-semibold bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 w-max">
+                  None added
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2 mb-4">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-1">
+                Budget
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <Select
+                  value={form.adSet.lifetimeBudget ? "LIFETIME" : "DAILY"}
+                  onValueChange={(v) =>
+                    setForm((f) => {
+                      if (v === "DAILY") {
+                        return {
+                          ...f,
+                          adSet: { ...f.adSet, lifetimeBudget: undefined },
+                        };
+                      }
                       return {
                         ...f,
-                        adSet: { ...f.adSet, lifetimeBudget: undefined },
+                        adSet: {
+                          ...f.adSet,
+                          dailyBudget: undefined,
+                          lifetimeBudget: f.adSet.lifetimeBudget ?? 0,
+                        },
                       };
-                    }
-                    return {
-                      ...f,
-                      adSet: {
-                        ...f.adSet,
-                        dailyBudget: undefined,
-                        lifetimeBudget: f.adSet.lifetimeBudget ?? 0,
-                      },
-                    };
-                  })
-                }
-              >
-                <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="DAILY">Daily budget</SelectItem>
-                  <SelectItem value="LIFETIME">Lifetime budget</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input
-                type="number"
-                min={1}
-                value={
-                  form.adSet.lifetimeBudget
-                    ? (form.adSet.lifetimeBudget ?? "")
-                    : (form.adSet.dailyBudget ?? "")
-                }
-                onChange={(e) =>
-                  setForm((f) => {
-                    const v = Number(e.target.value) || 0;
-                    return f.adSet.lifetimeBudget
-                      ? { ...f, adSet: { ...f.adSet, lifetimeBudget: v } }
-                      : { ...f, adSet: { ...f.adSet, dailyBudget: v } };
-                  })
-                }
-                placeholder="₹0.00"
-                className="h-11 rounded-xl border-slate-200 bg-white"
-              />
+                    })
+                  }
+                >
+                  <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DAILY">Daily budget</SelectItem>
+                    <SelectItem value="LIFETIME">Lifetime budget</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  min={1}
+                  value={
+                    form.adSet.lifetimeBudget
+                      ? (form.adSet.lifetimeBudget ?? "")
+                      : (form.adSet.dailyBudget ?? "")
+                  }
+                  onChange={(e) =>
+                    setForm((f) => {
+                      const v = Number(e.target.value) || 0;
+                      return f.adSet.lifetimeBudget
+                        ? { ...f, adSet: { ...f.adSet, lifetimeBudget: v } }
+                        : { ...f, adSet: { ...f.adSet, dailyBudget: v } };
+                    })
+                  }
+                  placeholder="₹0.00"
+                  className="h-11 rounded-xl border-slate-200 bg-white"
+                />
+              </div>
+              <p className="text-[11px] text-slate-505">
+                {form.adSet.lifetimeBudget
+                  ? "Total amount spent across the run of the ad set."
+                  : "Average daily spend. Some days may spend up to 75% more, others less."}
+                {" "}
+                <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
+                  About budgets
+                </a>
+              </p>
             </div>
-            <p className="text-[11px] text-slate-500">
-              {form.adSet.lifetimeBudget
-                ? "Total amount spent across the run of the ad set."
-                : "Average daily spend. Some days may spend up to 75% more, others less."}
-              {" "}
-              <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
-                About budgets
-              </a>
-            </p>
-          </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -732,16 +1080,33 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
         {/* Audience controls — info callout opens account-level modal; card
             summarises criteria (saved audience, locations, age/exclusions/langs).
             Matches Meta's Step 2 "Audience controls" block. */}
-        <FormSection
-          title="Audience controls"
-          description="Set criteria for where ads for this campaign can be delivered."
-          icon={ShieldAlert}
-        >
+        {!isAppPromotion && (
+          <FormSection
+            title="Audience controls"
+            description="Set criteria for where ads for this campaign can be delivered."
+            icon={ShieldAlert}
+          >
           <p className="text-xs text-slate-500">
-            <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
+            <a className="text-blue-600 hover:underline font-semibold" href="#" onClick={(e) => e.preventDefault()}>
               Learn more
             </a>
           </p>
+
+          {/* Controls Sub-block matching Screenshot 3 */}
+          {isAppPromotion && (
+            <div className="space-y-2 pt-1 pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                Controls
+                <AlertCircle className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+              <p className="text-[11px] text-slate-500 leading-normal">
+                We won't reach people beyond these settings, even with Advantage+ on.
+              </p>
+              <div className="inline-flex text-[11px] font-semibold text-slate-600 bg-slate-100 border border-slate-200/50 rounded-lg px-2.5 py-1">
+                No advertising settings set
+              </div>
+            </div>
+          )}
 
           {/* Account-level controls callout */}
           <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
@@ -967,9 +1332,31 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
                     : `${form.adSet.languages?.length} language${form.adSet.languages?.length === 1 ? "" : "s"}`}
                 </p>
               </div>
+
+              {/* Suggest an audience sub-block matching Screenshot 4 */}
+              {isAppPromotion && (
+                <div className="space-y-3 pt-3 border-t border-slate-100">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                    Suggest an audience
+                    <AlertCircle className="w-3.5 h-3.5 text-slate-400" />
+                  </div>
+                  <p className="text-[11px] text-slate-505 leading-normal">
+                    We'll reach people beyond these settings when it's likely to improve performance.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="h-9 text-xs font-bold rounded-xl border-slate-200" disabled>
+                      + Add suggestions (optional)
+                    </Button>
+                    <Button variant="outline" className="h-9 text-xs font-bold rounded-xl border-slate-200 ml-auto" disabled>
+                      Save audience
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </FormSection>
+      )}
 
         {/* Audience controls modal — account-scoped toggles */}
         <Dialog open={audienceControlsModalOpen} onOpenChange={setAudienceControlsModalOpen}>
@@ -1096,8 +1483,10 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
           </DialogContent>
         </Dialog>
 
-        {/* Geography */}
-        <FormSection title="Geography" description="Search for locations. Leave empty to default to entire US." icon={MapPin}>
+        {!isAppPromotion && (
+          <>
+            {/* Geography */}
+            <FormSection title="Geography" description="Search for locations. Leave empty to default to entire US." icon={MapPin}>
           <div className="space-y-3">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-2">
@@ -1450,6 +1839,8 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
           )}
           </div>
         </FormSection>
+          </>
+        )}
 
         {/* Custom Audiences */}
         <FormSection title="Custom Audiences" description="Reach people who have already interacted with your business." icon={UserSquare}>
@@ -1678,8 +2069,16 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
           </div>
         </FormSection>
 
-        {/* Placements */}
-        <FormSection title="Ad Placement" description="Where your ads will appear across Meta." icon={LayoutGrid}>
+        <FormSection
+          title="Ad Placement"
+          description="Where your ads will appear across Meta."
+          icon={LayoutGrid}
+          rightSlot={isAppPromotion && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2.5 py-0.5 shadow-sm shrink-0">
+              <Sparkles className="w-2.5 h-2.5" /> Advantage+ on
+            </span>
+          )}
+        >
           <div className="space-y-3">
             <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-2">
               <LayoutGrid className="w-3.5 h-3.5" /> Placements

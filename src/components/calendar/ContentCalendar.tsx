@@ -7,7 +7,7 @@ import {
   type CalendarEntry,
   type CalendarSummary,
 } from "@/api/calendarApi";
-import { creativeApi, IMAGE_GEN_TIMEOUT_MS, IMAGE_GEN_POLL_MS } from "@/api/creativeApi";
+import { creativeApi } from "@/api/creativeApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -651,33 +651,20 @@ function EntryEditDialog({
           platform: entry.platform,
           aspectRatio: ct === "story" ? "9:16" : "1:1",
           style: "photorealistic",
-          mode: "async",
+          mode: "sync",
         });
-        setGeneratedContent(res.data.data.promptUsed);
-        toast.info("Generating image in background...");
-
-        const assetId = res.data.data.assetId;
-        let cancelled = false;
-        const poll = setInterval(async () => {
-          if (cancelled) return;
-          try {
-            const check = await creativeApi.getAssets(clientId, "image");
-            const found = check.data.data.assets.find((a) => a.id === assetId);
-            if (found?.imageUrl) {
-              cancelled = true;
-              clearInterval(poll);
-              setGeneratedImageUrl(found.imageUrl);
-              setIsGenerating(false);
-              toast.success("Image ready!");
-            }
-          } catch { /* polling error, retry next tick */ }
-        }, IMAGE_GEN_POLL_MS);
-        const timeout = setTimeout(() => { cancelled = true; clearInterval(poll); setIsGenerating(false); }, IMAGE_GEN_TIMEOUT_MS);
-        // Store cleanup for when dialog closes
-        pollCleanupRef.current = () => { cancelled = true; clearInterval(poll); clearTimeout(timeout); };
+        if (res.data.data.imageUrl) {
+          setGeneratedImageUrl(res.data.data.imageUrl);
+          setIsGenerating(false);
+          toast.success("Image ready!");
+        } else {
+          toast.error("Image was generated but no URL was returned");
+          setIsGenerating(false);
+        }
       }
-    } catch {
-      toast.error("Generation failed");
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.message || err?.message || "Generation failed";
+      toast.error(errMsg);
       setIsGenerating(false);
     }
   };

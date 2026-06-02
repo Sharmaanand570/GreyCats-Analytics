@@ -50,7 +50,28 @@ export interface SSEErrorEvent {
   message: string;
 }
 
-export type SSEEvent = SSEChunkEvent | SSEDoneEvent | SSEErrorEvent;
+export interface SSEActionsEvent {
+  type: "actions";
+  items: any[];
+}
+
+export interface SSEFollowupsEvent {
+  type: "followups";
+  items: string[];
+}
+
+export type SSEEvent = SSEChunkEvent | SSEDoneEvent | SSEErrorEvent | SSEActionsEvent | SSEFollowupsEvent;
+
+export interface AIAnalytics {
+  totalSessions: number;
+  activeSessions: number;
+  totalMessages: number;
+  avgMessagesPerSession: number;
+  positiveRatings: number;
+  negativeRatings: number;
+  topQuestions: { question: string; count: number }[];
+  dailyChart: { date: string; count: number }[];
+}
 
 // ─────────────────────────────────────────────
 // API methods
@@ -136,6 +157,12 @@ export const chatApi = {
   generateSummary: async (payload: { templateId: number; clientId?: number | null; dateFrom: string; dateTo: string }) => {
     const res = await api.post("/ai/chat/summary", payload);
     return res.data as { success: boolean; data: { summary: string } };
+  },
+
+  // 2.9 — Aggregate AI chatbot usage analytics for the last 30 days
+  getAnalytics: async (): Promise<{ success: boolean; data: AIAnalytics }> => {
+    const res = await api.get("/ai/chat/analytics");
+    return res.data;
   },
 };
 

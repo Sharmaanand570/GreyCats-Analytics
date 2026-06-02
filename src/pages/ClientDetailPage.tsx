@@ -18,7 +18,6 @@ import { ReportSchedules } from '../components/ReportSchedules';
 import { useSyncStatus } from '@/features/reports/hooks/useSyncStatus';
 import ClientFormModal from '../components/clients/ClientFormModal';
 import BrandSettings from '../components/clients/BrandSettings';
-import ContentCalendar from '../components/calendar/ContentCalendar';
 import CreativeSuite from '../components/creative/CreativeSuite';
 import { getProfileImageUrl } from "@/utils/imageUtils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -229,6 +228,10 @@ const ClientDetailPage: React.FC = () => {
                                     <Sparkles className="w-4 h-4 mr-2" />
                                     Brand AI
                                 </TabsTrigger>
+                                <TabsTrigger value="creative-suite" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                                    <Palette className="w-4 h-4 mr-2" />
+                                    Creative Suite
+                                </TabsTrigger>
                             </TabsList>
                             {isReportAccessLocked && (
                                 <p className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
@@ -279,6 +282,14 @@ const ClientDetailPage: React.FC = () => {
                                 <div className="min-h-[500px]">
                                     {parsedClientId && (
                                         <BrandSettings clientId={parsedClientId} />
+                                    )}
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="creative-suite" className="space-y-4 focus-visible:outline-none">
+                                <div className="min-h-[500px]">
+                                    {parsedClientId && (
+                                        <CreativeSuite clientId={parsedClientId} />
                                     )}
                                 </div>
                             </TabsContent>

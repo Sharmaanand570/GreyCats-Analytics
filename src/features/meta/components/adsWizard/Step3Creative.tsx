@@ -27,7 +27,6 @@ import {
   MousePointerClick,
   Layers,
   Film,
-  Square,
   Plus,
   Trash2,
   AlertCircle,
@@ -41,19 +40,18 @@ import {
   BarChart3,
   Tag,
   Globe,
-  Zap,
   ExternalLink,
-  Phone,
-  MessageSquare,
   Facebook as FacebookIcon,
   Instagram as InstagramIcon,
   X,
+  Edit2,
   Sliders,
   Contrast,
   Play,
   Search,
   SlidersHorizontal,
   ChevronDown,
+  Sparkles,
 } from "lucide-react";
 import { useMetaAccounts } from "@/features/meta/hooks/useMetaData";
 import { AdCreativeLivePreview } from "./AdCreativeLivePreview";
@@ -73,7 +71,6 @@ import type {
   AdVariant,
   CarouselCard,
   CtaButton,
-  PublishMode,
 } from "@/features/meta/API/metaAdsManagerApi";
 import { cn } from "@/lib/utils";
 import { isValidHttpUrl } from "@/lib/url";
@@ -385,15 +382,18 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
   // Creative test setup modal states
   const [showTestSetup, setShowTestSetup] = useState(false);
   const [testAdsCount, setTestAdsCount] = useState(2);
-  const [testAdsBudget, setTestAdsBudget] = useState(40);
+  const [testAdsBudget, setTestAdsBudget] = useState(200);
   const [testAdsDuration, setTestAdsDuration] = useState("7 days");
-  const [testAdsMetric, setTestAdsMetric] = useState("Cost per result");
+  const [testAdsMetric, setTestAdsMetric] = useState("Cost per purchase");
 
   // Media Selector Modal states
   const [showMediaLibrary, setShowMediaLibrary] = useState(false);
   const [selectedLibraryImage, setSelectedLibraryImage] = useState<string | null>(null);
   const [activeLibraryTab, setActiveLibraryTab] = useState<"all" | "account" | "instagram" | "page">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [mediaSetupMode, setMediaSetupMode] = useState<"MANUAL" | "CATALOGUE">("MANUAL");
+  const [showAdSetupAdvanced, setShowAdSetupAdvanced] = useState(false);
+  const [useDisplayLink, setUseDisplayLink] = useState(!!form.ad.displayLink);
 
   // Carousel Card Media Library modal states (Awareness)
   const [showCarouselMediaModal, setShowCarouselMediaModal] = useState(false);
@@ -709,10 +709,10 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
           )}
         </FormSection>
 
-        {/* Identity — Facebook Page (required), Instagram, Threads, WhatsApp */}
+        {/* Identity — Facebook Page (required), Instagram, Threads, Branding */}
         <FormSection
           title="Identity"
-          description="The profiles that will be used in your ad."
+          description="The profiles and branding that will be used in your ad."
           icon={UserSquare}
         >
           {/* Facebook Page */}
@@ -751,17 +751,28 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
             <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-2">
               <InstagramIcon className="w-3.5 h-3.5 text-pink-500" /> Instagram profile
             </label>
-            <Input
-              value={form.ad.instagramAccountId ?? ""}
-              onChange={(e) =>
+            <Select
+              value={form.ad.instagramAccountId ?? "vapeguru"}
+              onValueChange={(v) =>
                 setForm((f) => ({
                   ...f,
-                  ad: { ...f.ad, instagramAccountId: e.target.value },
+                  ad: { ...f.ad, instagramAccountId: v === "none" ? undefined : v },
                 }))
               }
-              placeholder="Instagram account ID or handle"
-              className="h-11 rounded-xl border-slate-200 bg-white"
-            />
+            >
+              <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
+                <SelectValue placeholder="Select an Instagram profile" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Select an Instagram profile</SelectItem>
+                <SelectItem value="vapeguru">
+                  <div className="flex items-center gap-2">
+                    <InstagramIcon className="w-3.5 h-3.5 text-pink-500" />
+                    <span>__vapeguru__</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Threads profile */}
@@ -770,17 +781,23 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
               Threads profile
             </label>
             <div className="flex items-center gap-2">
-              <Input
-                value={form.ad.threadsProfileId ?? ""}
-                onChange={(e) =>
+              <Select
+                value={form.ad.threadsProfileId ?? "none"}
+                onValueChange={(v) =>
                   setForm((f) => ({
                     ...f,
-                    ad: { ...f.ad, threadsProfileId: e.target.value },
+                    ad: { ...f.ad, threadsProfileId: v === "none" ? undefined : v },
                   }))
                 }
-                placeholder="Select a Threads profile"
-                className="h-11 rounded-xl border-slate-200 bg-white flex-1"
-              />
+              >
+                <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white flex-1">
+                  <SelectValue placeholder="Select a Threads profile" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Select a Threads profile</SelectItem>
+                  <SelectItem value="vapeguru">__vapeguru__</SelectItem>
+                </SelectContent>
+              </Select>
               <span className="text-xs text-slate-400">or</span>
               <Button
                 type="button"
@@ -792,30 +809,19 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
             </div>
           </div>
 
-          {/* WhatsApp phone number */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
-              WhatsApp phone number
-            </label>
-            <div className="flex items-center gap-2">
-              <Input
-                value={form.ad.whatsappPhoneNumber ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    ad: { ...f.ad, whatsappPhoneNumber: e.target.value },
-                  }))
-                }
-                placeholder="Select a WhatsApp number"
-                className="h-11 rounded-xl border-slate-200 bg-white flex-1"
-              />
-              <span className="text-xs text-slate-400">or</span>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11 rounded-xl border-slate-200 font-bold text-slate-700 whitespace-nowrap"
-              >
-                Connect profile
+          {/* Branding callout matching Screenshot 1 */}
+          <div className="space-y-2 pt-2 border-t border-slate-100">
+            <div className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-1.5">
+              Branding
+              <Info className="w-3.5 h-3.5 text-slate-400" />
+            </div>
+            <p className="text-[11px] text-slate-500">
+              Set brand defaults for this ad and future ads.
+            </p>
+            <div className="flex items-center justify-between p-3 border border-slate-200 rounded-xl bg-slate-50 shadow-sm mt-1">
+              <span className="text-xs font-bold text-slate-600">Inactive</span>
+              <Button variant="outline" className="h-9 px-3 rounded-lg border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50" disabled>
+                Add branding
               </Button>
             </div>
           </div>
@@ -836,164 +842,216 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
             </Select>
           </div>
 
-          {/* Format change callout */}
-          <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <Info className="w-4 h-4 shrink-0 text-slate-500 mt-0.5" />
+          {/* Media setup Radio select block */}
+          <div className="space-y-3 pt-1">
+            <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
+              Media setup
+            </label>
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => setMediaSetupMode("MANUAL")}
+                className={cn(
+                  "w-full text-left flex gap-3 rounded-xl border px-4 py-3 transition-all",
+                  mediaSetupMode === "MANUAL"
+                    ? "border-slate-900 bg-slate-50"
+                    : "border-slate-200 bg-white hover:border-slate-300"
+                )}
+              >
+                <span
+                  className={cn(
+                    "mt-0.5 w-4 h-4 rounded-full border-2 shrink-0",
+                    mediaSetupMode === "MANUAL"
+                      ? "border-slate-900 bg-slate-900 ring-2 ring-white ring-inset"
+                      : "border-slate-300"
+                  )}
+                />
+                <div>
+                  <div className="text-sm font-bold text-slate-900">Manual upload</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    Choose images or videos to build your ad creative.
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMediaSetupMode("CATALOGUE")}
+                className={cn(
+                  "w-full text-left flex gap-3 rounded-xl border px-4 py-3 transition-all",
+                  mediaSetupMode === "CATALOGUE"
+                    ? "border-slate-900 bg-slate-50"
+                    : "border-slate-200 bg-white hover:border-slate-300"
+                )}
+              >
+                <span
+                  className={cn(
+                    "mt-0.5 w-4 h-4 rounded-full border-2 shrink-0",
+                    mediaSetupMode === "CATALOGUE"
+                      ? "border-slate-900 bg-slate-900 ring-2 ring-white ring-inset"
+                      : "border-slate-300"
+                  )}
+                />
+                <div>
+                  <div className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                    Advantage+ catalogue ads
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500/10" />
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                    Drive sales by showing relevant product media from your catalogue.{" "}
+                    <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
+                      About Advantage+ catalogue ads
+                    </a>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Format Selection Radio block */}
+          <div className="space-y-3 pt-1">
+            <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
+              Format
+            </label>
+            <p className="text-[11px] text-slate-500">
+              Choose an ad creative layout.
+            </p>
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMediaType("IMAGE");
+                  setForm((f) => ({ ...f, ad: { ...f.ad, format: "SINGLE_IMAGE_VIDEO", publishMode: "SINGLE_AD" } }));
+                }}
+                className={cn(
+                  "w-full text-left flex gap-3 rounded-xl border px-4 py-3 transition-all",
+                  form.ad.format === "SINGLE_IMAGE_VIDEO"
+                    ? "border-slate-900 bg-slate-50"
+                    : "border-slate-200 bg-white hover:border-slate-300"
+                )}
+              >
+                <span
+                  className={cn(
+                    "mt-0.5 w-4 h-4 rounded-full border-2 shrink-0",
+                    form.ad.format === "SINGLE_IMAGE_VIDEO"
+                      ? "border-slate-900 bg-slate-900 ring-2 ring-white ring-inset"
+                      : "border-slate-300"
+                  )}
+                />
+                <div>
+                  <div className="text-sm font-bold text-slate-900">Single image or video</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    One image or video, or a slideshow of multiple images.
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, ad: { ...f.ad, format: "CAROUSEL", publishMode: "SINGLE_AD" } }))}
+                className={cn(
+                  "w-full text-left flex gap-3 rounded-xl border px-4 py-3 transition-all",
+                  form.ad.format === "CAROUSEL"
+                    ? "border-slate-900 bg-slate-50"
+                    : "border-slate-200 bg-white hover:border-slate-300"
+                )}
+              >
+                <span
+                  className={cn(
+                    "mt-0.5 w-4 h-4 rounded-full border-2 shrink-0",
+                    form.ad.format === "CAROUSEL"
+                      ? "border-slate-900 bg-slate-900 ring-2 ring-white ring-inset"
+                      : "border-slate-300"
+                  )}
+                />
+                <div>
+                  <div className="text-sm font-bold text-slate-900">Carousel</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    Two or more scrollable images or videos.
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Format selection has changed info warning block matching Screenshot 2 */}
+          <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm mt-2">
+            <Info className="w-4 h-4 shrink-0 text-slate-600 mt-0.5" />
             <div className="space-y-1">
-              <p className="text-xs font-bold text-slate-900">Format selection has changed</p>
-              <p className="text-[11px] text-slate-600 leading-relaxed">
-                Format display options in ad creative is the new way to show your ad in collection
-                formats. You now have the flexibility to show your ad in multiple formats that you
-                choose.{" "}
-                <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
+              <p className="text-xs font-bold text-slate-800">Format selection has changed</p>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Format display options in ad creative is the new way to show your ad in collection formats. You now have the flexibility to show your ad in multiple formats that you choose.{" "}
+                <a className="font-bold text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
                   About format display options.
                 </a>
               </p>
             </div>
           </div>
 
-          {/* Publish Mode toggle */}
-          <div className="space-y-2">
-          <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
-            Publish Mode
+          {/* Multi-advertiser ads */}
+          <label className="flex items-start gap-2.5 cursor-pointer pt-2">
+            <Checkbox
+              checked={!!form.ad.multiAdvertiserAds}
+              onCheckedChange={(v) =>
+                setForm((f) => ({
+                  ...f,
+                  ad: { ...f.ad, multiAdvertiserAds: !!v },
+                }))
+              }
+              className="mt-0.5"
+            />
+            <div>
+              <div className="text-sm font-bold text-slate-900">Multi-advertiser ads</div>
+              <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">
+                Your ad can appear with others in the same ad unit to help promote discoverability. Your ad creative may be resized or cropped.{" "}
+                <a className="text-blue-600 hover:underline font-semibold" href="#" onClick={(e) => e.preventDefault()}>
+                  About multi-advertiser ads
+                </a>
+              </p>
+            </div>
           </label>
-          <div className="grid grid-cols-2 gap-2">
-            <PublishModeOption
-              value="SINGLE_AD"
-              current={form.ad.publishMode}
-              onClick={() => setForm((f) => ({ ...f, ad: { ...f.ad, publishMode: "SINGLE_AD" } }))}
-              icon={<Square className="w-4 h-4" />}
-              label="Single Ad"
-              hint="One creative to one ad set"
-            />
-            <PublishModeOption
-              value="AB_TEST"
-              current={form.ad.publishMode}
-              onClick={() => setForm((f) => ({ ...f, ad: { ...f.ad, publishMode: "AB_TEST" } }))}
-              icon={<Layers className="w-4 h-4" />}
-              label="A/B Test"
-              hint={`${MIN_VARIANTS}–${MAX_VARIANTS} variants in one ad set`}
-            />
-          </div>
-          {isAbTest && (
-            <div className="mt-2.5 p-4 rounded-xl border border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 animate-in fade-in duration-200">
-              <div className="space-y-0.5">
-                <p className="text-xs font-bold text-slate-700">Creative test setup</p>
-                <p className="text-[11px] text-slate-500 max-w-[450px]">
-                  Copy your original ad creative and configure test parameters to compare variants side-by-side.
-                </p>
-              </div>
-              <Button
-                type="button"
-                onClick={() => {
-                  const currentDailyBudget = form.adSet.dailyBudget || form.campaign.dailyBudget || 200;
-                  setTestAdsBudget(Math.round(currentDailyBudget * 0.2) || 40);
-                  setTestAdsCount(form.ad.adVariants.length > 0 ? form.ad.adVariants.length : 2);
-                  setShowTestSetup(true);
-                }}
-                className="h-9 rounded-lg font-bold bg-[#0969da] hover:bg-blue-700 text-white px-4 shrink-0 text-xs shadow-sm"
-              >
-                Set up test
-              </Button>
-            </div>
-          )}
-        </div>
 
-        {/* Ad Type toggle — only relevant in single-ad mode */}
-        {!isAbTest && (
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
-              Ad Format
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              <AdTypeOption
-                value="image"
-                current={form.ad.format === "SINGLE_IMAGE_VIDEO" && mediaType === "IMAGE" ? "image" : form.ad.format === "CAROUSEL" ? "CAROUSEL" : "video"}
-                onClick={() => { setMediaType("IMAGE"); setForm((f) => ({ ...f, ad: { ...f.ad, format: "SINGLE_IMAGE_VIDEO" } })); }}
-                icon={<Square className="w-4 h-4" />}
-                label="Single Image"
-                hint="One image, one link"
-              />
-              <AdTypeOption
-                value="CAROUSEL"
-                current={form.ad.format === "SINGLE_IMAGE_VIDEO" && mediaType === "IMAGE" ? "image" : form.ad.format === "CAROUSEL" ? "CAROUSEL" : "video"}
-                onClick={() => setForm((f) => ({ ...f, ad: { ...f.ad, format: "CAROUSEL" } }))}
-                icon={<Layers className="w-4 h-4" />}
-                label="Carousel"
-                hint={`${MIN_CAROUSEL_CARDS}–${MAX_CAROUSEL_CARDS} swipeable cards`}
-              />
-              <AdTypeOption
-                value="video"
-                current={form.ad.format === "SINGLE_IMAGE_VIDEO" && mediaType === "IMAGE" ? "image" : form.ad.format === "CAROUSEL" ? "CAROUSEL" : "video"}
-                onClick={() => { setMediaType("VIDEO"); setForm((f) => ({ ...f, ad: { ...f.ad, format: "SINGLE_IMAGE_VIDEO" } })); }}
-                icon={<Film className="w-4 h-4" />}
-                label="Video"
-                hint="One video creative"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Multi-advertiser ads */}
-        <label className="flex items-start gap-2.5 cursor-pointer pt-2">
-          <Checkbox
-            checked={!!form.ad.multiAdvertiserAds}
-            onCheckedChange={(v) =>
-              setForm((f) => ({
-                ...f,
-                ad: { ...f.ad, multiAdvertiserAds: !!v },
-              }))
-            }
-            className="mt-0.5"
-          />
-          <div>
-            <div className="text-sm font-bold text-slate-900">Multi-advertiser ads</div>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Your ad can appear with others in the same ad unit to help promote discoverability.
-              Your ad creative may be resized or cropped.{" "}
-              <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
-                About multi-advertiser ads
-              </a>
-            </p>
-          </div>
-        </label>
+          {/* Collapsible Ad Setup settings */}
+          <button
+            type="button"
+            onClick={() => setShowAdSetupAdvanced((v) => !v)}
+            className="inline-flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-blue-700 mt-2"
+          >
+            {showAdSetupAdvanced ? "Hide settings" : "Show more settings"}
+          </button>
         </FormSection>
 
-        {/* Destination — Instant Experience vs Website. When Website, surface
-            the URL, display link, mobile app and browser add-on rows. */}
+        {/* Destination — High fidelity matching Screenshot 3 for Sales campaigns */}
         <FormSection
           title="Destination"
-          description="Tell us where to send people immediately after they tap or click your ad."
+          description="Where you send people after they click your ad."
           icon={Globe}
         >
           <p className="text-xs text-slate-500">
             <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
-              Learn more
+              About destinations
             </a>
           </p>
 
-          {/* Destination kind radio */}
+          {/* Main destination Select */}
           <div className="space-y-2">
-            <DestinationKindOption
-              value="INSTANT_EXPERIENCE"
-              current={form.ad.destinationKind ?? "WEBSITE"}
-              icon={<Zap className="w-4 h-4 text-amber-500" />}
-              label="Instant Experience"
-              hint="Send people to a fast-loading, mobile-optimised experience."
-              onClick={() =>
-                setForm((f) => ({ ...f, ad: { ...f.ad, destinationKind: "INSTANT_EXPERIENCE" } }))
+            <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
+              Main destination
+            </label>
+            <Select
+              value={form.ad.destinationKind ?? "WEBSITE"}
+              onValueChange={(v) =>
+                setForm((f) => ({ ...f, ad: { ...f.ad, destinationKind: v as any } }))
               }
-            />
-            <DestinationKindOption
-              value="WEBSITE"
-              current={form.ad.destinationKind ?? "WEBSITE"}
-              icon={<LinkIcon className="w-4 h-4 text-slate-600" />}
-              label="Website"
-              hint="Send people to your website."
-              onClick={() =>
-                setForm((f) => ({ ...f, ad: { ...f.ad, destinationKind: "WEBSITE" } }))
-              }
-            />
+            >
+              <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
+                <SelectValue placeholder="Select a destination" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="WEBSITE">Website</SelectItem>
+                <SelectItem value="INSTANT_EXPERIENCE">Instant Experience</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Website-specific fields */}
@@ -1010,9 +1068,9 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
                     onChange={(e) =>
                       setForm((f) => ({ ...f, ad: { ...f.ad, websiteUrl: e.target.value } }))
                     }
-                    placeholder="https://www.yourwebsite.com/"
+                    placeholder="Enter the URL that people visit after your ad"
                     className={cn(
-                      "h-11 rounded-xl border-slate-200 bg-white flex-1",
+                      "h-11 rounded-xl border-slate-200 bg-white flex-1 text-sm placeholder:text-slate-400",
                       adLinkUrlInvalid && "border-rose-300"
                     )}
                   />
@@ -1033,128 +1091,77 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
                 {adLinkUrlInvalid && (
                   <FieldError message="Enter a full URL starting with http:// or https://" />
                 )}
-                {/* URL parameters moved-to-tracking callout */}
-                <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+
+                {/* URL parameters moved-to-tracking callout matching Screenshot 3 */}
+                <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm mt-1 animate-in fade-in duration-200">
                   <Info className="w-4 h-4 shrink-0 text-slate-500 mt-0.5" />
                   <div className="space-y-1">
-                    <p className="text-xs text-slate-700 leading-relaxed">
-                      URL parameters have been moved to <span className="font-bold">Tracking</span>{" "}
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      URL parameters have been moved to <span className="font-bold text-slate-800">Tracking</span>{" "}
                       so that you can manage them in one place.
                     </p>
-                    <a
+                    <button
+                      type="button"
+                      onClick={() => {
+                        document.getElementById("tracking-section")?.scrollIntoView({ behavior: "smooth" });
+                      }}
                       className="text-xs font-bold text-blue-600 hover:underline"
-                      href="#"
-                      onClick={(e) => e.preventDefault()}
                     >
                       Go to Tracking
-                    </a>
+                    </button>
                   </div>
                 </div>
               </div>
 
-              {/* Display link */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
-                  Display link
+              {/* Use a display link checkbox */}
+              <div className="space-y-3 pt-2">
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <Checkbox
+                    checked={useDisplayLink}
+                    onCheckedChange={(v) => {
+                      setUseDisplayLink(!!v);
+                      if (!v) {
+                        setForm((f) => ({ ...f, ad: { ...f.ad, displayLink: undefined } }));
+                      }
+                    }}
+                  />
+                  <span className="text-sm font-semibold text-slate-700 select-none">
+                    Use a display link
+                  </span>
                 </label>
-                <Input
-                  value={form.ad.displayLink ?? ""}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, ad: { ...f.ad, displayLink: e.target.value } }))
-                  }
-                  placeholder="Enter the link that you want to show on your ad"
-                  className="h-11 rounded-xl border-slate-200 bg-white"
-                />
+
+                {useDisplayLink && (
+                  <div className="space-y-2 pl-6 animate-in slide-in-from-top-1 duration-150">
+                    <Input
+                      value={form.ad.displayLink ?? ""}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, ad: { ...f.ad, displayLink: e.target.value } }))
+                      }
+                      placeholder="Enter the link that you want to show on your ad"
+                      className="h-11 rounded-xl border-slate-200 bg-white"
+                    />
+                  </div>
+                )}
               </div>
 
-              {/* Mobile app */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
-                  Mobile app
-                </label>
-                <Select
-                  value={form.ad.mobileAppId ?? "__none__"}
-                  onValueChange={(v) =>
-                    setForm((f) => ({
-                      ...f,
-                      ad: { ...f.ad, mobileAppId: v === "__none__" ? undefined : v },
-                    }))
-                  }
-                >
-                  <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
-                    <SelectValue placeholder="Choose app" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Choose app</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Browser add-ons */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
-                  Browser add-ons
-                </label>
-                <div className="space-y-2">
-                  <BrowserAddOnOption
-                    value="NONE"
-                    current={form.ad.browserAddOn ?? "NONE"}
-                    icon={<Square className="w-4 h-4 text-slate-400" />}
-                    label="None"
-                    hint="Don't add a button."
-                    onClick={() => setForm((f) => ({ ...f, ad: { ...f.ad, browserAddOn: "NONE" } }))}
-                  />
-                  <BrowserAddOnOption
-                    value="WHATSAPP"
-                    current={form.ad.browserAddOn ?? "NONE"}
-                    icon={<MessageSquare className="w-4 h-4 text-emerald-500" />}
-                    label="WhatsApp"
-                    hint="Add a WhatsApp button on your website."
-                    onClick={() => setForm((f) => ({ ...f, ad: { ...f.ad, browserAddOn: "WHATSAPP" } }))}
-                  />
-                  {form.ad.browserAddOn === "WHATSAPP" && (
-                    <div className="pl-7">
-                      <Input
-                        value={form.ad.whatsappLinkNumber ?? ""}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            ad: { ...f.ad, whatsappLinkNumber: e.target.value },
-                          }))
-                        }
-                        placeholder="WhatsApp number"
-                        className="h-10 rounded-xl border-slate-200 bg-white"
-                      />
-                    </div>
-                  )}
-                  <BrowserAddOnOption
-                    value="CALL"
-                    current={form.ad.browserAddOn ?? "NONE"}
-                    icon={<Phone className="w-4 h-4 text-blue-500" />}
-                    label="Call"
-                    hint="Let people call you directly."
-                    onClick={() => setForm((f) => ({ ...f, ad: { ...f.ad, browserAddOn: "CALL" } }))}
-                  />
-                  {form.ad.browserAddOn === "CALL" && (
-                    <div className="pl-7">
-                      <Input
-                        value={form.ad.phoneNumber ?? ""}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, ad: { ...f.ad, phoneNumber: e.target.value } }))
-                        }
-                        placeholder="Phone number"
-                        className="h-10 rounded-xl border-slate-200 bg-white"
-                      />
-                    </div>
-                  )}
-                  <BrowserAddOnOption
-                    value="MESSAGING_APPS"
-                    current={form.ad.browserAddOn ?? "NONE"}
-                    icon={<MessageSquare className="w-4 h-4 text-violet-500" />}
-                    label="Messaging apps"
-                    hint="Send people to Messenger, Instagram or WhatsApp."
-                    onClick={() => setForm((f) => ({ ...f, ad: { ...f.ad, browserAddOn: "MESSAGING_APPS" } }))}
-                  />
+              {/* Personalised destinations widget */}
+              <div className="space-y-3 pt-4 border-t border-slate-100 mt-2">
+                <div className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                  Personalised destinations
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Send people to the experience most likely to result in a conversion after they've clicked your ad.
+                </p>
+                <div className="flex items-center justify-between p-3.5 border border-slate-200 rounded-xl bg-slate-50 shadow-sm mt-1">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-slate-800">Turned off</span>
+                    <p className="text-[11px] text-slate-500">
+                      Optimise website destination, Browser add-ons
+                    </p>
+                  </div>
+                  <Button variant="outline" className="h-9 px-3.5 rounded-lg border-slate-200 text-xs font-bold text-blue-600 hover:bg-slate-50 active:bg-slate-100 shadow-sm bg-white">
+                    Edit
+                  </Button>
                 </div>
               </div>
             </>
@@ -2390,11 +2397,12 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
         </FormSection>
 
         {/* Tracking */}
-        <FormSection
-          title="Tracking"
-          description="Choose conversion events to track. This ad account's selected conversion dataset will be tracked by default."
-          icon={BarChart3}
-        >
+        <div id="tracking-section">
+          <FormSection
+            title="Tracking"
+            description="Choose conversion events to track. This ad account's selected conversion dataset will be tracked by default."
+            icon={BarChart3}
+          >
           {/* Website events */}
           <div className="space-y-2">
             <label className="flex items-center gap-2 cursor-pointer">
@@ -2481,6 +2489,7 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
             </Button>
           </div>
         </FormSection>
+        </div>
       </div>
         </Card>
       </div>
@@ -2527,12 +2536,12 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
                 <p className="text-xs text-slate-500">
                   Select 2 to 5. Your test ads will be compared alongside existing ads to find the best combination.
                 </p>
-                <div className="w-[120px]">
+                <div className="w-full">
                   <Select
                     value={testAdsCount.toString()}
                     onValueChange={(v) => setTestAdsCount(Number(v))}
                   >
-                    <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-white font-semibold text-slate-700">
+                    <SelectTrigger className="h-11 rounded-lg border-slate-200 bg-white font-semibold text-slate-700 w-full">
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2551,10 +2560,10 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
                   How much of your budget should go to test ads?
                 </label>
                 <p className="text-xs text-slate-500">
-                  Your ad set currently has a ₹{(form.adSet.dailyBudget || form.campaign.dailyBudget || 200).toFixed(2)} daily budget.
+                  Your campaign currently has a ₹{(form.campaign.dailyBudget || 1000).toFixed(2)} daily budget.
                 </p>
-                <div className="flex items-center gap-2 max-w-[200px]">
-                  <div className="relative flex-1">
+                <div className="flex items-center gap-2 w-full">
+                  <div className="relative flex-1 w-full">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-semibold text-xs">
                       ₹
                     </span>
@@ -2562,7 +2571,7 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
                       type="number"
                       value={testAdsBudget}
                       onChange={(e) => setTestAdsBudget(Number(e.target.value))}
-                      className="h-10 rounded-lg border-slate-200 pl-6 pr-12 font-semibold text-slate-700"
+                      className="h-11 rounded-lg border-slate-200 pl-6 pr-12 font-semibold text-slate-700 w-full"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px] tracking-wider">
                       INR
@@ -2570,7 +2579,7 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
                   </div>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-normal">
-                  We'll aim to spend an average of ₹{testAdsBudget.toFixed(2)} per day across test ads. If your ad set only includes test ads, they may receive more of the ad set budget.
+                  We'll aim to spend an average of ₹{testAdsBudget.toFixed(2)} per day across test ads. If your campaign only includes test ads, they may receive more of the campaign budget.
                 </p>
               </div>
 
@@ -2582,12 +2591,12 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
                 <p className="text-xs text-slate-500">
                   Your test will run for this many days or until your ad set has ended.
                 </p>
-                <div className="w-[160px]">
+                <div className="w-full">
                   <Select
                     value={testAdsDuration}
                     onValueChange={setTestAdsDuration}
                   >
-                    <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-white font-semibold text-slate-700">
+                    <SelectTrigger className="h-11 rounded-lg border-slate-200 bg-white font-semibold text-slate-700 w-full">
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2609,18 +2618,19 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
                   </label>
                   <Info className="w-3.5 h-3.5 text-slate-400" />
                 </div>
-                <div className="w-[220px]">
+                <div className="w-full">
                   <Select
                     value={testAdsMetric}
                     onValueChange={setTestAdsMetric}
                   >
-                    <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-white font-semibold text-slate-700">
+                    <SelectTrigger className="h-11 rounded-lg border-slate-200 bg-white font-semibold text-slate-700 w-full">
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Cost per result">Cost per result</SelectItem>
+                      <SelectItem value="Cost per purchase">Cost per purchase</SelectItem>
+                      <SelectItem value="Cost per post engagement">Cost per post engagement</SelectItem>
                       <SelectItem value="Cost per click (CPC)">Cost per click (CPC)</SelectItem>
-                      <SelectItem value="Cost per 1,000 people reached">Cost per 1,000 reached</SelectItem>
+                      <SelectItem value="Cost per 1,000 people reached">Cost per 1,000 people reached</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -2920,7 +2930,6 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
       {/* ── Carousel Card Media Library Modal (Awareness "Select up to 10 images") ── */}
       {showCarouselMediaModal && (() => {
         const remaining = MAX_CAROUSEL_CARDS - form.ad.carouselCards.length;
-        const allImages = [...MOCK_ACCOUNT_IMAGES, ...MOCK_INSTAGRAM_IMAGES, ...MOCK_PAGE_IMAGES];
         const filterImages = (list: typeof MOCK_ACCOUNT_IMAGES) =>
           list.filter((img) => img.name.toLowerCase().includes(carouselSearchQuery.toLowerCase()));
         return (
@@ -3311,184 +3320,6 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
   );
 }
 
-/* ---------- Helpers ---------- */
-
-function PublishModeOption({
-  value,
-  current,
-  onClick,
-  icon,
-  label,
-  hint,
-}: {
-  value: PublishMode;
-  current: PublishMode;
-  onClick: () => void;
-  icon: React.ReactNode;
-  label: string;
-  hint: string;
-}) {
-  const isActive = current === value;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "px-4 py-3 rounded-xl border text-left transition-all flex flex-col gap-1",
-        isActive
-          ? "bg-slate-900 text-white border-slate-900 shadow-sm"
-          : "bg-white text-slate-700 border-slate-200 hover:border-slate-300"
-      )}
-    >
-      <div className="flex items-center gap-2">
-        {icon}
-        <span className="text-sm font-bold">{label}</span>
-      </div>
-      <span className={cn("text-[10px]", isActive ? "text-slate-300" : "text-slate-400")}>
-        {hint}
-      </span>
-    </button>
-  );
-}
-
-function AdTypeOption({
-  value,
-  current,
-  onClick,
-  icon,
-  label,
-  hint,
-  disabled,
-}: {
-  value: string;
-  current: string;
-  onClick: () => void;
-  icon: React.ReactNode;
-  label: string;
-  hint: string;
-  disabled?: boolean;
-}) {
-  const isActive = current === value;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        "px-4 py-3 rounded-xl border text-left transition-all flex flex-col gap-1",
-        disabled && "opacity-40 cursor-not-allowed",
-        !disabled && isActive
-          ? "bg-slate-900 text-white border-slate-900 shadow-sm"
-          : !disabled
-            ? "bg-white text-slate-700 border-slate-200 hover:border-slate-300"
-            : "bg-white text-slate-500 border-slate-200"
-      )}
-    >
-      <div className="flex items-center gap-2">
-        {icon}
-        <span className="text-sm font-bold">{label}</span>
-      </div>
-      <span
-        className={cn(
-          "text-[10px]",
-          !disabled && isActive ? "text-slate-300" : "text-slate-400"
-        )}
-      >
-        {hint}
-      </span>
-    </button>
-  );
-}
-
-function DestinationKindOption({
-  value,
-  current,
-  icon,
-  label,
-  hint,
-  onClick,
-}: {
-  value: "INSTANT_EXPERIENCE" | "WEBSITE";
-  current: "INSTANT_EXPERIENCE" | "WEBSITE";
-  icon: React.ReactNode;
-  label: string;
-  hint: string;
-  onClick: () => void;
-}) {
-  const active = value === current;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "w-full text-left flex gap-3 rounded-xl border px-4 py-3 transition-all",
-        active
-          ? "border-slate-900 bg-slate-50"
-          : "border-slate-200 bg-white hover:border-slate-300"
-      )}
-    >
-      <span
-        className={cn(
-          "mt-0.5 w-4 h-4 rounded-full border-2 shrink-0",
-          active
-            ? "border-slate-900 bg-slate-900 ring-2 ring-white ring-inset"
-            : "border-slate-300"
-        )}
-      />
-      <div className="flex items-start gap-2 flex-1">
-        <span className="mt-0.5">{icon}</span>
-        <div>
-          <div className="text-sm font-bold text-slate-900">{label}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">{hint}</div>
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function BrowserAddOnOption({
-  value,
-  current,
-  icon,
-  label,
-  hint,
-  onClick,
-}: {
-  value: "NONE" | "WHATSAPP" | "CALL" | "MESSAGING_APPS";
-  current: "NONE" | "WHATSAPP" | "CALL" | "MESSAGING_APPS";
-  icon: React.ReactNode;
-  label: string;
-  hint: string;
-  onClick: () => void;
-}) {
-  const active = value === current;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "w-full text-left flex items-center gap-3 rounded-xl border px-4 py-2.5 transition-all",
-        active
-          ? "border-slate-900 bg-slate-50"
-          : "border-slate-200 bg-white hover:border-slate-300"
-      )}
-    >
-      <span
-        className={cn(
-          "w-4 h-4 rounded-full border-2 shrink-0",
-          active
-            ? "border-slate-900 bg-slate-900 ring-2 ring-white ring-inset"
-            : "border-slate-300"
-        )}
-      />
-      <span className="shrink-0">{icon}</span>
-      <div className="flex-1">
-        <div className="text-sm font-bold text-slate-900">{label}</div>
-        <div className="text-[11px] text-slate-500 mt-0.5">{hint}</div>
-      </div>
-    </button>
-  );
-}
 
 function ImageSlot({
   imageUrl,

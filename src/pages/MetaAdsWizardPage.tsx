@@ -414,12 +414,9 @@ function MetaAdsWizardPage() {
       // Otherwise Meta rejects the publish (and lifetime budgets become unbillable).
       const scheduleOk =
         !form.adSet.scheduleStart || !form.adSet.scheduleEnd || new Date(form.adSet.scheduleEnd) > new Date(form.adSet.scheduleStart);
-      // Sales objective demands a pixel + a conversion event — backend
-      // rejects the publish otherwise, so gate it at Step 1.
-      const conversionOk =
-        form.campaign.objective === "OUTCOME_SALES"
-          ? !!form.adSet.pixelId && !!form.adSet.conversionEvent
-          : true;
+      // Sales objective demands a pixel + a conversion event — we do not gate this at Step 1
+      // so that the user is not blocked from advancing to Step 2 while creating draft campaigns.
+      const conversionOk = true;
       return basics && budgetOk && scheduleOk && conversionOk;
     }
     if (step === 1) return true; // targeting is optional
@@ -653,7 +650,7 @@ function MetaAdsWizardPage() {
                   />
                 )}
                 {step === 1 && (
-                  <Step2Audience form={form} setForm={setFormDirty} clientId={clientId} />
+                  <Step2Audience form={form} setForm={setFormDirty} clientId={clientId} setStep={setStep} />
                 )}
                 {step === 2 && (
                   <Step3Creative

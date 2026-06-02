@@ -2,11 +2,11 @@ import { useState, useEffect, useRef, useCallback, memo } from "react";
 import ReactMarkdown from "react-markdown";
 import { useMutation } from "@tanstack/react-query";
 import { chatApi, type ChatSession, type ChatMessage } from "@/api/chatApi";
-import { useAIStream, type ActionItem } from "@/hooks/useAIStream";
+import { useAIStream } from "@/hooks/useAIStream";
 import { calendarApi } from "@/api/calendarApi";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import {
   X,
   MessageSquare,
@@ -90,14 +90,14 @@ const AIMessage = memo(function AIMessage({ content }: { content: string }) {
   return (
     <ReactMarkdown
       components={{
-        p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
-        strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
-        ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
-        ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
-        li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-        h3: ({ children }) => <h3 className="font-semibold text-sm mb-1 mt-3">{children}</h3>,
-        h4: ({ children }) => <h4 className="font-semibold text-sm mb-1 mt-2">{children}</h4>,
-        code: ({ children, className }) => {
+        p: ({ children }: any) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+        strong: ({ children }: any) => <strong className="font-semibold text-foreground">{children}</strong>,
+        ul: ({ children }: any) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
+        ol: ({ children }: any) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
+        li: ({ children }: any) => <li className="leading-relaxed">{children}</li>,
+        h3: ({ children }: any) => <h3 className="font-semibold text-sm mb-1 mt-3">{children}</h3>,
+        h4: ({ children }: any) => <h4 className="font-semibold text-sm mb-1 mt-2">{children}</h4>,
+        code: ({ children, className }: any) => {
           const isBlock = className?.includes("language-");
           return isBlock ? (
             <code className="block bg-muted rounded-md px-3 py-2 text-xs font-mono mt-1 mb-2 overflow-x-auto">

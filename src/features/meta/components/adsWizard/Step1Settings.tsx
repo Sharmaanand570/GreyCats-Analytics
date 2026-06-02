@@ -37,6 +37,8 @@ import {
   FlaskConical,
   Smartphone,
   Users,
+  Search,
+  X,
 } from "lucide-react";
 import { RequiredMark } from "@/components/ui/required-mark";
 import { FormSection } from "./FormSection";
@@ -65,6 +67,19 @@ import type {
 import { cn } from "@/lib/utils";
 
 type Props = StepProps & { clientId: number; showAllErrors?: boolean };
+
+export const MOCK_APPS = [
+  { id: "com.greycats.analytics", name: "GreyCats Analytics", subtitle: "GreyCats Inc.", platform: "iOS App", icon: "🐈", store: "Apple App Store", category: "Developer Tools" },
+  { id: "com.greycats.crm", name: "GreyCats CRM Lite", subtitle: "GreyCats Inc.", platform: "iOS App", icon: "💼", store: "Apple App Store", category: "Business" },
+  { id: "com.socialpulse.pro", name: "SocialPulse Pro", subtitle: "Pulse Media Ltd.", platform: "iOS App", icon: "⚡", store: "Apple App Store", category: "Social Networking" },
+  { id: "com.fittrack.go", name: "FitTrack Go", subtitle: "FitLife Systems", platform: "iOS App", icon: "🏃", store: "Apple App Store", category: "Health & Fitness" },
+  { id: "com.cryptovault.app", name: "CryptoVault Wallet", subtitle: "Crypto Solutions", platform: "iOS App", icon: "🪙", store: "Apple App Store", category: "Finance" },
+  { id: "com.greycats.analytics.android", name: "GreyCats Analytics (Android)", subtitle: "GreyCats Inc.", platform: "Android App", icon: "🐈", store: "Google Play Store", category: "Developer Tools" },
+  { id: "com.greycats.crm.android", name: "GreyCats CRM Lite (Android)", subtitle: "GreyCats Inc.", platform: "Android App", icon: "💼", store: "Google Play Store", category: "Business" },
+  { id: "com.socialpulse.pro.android", name: "SocialPulse Pro (Android)", subtitle: "Pulse Media Ltd.", platform: "Android App", icon: "⚡", store: "Google Play Store", category: "Social Networking" },
+  { id: "com.fittrack.go.android", name: "FitTrack Go (Android)", subtitle: "FitLife Systems", platform: "Android App", icon: "🏃", store: "Google Play Store", category: "Health & Fitness" },
+  { id: "com.cryptovault.app.android", name: "CryptoVault Wallet (Android)", subtitle: "Crypto Solutions", platform: "Android App", icon: "🪙", store: "Google Play Store", category: "Finance" },
+];
 
 // Sanity caps — anything beyond these is almost certainly a typo (extra zero).
 // The user can still publish; we just warn.
@@ -108,6 +123,8 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
   // Local UI toggles (not persisted to state) for showing/hiding advanced sections.
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showBudgetScheduling, setShowBudgetScheduling] = useState(false);
+  const [appDropdownOpen, setAppDropdownOpen] = useState(false);
+  const [appSearch, setAppSearch] = useState("");
 
   // Derived flags driven by current campaign state.
   const buyingType: BuyingType = form.campaign.buyingType ?? "AUCTION";
@@ -1312,50 +1329,155 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
             description="Reach people using iOS 14.5 and later. Required for app install on modern iOS."
             icon={Smartphone}
             rightSlot={
-              <Switch
-                checked={!!form.campaign.ios14CampaignEnabled}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    campaign: { ...f.campaign, ios14CampaignEnabled: e.target.checked },
-                  }))
-                }
-              />
-            }
-          >
-            {form.campaign.ios14CampaignEnabled ? (
-              <div className="space-y-2">
-                <p className="text-[11px] text-slate-500">
-                  Create a campaign to help you reach people using iOS 14.5 and later devices. An iOS
-                  14+ campaign will not deliver to devices using iOS 13.7 or earlier.{" "}
-                  <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
-                    Learn more
-                  </a>
-                </p>
-                <label className="text-xs font-bold uppercase tracking-widest text-slate-600">
-                  App <RequiredMark />
-                </label>
-                {/* Dropdown trigger styled like Meta's app selector — a real picker would call an
-                    /apps endpoint; for now we let the user paste an App ID inline. */}
-                <Input
-                  value={form.campaign.ios14AppId ?? ""}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-500 font-medium">
+                  {form.campaign.ios14CampaignEnabled ? "On" : "Off"}
+                </span>
+                <Switch
+                  checked={!!form.campaign.ios14CampaignEnabled}
                   onChange={(e) =>
                     setForm((f) => ({
                       ...f,
-                      campaign: { ...f.campaign, ios14AppId: e.target.value },
+                      campaign: { ...f.campaign, ios14CampaignEnabled: e.target.checked },
                     }))
                   }
-                  placeholder="Select the app that you want people to install and use"
-                  className="h-11 rounded-xl border-slate-200 bg-white"
                 />
-                <a className="inline-block text-xs font-semibold text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
-                  Can't find your app?
-                </a>
+              </div>
+            }
+          >
+            {form.campaign.ios14CampaignEnabled ? (
+              <div className="space-y-4 pt-1">
+                <p className="text-[12px] text-slate-600 leading-relaxed">
+                  Create a campaign to help you reach people using iOS 14.5 and later devices. An iOS
+                  14+ campaign will not deliver to devices using iOS 13.7 or earlier.{" "}
+                  <a className="text-blue-600 hover:underline font-semibold" href="#" onClick={(e) => e.preventDefault()}>
+                    Learn more
+                  </a>
+                </p>
+                
+                <div className="space-y-2 relative">
+                  <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-1.5">
+                    App <RequiredMark />
+                  </label>
+                  
+                  {/* Styled Search Selector Input */}
+                  <div className="relative">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Input
+                      value={appSearch}
+                      onFocus={() => setAppDropdownOpen(true)}
+                      onChange={(e) => {
+                        setAppSearch(e.target.value);
+                        setAppDropdownOpen(true);
+                      }}
+                      placeholder="Select the app that you want people to install and use"
+                      className="h-11 pl-10 pr-4 rounded-xl border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 text-sm"
+                    />
+                    {appDropdownOpen && (
+                      <div className="absolute top-full left-0 w-full mt-1.5 border border-slate-100 rounded-xl bg-white shadow-xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-50">
+                        {MOCK_APPS.filter(app =>
+                          app.name.toLowerCase().includes(appSearch.toLowerCase()) ||
+                          app.id.toLowerCase().includes(appSearch.toLowerCase())
+                        ).length === 0 ? (
+                          <div className="p-4 text-xs text-slate-400 text-center font-medium">
+                            No apps found matching "{appSearch}"
+                          </div>
+                        ) : (
+                          MOCK_APPS.filter(app =>
+                            app.name.toLowerCase().includes(appSearch.toLowerCase()) ||
+                            app.id.toLowerCase().includes(appSearch.toLowerCase())
+                          ).map((app) => (
+                            <button
+                              key={app.id}
+                              type="button"
+                              onClick={() => {
+                                setForm((f) => ({
+                                  ...f,
+                                  campaign: { ...f.campaign, ios14AppId: app.id },
+                                }));
+                                setAppSearch("");
+                                setAppDropdownOpen(false);
+                              }}
+                              className="w-full text-left px-4 py-3 hover:bg-slate-50/80 flex items-center gap-3 transition-colors group"
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100/60 border border-slate-200/50 flex items-center justify-center text-base shadow-sm group-hover:scale-95 transition-transform shrink-0">
+                                {app.icon}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-sm font-bold text-slate-900 leading-none flex items-center gap-1.5">
+                                  {app.name}
+                                  <span className="inline-flex text-[9px] font-black uppercase tracking-wider text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-md">
+                                    {app.platform}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-slate-400 truncate mt-1">
+                                  {app.id} · {app.category}
+                                </div>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dropdown Overlay to close it */}
+                  {appDropdownOpen && (
+                    <div 
+                      className="fixed inset-0 z-40 bg-transparent" 
+                      onClick={() => setAppDropdownOpen(false)}
+                    />
+                  )}
+                  
+                  {/* Selected App Card Details */}
+                  {form.campaign.ios14AppId && (
+                    (() => {
+                      const app = MOCK_APPS.find((a) => a.id === form.campaign.ios14AppId);
+                      if (!app) return null;
+                      return (
+                        <div className="flex items-center justify-between gap-4 p-4 rounded-2xl border border-slate-100 bg-slate-50/40 shadow-sm mt-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-[14px] bg-gradient-to-tr from-slate-100 to-white border border-slate-200/60 flex items-center justify-center text-2xl shadow-sm">
+                              {app.icon}
+                            </div>
+                            <div>
+                              <div className="text-sm font-black text-slate-900">{app.name}</div>
+                              <div className="text-[11px] text-slate-400 font-mono mt-0.5">{app.id}</div>
+                              <div className="flex items-center gap-1.5 mt-1.5">
+                                <span className="inline-flex items-center text-[10px] font-bold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-md shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                                  {app.store}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-medium">· {app.category}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setForm((f) => ({
+                                ...f,
+                                campaign: { ...f.campaign, ios14AppId: undefined },
+                              }));
+                            }}
+                            className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"
+                            title="Remove app"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    })()
+                  )}
+                  
+                  <a className="inline-block text-xs font-bold text-blue-600 hover:underline mt-1" href="#" onClick={(e) => e.preventDefault()}>
+                    Can't find your app?
+                  </a>
+                </div>
               </div>
             ) : (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 leading-relaxed">
                 Create a campaign to help you reach people using iOS 14.5 and later devices.{" "}
-                <a className="text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>
+                <a className="text-blue-600 hover:underline font-semibold" href="#" onClick={(e) => e.preventDefault()}>
                   Learn more
                 </a>
               </p>

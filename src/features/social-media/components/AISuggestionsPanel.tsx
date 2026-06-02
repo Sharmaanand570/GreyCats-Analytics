@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { calendarApi, type CalendarEntry } from "@/api/calendarApi";
-import { creativeApi, IMAGE_GEN_TIMEOUT_MS, IMAGE_GEN_POLL_MS } from "@/api/creativeApi";
+import { creativeApi } from "@/api/creativeApi";
 import { scheduledPostKeys } from "../hooks/useScheduledPosts";
 import { getAuthToken, StorageKey } from "@/utils/storage";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,6 @@ import {
   Sparkles,
   Loader2,
   ImagePlus,
-  Check,
   Trash2,
   Clock,
   CalendarPlus,
@@ -152,32 +151,21 @@ export function AISuggestionsPanel({ clientId, isOpen, onClose, onPostCreated }:
         platform: entry.platform === "linkedin" ? "linkedin" : entry.platform,
         aspectRatio: "1:1",
         style: "photorealistic",
-        mode: "async",
+        mode: "sync",
       });
 
-      const assetId = res.data.data.assetId;
-      toast.info("Generating image...");
-
-      // Poll for completion
-      const poll = setInterval(async () => {
-        try {
-          const check = await creativeApi.getAssets(clientId, "image");
-          const found = check.data.data.assets.find((a) => a.id === assetId);
-          if (found?.imageUrl) {
-            clearInterval(poll);
-            pollIntervalsRef.current.delete(entry.id);
-            setGeneratedImages((prev) => ({ ...prev, [entry.id]: found.imageUrl! }));
-            calendarApi.updateEntry(entry.id, { imageUrl: found.imageUrl } as Partial<CalendarEntry>).catch(() => {});
-            setGeneratingImage(null);
-            toast.success("Image ready!");
-          }
-        } catch { /* retry next tick */ }
-      }, IMAGE_GEN_POLL_MS);
-      pollIntervalsRef.current.set(entry.id, poll);
-
-      setTimeout(() => { clearInterval(poll); pollIntervalsRef.current.delete(entry.id); setGeneratingImage(null); }, IMAGE_GEN_TIMEOUT_MS);
-    } catch {
-      toast.error("Image generation failed");
+      if (res.data.data.imageUrl) {
+        setGeneratedImages((prev) => ({ ...prev, [entry.id]: res.data.data.imageUrl! }));
+        calendarApi.updateEntry(entry.id, { imageUrl: res.data.data.imageUrl } as Partial<CalendarEntry>).catch(() => {});
+        setGeneratingImage(null);
+        toast.success("Image ready!");
+      } else {
+        toast.error("Image was generated but no URL was returned");
+        setGeneratingImage(null);
+      }
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.message || err?.message || "Image generation failed";
+      toast.error(errMsg);
       setGeneratingImage(null);
     }
   };
@@ -383,8 +371,9 @@ export function AISuggestionsPanel({ clientId, isOpen, onClose, onPostCreated }:
                                 });
                                 setEditingCaption({ ...editingCaption, [entry.id]: res.data.data.content });
                                 toast.success(`${isArticle ? "Article" : "Script"} generated! (${res.data.data.wordCount} words)`);
-                              } catch {
-                                toast.error("Generation failed");
+                              } catch (err: any) {
+                                const errMsg = err?.response?.data?.message || err?.message || "Generation failed";
+                                toast.error(errMsg);
                               } finally {
                                 setGeneratingImage(null);
                               }
