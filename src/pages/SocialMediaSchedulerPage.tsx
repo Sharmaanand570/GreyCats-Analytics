@@ -1108,19 +1108,17 @@ export default function SocialMediaSchedulerPage() {
     const client = allClients.find(c => String(c.id) === urlClientId);
     if (!client) return;
 
-    let shouldUpdateStep = false;
     if (!currentClient || currentClient.id !== client.id) {
       _setCurrentClient(client as ClientWithIntegrations);
-      shouldUpdateStep = true;
     }
 
-    // Only advance step if we just loaded the client from the URL
-    // (prevents "Back to Workspace" from immediately looping back)
-    if (shouldUpdateStep && currentStep === 'select-client') {
+    // If we have a valid client in the URL, automatically route the step
+    // to the workspace calendar (or connection onboarding if they have no integrations)
+    if (currentStep === 'select-client') {
       const hasIntegrations = client.integrations && client.integrations.length > 0;
       setCurrentStep(hasIntegrations ? 'workspace' : 'connect-platforms');
     }
-  }, [urlClientId, allClients.length]);
+  }, [urlClientId, allClients.length, currentClient?.id, currentStep]);
 
   // Wrap setCurrentClient to persist lastClientId, update URL, and reset the post draft.
   // This ensures no form state bleeds across client switches.

@@ -1,4 +1,4 @@
-﻿import api from "@/apiConfig";
+import api from "@/apiConfig";
 import type { AxiosError } from "axios";
 
 // ==================== TYPES ====================
@@ -1730,5 +1730,126 @@ export const listAdsManagerPages = async (
       error as AxiosError<ApiErrorResponse>,
       "Failed to load pages"
     );
+  }
+};
+// ==================== FRONTEND INTEGRATION: NEW BACKEND APIS ====================
+
+export type MetaMobileApp = {
+  id: string;
+  name: string;
+  store: "Apple App Store" | "Google Play Store";
+  platform: "iOS App" | "Android App";
+  icon: string;
+  category: string;
+};
+
+export type MetaCreativeAsset = {
+  id: string;
+  name: string;
+  url: string;
+  dimensions?: string;
+};
+
+export type MetaAccountSettings = {
+  specificLocationsOnly?: boolean;
+  ageRestrictedGoods?: boolean;
+  brandProtection?: boolean;
+  excludeEmployees?: boolean;
+  excludePlacements?: boolean;
+};
+
+export type TargetingSuggestionNode = {
+  id: string;
+  name: string;
+  audience_size_lower_bound?: number;
+  audience_size_upper_bound?: number;
+  path?: string[];
+};
+
+export const getMobileApps = async (accountId: string, params?: { clientId?: number }): Promise<MetaMobileApp[]> => {
+  try {
+    const res = await api.get<{ success: boolean; data: MetaMobileApp[] }>(
+      `/meta-campaign-wizard/accounts/${accountId}/apps`,
+      { params }
+    );
+    return res.data.data ?? [];
+  } catch (error) {
+    throw wrapErr(error as AxiosError<ApiErrorResponse>, "Failed to load mobile apps");
+  }
+};
+
+export const getCreativeAssets = async (
+  accountId: string,
+  source: "account" | "instagram" | "page",
+  params?: { clientId?: number; pageId?: string }
+): Promise<MetaCreativeAsset[]> => {
+  try {
+    const res = await api.get<{ success: boolean; data: MetaCreativeAsset[] }>(
+      `/meta-campaign-wizard/accounts/${accountId}/creatives`,
+      { params: { ...params, source } }
+    );
+    return res.data.data ?? [];
+  } catch (error) {
+    throw wrapErr(error as AxiosError<ApiErrorResponse>, "Failed to load creative assets");
+  }
+};
+
+export const getAccountSettings = async (accountId: string, params?: { clientId?: number }): Promise<MetaAccountSettings> => {
+  try {
+    const res = await api.get<{ success: boolean; data: MetaAccountSettings }>(
+      `/meta-campaign-wizard/accounts/${accountId}/settings`,
+      { params }
+    );
+    return res.data.data ?? {};
+  } catch (error) {
+    throw wrapErr(error as AxiosError<ApiErrorResponse>, "Failed to load account settings");
+  }
+};
+
+export const updateAccountSettings = async (
+  accountId: string,
+  payload: MetaAccountSettings,
+  params?: { clientId?: number }
+): Promise<{ success: boolean }> => {
+  try {
+    const res = await api.post<{ success: boolean }>(
+      `/meta-campaign-wizard/accounts/${accountId}/settings`,
+      payload,
+      { params }
+    );
+    return res.data;
+  } catch (error) {
+    throw wrapErr(error as AxiosError<ApiErrorResponse>, "Failed to update account settings");
+  }
+};
+
+export const getTargetingSuggestions = async (
+  params?: { clientId?: number; objective?: string; app_id?: string }
+): Promise<TargetingSuggestionNode[]> => {
+  try {
+    const res = await api.get<{ success: boolean; data: TargetingSuggestionNode[] }>(
+      `/meta-campaign-wizard/targeting/suggestions`,
+      { params }
+    );
+    return res.data.data ?? [];
+  } catch (error) {
+    throw wrapErr(error as AxiosError<ApiErrorResponse>, "Failed to load targeting suggestions");
+  }
+};
+
+export const createSavedAudience = async (
+  accountId: string,
+  payload: { name: string; targeting: PublishAdTargeting },
+  params?: { clientId?: number }
+): Promise<{ success: boolean; audienceId: string }> => {
+  try {
+    const res = await api.post<{ success: boolean; audienceId: string }>(
+      `/meta-campaign-wizard/accounts/${accountId}/saved-audiences`,
+      payload,
+      { params }
+    );
+    return res.data;
+  } catch (error) {
+    throw wrapErr(error as AxiosError<ApiErrorResponse>, "Failed to create saved audience");
   }
 };

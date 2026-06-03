@@ -216,6 +216,14 @@ export function AuthForm({
             otp: otpVal,
           });
 
+          const { setUser } = useUserStore.getState();
+          const userData = {
+            ...response.user,
+            createdAt: new Date().toISOString(),
+            role: "USER",
+          };
+          setUser(userData as any);
+
           if (onAuthSuccess) {
             onAuthSuccess(response.user);
           }

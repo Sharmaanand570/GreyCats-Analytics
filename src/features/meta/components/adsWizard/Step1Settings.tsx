@@ -43,7 +43,7 @@ import {
 import { RequiredMark } from "@/components/ui/required-mark";
 import { FormSection } from "./FormSection";
 import { useMetaAccounts } from "@/features/meta/hooks/useMetaData";
-import { useMetaPixels } from "@/features/meta/hooks/useMetaAdsManager";
+import { useMetaPixels, useMobileApps } from "@/features/meta/hooks/useMetaAdsManager";
 import {
   AB_TEST_METRIC_BY_OBJECTIVE,
   RECOMMENDED_METRIC_BY_OBJECTIVE,
@@ -68,19 +68,6 @@ import { cn } from "@/lib/utils";
 
 type Props = StepProps & { clientId: number; showAllErrors?: boolean };
 
-export const MOCK_APPS = [
-  { id: "com.greycats.analytics", name: "GreyCats Analytics", subtitle: "GreyCats Inc.", platform: "iOS App", icon: "🐈", store: "Apple App Store", category: "Developer Tools" },
-  { id: "com.greycats.crm", name: "GreyCats CRM Lite", subtitle: "GreyCats Inc.", platform: "iOS App", icon: "💼", store: "Apple App Store", category: "Business" },
-  { id: "com.socialpulse.pro", name: "SocialPulse Pro", subtitle: "Pulse Media Ltd.", platform: "iOS App", icon: "⚡", store: "Apple App Store", category: "Social Networking" },
-  { id: "com.fittrack.go", name: "FitTrack Go", subtitle: "FitLife Systems", platform: "iOS App", icon: "🏃", store: "Apple App Store", category: "Health & Fitness" },
-  { id: "com.cryptovault.app", name: "CryptoVault Wallet", subtitle: "Crypto Solutions", platform: "iOS App", icon: "🪙", store: "Apple App Store", category: "Finance" },
-  { id: "com.greycats.analytics.android", name: "GreyCats Analytics (Android)", subtitle: "GreyCats Inc.", platform: "Android App", icon: "🐈", store: "Google Play Store", category: "Developer Tools" },
-  { id: "com.greycats.crm.android", name: "GreyCats CRM Lite (Android)", subtitle: "GreyCats Inc.", platform: "Android App", icon: "💼", store: "Google Play Store", category: "Business" },
-  { id: "com.socialpulse.pro.android", name: "SocialPulse Pro (Android)", subtitle: "Pulse Media Ltd.", platform: "Android App", icon: "⚡", store: "Google Play Store", category: "Social Networking" },
-  { id: "com.fittrack.go.android", name: "FitTrack Go (Android)", subtitle: "FitLife Systems", platform: "Android App", icon: "🏃", store: "Google Play Store", category: "Health & Fitness" },
-  { id: "com.cryptovault.app.android", name: "CryptoVault Wallet (Android)", subtitle: "Crypto Solutions", platform: "Android App", icon: "🪙", store: "Google Play Store", category: "Finance" },
-];
-
 // Sanity caps — anything beyond these is almost certainly a typo (extra zero).
 // The user can still publish; we just warn.
 const DAILY_BUDGET_WARN = 1000;
@@ -101,6 +88,10 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
   const isSalesObjective = form.campaign.objective === "OUTCOME_SALES";
   const { data: pixelsData, isLoading: isLoadingPixels } = useMetaPixels(
     isSalesObjective ? clientId : null
+  );
+  const { data: appsList = [], isLoading: isLoadingApps } = useMobileApps(
+    form.campaign.accountId || null,
+    clientId
   );
 
   const adAccounts = useMemo(() => data?.adAccounts ?? [], [data]);
@@ -132,7 +123,7 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
   const isAdvantagePlusObjective = ADVANTAGE_PLUS_OBJECTIVES.includes(objective);
   const isAppPromotion = objective === "OUTCOME_APP_PROMOTION";
   // For Advantage+ objectives the user picks via radio; for others CBO is a toggle.
-  // "CAMPAIGN" budget strategy ⇔ CBO on. Keep both in sync.
+  // "CAMPAIGN" budget strategy — CBO on. Keep both in sync.
   const budgetStrategy = form.campaign.budgetStrategy ?? "AD_SET";
   const isCboOn =
     isAdvantagePlusObjective ? budgetStrategy === "CAMPAIGN" : !!form.campaign.isCboEnabled;
@@ -1374,8 +1365,12 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
                       className="h-11 pl-10 pr-4 rounded-xl border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 text-sm"
                     />
                     {appDropdownOpen && (
-                      <div className="absolute top-full left-0 w-full mt-1.5 border border-slate-100 rounded-xl bg-white shadow-xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-50">
-                        {MOCK_APPS.filter(app =>
+                      <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden z-50">
+                        {isLoadingApps ? (
+                          <div className="p-4 text-xs text-slate-400 text-center font-medium">
+                            Loading apps...
+                          </div>
+                        ) : appsList.filter((app: any) =>
                           app.name.toLowerCase().includes(appSearch.toLowerCase()) ||
                           app.id.toLowerCase().includes(appSearch.toLowerCase())
                         ).length === 0 ? (
@@ -1383,10 +1378,10 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
                             No apps found matching "{appSearch}"
                           </div>
                         ) : (
-                          MOCK_APPS.filter(app =>
+                          appsList.filter((app: any) =>
                             app.name.toLowerCase().includes(appSearch.toLowerCase()) ||
                             app.id.toLowerCase().includes(appSearch.toLowerCase())
-                          ).map((app) => (
+                          ).map((app: any) => (
                             <button
                               key={app.id}
                               type="button"
@@ -1400,8 +1395,12 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
                               }}
                               className="w-full text-left px-4 py-3 hover:bg-slate-50/80 flex items-center gap-3 transition-colors group"
                             >
-                              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100/60 border border-slate-200/50 flex items-center justify-center text-base shadow-sm group-hover:scale-95 transition-transform shrink-0">
-                                {app.icon}
+                              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100/60 border border-slate-200/50 flex items-center justify-center text-base shadow-sm group-hover:scale-95 transition-transform shrink-0 overflow-hidden">
+                                {app.icon?.startsWith("http") ? (
+                                  <img src={app.icon} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  app.icon || "📱"
+                                )}
                               </div>
                               <div className="min-w-0 flex-1">
                                 <div className="text-sm font-bold text-slate-900 leading-none flex items-center gap-1.5">
@@ -1432,13 +1431,17 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
                   {/* Selected App Card Details */}
                   {form.campaign.ios14AppId && (
                     (() => {
-                      const app = MOCK_APPS.find((a) => a.id === form.campaign.ios14AppId);
+                      const app = appsList.find((a: any) => a.id === form.campaign.ios14AppId);
                       if (!app) return null;
                       return (
                         <div className="flex items-center justify-between gap-4 p-4 rounded-2xl border border-slate-100 bg-slate-50/40 shadow-sm mt-3 animate-in fade-in slide-in-from-top-2 duration-200">
                           <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-[14px] bg-gradient-to-tr from-slate-100 to-white border border-slate-200/60 flex items-center justify-center text-2xl shadow-sm">
-                              {app.icon}
+                            <div className="w-12 h-12 rounded-[14px] bg-gradient-to-tr from-slate-100 to-white border border-slate-200/60 flex items-center justify-center text-2xl shadow-sm overflow-hidden">
+                              {app.icon?.startsWith("http") ? (
+                                <img src={app.icon} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                app.icon || "📱"
+                              )}
                             </div>
                             <div>
                               <div className="text-sm font-black text-slate-900">{app.name}</div>
@@ -1447,7 +1450,7 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
                                 <span className="inline-flex items-center text-[10px] font-bold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-md shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                                   {app.store}
                                 </span>
-                                <span className="text-[10px] text-slate-400 font-medium">· {app.category}</span>
+                                <span className="text-[10px] text-slate-400 font-medium">┬╖ {app.category}</span>
                               </div>
                             </div>
                           </div>
@@ -1485,7 +1488,7 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
           </FormSection>
         )}
 
-        {/* A/B test — Auction only. Reservation has no bidding to compare against. */}
+        {/* A/B test ΓÇö Auction only. Reservation has no bidding to compare against. */}
         {isAuction && (
         <FormSection
           title="A/B test"
@@ -1622,7 +1625,7 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
         </FormSection>
         )}
 
-        {/* Audience segment reporting — Sales + Auction only */}
+        {/* Audience segment reporting ΓÇö Sales + Auction only */}
         {isAuction && isSalesObjective && (
           <FormSection
             title="Audience segment reporting"
@@ -1649,7 +1652,7 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
           </FormSection>
         )}
 
-        {/* Special Ad Categories — multi-select dropdown */}
+        {/* Special Ad Categories ΓÇö multi-select dropdown */}
         <FormSection
           title="Special Ad Categories"
           description="Declare if your ads are related to financial products, employment, housing, social issues, elections or politics."
@@ -1729,7 +1732,7 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
 
       </div>
 
-      {/* Objective change confirmation — mirrors Meta's "Your settings may change" modal */}
+      {/* Objective change confirmation ΓÇö mirrors Meta's "Your settings may change" modal */}
       <AlertDialog open={!!pendingObjective} onOpenChange={(open) => !open && setPendingObjective(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -35,10 +35,15 @@ import {
   Facebook as FacebookIcon,
 } from "lucide-react";
 import {
-  useAudiences,
   useBrowseTargeting,
   useSearchInterests,
   useSearchLocations,
+  useMobileApps,
+  useAccountSettings,
+  useUpdateAccountSettings,
+  useTargetingSuggestions,
+  useCreateSavedAudience,
+  useAudiences,
 } from "@/features/meta/hooks/useMetaAdsManager";
 import { useMetaAccounts } from "@/features/meta/hooks/useMetaData";
 import {
@@ -75,7 +80,6 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { FormSection } from "./FormSection";
-import { MOCK_APPS } from "./Step1Settings";
 
 // Meta's Marketing API caps targeting lists, and very long lists make ad sets
 // unwieldy + harder for the user to scan. Soft-cap below Meta's hard limits.
@@ -93,6 +97,36 @@ const useDebouncedValue = <T,>(value: T, delay = 300): T => {
 
 type Props = StepProps & { clientId: number | null; setStep?: (s: number) => void };
 
+const buildTargetingForSavedAudience = (adSet: any) => {
+  const geoIncluded = { countries: [] as string[], cities: [] as any[], regions: [] as any[], zips: [] as string[] };
+  const geoExcluded = { countries: [] as string[], cities: [] as any[], regions: [] as any[], zips: [] as string[] };
+
+  adSet.locations.forEach((l: any) => {
+    const target = l.excluded ? geoExcluded : geoIncluded;
+    if (l.type === "country") target.countries.push(l.key);
+    else if (l.type === "city") target.cities.push({ key: l.key, radius: 10, distance_unit: "mile" });
+    else if (l.type === "region") target.regions.push({ key: l.key });
+    else if (l.type === "zip") target.zips.push(l.key);
+  });
+
+  const includedInterests = adSet.interests.filter((i: any) => !i.excluded).map((i: any) => ({ id: i.id, name: i.name }));
+  const excludedInterests = adSet.interests.filter((i: any) => i.excluded).map((i: any) => ({ id: i.id, name: i.name }));
+  const includedAudiences = adSet.customAudiences.map((c: any) => ({ id: c.id, name: c.name }));
+  const excludedAudiences = adSet.excludedCustomAudiences.map((c: any) => ({ id: c.id, name: c.name }));
+
+  const hasGeoIncluded = geoIncluded.countries.length > 0 || geoIncluded.cities.length > 0 || geoIncluded.regions.length > 0 || geoIncluded.zips.length > 0;
+  const hasGeoExcluded = geoExcluded.countries.length > 0 || geoExcluded.cities.length > 0 || geoExcluded.regions.length > 0 || geoExcluded.zips.length > 0;
+
+  return {
+    ...(hasGeoIncluded ? { geo_locations: geoIncluded } : {}),
+    ...(hasGeoExcluded ? { excluded_geo_locations: geoExcluded } : {}),
+    ...(includedInterests.length ? { interests: includedInterests } : {}),
+    ...(excludedInterests.length ? { excluded_interests: excludedInterests } : {}),
+    ...(includedAudiences.length ? { custom_audiences: includedAudiences } : {}),
+    ...(excludedAudiences.length ? { excluded_custom_audiences: excludedAudiences } : {})
+  };
+};
+
 export function Step2Audience({ form, setForm, clientId }: Props) {
   const [locInput, setLocInput] = useState("");
   const [intInput, setIntInput] = useState("");
@@ -109,13 +143,30 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
     useState(false);
   const [excludeAudienceSearch, setExcludeAudienceSearch] = useState("");
 
+  const [saveAudienceModalOpen, setSaveAudienceModalOpen] = useState(false);
+  const [saveAudienceName, setSaveAudienceName] = useState("");
+  const [showSuggestionsDropdown, setShowSuggestionsDropdown] = useState(false);
+
+  const locQuery = useDebouncedValue(locInput);
+  const intQuery = useDebouncedValue(intInput);
+  const dtQuery = useDebouncedValue(dtInput);
+
+  const { data: dtResults, isFetching: isFetchingDt } = useBrowseTargeting(dtType, dtQuery);
+  const { data: audiencesData, isLoading: isLoadingAudiences } = useAudiences(clientId);
+  const { data: accountsData } = useMetaAccounts(clientId);
+  const { data: appsList = [], isLoading: isLoadingApps } = useMobileApps(form.campaign.accountId || null, clientId);
+  const { data: accountSettings } = useAccountSettings(form.campaign.accountId || null, clientId);
+  const { mutate: updateAccountSettings, isPending: isUpdatingAccountSettings } = useUpdateAccountSettings();
+  const { data: suggestions = [], isFetching: isFetchingSuggestions, refetch: fetchSuggestions } = useTargetingSuggestions(form.campaign.objective, form.campaign.ios14AppId, clientId);
+  const { mutate: createSavedAudience, isPending: isSavingAudience } = useCreateSavedAudience();
+
   const [appSearch, setAppSearch] = useState("");
   const [appDropdownOpen, setAppDropdownOpen] = useState(false);
   const selectedApp = useMemo(() => {
-    return MOCK_APPS.find((a) => a.id === form.campaign.ios14AppId);
-  }, [form.campaign.ios14AppId]);
+    return appsList.find((a: any) => a.id === form.campaign.ios14AppId);
+  }, [form.campaign.ios14AppId, appsList]);
   const [selectedStore, setSelectedStore] = useState<"Apple App Store" | "Google Play Store">(() => {
-    const app = MOCK_APPS.find((a) => a.id === form.campaign.ios14AppId);
+    const app = appsList.find((a: any) => a.id === form.campaign.ios14AppId);
     return app?.store === "Google Play Store" ? "Google Play Store" : "Apple App Store";
   });
   useEffect(() => {
@@ -124,15 +175,23 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
     }
   }, [selectedApp]);
 
-  const locQuery = useDebouncedValue(locInput);
-  const intQuery = useDebouncedValue(intInput);
-  const dtQuery = useDebouncedValue(dtInput);
+  useEffect(() => {
+    if (accountSettings) {
+      setForm((f) => ({
+        ...f,
+        adSet: {
+          ...f.adSet,
+          audienceControls: {
+            ...f.adSet.audienceControls,
+            ...accountSettings,
+          },
+        },
+      }));
+    }
+  }, [accountSettings, setForm]);
 
   const { data: locResults, isFetching: isFetchingLoc } = useSearchLocations(locQuery);
   const { data: intResults, isFetching: isFetchingInt } = useSearchInterests(intQuery);
-  const { data: dtResults, isFetching: isFetchingDt } = useBrowseTargeting(dtType, dtQuery);
-  const { data: audiencesData, isLoading: isLoadingAudiences } = useAudiences(clientId);
-  const { data: accountsData } = useMetaAccounts(clientId);
   const allAudiences = audiencesData?.audiences ?? [];
   const pages = useMemo(() => accountsData?.pages ?? [], [accountsData]);
 
@@ -334,8 +393,12 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
                     className="h-11 pl-10 pr-10 rounded-xl border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 text-sm w-full"
                   />
                   {appDropdownOpen && (
-                    <div className="absolute top-full left-0 w-full mt-1.5 border border-slate-100 rounded-xl bg-white shadow-xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-50">
-                      {MOCK_APPS.filter(app =>
+                    <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden z-50">
+                      {isLoadingApps ? (
+                        <div className="p-4 text-xs text-slate-400 text-center font-medium">
+                          Loading apps...
+                        </div>
+                      ) : appsList.filter((app: any) =>
                         app.store === selectedStore &&
                         (app.name.toLowerCase().includes(appSearch.toLowerCase()) ||
                          app.id.toLowerCase().includes(appSearch.toLowerCase()))
@@ -344,11 +407,11 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
                           No apps found matching "{appSearch}"
                         </div>
                       ) : (
-                        MOCK_APPS.filter(app =>
+                        appsList.filter((app: any) =>
                           app.store === selectedStore &&
                           (app.name.toLowerCase().includes(appSearch.toLowerCase()) ||
                            app.id.toLowerCase().includes(appSearch.toLowerCase()))
-                        ).map((app) => (
+                        ).map((app: any) => (
                           <button
                             key={app.id}
                             type="button"
@@ -362,8 +425,12 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
                             }}
                             className="w-full text-left px-4 py-3 hover:bg-slate-50/80 flex items-center gap-3 transition-colors group"
                           >
-                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100/60 border border-slate-200/50 flex items-center justify-center text-base shadow-sm group-hover:scale-95 transition-transform shrink-0">
-                              {app.icon}
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100/60 border border-slate-200/50 flex items-center justify-center text-base shadow-sm group-hover:scale-95 transition-transform shrink-0 overflow-hidden">
+                              {app.icon?.startsWith("http") ? (
+                                <img src={app.icon} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                app.icon || "📱"
+                              )}
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="text-sm font-bold text-slate-900 leading-none flex items-center gap-1.5">
@@ -395,8 +462,12 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
                 {form.campaign.ios14AppId && selectedApp && (
                   <div className="flex items-center justify-between gap-4 p-4 rounded-2xl border border-slate-100 bg-slate-50/40 shadow-sm mt-3 animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-[14px] bg-gradient-to-tr from-slate-100 to-white border border-slate-200/60 flex items-center justify-center text-2xl shadow-sm">
-                        {selectedApp.icon}
+                      <div className="w-12 h-12 rounded-[14px] bg-gradient-to-tr from-slate-100 to-white border border-slate-200/60 flex items-center justify-center text-2xl shadow-sm overflow-hidden">
+                        {selectedApp.icon?.startsWith("http") ? (
+                          <img src={selectedApp.icon} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          selectedApp.icon || "📱"
+                        )}
                       </div>
                       <div>
                         <div className="text-sm font-black text-slate-900">{selectedApp.name}</div>
@@ -1141,7 +1212,7 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">Use a saved audience</SelectItem>
-                {allAudiences.map((a) => (
+                {allAudiences.map((a: any) => (
                   <SelectItem key={a.id} value={a.id}>
                     {a.name}
                   </SelectItem>
@@ -1261,10 +1332,10 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
                 {excludeAudienceSearch.trim().length >= 1 && allAudiences.length > 0 && (
                   <div className="border border-slate-100 rounded-xl bg-white max-h-44 overflow-y-auto">
                     {allAudiences
-                      .filter((a) =>
+                      .filter((a: any) =>
                         a.name.toLowerCase().includes(excludeAudienceSearch.toLowerCase())
                       )
-                      .map((a) => {
+                      .map((a: any) => {
                         const alreadyExcluded = form.adSet.customAudiences.find(
                           (sel) => sel.id === a.id && sel.excluded
                         );
@@ -1344,10 +1415,73 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
                     We'll reach people beyond these settings when it's likely to improve performance.
                   </p>
                   <div className="flex gap-2">
-                    <Button variant="outline" className="h-9 text-xs font-bold rounded-xl border-slate-200" disabled>
-                      + Add suggestions (optional)
-                    </Button>
-                    <Button variant="outline" className="h-9 text-xs font-bold rounded-xl border-slate-200 ml-auto" disabled>
+                    <div className="relative">
+                      <Button
+                        variant="outline"
+                        className="h-9 text-xs font-bold rounded-xl border-slate-200"
+                        onClick={() => {
+                          fetchSuggestions();
+                          setShowSuggestionsDropdown(true);
+                        }}
+                      >
+                        {isFetchingSuggestions ? "Loading..." : "+ Add suggestions (optional)"}
+                      </Button>
+                      
+                      {showSuggestionsDropdown && (
+                        <div 
+                          className="fixed inset-0 z-40 bg-transparent" 
+                          onClick={() => setShowSuggestionsDropdown(false)}
+                        />
+                      )}
+                      
+                      {showSuggestionsDropdown && suggestions.length > 0 && (
+                        <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden z-50 divide-y divide-slate-50">
+                          <div className="p-2.5 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Suggested Targeting</span>
+                          </div>
+                          <div className="max-h-60 overflow-y-auto">
+                            {suggestions.map((s, i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between group relative z-50"
+                                onClick={() => {
+                                  setForm(f => ({
+                                    ...f,
+                                    adSet: {
+                                      ...f.adSet,
+                                      interests: [
+                                        ...f.adSet.interests,
+                                        { id: s.id, name: s.name }
+                                      ]
+                                    }
+                                  }));
+                                  setShowSuggestionsDropdown(false);
+                                }}
+                              >
+                                <div>
+                                  <div className="text-sm font-bold text-slate-800">{s.name}</div>
+                                  {(s.audience_size_lower_bound || s.audience_size_upper_bound) && (
+                                    <div className="text-[10px] text-slate-400 mt-0.5">
+                                      Size: {s.audience_size_lower_bound?.toLocaleString()} - {s.audience_size_upper_bound?.toLocaleString()}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors shrink-0">
+                                  <span className="text-sm leading-none">+</span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <Button
+                      variant="outline"
+                      className="h-9 text-xs font-bold rounded-xl border-slate-200 ml-auto"
+                      onClick={() => setSaveAudienceModalOpen(true)}
+                    >
                       Save audience
                     </Button>
                   </div>
@@ -1469,14 +1603,29 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
                   variant="outline"
                   onClick={() => setAudienceControlsModalOpen(false)}
                   className="h-9 rounded-lg"
+                  disabled={isUpdatingAccountSettings}
                 >
                   Cancel
                 </Button>
                 <Button
-                  onClick={() => setAudienceControlsModalOpen(false)}
+                  disabled={isUpdatingAccountSettings}
+                  onClick={() => {
+                    if (form.campaign.accountId && form.adSet.audienceControls) {
+                      updateAccountSettings(
+                        { accountId: form.campaign.accountId, payload: form.adSet.audienceControls, clientId: clientId ?? undefined },
+                        {
+                          onSuccess: () => {
+                            setAudienceControlsModalOpen(false);
+                          }
+                        }
+                      );
+                    } else {
+                      setAudienceControlsModalOpen(false);
+                    }
+                  }}
                   className="h-9 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
                 >
-                  Review changes
+                  {isUpdatingAccountSettings ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
             </DialogFooter>
@@ -1942,7 +2091,7 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
             </div>
           ) : (
             <div className="border border-slate-100 rounded-xl bg-white max-h-64 overflow-y-auto">
-              {allAudiences.map((a) => {
+              {allAudiences.map((a: any) => {
                 const selected = form.adSet.customAudiences.find((sel) => sel.id === a.id);
                 return (
                   <button
@@ -2212,6 +2361,64 @@ export function Step2Audience({ form, setForm, clientId }: Props) {
             </label>
           </FormSection>
         )}
+
+        {/* Save Audience Modal */}
+        <Dialog open={saveAudienceModalOpen} onOpenChange={setSaveAudienceModalOpen}>
+          <DialogContent className="max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-black text-slate-900">
+                Save Audience
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-500">
+                Give your audience a memorable name so you can reuse it later.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-600 block mb-2">
+                Audience Name
+              </label>
+              <Input
+                value={saveAudienceName}
+                onChange={(e) => setSaveAudienceName(e.target.value)}
+                placeholder="e.g. US Tech Enthusiasts (18-35)"
+                className="h-11 rounded-xl border-slate-200"
+              />
+            </div>
+            <DialogFooter className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setSaveAudienceModalOpen(false)}
+                className="h-9 rounded-lg"
+                disabled={isSavingAudience}
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={!saveAudienceName.trim() || isSavingAudience}
+                onClick={() => {
+                  if (form.campaign.accountId && form.adSet.locations.length > 0) {
+                    createSavedAudience(
+                      { 
+                        accountId: form.campaign.accountId, 
+                        payload: { name: saveAudienceName, targeting: buildTargetingForSavedAudience(form.adSet) as any }, 
+                        clientId: clientId ?? undefined 
+                      },
+                      {
+                        onSuccess: () => {
+                          setSaveAudienceModalOpen(false);
+                          setSaveAudienceName("");
+                        }
+                      }
+                    );
+                  }
+                }}
+                className="h-9 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {isSavingAudience ? "Saving..." : "Save"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
       </div>
     </Card>

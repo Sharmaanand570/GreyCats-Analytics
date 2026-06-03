@@ -586,3 +586,92 @@ export const useAdsManagerPages = (clientId: number | null) => {
     retry: 1,
   });
 };
+// ==================== FRONTEND INTEGRATION: NEW HOOKS ====================
+
+import {
+  getMobileApps,
+  getCreativeAssets,
+  getAccountSettings,
+  updateAccountSettings,
+  getTargetingSuggestions,
+  createSavedAudience,
+  type MetaMobileApp,
+  type MetaCreativeAsset,
+  type MetaAccountSettings,
+  type TargetingSuggestionNode,
+  type PublishAdTargeting,
+} from "../API/metaAdsManagerApi";
+
+export const useMobileApps = (accountId: string | null, clientId: number | null) => {
+  return useQuery<MetaMobileApp[], Error>({
+    queryKey: ["meta-campaign-wizard", "mobile-apps", accountId, clientId],
+    queryFn: () => getMobileApps(accountId as string, { clientId: clientId ?? undefined }),
+    enabled: !!accountId,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+};
+
+export const useCreativeAssets = (
+  accountId: string | null,
+  source: "account" | "instagram" | "page",
+  pageId: string | null,
+  clientId: number | null
+) => {
+  return useQuery<MetaCreativeAsset[], Error>({
+    queryKey: ["meta-campaign-wizard", "creatives", accountId, source, pageId, clientId],
+    queryFn: () =>
+      getCreativeAssets(accountId as string, source, {
+        clientId: clientId ?? undefined,
+        pageId: pageId ?? undefined,
+      }),
+    enabled: !!accountId,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+};
+
+export const useAccountSettings = (accountId: string | null, clientId: number | null) => {
+  return useQuery<MetaAccountSettings, Error>({
+    queryKey: ["meta-campaign-wizard", "account-settings", accountId, clientId],
+    queryFn: () => getAccountSettings(accountId as string, { clientId: clientId ?? undefined }),
+    enabled: !!accountId,
+    staleTime: 60 * 1000,
+    retry: 1,
+  });
+};
+
+export const useUpdateAccountSettings = () => {
+  const qc = useQueryClient();
+  return useMutation<{ success: boolean }, Error, { accountId: string; payload: MetaAccountSettings; clientId?: number }>({
+    mutationFn: ({ accountId, payload, clientId }) => updateAccountSettings(accountId, payload, { clientId }),
+    onSuccess: (_, { accountId, clientId }) => {
+      qc.invalidateQueries({ queryKey: ["meta-campaign-wizard", "account-settings", accountId, clientId ?? null] });
+      toast.success("Account settings updated");
+    },
+    onError: (e) => toastMetaError(e, "Failed to update account settings"),
+  });
+};
+
+export const useTargetingSuggestions = (objective?: string, appId?: string, clientId?: number) => {
+  return useQuery<TargetingSuggestionNode[], Error>({
+    queryKey: ["meta-campaign-wizard", "targeting-suggestions", objective, appId, clientId],
+    queryFn: () => getTargetingSuggestions({ objective, app_id: appId, clientId }),
+    // Typically fetched dynamically upon user action, but can be pre-fetched if useful.
+    enabled: false,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+};
+
+export const useCreateSavedAudience = () => {
+  const qc = useQueryClient();
+  return useMutation<{ success: boolean; audienceId: string }, Error, { accountId: string; payload: { name: string; targeting: PublishAdTargeting }; clientId?: number }>({
+    mutationFn: ({ accountId, payload, clientId }) => createSavedAudience(accountId, payload, { clientId }),
+    onSuccess: (_, { accountId, clientId }) => {
+      qc.invalidateQueries({ queryKey: ["meta-campaign-wizard", "saved-audiences", accountId, clientId ?? null] });
+      toast.success("Audience saved successfully");
+    },
+    onError: (e) => toastMetaError(e, "Failed to save audience"),
+  });
+};

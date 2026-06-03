@@ -110,6 +110,14 @@ export default function CheckoutPage() {
     }
   };
 
+  const handleButtonClick = () => {
+    if (isAlreadyOnPlan) {
+      handlePaymentSuccess();
+    } else {
+      handleCheckout();
+    }
+  };
+
   if (plansLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
@@ -256,22 +264,22 @@ export default function CheckoutPage() {
                     </button>
                  </div>
 
-                 <Button
-                    onClick={handleCheckout}
-                    disabled={isProcessing || isAlreadyOnPlan}
-                    className="w-full h-14 rounded-2xl text-lg font-bold !text-white bg-[#111] hover:bg-[#222] transition-all shadow-lg flex items-center justify-center gap-2"
-                    isLoading={isProcessing}
-                 >
-                    {isProcessing ? (
-                      "Processing..."
-                    ) : isAlreadyOnPlan ? (
-                      "Already Active"
-                    ) : selectedPlan.price === 0 ? (
-                      <>Activate Free Plan <Zap className="w-5 h-5 fill-current" /></>
-                    ) : (
-                      <>Pay Now <CreditCard className="w-5 h-5" /></>
-                    )}
-                 </Button>
+                  <Button
+                     onClick={handleButtonClick}
+                     disabled={isProcessing}
+                     className="w-full h-14 rounded-2xl text-lg font-bold !text-white bg-[#111] hover:bg-[#222] transition-all shadow-lg flex items-center justify-center gap-2"
+                     isLoading={isProcessing}
+                  >
+                     {isProcessing ? (
+                       "Processing..."
+                     ) : isAlreadyOnPlan ? (
+                       <>Go to Dashboard <Zap className="w-5 h-5 fill-current" /></>
+                     ) : selectedPlan.price === 0 ? (
+                       <>Activate Free Plan <Zap className="w-5 h-5 fill-current" /></>
+                     ) : (
+                       <>Pay Now <CreditCard className="w-5 h-5" /></>
+                     )}
+                  </Button>
 
                  <p className="text-[10px] text-center text-[#999] px-6">
                    By clicking the button above, you agree to our Terms of Service and authorize the charge to your payment method. You can cancel anytime from your settings.

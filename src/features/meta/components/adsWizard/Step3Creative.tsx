@@ -54,6 +54,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useMetaAccounts } from "@/features/meta/hooks/useMetaData";
+import { useCreativeAssets } from "@/features/meta/hooks/useMetaAdsManager";
 import { AdCreativeLivePreview } from "./AdCreativeLivePreview";
 import { uploadBlogMedia } from "@/features/blog/api/blogPostsApi";
 import { toast } from "sonner";
@@ -119,35 +120,7 @@ const isVideoFile = (file: File) =>
 const isCaptionsFile = (file: File) =>
   /\.(srt|vtt)$/i.test(file.name) || file.type === "text/vtt" || file.type === "application/x-subrip";
 
-const MOCK_ACCOUNT_IMAGES = [
-  { url: "https://images.unsplash.com/photo-1607613009820-a29f7bb81c04?w=500", name: "untitled", size: "1440 × 628" }
-];
 
-const MOCK_INSTAGRAM_IMAGES = [
-  { url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500", name: "dual_gummies", size: "1350 × 1688" },
-  { url: "https://images.unsplash.com/photo-1550572017-edd951b55104?w=500", name: "golden_vape", size: "1350 × 1687" },
-  { url: "https://images.unsplash.com/photo-1527689368864-3a821dbccc34?w=500", name: "pure_nostalgia", size: "1350 × 1688" },
-  { url: "https://images.unsplash.com/photo-1601049541289-9b1b7bbbfe19?w=500", name: "orange_vape", size: "1350 × 1688" },
-  { url: "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=500", name: "electric_blue", size: "1328 × 2360" },
-  { url: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=500", name: "pink_gummies", size: "1350 × 1687" },
-  { url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=500", name: "summer_beach", size: "1328 × 2360" },
-  { url: "https://images.unsplash.com/photo-1471897458574-0f3851804949?w=500", name: "product_aesthetic", size: "1350 × 1687" },
-  { url: "https://images.unsplash.com/photo-1511556532299-8f662fc26c06?w=500", name: "yellow_abstract", size: "1170 × 2080" },
-  { url: "https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?w=500", name: "berry_supplement", size: "1350 × 1688" },
-];
-
-const MOCK_PAGE_IMAGES = [
-  { url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500", name: "dual_gummies", size: "1350 × 1688" },
-  { url: "https://images.unsplash.com/photo-1550572017-edd951b55104?w=500", name: "golden_vape", size: "1350 × 1687" },
-  { url: "https://images.unsplash.com/photo-1527689368864-3a821dbccc34?w=500", name: "pure_nostalgia", size: "1350 × 1688" },
-  { url: "https://images.unsplash.com/photo-1601049541289-9b1b7bbbfe19?w=500", name: "orange_vape", size: "1350 × 1688" },
-  { url: "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=500", name: "electric_blue", size: "1328 × 2360" },
-  { url: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=500", name: "pink_gummies", size: "1350 × 1687" },
-  { url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=500", name: "summer_beach", size: "1328 × 2360" },
-  { url: "https://images.unsplash.com/photo-1471897458574-0f3851804949?w=500", name: "product_aesthetic", size: "1350 × 1687" },
-  { url: "https://images.unsplash.com/photo-1511556532299-8f662fc26c06?w=500", name: "yellow_abstract", size: "1170 × 2080" },
-  { url: "https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?w=500", name: "berry_supplement", size: "1350 × 1688" },
-];
 
 type Step3Props = StepProps & { showAllErrors?: boolean; clientId?: number | null };
 
@@ -158,6 +131,27 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
   // Pulled here so the Identity card can show the Facebook Page dropdown.
   const { data: accountsData } = useMetaAccounts((clientId ?? 0) as number);
   const pages = accountsData?.pages ?? [];
+
+  const { data: accountAssets = [], isFetching: isFetchingAccountAssets } = useCreativeAssets(
+    form.campaign.accountId || null,
+    "account",
+    form.campaign.pageId || null,
+    clientId ?? null
+  );
+
+  const { data: instagramAssets = [], isFetching: isFetchingInstagramAssets } = useCreativeAssets(
+    form.campaign.accountId || null,
+    "instagram",
+    form.campaign.pageId || null,
+    clientId ?? null
+  );
+
+  const { data: pageAssets = [], isFetching: isFetchingPageAssets } = useCreativeAssets(
+    form.campaign.accountId || null,
+    "page",
+    form.campaign.pageId || null,
+    clientId ?? null
+  );
   // We share one hidden <input type="file"> across all upload sites — the
   // currently-clicked target is stashed here so we know where the resulting URL belongs.
   const pendingTargetRef = useRef<UploadTarget | null>(null);
@@ -2791,7 +2785,9 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
                         </a>
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
-                        {MOCK_ACCOUNT_IMAGES.map((img, idx) => {
+                        {isFetchingAccountAssets ? (
+                          <div className="text-xs text-slate-400 p-4">Loading...</div>
+                        ) : accountAssets.filter((img: any) => img.name.toLowerCase().includes(searchQuery.toLowerCase())).map((img: any, idx: number) => {
                           const isSelected = selectedLibraryImage === img.url;
                           return (
                             <div 
@@ -2807,7 +2803,7 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
                               <img src={img.url} className="w-full h-full object-cover" alt="" />
                               <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors" />
                               <div className="absolute bottom-1.5 left-1.5 right-1.5 bg-black/60 backdrop-blur-[2px] text-white p-1 rounded text-[9px] font-mono leading-none truncate text-center opacity-90">
-                                {img.name} <br /> {img.size}
+                                {img.name} <br /> {img.dimensions}
                               </div>
                             </div>
                           );
@@ -2828,7 +2824,9 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
                         </a>
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
-                        {MOCK_INSTAGRAM_IMAGES.filter(img => img.name.toLowerCase().includes(searchQuery.toLowerCase())).map((img, idx) => {
+                        {isFetchingInstagramAssets ? (
+                          <div className="text-xs text-slate-400 p-4">Loading...</div>
+                        ) : instagramAssets.filter((img: any) => img.name.toLowerCase().includes(searchQuery.toLowerCase())).map((img: any, idx: number) => {
                           const isSelected = selectedLibraryImage === img.url;
                           return (
                             <div 
@@ -2844,7 +2842,7 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
                               <img src={img.url} className="w-full h-full object-cover" alt="" />
                               <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors" />
                               <div className="absolute bottom-1.5 left-1.5 right-1.5 bg-black/60 backdrop-blur-[2px] text-white p-1 rounded text-[9px] font-mono leading-none truncate text-center opacity-90">
-                                {img.name} <br /> {img.size}
+                                {img.name} <br /> {img.dimensions}
                               </div>
                             </div>
                           );
@@ -2870,7 +2868,9 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
                         </a>
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
-                        {MOCK_PAGE_IMAGES.filter(img => img.name.toLowerCase().includes(searchQuery.toLowerCase())).map((img, idx) => {
+                        {isFetchingPageAssets ? (
+                          <div className="text-xs text-slate-400 p-4">Loading...</div>
+                        ) : pageAssets.filter((img: any) => img.name.toLowerCase().includes(searchQuery.toLowerCase())).map((img: any, idx: number) => {
                           const isSelected = selectedLibraryImage === img.url;
                           return (
                             <div 
@@ -2886,7 +2886,7 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
                               <img src={img.url} className="w-full h-full object-cover" alt="" />
                               <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors" />
                               <div className="absolute bottom-1.5 left-1.5 right-1.5 bg-black/60 backdrop-blur-[2px] text-white p-1 rounded text-[9px] font-mono leading-none truncate text-center opacity-90">
-                                {img.name} <br /> {img.size}
+                                {img.name} <br /> {img.dimensions}
                               </div>
                             </div>
                           );
@@ -2930,7 +2930,7 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
       {/* ── Carousel Card Media Library Modal (Awareness "Select up to 10 images") ── */}
       {showCarouselMediaModal && (() => {
         const remaining = MAX_CAROUSEL_CARDS - form.ad.carouselCards.length;
-        const filterImages = (list: typeof MOCK_ACCOUNT_IMAGES) =>
+        const filterImages = (list: any[]) =>
           list.filter((img) => img.name.toLowerCase().includes(carouselSearchQuery.toLowerCase()));
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -3019,38 +3019,42 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-[11px] font-bold text-slate-600 uppercase tracking-widest">Account images</span>
-                        <span className="text-[10px] text-slate-400">Showing first {MOCK_ACCOUNT_IMAGES.length} image{MOCK_ACCOUNT_IMAGES.length !== 1 ? "s" : ""}</span>
+                        <span className="text-[10px] text-slate-400">Showing first {accountAssets.length} image{accountAssets.length !== 1 ? "s" : ""}</span>
                       </div>
                       <a className="text-[11px] font-semibold text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>See all</a>
                     </div>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                      {filterImages(MOCK_ACCOUNT_IMAGES).map((img, idx) => {
-                        const isSel = selectedCarouselLibraryImages.includes(img.url);
-                        const selIdx = selectedCarouselLibraryImages.indexOf(img.url);
-                        const canSelect = isSel || selectedCarouselLibraryImages.length < remaining;
-                        return (
-                          <div
-                            key={idx}
-                            onClick={() => canSelect && toggleCarouselImage(img.url)}
-                            className={cn(
-                              "group relative border-2 rounded-xl overflow-hidden bg-slate-50 flex flex-col transition-all shadow-sm aspect-square",
-                              isSel ? "border-[#0969da] ring-2 ring-blue-100" : canSelect ? "border-slate-100 hover:border-slate-300 cursor-pointer" : "border-slate-100 opacity-50 cursor-not-allowed"
-                            )}
-                          >
-                            <img src={img.url} className="w-full h-full object-cover" alt="" />
-                            <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors" />
-                            {isSel && (
-                              <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-[#0969da] border-2 border-white flex items-center justify-center shadow">
-                                <span className="text-white text-[9px] font-black">{selIdx + 1}</span>
+                    {isFetchingAccountAssets ? (
+                      <div className="text-xs text-slate-400 p-4">Loading...</div>
+                    ) : (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                        {filterImages(accountAssets).map((img, idx) => {
+                          const isSel = selectedCarouselLibraryImages.includes(img.url);
+                          const selIdx = selectedCarouselLibraryImages.indexOf(img.url);
+                          const canSelect = isSel || selectedCarouselLibraryImages.length < remaining;
+                          return (
+                            <div
+                              key={idx}
+                              onClick={() => canSelect && toggleCarouselImage(img.url)}
+                              className={cn(
+                                "group relative border-2 rounded-xl overflow-hidden bg-slate-50 flex flex-col transition-all shadow-sm aspect-square",
+                                isSel ? "border-[#0969da] ring-2 ring-blue-100" : canSelect ? "border-slate-100 hover:border-slate-300 cursor-pointer" : "border-slate-100 opacity-50 cursor-not-allowed"
+                              )}
+                            >
+                              <img src={img.url} className="w-full h-full object-cover" alt="" />
+                              <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors" />
+                              {isSel && (
+                                <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-[#0969da] border-2 border-white flex items-center justify-center shadow">
+                                  <span className="text-white text-[9px] font-black">{selIdx + 1}</span>
+                                </div>
+                              )}
+                              <div className="absolute bottom-1 left-1 right-1 bg-black/60 text-white p-1 rounded text-[8px] font-mono leading-none text-center truncate opacity-80">
+                                {img.dimensions}
                               </div>
-                            )}
-                            <div className="absolute bottom-1 left-1 right-1 bg-black/60 text-white p-1 rounded text-[8px] font-mono leading-none text-center truncate opacity-80">
-                              {img.size}
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -3061,38 +3065,42 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
                       <div className="flex items-center gap-2">
                         <InstagramIcon className="w-3.5 h-3.5 text-pink-500" />
                         <span className="text-[11px] font-bold text-slate-600 uppercase tracking-widest">Instagram images</span>
-                        <span className="text-[10px] text-slate-400">Showing first {MOCK_INSTAGRAM_IMAGES.length} images</span>
+                        <span className="text-[10px] text-slate-400">Showing first {instagramAssets.length} images</span>
                       </div>
                       <a className="text-[11px] font-semibold text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>See all</a>
                     </div>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                      {filterImages(MOCK_INSTAGRAM_IMAGES).map((img, idx) => {
-                        const isSel = selectedCarouselLibraryImages.includes(img.url);
-                        const selIdx = selectedCarouselLibraryImages.indexOf(img.url);
-                        const canSelect = isSel || selectedCarouselLibraryImages.length < remaining;
-                        return (
-                          <div
-                            key={idx}
-                            onClick={() => canSelect && toggleCarouselImage(img.url)}
-                            className={cn(
-                              "group relative border-2 rounded-xl overflow-hidden bg-slate-50 flex flex-col transition-all shadow-sm aspect-square",
-                              isSel ? "border-[#0969da] ring-2 ring-blue-100" : canSelect ? "border-slate-100 hover:border-slate-300 cursor-pointer" : "border-slate-100 opacity-50 cursor-not-allowed"
-                            )}
-                          >
-                            <img src={img.url} className="w-full h-full object-cover" alt="" />
-                            <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors" />
-                            {isSel && (
-                              <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-[#0969da] border-2 border-white flex items-center justify-center shadow">
-                                <span className="text-white text-[9px] font-black">{selIdx + 1}</span>
+                    {isFetchingInstagramAssets ? (
+                      <div className="text-xs text-slate-400 p-4">Loading...</div>
+                    ) : (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                        {filterImages(instagramAssets).map((img, idx) => {
+                          const isSel = selectedCarouselLibraryImages.includes(img.url);
+                          const selIdx = selectedCarouselLibraryImages.indexOf(img.url);
+                          const canSelect = isSel || selectedCarouselLibraryImages.length < remaining;
+                          return (
+                            <div
+                              key={idx}
+                              onClick={() => canSelect && toggleCarouselImage(img.url)}
+                              className={cn(
+                                "group relative border-2 rounded-xl overflow-hidden bg-slate-50 flex flex-col transition-all shadow-sm aspect-square",
+                                isSel ? "border-[#0969da] ring-2 ring-blue-100" : canSelect ? "border-slate-100 hover:border-slate-300 cursor-pointer" : "border-slate-100 opacity-50 cursor-not-allowed"
+                              )}
+                            >
+                              <img src={img.url} className="w-full h-full object-cover" alt="" />
+                              <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors" />
+                              {isSel && (
+                                <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-[#0969da] border-2 border-white flex items-center justify-center shadow">
+                                  <span className="text-white text-[9px] font-black">{selIdx + 1}</span>
+                                </div>
+                              )}
+                              <div className="absolute bottom-1 left-1 right-1 bg-black/60 text-white p-1 rounded text-[8px] font-mono leading-none text-center truncate opacity-80">
+                                {img.dimensions}
                               </div>
-                            )}
-                            <div className="absolute bottom-1 left-1 right-1 bg-black/60 text-white p-1 rounded text-[8px] font-mono leading-none text-center truncate opacity-80">
-                              {img.size}
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -3102,38 +3110,42 @@ export function Step3Creative({ form, setForm, showAllErrors, clientId }: Step3P
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-[11px] font-bold text-slate-600 uppercase tracking-widest">Page images</span>
-                        <span className="text-[10px] text-slate-400">Showing first {MOCK_PAGE_IMAGES.length} images</span>
+                        <span className="text-[10px] text-slate-400">Showing first {pageAssets.length} images</span>
                       </div>
                       <a className="text-[11px] font-semibold text-blue-600 hover:underline" href="#" onClick={(e) => e.preventDefault()}>See all</a>
                     </div>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                      {filterImages(MOCK_PAGE_IMAGES).map((img, idx) => {
-                        const isSel = selectedCarouselLibraryImages.includes(img.url);
-                        const selIdx = selectedCarouselLibraryImages.indexOf(img.url);
-                        const canSelect = isSel || selectedCarouselLibraryImages.length < remaining;
-                        return (
-                          <div
-                            key={idx}
-                            onClick={() => canSelect && toggleCarouselImage(img.url)}
-                            className={cn(
-                              "group relative border-2 rounded-xl overflow-hidden bg-slate-50 flex flex-col transition-all shadow-sm aspect-square",
-                              isSel ? "border-[#0969da] ring-2 ring-blue-100" : canSelect ? "border-slate-100 hover:border-slate-300 cursor-pointer" : "border-slate-100 opacity-50 cursor-not-allowed"
-                            )}
-                          >
-                            <img src={img.url} className="w-full h-full object-cover" alt="" />
-                            <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors" />
-                            {isSel && (
-                              <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-[#0969da] border-2 border-white flex items-center justify-center shadow">
-                                <span className="text-white text-[9px] font-black">{selIdx + 1}</span>
+                    {isFetchingPageAssets ? (
+                      <div className="text-xs text-slate-400 p-4">Loading...</div>
+                    ) : (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                        {filterImages(pageAssets).map((img, idx) => {
+                          const isSel = selectedCarouselLibraryImages.includes(img.url);
+                          const selIdx = selectedCarouselLibraryImages.indexOf(img.url);
+                          const canSelect = isSel || selectedCarouselLibraryImages.length < remaining;
+                          return (
+                            <div
+                              key={idx}
+                              onClick={() => canSelect && toggleCarouselImage(img.url)}
+                              className={cn(
+                                "group relative border-2 rounded-xl overflow-hidden bg-slate-50 flex flex-col transition-all shadow-sm aspect-square",
+                                isSel ? "border-[#0969da] ring-2 ring-blue-100" : canSelect ? "border-slate-100 hover:border-slate-300 cursor-pointer" : "border-slate-100 opacity-50 cursor-not-allowed"
+                              )}
+                            >
+                              <img src={img.url} className="w-full h-full object-cover" alt="" />
+                              <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors" />
+                              {isSel && (
+                                <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-[#0969da] border-2 border-white flex items-center justify-center shadow">
+                                  <span className="text-white text-[9px] font-black">{selIdx + 1}</span>
+                                </div>
+                              )}
+                              <div className="absolute bottom-1 left-1 right-1 bg-black/60 text-white p-1 rounded text-[8px] font-mono leading-none text-center truncate opacity-80">
+                                {img.dimensions}
                               </div>
-                            )}
-                            <div className="absolute bottom-1 left-1 right-1 bg-black/60 text-white p-1 rounded text-[8px] font-mono leading-none text-center truncate opacity-80">
-                              {img.size}
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
