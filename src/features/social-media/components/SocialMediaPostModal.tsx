@@ -1176,10 +1176,11 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
             <AIGeneratePanel
               clientId={clientId}
               platform={platform || 'instagram'}
-              onGenerated={(caption) => {
-                updateDraft({ message: caption });
+              onGenerated={(caption, imageFile) => {
+                if (caption) updateDraft({ message: caption });
+                if (imageFile) updateDraft({ mediaFiles: [...(draftPost.mediaFiles || []), imageFile] });
                 setMode('manual');
-                toast.success('Content generated! Review and schedule.');
+                toast.success(imageFile ? 'Image added! Review and schedule.' : 'Content generated! Review and schedule.');
               }}
             />
           )}
@@ -1597,7 +1598,7 @@ function AIGeneratePanel({
 }: {
   clientId: number;
   platform: string;
-  onGenerated: (caption: string, imageUrl?: string) => void;
+  onGenerated: (caption: string, imageFile?: File) => void;
 }) {
   const [topic, setTopic] = useState('');
   const [goal, setGoal] = useState('engagement');
@@ -1605,15 +1606,32 @@ function AIGeneratePanel({
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedCaptions, setGeneratedCaptions] = useState<any[]>([]);
   const [generatedArticle, setGeneratedArticle] = useState<string | null>(null);
+  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
 
   const handleGenerate = async () => {
     if (!topic.trim()) return;
     setIsGenerating(true);
     setGeneratedCaptions([]);
     setGeneratedArticle(null);
+    setGeneratedImageUrl(null);
 
     try {
-      if (contentType === 'article' || contentType === 'script') {
+      if (contentType === 'image') {
+        const res = await creativeApi.generateImage({
+          clientId,
+          intent: topic.trim(),
+          platform,
+          aspectRatio: '1:1',
+          mode: 'sync',
+        });
+        const url = res.data.data.imageUrl;
+        if (url) {
+          setGeneratedImageUrl(url);
+          toast.success('Image generated!');
+        } else {
+          toast.error('Image generation returned no image');
+        }
+      } else if (contentType === 'article' || contentType === 'script') {
         const res = await creativeApi.generateContent({
           clientId,
           contentType,
@@ -1649,6 +1667,7 @@ function AIGeneratePanel({
         <div className="flex gap-2">
           {[
             { id: 'caption', label: 'Caption' },
+            { id: 'image', label: 'Image' },
             { id: 'article', label: 'Article' },
             { id: 'script', label: 'Video Script' },
           ].map((t) => (
@@ -1738,6 +1757,38 @@ function AIGeneratePanel({
               </div>
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Results — image */}
+      {generatedImageUrl && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-zinc-500">Generated Image</p>
+            <button
+              onClick={async () => {
+                try {
+                  const response = await fetch(generatedImageUrl);
+                  const blob = await response.blob();
+                  const ext = blob.type.split('/')[1] || 'png';
+                  const file = new File([blob], `ai-generated.${ext}`, { type: blob.type });
+                  onGenerated('', file);
+                } catch {
+                  toast.error('Failed to load generated image');
+                }
+              }}
+              className="text-xs text-zinc-900 font-medium hover:underline"
+            >
+              Use as post image →
+            </button>
+          </div>
+          <div className="rounded-lg border border-zinc-200 overflow-hidden">
+            <img
+              src={generatedImageUrl}
+              alt="AI generated"
+              className="w-full h-auto max-h-60 object-contain bg-zinc-50"
+            />
+          </div>
         </div>
       )}
 
