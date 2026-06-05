@@ -16,7 +16,7 @@ import {
   parseISO,
 } from 'date-fns';
 import { ChevronLeft, ChevronRight, SquarePlus, X, Image as ImageIcon, Video as VideoIcon, ChevronDown, Pencil, Trash2, AlertCircle, CalendarPlus, Filter, CalendarClock, Share2 } from 'lucide-react';
-import { FaInstagram, FaFacebook, FaLinkedin } from 'react-icons/fa6';
+import { FaInstagram, FaFacebook, FaLinkedin, FaXTwitter } from 'react-icons/fa6';
 import { gsap } from 'gsap';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -56,6 +56,7 @@ const platformIcons: Record<PostPlatform, React.ReactNode> = {
   instagram: <FaInstagram className="w-3.5 h-3.5 text-pink-600" />,
   facebook: <FaFacebook className="w-3.5 h-3.5 text-blue-600" />,
   linkedin: <FaLinkedin className="w-3.5 h-3.5 text-blue-700" />,
+  twitter: <FaXTwitter className="w-3.5 h-3.5 text-zinc-900" />,
   both: (
     <div className="flex -space-x-0.5">
       <FaFacebook className="w-3 h-3 text-blue-600" />
@@ -68,6 +69,7 @@ const platformColors: Record<PostPlatform, string> = {
   instagram: 'bg-pink-50 border-pink-100 text-pink-900',
   facebook: 'bg-blue-50 border-blue-100 text-blue-900',
   linkedin: 'bg-blue-50 border-blue-100 text-blue-900',
+  twitter: 'bg-zinc-50 border-zinc-200 text-zinc-900',
   both: 'bg-purple-50 border-purple-100 text-purple-900',
 };
 
@@ -394,11 +396,35 @@ export function SocialMediaCalendar({ clientId, canPost, headerExtra }: SocialMe
       if (post.postType === 'STORY') {
         return 'This will remove the story from this app, but it will remain on Instagram until it expires (24h).';
       }
-      return 'This will also remove the post from your Instagram/Facebook profile. This action cannot be undone.';
+      if (post.platform === 'instagram' || post.platform === 'both') {
+        return (
+          <div className="space-y-2">
+            <p>This will remove the post from Facebook and this app.</p>
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 rounded-lg text-xs font-semibold flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <p>Due to Instagram API limitations, you must manually delete it from your Instagram profile.</p>
+            </div>
+          </div>
+        );
+      }
+      return 'This will also remove the post from your Facebook profile. This action cannot be undone.';
     }
     if (post.status === 'FAILED') {
       return 'This will remove the failed post record from your history.';
     }
+    
+    if (post.platform === 'instagram' || post.platform === 'both') {
+      return (
+        <div className="space-y-2">
+          <p>This will cancel the scheduled post.</p>
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 rounded-lg text-xs font-semibold flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <p>Due to Instagram API limitations, the post will be deleted from Facebook but may still go live on Instagram. Please verify and delete manually if needed.</p>
+          </div>
+        </div>
+      );
+    }
+    
     return 'This will cancel the scheduled post. It will never go live.';
   };
 
@@ -615,8 +641,8 @@ export function SocialMediaCalendar({ clientId, canPost, headerExtra }: SocialMe
 
     return (
       <div
-        className={`transition-all duration-300 ease-in-out bg-white border-zinc-200 rounded-xl shadow-sm flex flex-col min-h-0 shrink-0 ${
-          showUpcoming ? 'w-[320px] lg:w-[380px] opacity-100 border ml-4 overflow-hidden' : 'w-0 opacity-0 border-transparent ml-0 overflow-hidden'
+        className={`transition-all duration-300 ease-in-out bg-white/95 md:bg-white backdrop-blur-md md:backdrop-blur-none border-zinc-200 rounded-xl shadow-2xl md:shadow-sm flex flex-col min-h-0 shrink-0 z-30 md:z-auto ${
+          showUpcoming ? 'w-[320px] lg:w-[380px] opacity-100 border overflow-hidden absolute md:relative right-0 top-0 bottom-0 md:ml-4' : 'w-0 opacity-0 border-transparent ml-0 overflow-hidden absolute md:relative right-0 top-0 bottom-0'
         }`}
       >
         <div className="p-4 border-b border-zinc-100 flex justify-between items-center bg-white sticky top-0 shrink-0">
@@ -774,8 +800,8 @@ export function SocialMediaCalendar({ clientId, canPost, headerExtra }: SocialMe
           {(postsError as Error)?.message || 'Failed to load scheduled posts. Please try again.'}
         </div>
       )}
-      <div className="flex flex-1 min-h-0">
-        <div className="flex-1 min-w-0 overflow-auto bg-white border border-zinc-200 rounded-xl shadow-sm transition-all duration-300 relative">
+      <div className="flex flex-1 min-h-0 relative">
+        <div className="flex-1 min-w-0 overflow-x-auto overflow-y-auto bg-white border border-zinc-200 rounded-xl shadow-sm transition-all duration-300 relative custom-scrollbar">
           <div className="min-w-[800px] h-full flex flex-col">
             {renderDays()}
             <div className="flex-1">

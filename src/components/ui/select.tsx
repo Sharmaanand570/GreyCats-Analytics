@@ -90,7 +90,7 @@ const SelectValue = ({ placeholder }: { placeholder?: string }) => {
 }
 SelectValue.displayName = "SelectValue"
 
-const SelectContent = ({ children }: { children: React.ReactNode }) => {
+const SelectContent = ({ children, className: _className }: { children: React.ReactNode; className?: string }) => {
   return <>{children}</>
 }
 SelectContent.displayName = "SelectContent"

@@ -21,6 +21,7 @@ import {
   UserPlus,
   RefreshCcw
 } from 'lucide-react';
+import { SiTelegram } from 'react-icons/si';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -32,6 +33,7 @@ import { useBroadcasts } from '@/features/broadcasts/hooks/useBroadcasts';
 import { CreateBroadcastModal } from '@/features/broadcasts/components/CreateBroadcastModal';
 import { TemplateManager } from '@/features/broadcasts/components/TemplateManager';
 import { ProviderManager } from '@/features/broadcasts/components/ProviderManager';
+import { useIntegrations, useTemplates } from '@/features/broadcasts/hooks/useBroadcasts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { useClientContext } from '@/context/ClientContext';
@@ -408,10 +410,14 @@ function StepWorkspace({
   onSwitchWorkspace: () => void;
 }) {
   const { data: broadcasts, isLoading, refetch, isRefetching } = useBroadcasts(client.id);
+  const { data: integrations } = useIntegrations(client.id);
+  const { data: templates } = useTemplates();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
 
+
+  const [activeTab, setActiveTab] = useState('campaigns');
 
   const filteredBroadcasts = broadcasts?.filter(b =>
     b.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -461,11 +467,11 @@ function StepWorkspace({
 
       <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
         <div className="max-w-[1400px] mx-auto w-full">
-          <Tabs defaultValue="providers" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="bg-zinc-100/50 p-1 border border-zinc-200/50 rounded-xl mb-8">
-              <TabsTrigger value="providers" className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Providers</TabsTrigger>
-              <TabsTrigger value="templates" className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Templates</TabsTrigger>
               <TabsTrigger value="campaigns" className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Campaigns</TabsTrigger>
+              <TabsTrigger value="templates" className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Templates</TabsTrigger>
+              <TabsTrigger value="providers" className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Gateways</TabsTrigger>
             </TabsList>
 
             <TabsContent value="campaigns" className="space-y-8 focus-visible:outline-none">
@@ -501,6 +507,34 @@ function StepWorkspace({
                     {broadcasts?.reduce((acc, b) => acc + b.failedCount, 0).toLocaleString() || 0}
                   </p>
                 </div>
+              </div>
+
+              {/* Supported Channels Strip */}
+              <div className="bg-zinc-50 rounded-[24px] border border-zinc-200 p-4 mb-8 flex flex-col md:flex-row items-center gap-4 justify-between">
+                <div className="flex items-center gap-4">
+                  <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">Supported Channels:</span>
+                  <div className="flex items-wrap gap-5">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+                      <MessageSquare className="w-3.5 h-3.5 text-orange-500" /> SMS
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+                      <Mail className="w-3.5 h-3.5 text-blue-500" /> Email
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+                      <SiTelegram className="w-3.5 h-3.5 text-sky-500" /> Telegram
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-400">
+                      <MessageSquare className="w-3.5 h-3.5" /> WhatsApp (Soon)
+                    </span>
+                  </div>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  className="text-[11px] font-bold text-zinc-500 hover:text-zinc-900 h-8"
+                  onClick={() => setActiveTab('providers')}
+                >
+                  Manage Gateways <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                </Button>
               </div>
 
               <div className="bg-white rounded-[32px] border border-zinc-200/60 shadow-xl shadow-zinc-200/20 overflow-hidden min-h-[500px]">
@@ -561,7 +595,30 @@ function StepWorkspace({
                               <Send className="w-8 h-8 text-zinc-300" />
                             </div>
                             <h3 className="text-zinc-900 font-bold text-lg mb-1">No campaigns found</h3>
-                            <p className="text-zinc-500 text-sm font-medium">Create your first broadcast to reach your customers.</p>
+                            <p className="text-zinc-500 text-sm font-medium mb-6">Create your first broadcast to reach your customers.</p>
+                            
+                            {/* Smart Onboarding Helpers */}
+                            {(!integrations?.length || !templates?.length) && (
+                              <div className="max-w-md mx-auto bg-amber-50/50 border border-amber-100 rounded-2xl p-5 text-left flex gap-4">
+                                <AlertCircle className="w-6 h-6 text-amber-500 shrink-0" />
+                                <div>
+                                  <h4 className="text-sm font-bold text-amber-900">Setup Required</h4>
+                                  <p className="text-xs text-amber-700/80 mt-1 mb-3">Before you can send your first campaign, you need to configure a few things.</p>
+                                  <ul className="space-y-2">
+                                    {!integrations?.length && (
+                                      <li className="flex items-center gap-2 text-xs font-bold text-amber-900">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Need to configure a Gateway in the Gateways tab
+                                      </li>
+                                    )}
+                                    {!templates?.length && (
+                                      <li className="flex items-center gap-2 text-xs font-bold text-amber-900">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Need to create a Template in the Templates tab
+                                      </li>
+                                    )}
+                                  </ul>
+                                </div>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       ) : (

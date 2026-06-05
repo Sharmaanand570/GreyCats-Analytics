@@ -2,10 +2,12 @@ import api from '@/apiConfig';
 import type { AxiosError } from 'axios';
 import type {
   CreatePostPayload,
+  CreateMultiPlatformPostPayload,
   UpdatePostPayload,
   ListPostsParams,
   ScheduledPost,
   ScheduledPostResponse,
+  MultiPlatformPostResponse,
   ScheduledPostsListResponse,
   UploadMediaResponse,
   DeletePostResponse,
@@ -71,6 +73,25 @@ export const createScheduledPost = async (
     return response.data.post;
   } catch (error) {
     throw new Error(extractError(error, 'Failed to create scheduled post'));
+  }
+};
+
+/**
+ * Create scheduled posts across multiple platforms in one request.
+ * POST /api/scheduled-posts
+ * Uses platforms[] array — backend returns { success, posts[] }.
+ */
+export const createMultiPlatformPost = async (
+  payload: CreateMultiPlatformPostPayload
+): Promise<ScheduledPost[]> => {
+  try {
+    const response = await api.post<MultiPlatformPostResponse>(
+      '/scheduled-posts',
+      payload
+    );
+    return response.data.posts;
+  } catch (error) {
+    throw new Error(extractError(error, 'Failed to create scheduled posts'));
   }
 };
 

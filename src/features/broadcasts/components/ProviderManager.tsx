@@ -10,6 +10,8 @@ import {
 import { useConnectTelegram, useTelegramTargets } from '@/features/blog/hooks/useBlogPosts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SiTelegram } from 'react-icons/si';
 import {
   Plus,
@@ -506,21 +508,23 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Header */}
-      <Card className="border-gray-200 dark:border-white/10 shadow-sm overflow-hidden bg-white dark:bg-[#111]">
-        <CardContent className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <Card className="border-zinc-200 shadow-sm overflow-hidden bg-zinc-900 text-white">
+        <CardContent className="p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-6">
-            <div className="w-12 h-12 rounded-xl bg-indigo-600/10 flex items-center justify-center border border-indigo-600/20">
-              <Server className="w-6 h-6 text-indigo-600" />
+            <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center">
+              <Server className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Provider Integrations</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Connect and manage enterprise messaging gateways.</p>
+              <h2 className="text-2xl font-extrabold tracking-tight">Provider Integrations</h2>
+              <p className="text-sm text-zinc-400 font-medium mt-1">Connect and manage enterprise messaging gateways.</p>
             </div>
           </div>
           <Button 
             onClick={() => setIsCreating(!isCreating)}
-            variant={isCreating ? "outline" : "default"}
-            className="rounded-xl px-6 h-10 font-bold transition-all flex items-center gap-2"
+            className={cn(
+              "rounded-2xl px-6 h-12 font-bold transition-all flex items-center gap-2",
+              isCreating ? "bg-white/10 hover:bg-white/20 text-white" : "bg-white text-zinc-900 hover:bg-zinc-100"
+            )}
           >
             {isCreating ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
             {isCreating ? 'Cancel' : 'Connect Gateway'}
@@ -528,97 +532,104 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
         </CardContent>
       </Card>
 
-      {/* Integration Form */}
-      {isCreating && (
-        <Card className="border-gray-200 dark:border-white/10 shadow-lg overflow-hidden bg-white dark:bg-[#111] animate-in zoom-in-95 duration-300">
-          <CardHeader className="border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02] p-6">
-            <CardTitle className="text-lg font-bold">New Gateway Configuration</CardTitle>
-            <CardDescription>Setup a new messaging provider for your account.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-              <div className="space-y-3">
-                <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.2em] ml-1">Integration Name <span className="text-red-500">*</span></label>
-                <div className="relative">
-                  <Server className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-300" />
-                  <input 
-                    type="text" value={name} onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Adbizz Production Gateway"
-                    className="w-full pl-12 pr-5 py-4 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none"
-                  />
+
+
+      {/* Integration Form Modal */}
+      <Dialog open={isCreating} onOpenChange={(open) => {
+        setIsCreating(open);
+        if (!open) resetForm();
+      }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 border-0 bg-transparent shadow-none">
+          <Card className="border-gray-200 dark:border-white/10 shadow-2xl overflow-hidden bg-white dark:bg-[#111]">
+            <CardHeader className="border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02] p-6 relative">
+              <DialogTitle className="text-lg font-bold">New Gateway Configuration</DialogTitle>
+              <DialogDescription>Setup a new messaging provider for your account.</DialogDescription>
+            </CardHeader>
+            <CardContent className="p-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.2em] ml-1">Integration Name <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <Server className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-300" />
+                    <input 
+                      type="text" value={name} onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. Adbizz Production Gateway"
+                      className="w-full pl-12 pr-5 py-4 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-1">Channel Type</label>
+                  <div className="relative">
+                    <select
+                      value={type}
+                      onChange={(e) => {
+                        const newType = e.target.value as BroadcastChannel;
+                        setType(newType);
+                        setProvider(
+                          newType === 'SMS' ? 'ADBIZZ' :
+                          newType === 'EMAIL' ? 'SMTP' :
+                          'TELEGRAM'
+                        );
+                      }}
+                      className="w-full px-5 py-4 pr-12 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none cursor-pointer outline-none"
+                    >
+                      <option value="SMS">SMS Gateway</option>
+                      <option value="EMAIL">Email Gateway</option>
+                      <option value="TELEGRAM">Telegram Channel</option>
+                    </select>
+                    <ChevronDown className="w-5 h-5 text-gray-600 dark:text-gray-300 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-1">Service Provider</label>
+                  <div className="relative">
+                    <select value={provider} onChange={(e) => setProvider(e.target.value as BroadcastProvider)} className="w-full px-5 py-4 pr-12 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none cursor-pointer outline-none">
+                      {type === 'SMS' ? (
+                        <option value="ADBIZZ">Adbizz</option>
+                      ) : type === 'EMAIL' ? (
+                        <option value="SMTP">SMTP (Gmail/Outlook/Custom/Zoho)</option>
+                      ) : (
+                        <option value="TELEGRAM">Telegram Bot</option>
+                      )}
+                    </select>
+                    <ChevronDown className="w-5 h-5 text-gray-600 dark:text-gray-300 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
                 </div>
               </div>
-              <div className="space-y-3">
-                <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-1">Channel Type</label>
-                <div className="relative">
-                  <select
-                    value={type}
-                    onChange={(e) => {
-                      const newType = e.target.value as BroadcastChannel;
-                      setType(newType);
-                      setProvider(
-                        newType === 'SMS' ? 'ADBIZZ' :
-                        newType === 'EMAIL' ? 'SMTP' :
-                        'TELEGRAM'
-                      );
-                    }}
-                    className="w-full px-5 py-4 pr-12 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none cursor-pointer outline-none"
-                  >
-                    <option value="SMS">SMS Gateway</option>
-                    <option value="EMAIL">Email Gateway</option>
-                    <option value="TELEGRAM">Telegram Channel</option>
-                  </select>
-                  <ChevronDown className="w-5 h-5 text-gray-600 dark:text-gray-300 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+  
+              <div className="flex items-center gap-3 p-3 bg-indigo-500/5 rounded-xl border border-indigo-500/10 mb-6">
+                <Info className="w-3.5 h-3.5 text-indigo-500" />
+                <p className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
+                  {type === 'EMAIL'
+                    ? "Connect SMTP to broadcast from your domain. Default routing uses platform servers."
+                    : type === 'TELEGRAM'
+                    ? "Connect your bot to broadcast directly to your channels."
+                    : "Approved SMS templates require a connected gateway to execute."}
+                </p>
+              </div>
+  
+              <div className="pt-8 border-t border-zinc-100 dark:border-white/5">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  {renderConfigFields()}
                 </div>
               </div>
-              <div className="space-y-3">
-                <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-1">Service Provider</label>
-                <div className="relative">
-                  <select value={provider} onChange={(e) => setProvider(e.target.value as BroadcastProvider)} className="w-full px-5 py-4 pr-12 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none cursor-pointer outline-none">
-                    {type === 'SMS' ? (
-                      <option value="ADBIZZ">Adbizz</option>
-                    ) : type === 'EMAIL' ? (
-                      <option value="SMTP">SMTP (Gmail/Outlook/Custom/Zoho)</option>
-                    ) : (
-                      <option value="TELEGRAM">Telegram Bot</option>
-                    )}
-                  </select>
-                  <ChevronDown className="w-5 h-5 text-gray-600 dark:text-gray-300 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
+  
+              <div className="flex justify-end pt-8 mt-8 border-t border-gray-100 dark:border-white/5">
+                <Button
+                  onClick={handleSubmit}
+                  disabled={!name || createIntegration.isPending || connectTelegramMutation.isPending}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-10 h-12 font-bold shadow-lg shadow-indigo-500/20 min-w-[200px]"
+                >
+                  {createIntegration.isPending || connectTelegramMutation.isPending
+                    ? <Loader2 className="w-5 h-5 animate-spin" />
+                    : 'Activate Integration'}
+                </Button>
               </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-3 bg-indigo-500/5 rounded-xl border border-indigo-500/10 mb-6">
-              <Info className="w-3.5 h-3.5 text-indigo-500" />
-              <p className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-                {type === 'EMAIL'
-                  ? "Connect SMTP to broadcast from your domain. Default routing uses platform servers."
-                  : type === 'TELEGRAM'
-                  ? "Connect your bot to broadcast directly to your channels."
-                  : "Approved SMS templates require a connected gateway to execute."}
-              </p>
-            </div>
-
-            <div className="pt-8 border-t border-zinc-100 dark:border-white/5">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {renderConfigFields()}
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-8 mt-8 border-t border-gray-100 dark:border-white/5">
-              <Button
-                onClick={handleSubmit}
-                disabled={!name || createIntegration.isPending || connectTelegramMutation.isPending}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-10 h-12 font-bold shadow-lg shadow-indigo-500/20 min-w-[200px]"
-              >
-                {createIntegration.isPending || connectTelegramMutation.isPending
-                  ? <Loader2 className="w-5 h-5 animate-spin" />
-                  : 'Activate Integration'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        </DialogContent>
+      </Dialog>
 
       {/* Integration Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -636,156 +647,145 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
             <p className="text-gray-500 dark:text-gray-400 font-medium">Connect your first provider to start broadcasting.</p>
           </div>
         ) : (
-          <div className="col-span-full space-y-12">
-            {/* Email Providers Section */}
-            <div className="space-y-6">
-              <div className="flex items-center gap-3 ml-1">
-                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-600">
-                  <Mail className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">Email Channels</h3>
-                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">SMTP & Business Mail Gateways</p>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {(integrations as BroadcastIntegration[])?.filter(i => i.type === 'EMAIL').map(i => renderIntegrationCard(i))}
-                {(integrations as BroadcastIntegration[])?.filter(i => i.type === 'EMAIL').length === 0 && (
-                  <button 
-                    onClick={() => { setType('EMAIL'); setProvider('SMTP'); setIsCreating(true); }}
-                    className="h-[240px] border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 hover:border-indigo-500/30 hover:bg-indigo-500/5 transition-all group"
-                  >
-                    <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Plus className="w-6 h-6 text-gray-400" />
-                    </div>
-                    <div className="text-center px-6">
-                      <p className="text-sm font-bold text-gray-600 dark:text-gray-300">No Email Gateway Connected</p>
-                      <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-1">Connect SMTP to send emails</p>
-                    </div>
-                  </button>
+          <div className="col-span-full">
+            <Tabs defaultValue="email" className="w-full space-y-8">
+              <TabsList className="bg-zinc-100/50 p-1.5 rounded-2xl inline-flex h-auto w-full md:w-auto">
+                <TabsTrigger value="email" className="rounded-xl px-6 py-2.5 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-indigo-600 transition-all flex items-center gap-2">
+                  <Mail className="w-3.5 h-3.5" /> Email Channels
+                </TabsTrigger>
+                <TabsTrigger value="sms" className="rounded-xl px-6 py-2.5 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-orange-600 transition-all flex items-center gap-2">
+                  <MessageSquare className="w-3.5 h-3.5" /> SMS Channels
+                </TabsTrigger>
+                {!admin && (
+                  <TabsTrigger value="telegram" className="rounded-xl px-6 py-2.5 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-sky-600 transition-all flex items-center gap-2">
+                    <SiTelegram className="w-3.5 h-3.5" /> Telegram Bots
+                  </TabsTrigger>
                 )}
-              </div>
-            </div>
+              </TabsList>
 
-            {/* SMS Providers Section */}
-            <div className="space-y-6">
-              <div className="flex items-center gap-3 ml-1">
-                <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-600">
-                  <MessageSquare className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">SMS Channels</h3>
-                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Adbizz, Twilio & MSG91 Gateways</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {(integrations as BroadcastIntegration[])?.filter(i => i.type === 'SMS').map(i => renderIntegrationCard(i))}
-                {(integrations as BroadcastIntegration[])?.filter(i => i.type === 'SMS').length === 0 && (
-                  <button
-                    onClick={() => { setType('SMS'); setProvider('ADBIZZ'); setIsCreating(true); }}
-                    className="h-[240px] border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 hover:border-orange-500/30 hover:bg-orange-500/5 transition-all group"
-                  >
-                    <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Plus className="w-6 h-6 text-gray-400" />
-                    </div>
-                    <div className="text-center px-6">
-                      <p className="text-sm font-bold text-gray-600 dark:text-gray-300">No SMS Gateway Connected</p>
-                      <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-1">Connect Adbizz to send messages</p>
-                    </div>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Telegram Channels Section */}
-            {!admin && (
-              <div className="space-y-6">
-                <div className="flex items-center gap-3 ml-1">
-                  <div className="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center text-sky-600">
-                    <SiTelegram className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">Telegram Channels</h3>
-                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Bot-powered channel broadcasts</p>
+              <TabsContent value="email" className="mt-0 outline-none">
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {(integrations as BroadcastIntegration[])?.filter(i => i.type === 'EMAIL').map(i => renderIntegrationCard(i))}
+                    {(integrations as BroadcastIntegration[])?.filter(i => i.type === 'EMAIL').length === 0 && (
+                      <button 
+                        onClick={() => { setType('EMAIL'); setProvider('SMTP'); setIsCreating(true); }}
+                        className="h-[240px] border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 hover:border-indigo-500/30 hover:bg-indigo-500/5 transition-all group"
+                      >
+                        <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Plus className="w-6 h-6 text-gray-400" />
+                        </div>
+                        <div className="text-center px-6">
+                          <p className="text-sm font-bold text-gray-600 dark:text-gray-300">No Email Gateway Connected</p>
+                          <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-1">Connect SMTP to send emails</p>
+                        </div>
+                      </button>
+                    )}
                   </div>
                 </div>
+              </TabsContent>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {isLoadingTelegram ? (
-                    <div className="col-span-full py-10 flex justify-center">
-                      <Loader2 className="w-6 h-6 text-sky-500 animate-spin" />
-                    </div>
-                  ) : telegramTargets.length === 0 ? (
-                    <button
-                      onClick={() => { setType('TELEGRAM'); setProvider('TELEGRAM'); setIsCreating(true); }}
-                      className="h-[240px] border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 hover:border-sky-500/30 hover:bg-sky-500/5 transition-all group"
-                    >
-                      <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Plus className="w-6 h-6 text-gray-400" />
-                      </div>
-                      <div className="text-center px-6">
-                        <p className="text-sm font-bold text-gray-600 dark:text-gray-300">No Telegram Channel Connected</p>
-                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-1">Connect a bot to broadcast to channels</p>
-                      </div>
-                    </button>
-                  ) : (
-                    (telegramTargets as any[]).map((tg) => {
-                      const scopedClientName = clientNameById(tg.clientId ?? null);
-                      return (
-                        <Card key={tg.id} className="group border-gray-200 dark:border-white/10 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden bg-white dark:bg-[#111]">
-                          <CardContent className="p-8 flex flex-col h-full relative">
-                            <div className="absolute top-0 right-0 text-white text-[8px] font-black uppercase tracking-widest px-3 py-1 rounded-bl-xl shadow-lg flex items-center gap-1.5 bg-sky-500 shadow-sky-500/20">
-                              <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                              Active
-                            </div>
-                            <div className="flex items-center gap-6 mb-8 mt-2">
-                              <div className="w-14 h-14 rounded-2xl flex items-center justify-center border border-gray-100 dark:border-white/10 group-hover:scale-110 transition-all duration-500 bg-sky-500/5 text-sky-600">
-                                <SiTelegram className="w-7 h-7" />
-                              </div>
-                              <div>
-                                <h3 className="font-bold text-gray-900 dark:text-white text-lg tracking-tight leading-none mb-2">{tg.name}</h3>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest bg-gray-100 dark:bg-white/10 px-2 py-0.5 rounded-md">TELEGRAM</span>
-                                  {scopedClientName ? (
-                                    <span className="inline-flex items-center gap-1 text-[9px] font-black text-blue-700 uppercase tracking-widest bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md">
-                                      <Building2 className="w-2.5 h-2.5" />
-                                      {scopedClientName}
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 text-[9px] font-black text-gray-500 uppercase tracking-widest bg-gray-100 dark:bg-white/10 px-2 py-0.5 rounded-md">
-                                      <Globe className="w-2.5 h-2.5" />
-                                      Global
-                                    </span>
-                                  )}
+              <TabsContent value="sms" className="mt-0 outline-none">
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {(integrations as BroadcastIntegration[])?.filter(i => i.type === 'SMS').map(i => renderIntegrationCard(i))}
+                    {(integrations as BroadcastIntegration[])?.filter(i => i.type === 'SMS').length === 0 && (
+                      <button
+                        onClick={() => { setType('SMS'); setProvider('ADBIZZ'); setIsCreating(true); }}
+                        className="h-[240px] border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 hover:border-orange-500/30 hover:bg-orange-500/5 transition-all group"
+                      >
+                        <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Plus className="w-6 h-6 text-gray-400" />
+                        </div>
+                        <div className="text-center px-6">
+                          <p className="text-sm font-bold text-gray-600 dark:text-gray-300">No SMS Gateway Connected</p>
+                          <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-1">Connect Adbizz to send messages</p>
+                        </div>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+
+              {!admin && (
+                <TabsContent value="telegram" className="mt-0 outline-none">
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                      {isLoadingTelegram ? (
+                        <div className="col-span-full py-10 flex justify-center">
+                          <Loader2 className="w-6 h-6 text-sky-500 animate-spin" />
+                        </div>
+                      ) : telegramTargets.length === 0 ? (
+                        <button
+                          onClick={() => { setType('TELEGRAM'); setProvider('TELEGRAM'); setIsCreating(true); }}
+                          className="h-[240px] border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 hover:border-sky-500/30 hover:bg-sky-500/5 transition-all group"
+                        >
+                          <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Plus className="w-6 h-6 text-gray-400" />
+                          </div>
+                          <div className="text-center px-6">
+                            <p className="text-sm font-bold text-gray-600 dark:text-gray-300">No Telegram Channel Connected</p>
+                            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-1">Connect a bot to broadcast to channels</p>
+                          </div>
+                        </button>
+                      ) : (
+                        (telegramTargets as any[]).map((tg) => {
+                          const scopedClientName = clientNameById(tg.clientId ?? null);
+                          return (
+                            <Card key={tg.id} className="group border-gray-200 dark:border-white/10 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden bg-white dark:bg-[#111]">
+                              <CardContent className="p-8 flex flex-col h-full relative">
+                                <div className="absolute top-0 right-0 text-white text-[8px] font-black uppercase tracking-widest px-3 py-1 rounded-bl-xl shadow-lg flex items-center gap-1.5 bg-sky-500 shadow-sky-500/20">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                                  Active
                                 </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between pt-6 border-t border-gray-100 dark:border-white/5 mt-auto">
-                              <span className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">Operational</span>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })
-                  )}
-                  {telegramTargets.length > 0 && (
-                    <button
-                      onClick={() => { setType('TELEGRAM'); setProvider('TELEGRAM'); setIsCreating(true); }}
-                      className="h-[240px] border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 hover:border-sky-500/30 hover:bg-sky-500/5 transition-all group"
-                    >
-                      <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Plus className="w-6 h-6 text-gray-400" />
-                      </div>
-                      <div className="text-center px-6">
-                        <p className="text-sm font-bold text-gray-600 dark:text-gray-300">Connect Another Channel</p>
-                      </div>
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
+                                <div className="flex items-center gap-6 mb-8 mt-2">
+                                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center border border-gray-100 dark:border-white/10 group-hover:scale-110 transition-all duration-500 bg-sky-500/5 text-sky-600">
+                                    <SiTelegram className="w-7 h-7" />
+                                  </div>
+                                  <div>
+                                    <h3 className="font-bold text-gray-900 dark:text-white text-lg tracking-tight leading-none mb-2">{tg.name}</h3>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest bg-gray-100 dark:bg-white/10 px-2 py-0.5 rounded-md">TELEGRAM</span>
+                                      {scopedClientName ? (
+                                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-blue-700 uppercase tracking-widest bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md">
+                                          <Building2 className="w-2.5 h-2.5" />
+                                          {scopedClientName}
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-gray-500 uppercase tracking-widest bg-gray-100 dark:bg-white/10 px-2 py-0.5 rounded-md">
+                                          <Globe className="w-2.5 h-2.5" />
+                                          Global
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-between pt-6 border-t border-gray-100 dark:border-white/5 mt-auto">
+                                  <span className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">Operational</span>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })
+                      )}
+                      {telegramTargets.length > 0 && (
+                        <button
+                          onClick={() => { setType('TELEGRAM'); setProvider('TELEGRAM'); setIsCreating(true); }}
+                          className="h-[240px] border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 hover:border-sky-500/30 hover:bg-sky-500/5 transition-all group"
+                        >
+                          <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Plus className="w-6 h-6 text-gray-400" />
+                          </div>
+                          <div className="text-center px-6">
+                            <p className="text-sm font-bold text-gray-600 dark:text-gray-300">Connect Another Channel</p>
+                          </div>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </TabsContent>
+              )}
+            </Tabs>
           </div>
         )}
       </div>

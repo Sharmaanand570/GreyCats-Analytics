@@ -3,7 +3,7 @@ import { format, parseISO } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Pencil, Trash2, SquarePlus, AlertCircle, Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
-import { FaInstagram, FaFacebook, FaLinkedin } from 'react-icons/fa6';
+import { FaInstagram, FaFacebook, FaLinkedin, FaXTwitter } from 'react-icons/fa6';
 import { PostStatusBadge } from './PostStatusBadge';
 import type { ScheduledPost, PostPlatform, PostStatus } from '../api/types';
 
@@ -11,6 +11,7 @@ const platformIcons: Record<PostPlatform, React.ReactNode> = {
   instagram: <FaInstagram className="w-4 h-4 text-pink-600" />,
   facebook: <FaFacebook className="w-4 h-4 text-blue-600" />,
   linkedin: <FaLinkedin className="w-4 h-4 text-blue-700" />,
+  twitter: <FaXTwitter className="w-4 h-4 text-zinc-900" />,
   both: (
     <div className="flex -space-x-0.5">
       <FaFacebook className="w-3.5 h-3.5 text-blue-600" />
@@ -74,7 +75,7 @@ export function DayPostsSheet({
 }: DayPostsSheetProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden bg-white rounded-2xl gap-0">
+      <DialogContent className="w-[95vw] sm:w-full sm:max-w-[500px] p-0 overflow-hidden bg-white rounded-2xl gap-0">
         {/* Header — pr-10 keeps content clear of the dialog's absolute-positioned X button */}
         <DialogHeader className="px-6 pt-6 pb-4 pr-12 border-b border-zinc-100">
           <div className="flex items-start justify-between gap-3">

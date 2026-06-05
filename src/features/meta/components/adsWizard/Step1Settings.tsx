@@ -39,6 +39,12 @@ import {
   Users,
   Search,
   X,
+  Megaphone,
+  MousePointerClick,
+  MessageCircle,
+  Filter,
+  ShoppingBag,
+  Info,
 } from "lucide-react";
 import { RequiredMark } from "@/components/ui/required-mark";
 import { FormSection } from "./FormSection";
@@ -429,9 +435,14 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
         </FormSection>
 
         {/* Campaign Details — buying type, objective, advanced collapse */}
-        <FormSection title="Campaign Details" description="Choose how you'll pay and what you're optimizing for." icon={Target}>
+        <div className="py-8 space-y-6">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-[15px] font-bold text-slate-900">Campaign details</h3>
+          </div>
+
           <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-2">
+            <label className="text-[13px] font-bold text-slate-900">
               Buying type
             </label>
             <Select
@@ -448,22 +459,20 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
                     campaign: {
                       ...f.campaign,
                       buyingType: next,
-                      // Reservation only supports a subset — snap to Awareness if invalid.
                       objective: objectiveStillValid ? f.campaign.objective : "OUTCOME_AWARENESS",
                     },
                   };
                 });
               }}
             >
-              <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
+              <SelectTrigger className="h-10 rounded border-slate-300 bg-white shadow-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {BUYING_TYPE_OPTIONS.map((opt) => (
                   <SelectItem key={opt.value} value={opt.value} className="py-2">
                     <div className="flex flex-col items-start gap-0.5">
-                      <span className="font-bold text-sm text-slate-900">{opt.label}</span>
-                      <span className="text-[11px] text-slate-500">{opt.hint}</span>
+                      <span className="font-semibold text-[13px] text-slate-900">{opt.label}</span>
                     </div>
                   </SelectItem>
                 ))}
@@ -471,51 +480,74 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-2">
-              Campaign Objective <RequiredMark />
+          <div className="space-y-3">
+            <label className="text-[13px] font-bold text-slate-900 flex items-center gap-1.5">
+              Campaign objective <Info className="w-3.5 h-3.5 text-slate-600" />
             </label>
-            <Select
-              value={form.campaign.objective}
-              onValueChange={(v) => {
-                const next = v as CampaignObjective;
-                if (next === form.campaign.objective) return;
-                setTouchedObjective(true);
-                // Stash the pending choice; the modal commits it once user confirms.
-                setPendingObjective(next);
-              }}
-            >
-              <SelectTrigger
-                className={cn(
-                  "h-12 rounded-xl border-slate-200 bg-white shadow-sm",
-                  hasObjectiveError && "border-rose-400 focus:ring-rose-300"
-                )}
-                onBlur={() => setTouchedObjective(true)}
-              >
-                <SelectValue placeholder="What is your goal?" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableObjectives.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value} className="py-3">
-                    <div className="flex flex-col items-start gap-0.5">
-                      <span className="font-bold text-sm text-slate-900">{opt.label}</span>
-                      <span className="text-[11px] text-slate-500">{opt.hint}</span>
+            <div className="flex flex-col gap-1">
+              {availableObjectives.map((opt) => {
+                const isSelected = form.campaign.objective === opt.value;
+                
+                let Icon = Megaphone;
+                if (opt.value === "OUTCOME_TRAFFIC") Icon = MousePointerClick;
+                if (opt.value === "OUTCOME_ENGAGEMENT") Icon = MessageCircle;
+                if (opt.value === "OUTCOME_LEADS") Icon = Filter;
+                if (opt.value === "OUTCOME_APP_PROMOTION") Icon = Users;
+                if (opt.value === "OUTCOME_SALES") Icon = ShoppingBag;
+
+                return (
+                  <label
+                    key={opt.value}
+                    className={cn(
+                      "flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors border border-transparent",
+                      isSelected ? "bg-[#eef3f8]" : "hover:bg-slate-50"
+                    )}
+                  >
+                    <div className="relative flex items-center justify-center w-4 h-4 ml-1">
+                      <input
+                        type="radio"
+                        name="campaign_objective"
+                        value={opt.value}
+                        checked={isSelected}
+                        onChange={() => {
+                          const next = opt.value as CampaignObjective;
+                          if (next === form.campaign.objective) return;
+                          setTouchedObjective(true);
+                          setPendingObjective(next);
+                        }}
+                        className="peer sr-only"
+                      />
+                      <div className={cn(
+                        "w-4 h-4 rounded-full border flex items-center justify-center transition-colors",
+                        isSelected ? "border-[#0866ff]" : "border-slate-400"
+                      )}>
+                        {isSelected && <div className="w-2 h-2 rounded-full bg-[#0866ff]" />}
+                      </div>
                     </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                    
+                    <div className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors",
+                      isSelected ? "bg-[#0866ff] text-white" : "bg-slate-100 text-slate-600"
+                    )}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    
+                    <span className="text-[13px] text-slate-900">{opt.label}</span>
+                  </label>
+                );
+              })}
+            </div>
             {hasObjectiveError && <FieldError message="Campaign objective is required." />}
           </div>
 
           {isSalesObjective && (
             <div className="pl-4 ml-2 border-l-2 border-emerald-100 space-y-4 py-2">
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-1">
+                <label className="text-[13px] font-bold text-slate-900 flex items-center gap-1">
                   Meta Pixel <RequiredMark />
                 </label>
                 {isLoadingPixels ? (
-                  <Skeleton className="h-11 rounded-xl" />
+                  <Skeleton className="h-10 rounded" />
                 ) : pixels.length === 0 ? (
                   <div className="text-xs text-rose-700 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">
                     No Pixels found for this ad account. Create one in Meta Events Manager.
@@ -530,7 +562,7 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
                   >
                     <SelectTrigger
                       className={cn(
-                        "h-11 rounded-xl border-slate-200 bg-white",
+                        "h-10 rounded border-slate-300 bg-white",
                         hasPixelError && "border-rose-400 focus:ring-rose-300"
                       )}
                       onBlur={() => setTouchedPixel(true)}
@@ -541,7 +573,7 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
                       {pixels.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                           <div className="flex items-center justify-between w-[240px]">
-                            <span className="font-semibold text-slate-900 truncate">
+                            <span className="font-semibold text-[13px] text-slate-900 truncate">
                               {p.name}
                             </span>
                             <span className="text-[10px] text-slate-400 font-mono ml-2 shrink-0">
@@ -557,7 +589,7 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-1">
+                <label className="text-[13px] font-bold text-slate-900 flex items-center gap-1">
                   Conversion Event <RequiredMark />
                 </label>
                 <Select
@@ -569,7 +601,7 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
                 >
                   <SelectTrigger
                     className={cn(
-                      "h-11 rounded-xl border-slate-200 bg-white",
+                      "h-10 rounded border-slate-300 bg-white",
                       hasConversionEventError && "border-rose-400 focus:ring-rose-300"
                     )}
                     onBlur={() => setTouchedConversionEvent(true)}
@@ -579,7 +611,7 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
                   <SelectContent>
                     {CONVERSION_EVENT_OPTIONS.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
-                        <span className="font-semibold text-slate-900">{opt.label}</span>
+                        <span className="font-semibold text-[13px] text-slate-900">{opt.label}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -591,60 +623,84 @@ export function Step1Settings({ form, setForm, clientId, showAllErrors }: Props)
             </div>
           )}
 
-          {/* Show more / Hide settings toggle — Auction only. Reservation has no
-              campaign spending limit since impressions are pre-purchased. */}
           {isAuction && (
-            <button
-              type="button"
-              onClick={() =>
-                setForm((f) => ({
-                  ...f,
-                  campaign: { ...f.campaign, showAdvancedSettings: !f.campaign.showAdvancedSettings },
-                }))
-              }
-              className="inline-flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-blue-700 mt-2"
-            >
-              {form.campaign.showAdvancedSettings ? (
-                <>
-                  Hide settings <ChevronUp className="w-4 h-4" />
-                </>
-              ) : (
-                <>
-                  Show more options <ChevronDown className="w-4 h-4" />
-                </>
-              )}
-            </button>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setForm((f) => ({
+                    ...f,
+                    campaign: { ...f.campaign, showAdvancedSettings: !f.campaign.showAdvancedSettings },
+                  }))
+                }
+                className="inline-flex items-center gap-1 text-[13px] text-[#0064d1] font-semibold hover:underline"
+              >
+                {form.campaign.showAdvancedSettings ? (
+                  <>
+                    Hide options <ChevronUp className="w-4 h-4" />
+                  </>
+                ) : (
+                  <>
+                    Show options <ChevronDown className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </div>
           )}
 
           {isAuction && form.campaign.showAdvancedSettings && (
-            <div className="pl-4 ml-2 border-l-2 border-slate-100 space-y-4 py-2">
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-widest text-slate-600 flex items-center gap-1">
-                  Campaign spending limit <span className="text-slate-300 font-normal normal-case">(optional)</span>
-                </label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={form.campaign.campaignSpendingLimit ?? ""}
-                  onChange={(e) =>
+            <div className="space-y-3">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[13px] font-bold text-slate-900">Campaign spending limit</span>
+                <span className="text-[13px] text-slate-500">· Optional</span>
+                <Info className="w-3.5 h-3.5 text-slate-600" />
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="add-spending-limit"
+                  checked={form.campaign.campaignSpendingLimit !== undefined}
+                  onCheckedChange={(v) => {
                     setForm((f) => ({
                       ...f,
                       campaign: {
                         ...f.campaign,
-                        campaignSpendingLimit: e.target.value ? Number(e.target.value) : undefined,
+                        campaignSpendingLimit: v ? 0 : undefined,
                       },
                     }))
-                  }
-                  placeholder="No limit"
-                  className="h-11 rounded-xl border-slate-200 bg-white"
+                  }}
+                  className="rounded-sm w-4 h-4"
                 />
-                <p className="text-[11px] text-slate-400">
-                  Cap the total amount Meta can spend on this campaign across its lifetime.
-                </p>
+                <label htmlFor="add-spending-limit" className="text-[13px] text-slate-900 cursor-pointer">
+                  Add campaign spending limit
+                </label>
               </div>
+
+              {form.campaign.campaignSpendingLimit !== undefined && (
+                <div className="pl-6 mt-2 space-y-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.campaign.campaignSpendingLimit === 0 ? "" : form.campaign.campaignSpendingLimit}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        campaign: {
+                          ...f.campaign,
+                          campaignSpendingLimit: e.target.value ? Number(e.target.value) : 0,
+                        },
+                      }))
+                    }
+                    placeholder="Enter limit"
+                    className="h-10 rounded border-slate-300 bg-white"
+                  />
+                  <p className="text-[11px] text-slate-400">
+                    Cap the total amount Meta can spend on this campaign across its lifetime.
+                  </p>
+                </div>
+              )}
             </div>
           )}
-        </FormSection>
+        </div>
 
         {/* Advantage+ catalogue — Sales objective + Auction only */}
         {isAuction && isSalesObjective && (

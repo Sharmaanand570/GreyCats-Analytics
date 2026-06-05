@@ -25,7 +25,7 @@ import { useClient, useClients } from "../hooks/useClients";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { ScrollArea } from "../components/ui/scroll-area";
-import { Building2, ArrowRight } from "lucide-react";
+import { Building2, ArrowRight, Database } from "lucide-react";
 import { useSyncStatus } from "@/features/reports/hooks/useSyncStatus";
 import { SyncStatusBadge } from "@/components/SyncStatusBadge";
 import { SyncProgressBar } from "@/components/SyncProgressBar";
@@ -480,8 +480,11 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
   const content = (
     <div className="w-full h-full flex flex-col">
       {!hideHeader && (
-        <div className="w-full h-[4.8em]  border-b flex justify-between items-center px-5 ">
-          <span className="font-medium text-xl">Data Sources</span>
+        <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+          <div>
+            <span className="font-medium text-xl">Platforms</span>
+            <p className="text-sm text-slate-500 mt-1">Manage all your platform connections in one place.</p>
+          </div>
           <div className="flex items-center">
             <span className="mx-2 text-lg text-gray-500">
               <FiSearch />
@@ -588,6 +591,40 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
                 Failed to load integrations
               </p>
             </div>
+          </div>
+        ) : tableData.length === 0 ? (
+          <div className="bg-white rounded-[32px] border border-zinc-200/60 shadow-xl shadow-zinc-200/20 p-12 text-center max-w-3xl mx-auto my-10">
+            <div className="w-24 h-24 bg-zinc-50 rounded-[40px] flex items-center justify-center mx-auto mb-8 border border-zinc-100 shadow-inner transform -rotate-6 transition-transform hover:rotate-0 duration-500">
+              <Database className="w-10 h-10 text-zinc-400" />
+            </div>
+            <h3 className="text-zinc-900 font-extrabold text-3xl tracking-tight mb-4">Connect Your First Platform</h3>
+            <p className="text-zinc-500 text-lg font-medium leading-relaxed mb-10 max-w-xl mx-auto">
+              Platforms are the engines that power your workspace. Connect data sources like Google Analytics, Facebook Ads, or Shopify to automatically feed data into your <span className="font-bold text-zinc-700">Reports</span> and train your <span className="font-bold text-zinc-700">Brand AI</span>.
+            </p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12 text-left">
+              <div className="bg-zinc-50/50 p-6 rounded-[24px] border border-zinc-100">
+                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm mb-4">1</div>
+                <h4 className="font-bold text-zinc-900 mb-2">Connect</h4>
+                <p className="text-xs text-zinc-500 font-medium">Securely authorize your favorite platforms with 1-click OAuth.</p>
+              </div>
+              <div className="bg-zinc-50/50 p-6 rounded-[24px] border border-zinc-100">
+                <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-sm mb-4">2</div>
+                <h4 className="font-bold text-zinc-900 mb-2">Sync</h4>
+                <p className="text-xs text-zinc-500 font-medium">We securely download your historical data to power insights.</p>
+              </div>
+              <div className="bg-zinc-50/50 p-6 rounded-[24px] border border-zinc-100">
+                <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-sm mb-4">3</div>
+                <h4 className="font-bold text-zinc-900 mb-2">Analyze</h4>
+                <p className="text-xs text-zinc-500 font-medium">View instant reports and ask Brand AI questions about your data.</p>
+              </div>
+            </div>
+
+            <ConnectDataSource clientId={clientId}>
+              <Button className="rounded-2xl h-14 px-10 bg-zinc-900 hover:bg-zinc-800 text-white font-bold shadow-xl shadow-zinc-200/50 transition-all active:scale-[0.98] text-base">
+                Get Started
+              </Button>
+            </ConnectDataSource>
           </div>
         ) : (
           <TableComponent

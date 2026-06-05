@@ -215,7 +215,7 @@ export function AISuggestionsPanel({ clientId, isOpen, onClose, onPostCreated }:
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0">
+      <DialogContent className="w-[95vw] sm:w-[90vw] md:w-full max-w-2xl max-h-[85vh] flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <CalendarPlus className="h-5 w-5" />

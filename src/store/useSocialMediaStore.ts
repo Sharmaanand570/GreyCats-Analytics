@@ -7,6 +7,8 @@ export interface DraftPost {
   date: Date;
   time: string; // "HH:mm"
   platform: PostPlatform | '';
+  /** Multi-platform selection (used in create mode). Drives the new platforms[] payload. */
+  selectedPlatforms: string[];
   postType: PostType;
   message: string;
   firstComment: string;
@@ -20,6 +22,7 @@ const DEFAULT_DRAFT: DraftPost = {
   date: new Date(),
   time: '10:00',
   platform: '',
+  selectedPlatforms: [],
   postType: 'FEED',
   message: '',
   firstComment: '',
@@ -74,7 +77,17 @@ export const useSocialMediaStore = create<SocialMediaState>()(
         },
         currentStep: state.currentStep,
       }),
+      // Merge persisted (potentially old) state with current defaults so new
+      // fields like selectedPlatforms are never undefined after a page reload.
+      merge: (persisted: any, current) => ({
+        ...current,
+        ...persisted,
+        draftPost: {
+          ...DEFAULT_DRAFT,
+          ...(persisted as any)?.draftPost,
+          mediaFiles: [], // always reset files
+        },
+      }),
     }
   )
 );
-

@@ -95,9 +95,9 @@ function StepSelectClient({
   const [addMenuOpen, setAddMenuOpen] = useState(false);
 
   return (
-    <div className="w-full p-8 relative">
+    <div className="w-full p-4 sm:p-8 relative">
       <div className="max-w-5xl mx-auto relative z-10">
-        <div className="mb-12 text-center pt-10">
+        <div className="mb-8 sm:mb-12 text-center pt-6 sm:pt-10">
           <div className="w-20 h-20 bg-white shadow-xl shadow-zinc-200/50 border border-zinc-100 rounded-[28%] flex items-center justify-center mx-auto mb-6 transform rotate-3 hover:rotate-0 transition-transform duration-500">
             <Layers className="w-10 h-10 text-zinc-800" />
           </div>
@@ -234,8 +234,8 @@ function StepCreateClient({
   };
 
   return (
-    <div className="w-full p-8 relative">
-      <div className="max-w-xl mx-auto relative z-10 pt-10">
+    <div className="w-full p-4 sm:p-8 relative">
+      <div className="max-w-xl mx-auto relative z-10 pt-6 sm:pt-10">
         {/* Progress Indicator */}
         <div className="flex items-center justify-center gap-3 mb-12">
           <div className="flex items-center gap-2">
@@ -363,8 +363,8 @@ function StepPickExistingClient({
   onBack: () => void;
 }) {
   return (
-    <div className="w-full p-8 relative">
-      <div className="max-w-3xl mx-auto relative z-10 pt-10">
+    <div className="w-full p-4 sm:p-8 relative">
+      <div className="max-w-3xl mx-auto relative z-10 pt-6 sm:pt-10">
         <button
           onClick={onBack}
           className="flex items-center gap-2 text-sm font-bold text-zinc-500 hover:text-zinc-800 transition-all mb-8 group"
@@ -373,8 +373,8 @@ function StepPickExistingClient({
           Back to Selection
         </button>
 
-        <div className="bg-white/80 backdrop-blur-md border border-zinc-200/50 rounded-[32px] p-10 shadow-2xl shadow-zinc-200/50">
-          <div className="mb-10 text-center">
+        <div className="bg-white/80 backdrop-blur-md border border-zinc-200/50 rounded-[24px] sm:rounded-[32px] p-6 sm:p-10 shadow-2xl shadow-zinc-200/50">
+          <div className="mb-8 sm:mb-10 text-center">
             <div className="w-16 h-16 bg-white shadow-lg border border-zinc-100 rounded-2xl flex items-center justify-center mx-auto mb-5 transform rotate-3">
               <Users className="w-8 h-8 text-zinc-800" />
             </div>
@@ -483,11 +483,11 @@ function StepConnectPlatforms({
   const hasAnyConnection = linkedPages.length > 0 || linkedLinkedin.length > 0;
 
   return (
-    <div className="w-full p-6 relative">
+    <div className="w-full p-4 sm:p-6 relative">
       <div className="max-w-4xl mx-auto relative z-10 pt-4">
         {/* Top bar: Left = back + heading, Right = coming soon + stepper */}
-        <div className="flex items-end justify-between gap-6 mb-6">
-          <div className="flex-1 min-w-0">
+        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 sm:gap-6 mb-6">
+          <div className="flex-1 min-w-0 w-full sm:w-auto">
             <button
               onClick={onBack}
               className="flex items-center gap-2 text-sm font-bold text-zinc-500 hover:text-zinc-800 transition-all mb-3 group"
@@ -541,7 +541,7 @@ function StepConnectPlatforms({
 
         <div className="grid grid-cols-1 gap-6">
           {/* Active Integrations */}
-          <div className="bg-white/80 backdrop-blur-sm border border-zinc-200/50 rounded-[32px] p-8 shadow-xl shadow-zinc-100/50">
+          <div className="bg-white/80 backdrop-blur-sm border border-zinc-200/50 rounded-[24px] sm:rounded-[32px] p-6 sm:p-8 shadow-xl shadow-zinc-100/50">
             {/* Platform badge + header */}
             <div className="flex items-center gap-2 mb-4">
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-100">
@@ -648,7 +648,7 @@ function StepConnectPlatforms({
           </div>
 
           {/* LinkedIn Integrations */}
-          <div className="bg-white/80 backdrop-blur-sm border border-zinc-200/50 rounded-[32px] p-8 shadow-xl shadow-zinc-100/50">
+          <div className="bg-white/80 backdrop-blur-sm border border-zinc-200/50 rounded-[24px] sm:rounded-[32px] p-6 sm:p-8 shadow-xl shadow-zinc-100/50">
             <div className="flex items-center gap-2 mb-4">
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-100">
                 <FaLinkedin className="w-3.5 h-3.5 text-blue-700" />
@@ -837,9 +837,9 @@ function StepWorkspace({
 
   return (
     <div className="w-full h-full flex flex-col bg-zinc-50/30">
-      <div className="px-5 py-3 border-b border-zinc-100 bg-white/60 backdrop-blur-sm shrink-0">
+      <div className="px-3 sm:px-5 py-3 border-b border-zinc-100 bg-white/60 backdrop-blur-sm shrink-0">
         <div className="max-w-[1400px] mx-auto flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl border border-zinc-100 overflow-hidden flex items-center justify-center bg-zinc-50 shrink-0">
               <ClientLogo logo={client.logo} size="md" />
             </div>
@@ -956,7 +956,7 @@ function StepWorkspace({
         </div>
       </div>
 
-      <div className="flex-1 p-6 overflow-hidden">
+      <div className="flex-1 p-3 sm:p-6 overflow-hidden">
         <div className="max-w-[1400px] mx-auto h-full">
           <SocialMediaCalendar
             clientId={client.id}
@@ -1254,7 +1254,7 @@ export default function SocialMediaSchedulerPage() {
 
   return (
     <div className="w-full h-screen flex flex-col overflow-hidden bg-white">
-      <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
+      <div className="w-full sm:rounded-l-2xl overflow-hidden h-full sm:my-4 bg-[#fdfdfd]">
         <div className="w-full h-full flex flex-col relative">
           <div className="flex-1 overflow-y-auto relative h-full">
             {renderContent()}

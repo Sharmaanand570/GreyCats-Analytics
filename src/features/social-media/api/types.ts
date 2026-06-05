@@ -1,6 +1,7 @@
 // Scheduled Posts — Backend-aligned types
 
-export type PostPlatform = 'facebook' | 'instagram' | 'both' | 'linkedin';
+export type PostPlatform = 'facebook' | 'instagram' | 'both' | 'linkedin' | 'twitter';
+export type SelectablePlatform = 'facebook' | 'instagram' | 'twitter' | 'linkedin';
 export type PostStatus = 'PENDING' | 'PROCESSING' | 'PUBLISHED' | 'FAILED';
 export type MediaType = 'IMAGE' | 'VIDEO' | 'CAROUSEL';
 export type PostType = 'FEED' | 'STORY';
@@ -59,6 +60,7 @@ export interface CreatePostPayload {
   metaAccountId?: number;
   twitterAccountId?: number;
   linkedinPortAccountId?: number;
+  linkedinAuthAccountId?: number;
   clientId?: number;
   platform: PostPlatform;
   postType?: PostType;
@@ -75,6 +77,25 @@ export interface CreatePostPayload {
   locationId?: string;
 }
 
+/** Payload for the multi-platform create endpoint (platforms[]). */
+export interface CreateMultiPlatformPostPayload {
+  platforms: SelectablePlatform[];
+  metaAccountId?: number;
+  twitterAccountId?: number;
+  linkedinPortAccountId?: number;
+  linkedinAuthAccountId?: number;
+  clientId?: number;
+  postType?: PostType;
+  message?: string;
+  firstComment?: string;
+  mediaUrls?: string[];
+  mediaType?: MediaType;
+  scheduledFor: string; // ISO UTC
+  userTags?: UserTag[];
+  collaboratorIds?: string[];
+  locationId?: string;
+}
+
 export interface UpdatePostPayload {
   message?: string;
   firstComment?: string;
@@ -85,6 +106,7 @@ export interface UpdatePostPayload {
   metaAccountId?: number;
   twitterAccountId?: number;
   linkedinPortAccountId?: number;
+  linkedinAuthAccountId?: number;
   postType?: PostType;
   userTags?: UserTag[];
   collaboratorIds?: string[];
@@ -100,6 +122,12 @@ export interface UploadMediaResponse {
 export interface ScheduledPostResponse {
   success: boolean;
   post: ScheduledPost;
+}
+
+/** Response when platforms[] array was sent — backend returns posts[] */
+export interface MultiPlatformPostResponse {
+  success: boolean;
+  posts: ScheduledPost[];
 }
 
 export interface ScheduledPostsListResponse {

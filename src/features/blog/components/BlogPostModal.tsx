@@ -159,8 +159,6 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
   const [aiBodyLoading, setAiBodyLoading] = useState(false);
   const [showAiTitleInput, setShowAiTitleInput] = useState(false);
   const [aiTitleTopic, setAiTitleTopic] = useState('');
-  const [showAiBodyInput, setShowAiBodyInput] = useState(false);
-  const [aiBodyTopic, setAiBodyTopic] = useState('');
 
   const createMutation = useCreateBlogPost();
   const updateMutation = useUpdateBlogPost();
@@ -557,9 +555,10 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
                         setShowAiTitleInput(true);
                       }
                     }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md bg-zinc-100 hover:bg-zinc-900 hover:text-white text-zinc-400 transition-all"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1.5 rounded-md bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white shadow-sm hover:shadow transition-all flex items-center gap-1.5 text-[10px] font-bold tracking-wide"
                   >
                     {aiTitleLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    <span className="hidden md:inline">{title ? "Rewrite" : "AI Assist"}</span>
                   </button>
                   {showAiTitleInput && (
                     <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-white rounded-lg border border-zinc-300 shadow-lg p-3 space-y-2">
@@ -589,74 +588,39 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
               </div>
               <div>
                 <label className="text-xs font-semibold text-zinc-600 mb-1.5 block">Body</label>
-                <div className="relative border border-zinc-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-zinc-300 focus-within:border-zinc-300 transition-all">
-                  <EditorToolbar editor={editor} />
-                  <EditorContent editor={editor} />
+                <div className="relative">
+                  <div className="border border-zinc-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-zinc-300 focus-within:border-zinc-300 transition-all">
+                    <EditorToolbar editor={editor} />
+                    <EditorContent editor={editor} />
+                  </div>
                   {/* AI sparkles icon inside the editor */}
                   <button
                     type="button"
-                    title={content ? "Rewrite with AI" : "Write with AI"}
+                    title={editor?.getText().trim() ? "Rewrite with AI" : "Write with AI"}
                     disabled={aiBodyLoading}
                     onClick={() => {
-                      const topic = title.trim() || (content ? content.slice(0, 100) : '');
-                      if (topic) {
-                        setAiBodyLoading(true);
-                        creativeApi.generateContent({ clientId, contentType: 'article', topic: content ? `Rewrite and improve: ${topic}` : topic, platform: 'linkedin' })
-                          .then((res) => {
-                            if (editor && res.data.data.content) {
-                              editor.commands.setContent(res.data.data.content.replace(/\n/g, '<br>'));
-                              updateDraft({ content: res.data.data.content });
-                              toast.success(`Blog body ${content ? 'improved' : 'generated'}! (${res.data.data.wordCount} words)`);
-                            }
-                          }).catch(() => toast.error('Failed to generate')).finally(() => setAiBodyLoading(false));
-                      } else {
-                        setShowAiBodyInput(true);
+                      const textContent = editor?.getText().trim() || '';
+                      if (!title.trim() && !textContent) {
+                        toast.error('Please enter or generate a Title first!');
+                        return;
                       }
+
+                      const topic = title.trim() || textContent.slice(0, 100);
+                      setAiBodyLoading(true);
+                      creativeApi.generateContent({ clientId, contentType: 'article', topic: textContent ? `Rewrite and improve: ${topic}` : topic, platform: 'linkedin' })
+                        .then((res) => {
+                          if (editor && res.data.data.content) {
+                            editor.commands.setContent(res.data.data.content.replace(/\n/g, '<br>'));
+                            updateDraft({ content: res.data.data.content });
+                            toast.success(`Blog body ${textContent ? 'improved' : 'generated'}! (${res.data.data.wordCount} words)`);
+                          }
+                        }).catch(() => toast.error('Failed to generate')).finally(() => setAiBodyLoading(false));
                     }}
-                    className="absolute bottom-2 right-2 p-1.5 rounded-md bg-zinc-100 hover:bg-zinc-900 hover:text-white text-zinc-400 transition-all z-10"
+                    className="absolute bottom-3 right-3 px-3 py-2 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white shadow-md hover:shadow-lg transition-all z-10 flex items-center gap-2 text-xs font-bold tracking-wide"
                   >
-                    {aiBodyLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    {aiBodyLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                    <span className="hidden md:inline">{editor?.getText().trim() ? "Improve with AI" : "Write with AI"}</span>
                   </button>
-                  {/* Floating topic input when no context */}
-                  {showAiBodyInput && (
-                    <div className="absolute bottom-10 right-2 z-20 w-72 bg-white rounded-lg border border-zinc-300 shadow-lg p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-zinc-700">What should the blog be about?</span>
-                        <button type="button" onClick={() => setShowAiBodyInput(false)} className="text-zinc-400 hover:text-zinc-600"><XIcon className="w-3.5 h-3.5" /></button>
-                      </div>
-                      <input autoFocus type="text" value={aiBodyTopic} onChange={(e) => setAiBodyTopic(e.target.value)} placeholder="e.g. Travel tips, Hotel amenities..."
-                        className="w-full text-sm border border-zinc-200 rounded-md px-3 py-2 focus:outline-none focus:border-zinc-400"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && aiBodyTopic.trim()) {
-                            e.preventDefault(); setAiBodyLoading(true); setShowAiBodyInput(false);
-                            creativeApi.generateContent({ clientId, contentType: 'article', topic: aiBodyTopic.trim(), platform: 'linkedin' })
-                              .then((res) => {
-                                if (editor && res.data.data.content) {
-                                  editor.commands.setContent(res.data.data.content.replace(/\n/g, '<br>'));
-                                  updateDraft({ content: res.data.data.content });
-                                  toast.success(`Blog generated! (${res.data.data.wordCount} words)`);
-                                }
-                              }).catch(() => toast.error('Failed')).finally(() => { setAiBodyLoading(false); setAiBodyTopic(''); });
-                          } else if (e.key === 'Escape') { setShowAiBodyInput(false); }
-                        }}
-                      />
-                      <div className="flex justify-end">
-                        <button type="button" disabled={!aiBodyTopic.trim()} onClick={() => {
-                          setAiBodyLoading(true); setShowAiBodyInput(false);
-                          creativeApi.generateContent({ clientId, contentType: 'article', topic: aiBodyTopic.trim(), platform: 'linkedin' })
-                            .then((res) => {
-                              if (editor && res.data.data.content) {
-                                editor.commands.setContent(res.data.data.content.replace(/\n/g, '<br>'));
-                                updateDraft({ content: res.data.data.content });
-                                toast.success(`Blog generated! (${res.data.data.wordCount} words)`);
-                              }
-                            }).catch(() => toast.error('Failed')).finally(() => { setAiBodyLoading(false); setAiBodyTopic(''); });
-                        }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-900 text-white text-xs font-medium disabled:opacity-50 hover:bg-zinc-800 transition-all">
-                          <Sparkles className="w-3 h-3" /> Generate
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

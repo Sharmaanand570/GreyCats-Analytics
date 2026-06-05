@@ -12,24 +12,39 @@ import Reports from '../components/Reports';
 import { AccountSelectionModal } from '../components/clients/AccountSelectionModal';
 import type { IntegrationType } from '../types/integration.types';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Loader2, LayoutDashboard, FileBarChart, Database, CalendarDays, Edit2, Sparkles, Palette } from 'lucide-react';
+import { ChevronLeft, Loader2, LayoutDashboard, FileBarChart, Database, CalendarDays, Edit2, Sparkles } from 'lucide-react';
 import { NotificationsPopover } from '../components/NotificationsPopover';
 import { ReportSchedules } from '../components/ReportSchedules';
 import { useSyncStatus } from '@/features/reports/hooks/useSyncStatus';
 import ClientFormModal from '../components/clients/ClientFormModal';
-import BrandSettings from '../components/clients/BrandSettings';
-import CreativeSuite from '../components/creative/CreativeSuite';
+import AIStudio from '../components/ai-studio/AIStudio';
 import { getProfileImageUrl } from "@/utils/imageUtils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 import { clientKeys } from '../hooks/useClients';
 import type { Client } from "@/types/client.types";
 
+const EmptyPlatformState = ({ title, description, onConnect }: { title: string, description: string, onConnect: () => void }) => (
+    <div className="bg-white rounded-[32px] border border-zinc-200/60 shadow-xl shadow-zinc-200/20 p-12 text-center max-w-3xl mx-auto my-10">
+        <div className="w-24 h-24 bg-zinc-50 rounded-[40px] flex items-center justify-center mx-auto mb-8 border border-zinc-100 shadow-inner transform -rotate-6 transition-transform hover:rotate-0 duration-500">
+            <Database className="w-10 h-10 text-zinc-400" />
+        </div>
+        <h3 className="text-zinc-900 font-extrabold text-3xl tracking-tight mb-4">{title}</h3>
+        <p className="text-zinc-500 text-lg font-medium leading-relaxed mb-10 max-w-xl mx-auto">
+            {description}
+        </p>
+        <Button onClick={onConnect} className="rounded-2xl h-14 px-10 bg-zinc-900 hover:bg-zinc-800 text-white font-bold shadow-xl shadow-zinc-200/50 transition-all active:scale-[0.98] text-base">
+            Connect a Platform
+        </Button>
+    </div>
+);
+
 const ClientDetailPage: React.FC = () => {
     const { clientId } = useParams<{ clientId: string }>();
     const navigate = useNavigate();
     const parsedClientId = clientId ? parseInt(clientId) : null;
     const { data: client, isLoading, error } = useClient(parsedClientId);
+    const hasPlatforms = client?.integrations && client.integrations.length > 0;
     const [searchParams] = useSearchParams();
     const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
     const [accountModalOpen, setAccountModalOpen] = useState(false);
@@ -222,15 +237,11 @@ const ClientDetailPage: React.FC = () => {
                                 </TabsTrigger>
                                 <TabsTrigger value="data-sources" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
                                     <Database className="w-4 h-4 mr-2" />
-                                    Data Sources
+                                    Platforms
                                 </TabsTrigger>
-                                <TabsTrigger value="brand-ai" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                                <TabsTrigger value="ai-studio" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
                                     <Sparkles className="w-4 h-4 mr-2" />
-                                    Brand AI
-                                </TabsTrigger>
-                                <TabsTrigger value="creative-suite" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                                    <Palette className="w-4 h-4 mr-2" />
-                                    Creative Suite
+                                    AI Studio
                                 </TabsTrigger>
                             </TabsList>
                             {isReportAccessLocked && (
@@ -242,27 +253,51 @@ const ClientDetailPage: React.FC = () => {
                             <TabsContent value="overview" className="space-y-4 focus-visible:outline-none">
                                 <div className="min-h-[500px]">
                                     {parsedClientId && (
-                                        <Dashboard
-                                            clientId={parsedClientId}
-                                            onConnectIntegration={() => setActiveTab("data-sources")}
-                                            withLayout={false}
-                                            hideHeader={true}
-                                            dateRange={dateRange}
-                                            onDateRangeChange={setDateRange}
-                                        />
+                                        !hasPlatforms ? (
+                                            <EmptyPlatformState 
+                                                title="No Data to Display" 
+                                                description="Your dashboard is empty because no platforms are connected. Connect a platform like Google Analytics or Facebook Ads to see your data here."
+                                                onConnect={() => setActiveTab("data-sources")}
+                                            />
+                                        ) : (
+                                            <Dashboard
+                                                clientId={parsedClientId}
+                                                onConnectIntegration={() => setActiveTab("data-sources")}
+                                                withLayout={false}
+                                                hideHeader={true}
+                                                dateRange={dateRange}
+                                                onDateRangeChange={setDateRange}
+                                            />
+                                        )
                                     )}
                                 </div>
                             </TabsContent>
 
                             <TabsContent value="reports" className="space-y-4 focus-visible:outline-none">
                                 {parsedClientId && (
-                                    <Reports viewMode="embedded" clientId={parsedClientId} />
+                                    !hasPlatforms ? (
+                                        <EmptyPlatformState 
+                                            title="Reports Unavailable" 
+                                            description="You need to connect at least one platform before you can generate reports. Connect a platform to start analyzing your data."
+                                            onConnect={() => setActiveTab("data-sources")}
+                                        />
+                                    ) : (
+                                        <Reports viewMode="embedded" clientId={parsedClientId} />
+                                    )
                                 )}
                             </TabsContent>
 
                             <TabsContent value="schedules" className="space-y-4 focus-visible:outline-none">
                                 {parsedClientId && (
-                                    <ReportSchedules clientId={parsedClientId} />
+                                    !hasPlatforms ? (
+                                        <EmptyPlatformState 
+                                            title="No Scheduled Reports" 
+                                            description="Connect a platform to start generating and scheduling automated reports for your workspace."
+                                            onConnect={() => setActiveTab("data-sources")}
+                                        />
+                                    ) : (
+                                        <ReportSchedules clientId={parsedClientId} />
+                                    )
                                 )}
                             </TabsContent>
 
@@ -278,18 +313,10 @@ const ClientDetailPage: React.FC = () => {
                                 </div>
                             </TabsContent>
 
-                            <TabsContent value="brand-ai" className="space-y-4 focus-visible:outline-none">
-                                <div className="min-h-[500px]">
+                            <TabsContent value="ai-studio" className="space-y-4 focus-visible:outline-none">
+                                <div className="min-h-[700px] pb-8">
                                     {parsedClientId && (
-                                        <BrandSettings clientId={parsedClientId} />
-                                    )}
-                                </div>
-                            </TabsContent>
-
-                            <TabsContent value="creative-suite" className="space-y-4 focus-visible:outline-none">
-                                <div className="min-h-[500px]">
-                                    {parsedClientId && (
-                                        <CreativeSuite clientId={parsedClientId} />
+                                        <AIStudio clientId={parsedClientId} />
                                     )}
                                 </div>
                             </TabsContent>

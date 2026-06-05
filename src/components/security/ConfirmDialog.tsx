@@ -16,7 +16,7 @@ interface ConfirmDialogProps {
     onOpenChange: (open: boolean) => void;
     onConfirm: () => void;
     title: string;
-    description: string;
+    description: React.ReactNode;
     confirmText?: string;
     cancelText?: string;
     requireTyping?: string; // Optional word user must type to confirm (e.g., "DELETE")

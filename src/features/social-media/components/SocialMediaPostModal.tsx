@@ -19,7 +19,7 @@ import { useCreatePost } from '../hooks/useCreatePost';
 import { useUpdatePost } from '../hooks/useUpdatePost';
 import { useSearchCollaborator } from '../hooks/useSearchCollaborator';
 import { useSearchLocation } from '../hooks/useSearchLocation';
-import type { ScheduledPost, PostPlatform, PostType, UserTag, CollaboratorSearchResult, LocationSearchResult } from '../api/types';
+import type { ScheduledPost, PostPlatform, PostType, UserTag, CollaboratorSearchResult, LocationSearchResult, SelectablePlatform } from '../api/types';
 import { Loader2 } from 'lucide-react';
 
 interface SocialMediaPostModalProps {
@@ -29,7 +29,14 @@ interface SocialMediaPostModalProps {
   editingPost?: ScheduledPost | null;
 }
 
-const PLATFORMS: { id: PostPlatform; icon: React.ReactNode; label: string }[] = [
+const SELECTABLE_PLATFORMS: { id: SelectablePlatform; icon: React.ReactNode; label: string; color: string }[] = [
+  { id: 'instagram', icon: <FaInstagram className="w-4 h-4" />, label: 'Instagram', color: 'text-pink-600' },
+  { id: 'facebook', icon: <FaFacebook className="w-4 h-4" />, label: 'Facebook', color: 'text-blue-600' },
+  { id: 'linkedin', icon: <FaLinkedin className="w-4 h-4" />, label: 'LinkedIn', color: 'text-blue-700' },
+];
+
+// For the edit flow (single platform display) — keeps legacy 'both' support
+const EDIT_PLATFORMS: { id: PostPlatform; icon: React.ReactNode; label: string }[] = [
   { id: 'instagram', icon: <FaInstagram className="w-5 h-5" />, label: 'Instagram' },
   { id: 'facebook', icon: <FaFacebook className="w-5 h-5" />, label: 'Facebook' },
   {
@@ -67,6 +74,7 @@ const ASPECT_RATIOS: Record<string, { label: string; value: string; css: string 
   linkedin: [
     { label: 'Any (Auto)', value: '1:1', css: '1/1' },
   ],
+
 };
 
 const CAPTION_LIMITS: Record<string, number> = {
@@ -74,6 +82,7 @@ const CAPTION_LIMITS: Record<string, number> = {
   facebook: 63206,
   both: 2200,
   linkedin: 3000,
+
 };
 
 const COMMON_TIMEZONES = [
@@ -112,8 +121,42 @@ const VIDEO_SPECS = {
 export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }: SocialMediaPostModalProps) {
   const { currentClient } = useClientContext();
   const { draftPost, updateDraft, resetDraft } = useSocialMediaStore();
-  const { platform, postType, aspectRatio, message: caption, mediaFiles = [], time } = draftPost;
+  const { platform, postType, aspectRatio, message: caption, mediaFiles = [], time, selectedPlatforms = [] } = draftPost;
   const isStory = postType === 'STORY';
+  const isEditing = !!editingPost;
+
+  // Derived helpers — what credentials are required for selected platforms
+  const isMetaNeeded = !isEditing && (selectedPlatforms.includes('instagram') || selectedPlatforms.includes('facebook'));
+  const isLinkedinNeeded = !isEditing && selectedPlatforms.includes('linkedin');
+
+  // Whether any non-Meta platform is selected (LinkedIn doesn't support Stories)
+  const hasNonMetaPlatforms = !isEditing && selectedPlatforms.includes('linkedin');
+
+  // Whether any Meta platform is selected (needed to show Story toggle)
+  const hasMetaPlatforms = !isEditing &&
+    (selectedPlatforms.includes('instagram') || selectedPlatforms.includes('facebook'));
+
+  /**
+   * Compute the intersection of aspect ratios supported by ALL currently selected
+   * platforms. Falls back to [1:1] if no common ratio exists.
+   */
+  const compatibleRatios: { label: string; value: string; css: string }[] = (() => {
+    if (isEditing || selectedPlatforms.length === 0) {
+      return ASPECT_RATIOS[platform || 'instagram'] || ASPECT_RATIOS['instagram'];
+    }
+    // Seed from the first platform, then intersect against every subsequent one
+    let result = ASPECT_RATIOS[selectedPlatforms[0]] || ASPECT_RATIOS['instagram'];
+    for (let i = 1; i < selectedPlatforms.length; i++) {
+      const next = new Set((ASPECT_RATIOS[selectedPlatforms[i]] || ASPECT_RATIOS['instagram']).map(r => r.value));
+      result = result.filter(r => next.has(r.value));
+    }
+    return result.length > 0 ? result : [{ label: 'Square (1:1)', value: '1:1', css: '1/1' }];
+  })();
+
+  // In preview, show the first selected platform (or edit platform)
+  const previewPlatform: PostPlatform | '' = isEditing
+    ? platform
+    : (selectedPlatforms[0] as PostPlatform) || '';
 
   const createMutation = useCreatePost();
   const updateMutation = useUpdatePost();
@@ -138,7 +181,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
   // Location tagging
   const [selectedLocation, setSelectedLocation] = useState<LocationSearchResult | null>(null);
 
-  // LinkedIn Targets
+  // LinkedIn / Twitter account selectors
   const [selectedLinkedinTargetId, setSelectedLinkedinTargetId] = useState<string>('');
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
@@ -174,8 +217,6 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
     error: locationError,
     clear: clearLocationSearch,
   } = useSearchLocation(metaAccountIdForSearch);
-
-  const isEditing = !!editingPost;
 
   // Prefill draft when editing + reset tagging/collaborators
   useEffect(() => {
@@ -222,12 +263,30 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
     }
   }, [isOpen, platform, selectedLinkedinTargetId, currentClient]);
 
-  // Auto-select first platform
+  // Auto-select first platform in create mode — pre-tick instagram
   useEffect(() => {
-    if (isOpen && !platform) {
-      updateDraft({ platform: 'instagram', aspectRatio: '1:1' });
+    if (isOpen && !isEditing && selectedPlatforms.length === 0) {
+      updateDraft({ selectedPlatforms: ['instagram'], aspectRatio: '1:1' });
     }
-  }, [isOpen, platform]);
+    // For edit mode: keep legacy single-platform in the draft
+  }, [isOpen, isEditing, selectedPlatforms.length]);
+
+  // When platform selection changes, auto-correct aspectRatio if it's no longer
+  // in the intersection of supported ratios for all selected platforms.
+  useEffect(() => {
+    if (isEditing || selectedPlatforms.length === 0) return;
+    const isCurrentRatioCompatible = compatibleRatios.some((r) => r.value === aspectRatio);
+    if (!isCurrentRatioCompatible && compatibleRatios.length > 0) {
+      updateDraft({ aspectRatio: compatibleRatios[0].value });
+    }
+  }, [selectedPlatforms.join(',')]);
+
+  // When Story is selected but all Meta platforms are removed, revert to FEED.
+  useEffect(() => {
+    if (!isEditing && isStory && !hasMetaPlatforms && selectedPlatforms.length > 0) {
+      updateDraft({ postType: 'FEED' });
+    }
+  }, [selectedPlatforms.join(','), isStory, isEditing, hasMetaPlatforms]);
 
   useEffect(() => {
     // Determine preview URLs: prioritizes new mediaFiles, falls back to editingPost.mediaUrls
@@ -380,7 +439,13 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
     return utcDate.toISOString();
   };
 
-  const captionLimit = CAPTION_LIMITS[platform || 'instagram'] || 2200;
+  // Caption limit: use the most restrictive platform selected (or edit platform)
+  const activePlatformForLimit: string = isEditing
+    ? (platform || 'instagram')
+    : selectedPlatforms.includes('instagram')
+    ? 'instagram'
+    : selectedPlatforms[0] || 'instagram';
+  const captionLimit = CAPTION_LIMITS[activePlatformForLimit] || 2200;
   const captionLength = caption?.length || 0;
   const isCaptionOverLimit = captionLength > captionLimit;
 
@@ -393,12 +458,18 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
 
   const scheduledForStr = buildScheduledFor();
   const scheduledForPastError = new Date(scheduledForStr) <= new Date() && !isEditing;
-  const scheduleWarning = !platform ? 'Platform required' : scheduledForPastError ? 'Date must be future' : null;
+  const scheduleWarning = isEditing
+    ? (!platform ? 'Platform required' : scheduledForPastError ? 'Date must be future' : null)
+    : (selectedPlatforms.length === 0 ? 'Select a platform' : scheduledForPastError ? 'Date must be future' : null);
 
   const hasNewMedia = mediaFiles.length > 0;
   const hasExistingMedia = isEditing && (editingPost?.mediaUrls?.length || 0) > 0;
-  const mediaWarning = (isStory || platform === 'instagram' || platform === 'both') && !hasNewMedia && !hasExistingMedia
-    ? (isStory ? 'Media required for Stories' : 'Media required for Instagram') : null;
+  // Media required for Instagram (create) or Stories
+  const mediaRequiredForInstagram = !isEditing &&
+    (selectedPlatforms.includes('instagram')) && !hasNewMedia;
+  const mediaWarning = (isStory || (isEditing && (platform === 'instagram' || platform === 'both'))) && !hasNewMedia && !hasExistingMedia
+    ? (isStory ? 'Media required for Stories' : 'Media required for Instagram')
+    : (mediaRequiredForInstagram && !isStory ? 'Media required for Instagram' : null);
 
   const captionWarning = isCaptionOverLimit ? 'Caption limit exceeded' : null;
 
@@ -434,7 +505,6 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
 
 
   const handleSave = async () => {
-    if (!platform) return;
     if (isCaptionOverLimit) return;
     if (scheduledForPastError) {
       setUploadError('Scheduled date/time must be in the future.');
@@ -444,21 +514,21 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
     setUploadError(null);
 
     try {
-      // 1. Find account IDs from integrations
-      let metaAccountId: number | undefined;
-
-      if (platform !== 'linkedin') {
-        const metaIntegration = currentClient?.integrations?.find(
-          (i) => i.integrationType === 'meta-business'
-        );
-        if (!metaIntegration) {
-          throw new Error('No Meta account linked to this workspace. Please connect one in the studio header.');
-        }
-        metaAccountId = typeof metaIntegration.accountId === 'number' ? metaIntegration.accountId : parseInt(metaIntegration.accountId as string) || undefined;
-      }
-
-      // 2. Create or Update using hooks
+      // ── EDIT FLOW: single-platform PATCH ──
       if (isEditing && editingPost) {
+        let metaAccountId: number | undefined;
+        if (platform !== 'linkedin') {
+          const metaIntegration = currentClient?.integrations?.find(
+            (i) => i.integrationType === 'meta-business'
+          );
+          if (!metaIntegration) {
+            throw new Error('No Meta account linked to this workspace.');
+          }
+          metaAccountId = typeof metaIntegration.accountId === 'number'
+            ? metaIntegration.accountId
+            : parseInt(metaIntegration.accountId as string) || undefined;
+        }
+
         updateMutation.mutate({
           id: editingPost.id,
           files: mediaFiles,
@@ -492,39 +562,72 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
             onClose();
           }
         });
-      } else {
-        createMutation.mutate({
-          files: mediaFiles,
-          payload: {
-            metaAccountId,
-            clientId,
-            postType: postType || 'FEED',
-            scheduledFor: scheduledForStr,
-            platform: platform as PostPlatform,
-            linkedinPortAccountId: platform === 'linkedin' && selectedLinkedinTargetId ? parseInt(selectedLinkedinTargetId) : undefined,
-            ...(isStory ? {} : {
-              message: caption || undefined,
-              userTags: platform === 'instagram' && userTags.length > 0 ? userTags : undefined,
-              collaboratorIds:
-                platform === 'instagram' && collaborators.length > 0
-                  ? collaborators.map((c) => c.username)
-                  : undefined,
-              locationId: selectedLocation?.id || undefined,
-            }),
-          },
-        }, {
-          onSuccess: () => {
-            setMediaUrls([]);
-            setUserTags([]);
-            setCollaborators([]);
-            setSelectedLocation(null);
-            setUploadError(null);
-            setCurrentPreviewIndex(0);
-            resetDraft();
-            onClose();
-          }
-        });
+        return;
       }
+
+      // ── CREATE FLOW: multi-platform POST ──
+      if (selectedPlatforms.length === 0) {
+        setUploadError('Please select at least one platform.');
+        return;
+      }
+
+      // Gather account IDs
+      let metaAccountId: number | undefined;
+      let linkedinPortAccountId: number | undefined;
+
+      if (isMetaNeeded) {
+        const metaIntegration = currentClient?.integrations?.find(
+          (i) => i.integrationType === 'meta-business'
+        );
+        if (!metaIntegration) {
+          setUploadError('No Meta account linked to this workspace. Please connect one in the studio header.');
+          return;
+        }
+        metaAccountId = typeof metaIntegration.accountId === 'number'
+          ? metaIntegration.accountId
+          : parseInt(metaIntegration.accountId as string) || undefined;
+      }
+
+      if (isLinkedinNeeded) {
+        if (!selectedLinkedinTargetId) {
+          setUploadError('Please select a LinkedIn page.');
+          return;
+        }
+        linkedinPortAccountId = parseInt(selectedLinkedinTargetId);
+      }
+
+      createMutation.mutate({
+        mode: 'multi',
+        files: mediaFiles,
+        payload: {
+          platforms: selectedPlatforms as any,
+          metaAccountId,
+          linkedinPortAccountId,
+          clientId,
+          postType: postType || 'FEED',
+          scheduledFor: scheduledForStr,
+          ...(isStory ? {} : {
+            message: caption || undefined,
+            userTags: selectedPlatforms.includes('instagram') && userTags.length > 0 ? userTags : undefined,
+            collaboratorIds:
+              selectedPlatforms.includes('instagram') && collaborators.length > 0
+                ? collaborators.map((c) => c.username)
+                : undefined,
+            locationId: selectedLocation?.id || undefined,
+          }),
+        },
+      }, {
+        onSuccess: () => {
+          setMediaUrls([]);
+          setUserTags([]);
+          setCollaborators([]);
+          setSelectedLocation(null);
+          setUploadError(null);
+          setCurrentPreviewIndex(0);
+          resetDraft();
+          onClose();
+        }
+      });
     } catch (error: any) {
       setUploadError(error.message);
     }
@@ -532,18 +635,32 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
 
   const previewAspectRatioCss = isStory
     ? '9/16'
-    : (platform && ASPECT_RATIOS[platform]?.find((r) => r.value === aspectRatio)?.css) || '1/1';
+    : (previewPlatform && ASPECT_RATIOS[previewPlatform]?.find((r) => r.value === aspectRatio)?.css) || '1/1';
 
-  const canSave =
-    !!platform &&
-    !uploadError &&
-    (!isCaptionOverLimit || isStory) &&
-    (isStory
-      ? (hasNewMedia || hasExistingMedia) // Stories always require media
-      : (platform === 'facebook' || platform === 'linkedin' ? true : hasNewMedia || hasExistingMedia)) &&
-    !createMutation.isPending &&
-    !updateMutation.isPending &&
-    !scheduledForPastError;
+  const canSave = isEditing
+    ? (
+        !!platform &&
+        !uploadError &&
+        (!isCaptionOverLimit || isStory) &&
+        (isStory
+          ? (hasNewMedia || hasExistingMedia)
+          : (platform === 'facebook' || platform === 'linkedin' ? true : hasNewMedia || hasExistingMedia)) &&
+        !createMutation.isPending &&
+        !updateMutation.isPending &&
+        !scheduledForPastError
+      )
+    : (
+        selectedPlatforms.length > 0 &&
+        !uploadError &&
+        (!isCaptionOverLimit || isStory) &&
+        (isStory
+          ? hasNewMedia
+          : (selectedPlatforms.every(p => p === 'facebook' || p === 'linkedin') ? true : hasNewMedia || !selectedPlatforms.includes('instagram'))) &&
+        !createMutation.isPending &&
+        !updateMutation.isPending &&
+        !scheduledForPastError &&
+        (!isLinkedinNeeded || !!selectedLinkedinTargetId)
+      );
 
   const renderMediaSection = () => (
     <div>
@@ -1006,7 +1123,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
   );
 
   const renderPreview = () => (
-    <div className="w-full md:w-[55%] lg:flex-1 bg-zinc-50 border-t md:border-t-0 md:border-l border-zinc-200 p-4 md:p-6 flex flex-col items-center overflow-y-auto min-h-[40vh] md:min-h-[600px]">
+    <div className="w-full md:w-[55%] lg:flex-1 bg-zinc-50 border-t md:border-t-0 md:border-l border-zinc-200 p-4 md:p-6 flex flex-col items-center md:overflow-y-auto md:min-h-[600px]">
       <div className="w-full max-w-[320px] bg-white border border-zinc-200 shadow-sm rounded-xl overflow-hidden flex flex-col mt-4 mb-auto shrink-0">
         {isStory ? (
           <div className="flex items-center p-3 border-b border-zinc-100 gap-2">
@@ -1023,7 +1140,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
               <div className="w-24 h-2 bg-zinc-200 rounded"></div>
               <div className="w-16 h-2 bg-zinc-100 rounded"></div>
             </div>
-            {(platform === 'instagram' || platform === 'both') && (
+            {(previewPlatform === 'instagram' || previewPlatform === 'both') && (
               <div className="w-1 h-3 flex flex-col justify-between">
                 <div className="w-1 h-1 bg-zinc-300 rounded-full" />
                 <div className="w-1 h-1 bg-zinc-300 rounded-full" />
@@ -1069,7 +1186,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
           )}
 
           {/* Photo-tag pins */}
-          {platform === 'instagram' && userTags.map((tag, i) => (
+          {previewPlatform === 'instagram' && userTags.map((tag, i) => (
             <div
               key={i}
               className="absolute z-20 flex flex-col items-center pointer-events-none select-none"
@@ -1119,7 +1236,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
 
         {!isStory && (
         <div className="p-3 flex flex-col gap-2">
-          {(platform === 'instagram' || platform === 'both') && (
+          {(previewPlatform === 'instagram' || previewPlatform === 'both') && (
             <div className="flex gap-3 mb-1">
               <div className="w-5 h-5 rounded-full border border-zinc-300"></div>
               <div className="w-5 h-5 rounded-full border border-zinc-300"></div>
@@ -1134,18 +1251,24 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
         )}
       </div>
       <p className="text-xs text-zinc-400 mt-4 uppercase tracking-widest font-medium text-center">
-        {platform ? PLATFORMS.find((p) => p.id === platform)?.label : ''} {isStory ? 'Story' : ''} Preview
+        {isEditing
+          ? `${EDIT_PLATFORMS.find((p) => p.id === platform)?.label || ''} ${isStory ? 'Story' : ''} Preview`
+          : selectedPlatforms.length > 1
+          ? `${selectedPlatforms.length} Platforms · Preview`
+          : selectedPlatforms.length === 1
+          ? `${SELECTABLE_PLATFORMS.find((p) => p.id === selectedPlatforms[0])?.label || ''} ${isStory ? 'Story' : ''} Preview`
+          : 'Preview'}
       </p>
     </div>
   );
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[1024px] max-w-5xl p-0 overflow-hidden bg-white gap-0 rounded-2xl flex flex-col md:flex-row max-h-[90vh]">
+      <DialogContent className="w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[1024px] max-w-5xl p-0 overflow-y-auto overflow-x-hidden md:overflow-hidden bg-white gap-0 rounded-2xl flex flex-col md:flex-row max-h-[90vh] custom-scrollbar">
         {/* Left Side: Inputs */}
-        <div className="w-full md:w-[45%] lg:w-[480px] shrink-0 flex flex-col bg-white min-h-[50vh] md:min-h-[600px]">
+        <div className="w-full md:w-[45%] lg:w-[480px] shrink-0 flex flex-col bg-white md:min-h-[600px]">
           {/* Scrollable content area */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-0">
+          <div className="flex-1 md:overflow-y-auto p-4 md:p-6 pb-0">
           <DialogHeader className="mb-4 md:mb-6">
             <DialogTitle className="text-xl font-semibold text-zinc-900">
               {isEditing ? 'Edit Post' : 'Schedule Post'}
@@ -1250,36 +1373,94 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
                   {/* Platform Selection */}
                   <div>
                     <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 block">
-                      Platform
+                      {isEditing ? 'Platform' : 'Platforms'}
+                      {!isEditing && selectedPlatforms.length > 0 && (
+                        <span className="ml-2 text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
+                          {selectedPlatforms.length} selected
+                        </span>
+                      )}
                     </label>
-                    <div className="flex flex-wrap gap-2">
-                      {PLATFORMS.map((p) => (
-                        <button
-                          key={p.id}
-                          onClick={() => {
-                            updateDraft({ 
-                              platform: p.id,
-                            });
-                            const validRatios = ASPECT_RATIOS[p.id] || ASPECT_RATIOS['instagram'];
-                            if (!validRatios.find((r) => r.value === aspectRatio)) {
-                              updateDraft({ aspectRatio: validRatios[0].value });
-                            }
-                          }}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all ${
-                            platform === p.id
-                              ? 'border-zinc-900 bg-zinc-900 text-white shadow-md'
-                              : 'border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50'
-                          }`}
-                        >
-                          {p.icon}
-                          <span className="font-medium">{p.label}</span>
-                        </button>
-                      ))}
-                    </div>
+
+                    {isEditing ? (
+                      /* Edit mode: single-select (legacy) */
+                      <div className="flex flex-wrap gap-2">
+                        {EDIT_PLATFORMS.map((p) => (
+                          <button
+                            key={p.id}
+                            onClick={() => {
+                              updateDraft({ platform: p.id });
+                              const validRatios = ASPECT_RATIOS[p.id] || ASPECT_RATIOS['instagram'];
+                              if (!validRatios.find((r) => r.value === aspectRatio)) {
+                                updateDraft({ aspectRatio: validRatios[0].value });
+                              }
+                            }}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all ${
+                              platform === p.id
+                                ? 'border-zinc-900 bg-zinc-900 text-white shadow-md'
+                                : 'border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50'
+                            }`}
+                          >
+                            {p.icon}
+                            <span className="font-medium">{p.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      /* Create mode: multi-select checkboxes */
+                      <div className="grid grid-cols-2 gap-2">
+                        {SELECTABLE_PLATFORMS.map((p) => {
+                          const isChecked = selectedPlatforms.includes(p.id);
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                const next = isChecked
+                                  ? selectedPlatforms.filter((x) => x !== p.id)
+                                  : [...selectedPlatforms, p.id];
+                                updateDraft({ selectedPlatforms: next });
+                                // Sync aspect ratio for preview
+                                if (!isChecked) {
+                                  const validRatios = ASPECT_RATIOS[p.id] || ASPECT_RATIOS['instagram'];
+                                  if (!validRatios.find((r) => r.value === aspectRatio)) {
+                                    updateDraft({ aspectRatio: validRatios[0].value });
+                                  }
+                                }
+                              }}
+                              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 text-sm transition-all ${
+                                isChecked
+                                  ? 'border-zinc-900 bg-zinc-900 text-white shadow-md'
+                                  : 'border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 hover:border-zinc-300'
+                              }`}
+                            >
+                              <div className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
+                                isChecked ? 'bg-white border-white' : 'border-current'
+                              }`}>
+                                {isChecked && (
+                                  <svg className="w-2.5 h-2.5 text-zinc-900" viewBox="0 0 10 8" fill="none">
+                                    <path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                )}
+                              </div>
+                              <span className={`${isChecked ? '' : p.color}`}>{p.icon}</span>
+                              <span className="font-medium text-xs">{p.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Info banner when facebook+instagram both selected */}
+                    {!isEditing && selectedPlatforms.includes('instagram') && selectedPlatforms.includes('facebook') && (
+                      <div className="mt-2 flex items-start gap-2 text-[11px] text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                        <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        Facebook + Instagram will be published as a combined Meta post.
+                      </div>
+                    )}
                   </div>
 
                   {/* LinkedIn Target Selection */}
-                  {platform === 'linkedin' && (
+                  {(isLinkedinNeeded || (isEditing && platform === 'linkedin')) && (
                     <div>
                       <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                         <Building2 className="w-3.5 h-3.5" />
@@ -1305,15 +1486,14 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
                     </div>
                   )}
 
-                  {/* Post Type (Feed / Story) */}
-                  {platform && (
+                  {/* Post Type (Feed / Story) — only shown when Meta is selected or in edit mode */}
+                  {(isEditing ? !!platform : hasMetaPlatforms) && (
                     <div>
                       <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 block">
                         Post Type
                       </label>
                       <div className="flex gap-2">
-                        {(['FEED', 'STORY'] as PostType[])
-                          .map((pt) => (
+                        {(['FEED', 'STORY'] as PostType[]).map((pt) => (
                           <button
                             key={pt}
                             onClick={() => {
@@ -1332,7 +1512,24 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
                           </button>
                         ))}
                       </div>
-                      {isStory && (
+
+                      {/* Story is meta-only: show note when other platforms are also ticked */}
+                      {isStory && hasNonMetaPlatforms && (
+                        <div className="mt-2 flex items-start gap-2 text-[11px] text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                          <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                          <span>
+                            Story applies to <strong>Instagram / Facebook</strong> only.{' '}
+                            {[
+                              selectedPlatforms.includes('linkedin') && 'LinkedIn',
+                            ]
+                              .filter(Boolean)
+                              .join(' & ')}{' '}
+                            will receive a regular <strong>Feed post</strong> with the same content.
+                          </span>
+                        </div>
+                      )}
+
+                      {isStory && !hasNonMetaPlatforms && (
                         <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-md px-2.5 py-1.5 font-medium mt-2">
                           Stories are media-only. Caption, location, tags, and collaborators are not supported.
                         </p>
@@ -1341,13 +1538,13 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
                   )}
 
                   {/* Aspect Ratio — locked to 9:16 for Stories */}
-                  {platform && !isStory && (
+                  {(isEditing ? (!!platform && !isStory) : (selectedPlatforms.length > 0 && !isStory)) && (
                     <div>
                       <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 block">
                         Aspect Ratio
                       </label>
                       <div className="flex flex-wrap gap-2">
-                        {(ASPECT_RATIOS[platform] || ASPECT_RATIOS['instagram']).map((ratio) => (
+                        {compatibleRatios.map((ratio) => (
                           <button
                             key={ratio.value}
                             onClick={() => updateDraft({ aspectRatio: ratio.value })}
@@ -1361,9 +1558,21 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
                           </button>
                         ))}
                       </div>
+
+                      {/* Show note when ratios are limited by cross-platform incompatibility */}
+                      {!isEditing && selectedPlatforms.length > 1 && compatibleRatios.length < (ASPECT_RATIOS[selectedPlatforms[0]] || ASPECT_RATIOS['instagram']).length && (
+                        <div className="mt-2 flex items-start gap-2 text-[11px] text-zinc-500 bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2">
+                          <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 text-zinc-400" />
+                          <span>
+                            Only ratios supported by <strong>all selected platforms</strong> are shown.
+                            {compatibleRatios.length === 1 && ' 1:1 is the only universally compatible ratio.'}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
-                  {platform && isStory && (
+
+                  {(isEditing ? (!!platform && isStory) : (selectedPlatforms.length > 0 && isStory)) && (
                     <div>
                       <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 block">
                         Aspect Ratio
@@ -1384,6 +1593,7 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
               )}
             </div>
 
+
             {/* --- 2. Media --- */}
             <div className="border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
               {renderSectionHeader('media', 'Media', <ImageIcon className="w-4 h-4 text-zinc-500" />, mediaWarning || uploadError)}
@@ -1400,8 +1610,20 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
               {renderSectionHeader('details', 'Post Details', <FileText className="w-4 h-4 text-zinc-500" />, captionWarning)}
               {expandedSection === 'details' && (
                 <div className="p-4 space-y-5 bg-white border-t border-zinc-200">
+                  {/* Multi-platform Meta-only note */}
+                  {!isEditing && hasMetaPlatforms && hasNonMetaPlatforms && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex gap-2.5 mb-4 shadow-sm">
+                      <Info className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                      <div className="text-[11px] text-blue-800 leading-relaxed font-medium">
+                        <strong>Meta Features Only:</strong> Photo Tagging, Collaborators, and Location are only supported by Instagram and Facebook. These settings will be <strong>ignored</strong> for your {[
+                          selectedPlatforms.includes('linkedin') && 'LinkedIn',
+                        ].filter(Boolean).join(' and ')} post.
+                      </div>
+                    </div>
+                  )}
+
                   {/* Global Warning for Instagram */}
-                  {platform === 'instagram' && (
+                  {(isEditing ? platform === 'instagram' : selectedPlatforms.includes('instagram')) && (
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-2.5 mb-2 shadow-sm">
                       <Info className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
                       <div className="text-[11px] text-amber-800 leading-relaxed font-medium">
@@ -1411,13 +1633,16 @@ export function SocialMediaPostModal({ isOpen, onClose, clientId, editingPost }:
                   )}
 
                   {/* Photo Tagging — Instagram image posts only */}
-                  {platform === 'instagram' && renderPhotoTaggingSection()}
+                  {(isEditing ? platform === 'instagram' : selectedPlatforms.includes('instagram')) && renderPhotoTaggingSection()}
 
                   {/* Collaborators — Instagram only */}
-                  {platform === 'instagram' && renderCollaboratorsSection()}
+                  {(isEditing ? platform === 'instagram' : selectedPlatforms.includes('instagram')) && renderCollaboratorsSection()}
 
                   {/* Location — Meta only (FB/IG) */}
-                  {(platform === 'instagram' || platform === 'facebook' || platform === 'both') && renderLocationSection()}
+                  {(isEditing
+                    ? (platform === 'instagram' || platform === 'facebook' || platform === 'both')
+                    : (selectedPlatforms.includes('instagram') || selectedPlatforms.includes('facebook'))
+                  ) && renderLocationSection()}
 
                   {/* Caption */}
                   <div>

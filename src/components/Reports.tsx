@@ -273,8 +273,8 @@ function Reports({ viewMode = "full", clientId: propClientId }: ReportsProps) {
   }
 
   return (
-    <div className="w-full h-[2000vh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 ">
-      <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd] ">
+    <div className="w-full min-h-screen flex flex-col overflow-x-hidden bg-white">
+      <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
         {Content}
       </div>
     </div>

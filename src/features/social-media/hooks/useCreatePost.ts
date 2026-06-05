@@ -1,14 +1,31 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { uploadScheduledMedia, createScheduledPost } from '../api/scheduledPostsApi';
+import {
+  uploadScheduledMedia,
+  createScheduledPost,
+  createMultiPlatformPost,
+} from '../api/scheduledPostsApi';
 import { scheduledPostKeys } from './useScheduledPosts';
-import type { CreatePostPayload, MediaType } from '../api/types';
+import type {
+  CreatePostPayload,
+  CreateMultiPlatformPostPayload,
+  MediaType,
+} from '../api/types';
 
-interface CreatePostInput {
+interface CreateSingleInput {
+  mode: 'single';
   files: File[];
   payload: Omit<CreatePostPayload, 'mediaUrls' | 'mediaType'>;
 }
+
+interface CreateMultiInput {
+  mode: 'multi';
+  files: File[];
+  payload: Omit<CreateMultiPlatformPostPayload, 'mediaUrls' | 'mediaType'>;
+}
+
+type CreatePostInput = CreateSingleInput | CreateMultiInput;
 
 /** Auto-detect mediaType from files. */
 const detectMediaType = (files: File[]): MediaType | undefined => {
@@ -23,31 +40,48 @@ export const useCreatePost = () => {
   const [uploadProgress, setUploadProgress] = useState<number>(0);
 
   const mutation = useMutation({
-    mutationFn: async ({ files, payload }: CreatePostInput) => {
+    mutationFn: async (input: CreatePostInput) => {
       let mediaUrls: string[] = [];
       let mediaType: MediaType | undefined;
 
       // Step 1: Upload media if any
-      if (files.length > 0) {
+      if (input.files.length > 0) {
         setUploadProgress(0);
-        mediaUrls = await uploadScheduledMedia(files, (percent) => {
+        mediaUrls = await uploadScheduledMedia(input.files, (percent) => {
           setUploadProgress(percent);
         });
-        mediaType = detectMediaType(files);
+        mediaType = detectMediaType(input.files);
       }
 
       setUploadProgress(100);
 
-      // Step 2: Create the scheduled post
-      return createScheduledPost({
-        ...payload,
-        mediaUrls,
-        mediaType,
-      });
+      // Step 2: Create post(s)
+      if (input.mode === 'multi') {
+        return createMultiPlatformPost({
+          ...input.payload,
+          mediaUrls,
+          mediaType,
+        });
+      } else {
+        return createScheduledPost({
+          ...input.payload,
+          mediaUrls,
+          mediaType,
+        });
+      }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: scheduledPostKeys.lists() });
-      toast.success('Post scheduled successfully!');
+      // result is ScheduledPost[] (multi) or ScheduledPost (single)
+      const count = Array.isArray(result) ? result.length : 1;
+      const platformNames = Array.isArray(result)
+        ? result.map((p) => p.platform).join(', ')
+        : null;
+      if (count > 1 && platformNames) {
+        toast.success(`Post scheduled on ${count} platforms: ${platformNames}`);
+      } else {
+        toast.success('Post scheduled successfully!');
+      }
       setUploadProgress(0);
     },
     onError: (error: Error) => {
