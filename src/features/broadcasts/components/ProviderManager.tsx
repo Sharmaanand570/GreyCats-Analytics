@@ -143,7 +143,7 @@ export function ProviderManager({ admin = false, clientId, fixedChannel }: Provi
     } else {
       setError(null);
     }
-  }, [name, provider, twilioSid, twilioToken, adbizzUser, adbizzKey, smtpHost, smtpPort, tgBotToken, isCreating]);
+  }, [name, provider, twilioSid, twilioToken, adbizzUser, adbizzKey, smtpHost, smtpPort, tgBotToken, isCreating, msg91Key]);
 
   const validateForm = () => {
     if (!name.trim() || name.length < 3) { toast.error('Valid integration name is required'); return false; }
@@ -230,15 +230,21 @@ export function ProviderManager({ admin = false, clientId, fixedChannel }: Provi
   };
 
   const renderIntegrationCard = (i: BroadcastIntegration) => {
-    const isSms = i.type === 'SMS';
-    const isWhatsapp = i.type === 'WHATSAPP';
+    const channelConfig = {
+      SMS: { icon: MessageSquare, style: 'bg-orange-500/5 text-orange-600', activeBadge: 'bg-orange-500 shadow-orange-500/20' },
+      EMAIL: { icon: Mail, style: 'bg-indigo-500/5 text-indigo-600', activeBadge: 'bg-indigo-500 shadow-indigo-500/20' },
+      TELEGRAM: { icon: SiTelegram, style: 'bg-sky-500/5 text-sky-600', activeBadge: 'bg-sky-500 shadow-sky-500/20' },
+      WHATSAPP: { icon: SiWhatsapp, style: 'bg-green-500/5 text-green-600', activeBadge: 'bg-green-500 shadow-green-500/20' },
+    };
+    const chanCfg = channelConfig[i.type.toUpperCase() as keyof typeof channelConfig] || channelConfig.SMS;
+    const IconComponent = chanCfg.icon;
     const scopedClientName = clientNameById(i.clientId);
     return (
       <Card key={i.id} className="group border-gray-200 dark:border-white/10 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden bg-white dark:bg-[#111]">
         <CardContent className="p-8 flex flex-col h-full relative">
           <div className={cn(
             "absolute top-0 right-0 text-white text-[8px] font-black uppercase tracking-widest px-3 py-1 rounded-bl-xl shadow-lg flex items-center gap-1.5",
-            isWhatsapp ? "bg-green-500 shadow-green-500/20" : isSms ? "bg-orange-500 shadow-orange-500/20" : "bg-indigo-500 shadow-indigo-500/20"
+            chanCfg.activeBadge
           )}>
             <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
             Active
@@ -255,9 +261,9 @@ export function ProviderManager({ admin = false, clientId, fixedChannel }: Provi
           <div className="flex items-center gap-6 mb-8 mt-2">
             <div className={cn(
               "w-14 h-14 rounded-2xl flex items-center justify-center border border-gray-100 dark:border-white/10 group-hover:scale-110 transition-all duration-500",
-              isWhatsapp ? "bg-green-500/5 text-green-600" : isSms ? "bg-orange-500/5 text-orange-600" : "bg-indigo-500/5 text-indigo-600"
+              chanCfg.style
             )}>
-              {isWhatsapp ? <SiWhatsapp className="w-7 h-7" /> : isSms ? <MessageSquare className="w-7 h-7" /> : <Mail className="w-7 h-7" />}
+              <IconComponent className="w-7 h-7" />
             </div>
             <div>
               <h3 className="font-bold text-gray-900 dark:text-white text-lg tracking-tight leading-none mb-2">{i.name}</h3>
@@ -294,7 +300,7 @@ export function ProviderManager({ admin = false, clientId, fixedChannel }: Provi
             {i.isDefault && (
               <div className={cn(
                 "flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg",
-                isWhatsapp ? "bg-green-500/5 text-green-600" : isSms ? "bg-orange-500/5 text-orange-600" : "bg-indigo-500/5 text-indigo-600"
+                chanCfg.style
               )}>
                 <ShieldCheck className="w-3.5 h-3.5" />
                 System Default
@@ -637,7 +643,11 @@ export function ProviderManager({ admin = false, clientId, fixedChannel }: Provi
                   <div className="relative">
                     <select value={provider} onChange={(e) => setProvider(e.target.value as BroadcastProvider)} className="w-full px-5 py-4 pr-12 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none cursor-pointer outline-none">
                       {type === 'SMS' ? (
-                        <option value="ADBIZZ">Adbizz</option>
+                        <>
+                          <option value="ADBIZZ">Adbizz</option>
+                          <option value="TWILIO">Twilio</option>
+                          <option value="MSG91">MSG91</option>
+                        </>
                       ) : type === 'EMAIL' ? (
                         <option value="SMTP">SMTP (Gmail/Outlook/Custom/Zoho)</option>
                       ) : type === 'WHATSAPP' ? (

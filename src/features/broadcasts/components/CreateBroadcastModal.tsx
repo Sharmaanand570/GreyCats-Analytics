@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Dialog, 
   DialogContent,
@@ -98,12 +98,29 @@ export function CreateBroadcastModal({ isOpen, onClose, clientId, fixedChannel }
   const validatePhone = (phone: string) => /^\+?\d{10,15}$/.test(phone);
   const validateTelegramTarget = (s: string) => /^@[A-Za-z0-9_]{4,}$/.test(s) || /^-?\d{5,}$/.test(s);
 
+  const resetForm = useCallback(() => {
+    setChannel(fixedChannel || 'SMS');
+    setName('');
+    setSubject('');
+    setTemplateId(null);
+    setIntegrationId(null);
+    setManualRecipients('');
+    setCsvFile(null);
+    setColumnName('');
+    setVariableMapping({});
+    setMessage('');
+    setError(null);
+    setStep(fixedChannel ? 'config' : 'channel');
+    setShowTemplateManager(false);
+    setShowProviderManager(false);
+  }, [fixedChannel]);
+
   useEffect(() => {
     if (!isOpen) {
       setStep(fixedChannel ? 'config' : 'channel');
       resetForm();
     }
-  }, [isOpen, fixedChannel]);
+  }, [isOpen, fixedChannel, resetForm]);
 
   useEffect(() => {
     setIntegrationId(null);
@@ -197,22 +214,7 @@ export function CreateBroadcastModal({ isOpen, onClose, clientId, fixedChannel }
     }
   };
 
-  const resetForm = () => {
-    setChannel(fixedChannel || 'SMS');
-    setName('');
-    setSubject('');
-    setTemplateId(null);
-    setIntegrationId(null);
-    setManualRecipients('');
-    setCsvFile(null);
-    setColumnName('');
-    setVariableMapping({});
-    setMessage('');
-    setError(null);
-    setStep(fixedChannel ? 'config' : 'channel');
-    setShowTemplateManager(false);
-    setShowProviderManager(false);
-  };
+
 
   const isLoading = createManual.isPending || createCsv.isPending;
 
@@ -762,7 +764,13 @@ export function CreateBroadcastModal({ isOpen, onClose, clientId, fixedChannel }
           variant="ghost" 
           onClick={() => {
             if (step === 'channel') onClose();
-            else if (step === 'config') fixedChannel ? onClose() : setStep('channel');
+            else if (step === 'config') {
+              if (fixedChannel) {
+                onClose();
+              } else {
+                setStep('channel');
+              }
+            }
             else if (step === 'audience') setStep('config');
             else if (step === 'review') setStep('audience');
           }}

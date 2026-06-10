@@ -439,6 +439,8 @@ function StepWorkspace({
   const channelThemes = {
     whatsapp: {
       iconColor: "text-[#128C7E]",
+      hoverColor: "group-hover:text-[#128C7E]",
+      glowShadow: "hover:shadow-green-500/10 hover:border-emerald-500/30",
       bgColor: "bg-[#128C7E]",
       lightBg: "bg-[#128C7E]/10",
       borderColor: "border-[#128C7E]/20",
@@ -448,6 +450,8 @@ function StepWorkspace({
     },
     telegram: {
       iconColor: "text-sky-500",
+      hoverColor: "group-hover:text-sky-500",
+      glowShadow: "hover:shadow-sky-500/10 hover:border-sky-500/30",
       bgColor: "bg-sky-500",
       lightBg: "bg-sky-50",
       borderColor: "border-sky-200",
@@ -457,6 +461,8 @@ function StepWorkspace({
     },
     sms: {
       iconColor: "text-orange-600",
+      hoverColor: "group-hover:text-orange-600",
+      glowShadow: "hover:shadow-orange-600/10 hover:border-orange-600/30",
       bgColor: "bg-orange-600",
       lightBg: "bg-orange-50",
       borderColor: "border-orange-200",
@@ -466,6 +472,8 @@ function StepWorkspace({
     },
     email: {
       iconColor: "text-blue-600",
+      hoverColor: "group-hover:text-blue-600",
+      glowShadow: "hover:shadow-blue-600/10 hover:border-blue-600/30",
       bgColor: "bg-blue-600",
       lightBg: "bg-blue-50",
       borderColor: "border-blue-200",
@@ -476,6 +484,13 @@ function StepWorkspace({
   };
   const theme = channelThemes[channel.toLowerCase() as keyof typeof channelThemes] || channelThemes.whatsapp;
   const ChannelIcon = theme.icon;
+
+  const channelTableConfig = {
+    SMS: { icon: MessageSquare, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
+    EMAIL: { icon: Mail, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+    TELEGRAM: { icon: SiTelegram, color: 'text-sky-600', bg: 'bg-sky-50', border: 'border-sky-100' },
+    WHATSAPP: { icon: SiWhatsapp, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100' },
+  };
 
   return (
     <div className="h-full flex flex-col">
@@ -536,7 +551,7 @@ function StepWorkspace({
               {(totalCampaigns > 0 || isLoading) && (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                <div className={cn("bg-white p-6 rounded-[28px] border shadow-sm transition-all hover:shadow-md", theme.borderColor)}>
+                <div className={cn("bg-white p-6 rounded-[28px] border shadow-sm transition-all duration-500 hover:shadow-xl", theme.borderColor, theme.glowShadow)}>
                   <div className="flex items-center gap-3 mb-4">
                     <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center", theme.lightBg)}>
                       <BarChart3 className={cn("w-5 h-5", theme.iconColor)} />
@@ -545,7 +560,7 @@ function StepWorkspace({
                   </div>
                   <p className="text-4xl font-extrabold text-zinc-900 tracking-tight">{filteredBroadcasts?.length || 0}</p>
                 </div>
-                <div className={cn("bg-white p-6 rounded-[28px] border shadow-sm transition-all hover:shadow-md", theme.borderColor)}>
+                <div className={cn("bg-white p-6 rounded-[28px] border shadow-sm transition-all duration-500 hover:shadow-xl", theme.borderColor, theme.glowShadow)}>
                   <div className="flex items-center gap-3 mb-4">
                     <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center", theme.lightBg)}>
                       <CheckCircle2 className={cn("w-5 h-5", theme.iconColor)} />
@@ -556,7 +571,7 @@ function StepWorkspace({
                     {filteredBroadcasts?.reduce((acc, b) => acc + b.sentCount, 0).toLocaleString() || 0}
                   </p>
                 </div>
-                <div className={cn("bg-white p-6 rounded-[28px] border shadow-sm transition-all hover:shadow-md", theme.borderColor)}>
+                <div className={cn("bg-white p-6 rounded-[28px] border shadow-sm transition-all duration-500 hover:shadow-xl", theme.borderColor, theme.glowShadow)}>
                   <div className="flex items-center gap-3 mb-4">
                     <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center", theme.lightBg)}>
                       <AlertCircle className={cn("w-5 h-5", theme.iconColor)} />
@@ -732,26 +747,22 @@ function StepWorkspace({
                         filteredBroadcasts?.map((b) => {
                           const cfg = statusConfig[b.status as keyof typeof statusConfig] || statusConfig.PENDING;
                           const progress = b.totalCount > 0 ? (b.sentCount / b.totalCount) * 100 : 0;
+                          const chanCfg = channelTableConfig[b.channel.toUpperCase() as keyof typeof channelTableConfig] || channelTableConfig.SMS;
+                          const ChanIcon = chanCfg.icon;
                           
                           return (
                             <tr key={b.id} className="hover:bg-zinc-50/50 transition-colors group">
                               <td className="px-8 py-6">
                                 <div className="flex flex-col">
-                                  <span className="font-bold text-zinc-900 mb-1 group-hover:text-blue-600 transition-colors">{b.name}</span>
+                                  <span className={cn("font-bold text-zinc-900 mb-1 transition-colors", theme.hoverColor)}>{b.name}</span>
                                   <span className="text-xs text-zinc-400 font-medium truncate max-w-[200px]">{b.message}</span>
                                 </div>
                               </td>
                               <td className="px-8 py-6">
                                 <div className="flex items-center gap-2">
-                                  {b.channel === 'SMS' ? (
-                                    <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center border border-orange-100">
-                                      <MessageSquare className="w-4 h-4 text-orange-600" />
-                                    </div>
-                                  ) : (
-                                    <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-100">
-                                      <Mail className="w-4 h-4 text-blue-600" />
-                                    </div>
-                                  )}
+                                  <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center border", chanCfg.bg, chanCfg.border)}>
+                                    <ChanIcon className={cn("w-4 h-4", chanCfg.color)} />
+                                  </div>
                                   <span className="text-xs font-bold text-zinc-600">{b.channel}</span>
                                 </div>
                               </td>
@@ -769,9 +780,9 @@ function StepWorkspace({
                                   </div>
                                   <div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden border border-zinc-200/50 shadow-inner">
                                     <div 
-                                      className={`h-full transition-all duration-500 rounded-full ${
-                                        b.status === 'FAILED' ? 'bg-red-500' : 'bg-blue-600'
-                                      }`}
+                                      className={cn("h-full transition-all duration-500 rounded-full",
+                                        b.status === 'FAILED' ? 'bg-red-500' : theme.bgColor
+                                      )}
                                       style={{ width: `${progress}%` }}
                                     />
                                   </div>

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { creativeApi } from '@/api/creativeApi';
+import { SiTelegram, SiWhatsapp } from 'react-icons/si';
 import type { BroadcastChannel } from '../api/types';
 import { useUserStore } from '@/utils/useUserStore';
 import { cn } from '@/lib/utils';
@@ -52,6 +53,8 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
   const [editingExternalIds, setEditingExternalIds] = useState<Record<number, string>>({});
   const [error, setError] = useState<string | null>(null);
 
+  const max = channel === 'SMS' ? 160 : channel === 'WHATSAPP' ? 1024 : channel === 'TELEGRAM' ? 4096 : 10000;
+
   useEffect(() => {
     if (fixedChannel) {
       setChannel(fixedChannel);
@@ -72,12 +75,12 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
 
     if (name && name.length < 3) {
       setError('Template name is too short');
-    } else if (channel === 'SMS' && content.length > 160) {
-      setError(`SMS exceeds 160 characters (${content.length})`);
+    } else if (content.length > max) {
+      setError(`${channel} exceeds ${max} characters (${content.length}/${max})`);
     } else {
       setError(null);
     }
-  }, [name, content, channel, isCreating]);
+  }, [name, content, channel, isCreating, max]);
 
   const handleSubmit = async () => {
     if (!name || !content) {
@@ -190,14 +193,20 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
                 />
               </div>
               {!fixedChannel && (
-              <div className="space-y-3">
+              <div className="space-y-3 col-span-1 md:col-span-2">
                 <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-1">Communication Channel</label>
-                <div className="flex bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-1.5">
-                  <button onClick={() => setChannel('SMS')} className={cn("flex-1 py-3 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-2", channel === 'SMS' ? 'bg-white dark:bg-white/10 shadow-md text-black dark:text-white' : 'text-gray-400 hover:text-gray-600')}>
+                <div className="flex bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-1.5 flex-wrap gap-1 md:flex-nowrap">
+                  <button onClick={() => setChannel('WHATSAPP')} className={cn("flex-1 py-3 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-2 min-w-[90px]", channel === 'WHATSAPP' ? 'bg-white dark:bg-white/10 shadow-md text-green-600 dark:text-green-400' : 'text-gray-400 hover:text-gray-600')}>
+                    <SiWhatsapp className="w-3.5 h-3.5" /> WhatsApp
+                  </button>
+                  <button onClick={() => setChannel('SMS')} className={cn("flex-1 py-3 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-2 min-w-[90px]", channel === 'SMS' ? 'bg-white dark:bg-white/10 shadow-md text-orange-600 dark:text-orange-400' : 'text-gray-400 hover:text-gray-600')}>
                     <MessageSquare className="w-3.5 h-3.5" /> SMS
                   </button>
-                  <button onClick={() => setChannel('EMAIL')} className={cn("flex-1 py-3 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-2", channel === 'EMAIL' ? 'bg-white dark:bg-white/10 shadow-md text-black dark:text-white' : 'text-gray-400 hover:text-gray-600')}>
+                  <button onClick={() => setChannel('EMAIL')} className={cn("flex-1 py-3 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-2 min-w-[90px]", channel === 'EMAIL' ? 'bg-white dark:bg-white/10 shadow-md text-blue-600 dark:text-blue-400' : 'text-gray-400 hover:text-gray-600')}>
                     <MailIcon className="w-3.5 h-3.5" /> Email
+                  </button>
+                  <button onClick={() => setChannel('TELEGRAM')} className={cn("flex-1 py-3 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-2 min-w-[90px]", channel === 'TELEGRAM' ? 'bg-white dark:bg-white/10 shadow-md text-sky-600 dark:text-sky-400' : 'text-gray-400 hover:text-gray-600')}>
+                    <SiTelegram className="w-3.5 h-3.5" /> Telegram
                   </button>
                 </div>
               </div>
@@ -279,13 +288,11 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
                   </div>
                 )}
               </div>
-              {channel === 'SMS' && (
-                <div className="flex justify-end pr-2">
-                  <span className={cn("text-[9px] font-black uppercase tracking-widest", content.length > 160 ? "text-red-500" : "text-gray-400")}>
-                    {content.length} / 160 Characters
-                  </span>
-                </div>
-              )}
+              <div className="flex justify-end pr-2 mt-1">
+                <span className={cn("text-[9px] font-black uppercase tracking-widest", content.length > max ? "text-red-500" : "text-gray-400")}>
+                  {content.length} / {max} Characters ({channel})
+                </span>
+              </div>
             </div>
 
             {error && (
@@ -359,32 +366,44 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
             <p className="text-gray-500 dark:text-gray-400 font-medium">Start by creating your first message blueprint.</p>
           </div>
         ) : (
-          filteredTemplates?.map(t => (
-            <Card key={t.id} className="group border-gray-200 dark:border-white/10 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden bg-white dark:bg-[#111]">
-              <CardContent className="p-6 flex flex-col h-full">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "w-10 h-10 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110",
-                      t.channel === 'SMS' ? 'bg-orange-500/10 text-orange-600' : 'bg-blue-500/10 text-blue-600'
-                    )}>
-                      {t.channel === 'SMS' ? <MessageSquare className="w-5 h-5" /> : <MailIcon className="w-5 h-5" />}
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-gray-900 dark:text-white text-base tracking-tight leading-tight">{t.name}</h3>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {!t.userId && (
-                          <div className="flex items-center gap-1 text-[8px] font-black text-blue-600 uppercase tracking-widest bg-blue-500/5 px-1.5 py-0.5 rounded">
-                            <ShieldCheck className="w-2 h-2" />
-                            System
-                          </div>
-                        )}
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-[0.2em]">{t.channel}</p>
+          filteredTemplates?.map(t => {
+            const channelConfig = {
+              SMS: { icon: MessageSquare, style: 'bg-orange-500/10 text-orange-600', badge: 'bg-orange-500/10 text-orange-600 border border-orange-500/20' },
+              EMAIL: { icon: MailIcon, style: 'bg-blue-500/10 text-blue-600', badge: 'bg-blue-500/10 text-blue-600 border border-blue-500/20' },
+              TELEGRAM: { icon: SiTelegram, style: 'bg-sky-500/10 text-sky-600', badge: 'bg-sky-500/10 text-sky-600 border border-sky-500/20' },
+              WHATSAPP: { icon: SiWhatsapp, style: 'bg-green-500/10 text-green-600', badge: 'bg-green-500/10 text-green-600 border border-green-500/20' },
+            };
+            const chanCfg = channelConfig[t.channel.toUpperCase() as keyof typeof channelConfig] || channelConfig.SMS;
+            const IconComponent = chanCfg.icon;
+
+            return (
+              <Card key={t.id} className="group border-gray-200 dark:border-white/10 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden bg-white dark:bg-[#111]">
+                <CardContent className="p-6 flex flex-col h-full">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "w-10 h-10 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110",
+                        chanCfg.style
+                      )}>
+                        <IconComponent className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-gray-900 dark:text-white text-base tracking-tight leading-tight">{t.name}</h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          {!t.userId && (
+                            <div className="flex items-center gap-1 text-[8px] font-black text-blue-600 uppercase tracking-widest bg-blue-500/5 px-1.5 py-0.5 rounded">
+                              <ShieldCheck className="w-2 h-2" />
+                              System
+                            </div>
+                          )}
+                          <span className={cn("text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded", chanCfg.badge)}>
+                            {t.channel}
+                          </span>
+                        </div>
                       </div>
                     </div>
+                    {getStatusBadge(t.status)}
                   </div>
-                  {getStatusBadge(t.status)}
-                </div>
 
                 <div className="flex-1 bg-gray-50 dark:bg-black/20 p-4 rounded-xl border border-gray-100 dark:border-white/5 mb-6">
                   <p className="text-xs text-gray-600 dark:text-gray-300 font-medium leading-relaxed italic">"{t.content}"</p>
@@ -456,7 +475,7 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
                 </div>
               </CardContent>
             </Card>
-          ))
+          )})
         )}
       </div>
     </div>

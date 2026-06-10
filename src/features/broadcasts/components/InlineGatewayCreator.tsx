@@ -81,7 +81,7 @@ export function InlineGatewayCreator({ channel, clientId, onCancel, onSuccess }:
     } else {
       setError(null);
     }
-  }, [name, provider, twilioSid, twilioToken, adbizzUser, adbizzKey, smtpHost, smtpPort, tgBotToken]);
+  }, [name, provider, twilioSid, twilioToken, adbizzUser, adbizzKey, smtpHost, smtpPort, tgBotToken, msg91Key]);
 
   const handleSubmit = async () => {
     if (!name.trim() || name.length < 3) { toast.error('Valid integration name is required'); return; }
