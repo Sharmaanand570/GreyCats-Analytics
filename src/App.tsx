@@ -83,6 +83,7 @@ const LinkedinDetailPage = lazy(
   () => import("./pages/LinkedinDetailPage")
 );
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
+const SeoReporterPage = lazy(() => import("./features/seo-reporter/pages/SeoReporterPage"));
 
 const SocialMediaSchedulerPage = lazy(() => import("./pages/SocialMediaSchedulerPage"));
 const BlogSchedulerPage = lazy(() => import("./pages/BlogSchedulerPage"));
@@ -227,6 +228,7 @@ function App() {
               <Route path="alerts" element={<AlertsPage />} />
               <Route path="tasks" element={<TasksPage />} />
               <Route path="account-setup" element={<SettingsPage />} />
+              <Route path="seo-report" element={<SeoReporterPage />} />
               <Route path="social-media/scheduler/:clientId?" element={<SocialMediaSchedulerPage />} />
               <Route path="blog/scheduler/:clientId?" element={<BlogSchedulerPage />} />
               <Route path="broadcasts">

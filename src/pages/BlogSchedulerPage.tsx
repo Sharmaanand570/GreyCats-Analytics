@@ -467,7 +467,15 @@ export default function BlogSchedulerPage() {
   const { isLoading } = useAllClients();
   const isLoadingClients = isLoadingContext || isLoading;
 
+  const isClearingClient = React.useRef(false);
+
   const setCurrentClient = (client: ClientWithIntegrations | null) => {
+    if (!client) {
+      isClearingClient.current = true;
+    } else {
+      isClearingClient.current = false;
+    }
+
     _setCurrentClient(client);
     // Reset the blog draft when switching clients to prevent form state leakage
     resetDraft();
@@ -484,20 +492,27 @@ export default function BlogSchedulerPage() {
 
   // Sync URL clientId with state on mount or change
   useEffect(() => {
+    // If no URL client, but context has one AND we aren't actively clearing it:
+    if (!urlClientId && currentClient?.id && !isClearingClient.current) {
+      navigate(`/blog/scheduler/${currentClient.id}`, { replace: true });
+      return;
+    }
+
     if (!urlClientId || allClients.length === 0) return;
     const client = allClients.find(c => String(c.id) === urlClientId);
     if (!client) return;
 
-    let shouldUpdateStep = false;
+    // Reset the flag since we have a valid client
+    isClearingClient.current = false;
+
     if (!currentClient || currentClient.id !== client.id) {
       _setCurrentClient(client as ClientWithIntegrations);
-      shouldUpdateStep = true;
     }
 
-    if (shouldUpdateStep && currentStep === 'select-client') {
+    if (currentStep === 'select-client') {
       setCurrentStep('workspace');
     }
-  }, [urlClientId, allClients.length]);
+  }, [urlClientId, allClients.length, currentClient?.id, currentStep, navigate]);
 
   const [subStep, setSubStep] = useState<'main' | 'create' | 'existing'>('main');
 

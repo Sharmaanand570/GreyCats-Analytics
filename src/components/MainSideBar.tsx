@@ -31,6 +31,7 @@ import {
   Megaphone,
   MessageSquare,
   Mail,
+  Search,
 } from "lucide-react";
 import { FiMenu } from "react-icons/fi";
 import { SiGoogleads, SiWhatsapp, SiTelegram } from "react-icons/si";
@@ -81,6 +82,21 @@ function MainSideBar(): React.JSX.Element {
 
   useEffect(() => {
     setActive(location.pathname);
+    
+    // Auto-expand the appropriate sidebar group based on the current route
+    if (location.pathname.startsWith('/social-media') || location.pathname.startsWith('/blog')) {
+      setOpenGroups({ Scheduler: true });
+    } else if (location.pathname.startsWith('/broadcasts')) {
+      setOpenGroups({ Broadcast: true });
+    } else if (location.pathname.startsWith('/data-sources')) {
+      setOpenGroups({ 'Ads Manager': true });
+    } else if (location.pathname.startsWith('/seo-report')) {
+      setOpenGroups({ 'SEO Tools': true });
+    } else if (location.pathname.startsWith('/admin') || location.pathname.startsWith('/account-setup') || location.pathname.startsWith('/billing')) {
+      setOpenGroups({ Settings: true });
+    } else {
+      setOpenGroups({ Analytics: true });
+    }
   }, [location.pathname]);
 
   // Initialize collapse state based on current route.
@@ -97,9 +113,17 @@ function MainSideBar(): React.JSX.Element {
     getInitialCollapseState()
   );
 
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
-    Analytics: true,
-  });
+  const getInitialOpenGroup = () => {
+    const path = location.pathname;
+    if (path.startsWith('/social-media') || path.startsWith('/blog')) return { Scheduler: true };
+    if (path.startsWith('/broadcasts')) return { Broadcast: true };
+    if (path.startsWith('/data-sources')) return { 'Ads Manager': true };
+    if (path.startsWith('/seo-report')) return { 'SEO Tools': true };
+    if (path.startsWith('/admin') || path.startsWith('/account-setup') || path.startsWith('/billing')) return { Settings: true };
+    return { Analytics: true };
+  };
+
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(getInitialOpenGroup());
 
   const toggleGroup = (label: string) => {
     setOpenGroups((prev) => {
@@ -148,6 +172,9 @@ function MainSideBar(): React.JSX.Element {
     if (itemPath === '/data-sources/google-ads') {
       // Match the google-ads root and /:clientId, but NOT /wizard subpath.
       return /^\/data-sources\/google-ads(\/\d+)?$/.test(pathname);
+    }
+    if (itemPath === '/seo-report') {
+      return pathname.startsWith('/seo-report');
     }
     if (itemPath === '/admin/dashboard') {
       return pathname.startsWith('/admin');
@@ -237,6 +264,13 @@ function MainSideBar(): React.JSX.Element {
       isCollapsible: true,
       items: analyticsItems,
     }] : []),
+    {
+      label: "SEO Tools",
+      isCollapsible: true,
+      items: [
+        { label: "SEO Reporter", path: "/seo-report", icon: <Search /> }
+      ]
+    },
     ...(hasSchedulerAccess ? [{
       label: "Scheduler",
       isCollapsible: true,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSocialMediaStore } from '@/store/useSocialMediaStore';
 import { SocialMediaCalendar } from '@/features/social-media/components/SocialMediaCalendar';
@@ -549,7 +549,9 @@ function StepConnectPlatforms({
                 <FaInstagram className="w-3.5 h-3.5 text-pink-500" />
                 <span className="text-[11px] font-bold text-blue-700 tracking-tight ml-0.5">Meta</span>
               </div>
-              <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider bg-green-50 border border-green-100 px-2 py-0.5 rounded-full">Connected</span>
+              {linkedPages.length > 0 && (
+                <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider bg-green-50 border border-green-100 px-2 py-0.5 rounded-full">Connected</span>
+              )}
             </div>
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -638,10 +640,9 @@ function StepConnectPlatforms({
             <div className="mt-6 flex justify-end border-t border-zinc-100 pt-6">
               <Button
                 onClick={onContinue}
-                disabled={!hasAnyConnection}
                 className="h-11 px-8 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm tracking-tight transition-all shadow-lg shadow-zinc-200 flex items-center gap-2 active:scale-95 disabled:opacity-30 disabled:pointer-events-none"
               >
-                Go to Calendar
+                {hasAnyConnection ? 'Go to Calendar' : 'Skip for now'}
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
@@ -1102,11 +1103,22 @@ export default function SocialMediaSchedulerPage() {
   const { isLoading } = useAllClients();
   const isLoadingClients = isLoadingContext || isLoading;
 
+  const isClearingClient = useRef(false);
+
   // Sync URL clientId with state on mount or change
   useEffect(() => {
+    // If no URL client, but context has one AND we aren't actively clearing it:
+    if (!urlClientId && currentClient?.id && !isClearingClient.current) {
+      navigate(`/social-media/scheduler/${currentClient.id}`, { replace: true });
+      return;
+    }
+
     if (!urlClientId || allClients.length === 0) return;
     const client = allClients.find(c => String(c.id) === urlClientId);
     if (!client) return;
+
+    // Reset the flag since we have a valid client
+    isClearingClient.current = false;
 
     if (!currentClient || currentClient.id !== client.id) {
       _setCurrentClient(client as ClientWithIntegrations);
@@ -1115,15 +1127,19 @@ export default function SocialMediaSchedulerPage() {
     // If we have a valid client in the URL, automatically route the step
     // to the workspace calendar (or connection onboarding if they have no integrations)
     if (currentStep === 'select-client') {
-      const targetClient = (currentClient && currentClient.id === client.id) ? currentClient : client;
-      const hasIntegrations = targetClient.integrations && targetClient.integrations.length > 0;
-      setCurrentStep(hasIntegrations ? 'workspace' : 'connect-platforms');
+      setCurrentStep('workspace');
     }
-  }, [urlClientId, allClients.length, currentClient?.id, currentStep]);
+  }, [urlClientId, allClients.length, currentClient?.id, currentStep, navigate]);
 
   // Wrap setCurrentClient to persist lastClientId, update URL, and reset the post draft.
   // This ensures no form state bleeds across client switches.
   const setCurrentClient = (client: ClientWithIntegrations | null) => {
+    if (!client) {
+      isClearingClient.current = true;
+    } else {
+      isClearingClient.current = false;
+    }
+
     _setCurrentClient(client);
     // Always wipe any in-progress post draft so Client B never sees Client A's data
     resetDraft();
@@ -1207,12 +1223,7 @@ export default function SocialMediaSchedulerPage() {
           isError={false}
           onSelect={(client: ClientWithIntegrations) => {
             setCurrentClient(client);
-            const hasIntegrations = client.integrations && client.integrations.length > 0;
-            if (hasIntegrations) {
-              setCurrentStep('workspace');
-            } else {
-              setCurrentStep('connect-platforms');
-            }
+            setCurrentStep('workspace');
           }}
           onAddExisting={() => setSubStep('existing')}
           onAddNew={() => setSubStep('create')}
