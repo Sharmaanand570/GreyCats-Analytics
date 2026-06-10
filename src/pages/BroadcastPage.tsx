@@ -675,12 +675,12 @@ function StepWorkspace({
                                     </div>
                                   </div>
 
-                                  <div className={cn("p-6 rounded-2xl border transition-all", 
-                                    hasChannelTemplates ? "bg-zinc-50/50 border-zinc-200 opacity-60" : (!hasChannelIntegrations ? "bg-white border-zinc-100 opacity-40 grayscale" : cn("bg-white shadow-xl ring-1", theme.borderColor))
+                                  <div className={cn("p-6 rounded-2xl border transition-all shadow-sm hover:shadow-md", 
+                                    hasChannelTemplates ? "bg-zinc-50/50 border-zinc-200 opacity-60" : cn("bg-white shadow-xl ring-1", theme.borderColor)
                                   )}>
                                     <div className="flex items-start gap-4">
                                       <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
-                                        hasChannelTemplates ? "bg-green-100 text-green-600" : (!hasChannelIntegrations ? "bg-zinc-100 text-zinc-400" : cn(theme.lightBg, theme.iconColor))
+                                        hasChannelTemplates ? "bg-green-100 text-green-600" : cn(theme.lightBg, theme.iconColor)
                                       )}>
                                         {hasChannelTemplates ? <CheckCircle2 className="w-5 h-5" /> : <span className="font-bold text-sm">2</span>}
                                       </div>
@@ -690,8 +690,7 @@ function StepWorkspace({
                                         {!hasChannelTemplates && (
                                           <Button 
                                             onClick={() => setActiveTab('templates')} 
-                                            disabled={!hasChannelIntegrations}
-                                            className={cn("text-white font-bold rounded-xl h-10 px-6 shadow-md disabled:opacity-50", theme.bgColor, theme.iconColor.replace('text-', 'shadow-').replace(']', ']/20'))}
+                                            className={cn("text-white font-bold rounded-xl h-10 px-6 shadow-md", theme.bgColor, theme.iconColor.replace('text-', 'shadow-').replace(']', ']/20'))}
                                           >
                                             Create Template
                                           </Button>
@@ -700,22 +699,21 @@ function StepWorkspace({
                                     </div>
                                   </div>
 
-                                  <div className={cn("p-6 rounded-2xl border transition-all", 
-                                    !hasChannelIntegrations || !hasChannelTemplates ? "bg-white border-zinc-100 opacity-40 grayscale" : "bg-white border-blue-200 shadow-xl shadow-blue-900/5 ring-1 ring-blue-100"
+                                  <div className={cn("p-6 rounded-2xl border transition-all shadow-sm hover:shadow-md", 
+                                    totalCampaigns > 0 ? "bg-zinc-50/50 border-zinc-200 opacity-60" : cn("bg-white shadow-xl ring-1", theme.borderColor)
                                   )}>
                                     <div className="flex items-start gap-4">
                                       <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
-                                        !hasChannelIntegrations || !hasChannelTemplates ? "bg-zinc-100 text-zinc-400" : "bg-blue-100 text-blue-600"
+                                        totalCampaigns > 0 ? "bg-green-100 text-green-600" : cn(theme.lightBg, theme.iconColor)
                                       )}>
-                                        <span className="font-bold text-sm">3</span>
+                                        {totalCampaigns > 0 ? <CheckCircle2 className="w-5 h-5" /> : <span className="font-bold text-sm">3</span>}
                                       </div>
                                       <div className="flex-1">
                                         <h4 className="text-lg font-bold text-zinc-900">Launch Campaign</h4>
                                         <p className="text-sm text-zinc-500 mt-1 mb-4">Select your audience and send out your broadcast.</p>
                                         <Button 
                                           onClick={() => setIsCreateModalOpen(true)} 
-                                          disabled={!hasChannelIntegrations || !hasChannelTemplates}
-                                          className="bg-zinc-900 hover:bg-zinc-800 text-white font-bold rounded-xl h-10 px-6 shadow-md shadow-zinc-900/20 disabled:opacity-50"
+                                          className={cn("text-white font-bold rounded-xl h-10 px-6 shadow-md", theme.bgColor, theme.iconColor.replace('text-', 'shadow-').replace(']', ']/20'))}
                                         >
                                           <Plus className="w-4 h-4 mr-2" />
                                           New Campaign
