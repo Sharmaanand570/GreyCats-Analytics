@@ -485,6 +485,31 @@ function StepWorkspace({
   const theme = channelThemes[channel.toLowerCase() as keyof typeof channelThemes] || channelThemes.whatsapp;
   const ChannelIcon = theme.icon;
 
+  const channelLower = theme.name.toLowerCase();
+  const accentBorderClass = 
+    channelLower === 'whatsapp' ? 'border-l-[#128C7E]' :
+    channelLower === 'telegram' ? 'border-l-sky-500' :
+    channelLower === 'sms' ? 'border-l-orange-600' :
+    'border-l-blue-600'; // email
+
+  const cardGradientClass = 
+    channelLower === 'whatsapp' ? 'to-[#128C7E]/5' :
+    channelLower === 'telegram' ? 'to-sky-500/5' :
+    channelLower === 'sms' ? 'to-orange-500/5' :
+    'to-blue-500/5'; // email
+
+  const ringClass = 
+    channelLower === 'whatsapp' ? 'ring-[#128C7E]/10' :
+    channelLower === 'telegram' ? 'ring-sky-500/10' :
+    channelLower === 'sms' ? 'ring-orange-600/10' :
+    'ring-blue-600/10'; // email
+
+  const buttonGradientClass = 
+    channelLower === 'whatsapp' ? 'bg-gradient-to-r from-[#128C7E] to-[#0c6b60] hover:from-[#0c6b60] hover:to-[#085249]' :
+    channelLower === 'telegram' ? 'bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700' :
+    channelLower === 'sms' ? 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700' :
+    'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'; // email
+
   const channelTableConfig = {
     SMS: { icon: MessageSquare, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
     EMAIL: { icon: Mail, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
@@ -654,20 +679,24 @@ function StepWorkspace({
                                 <p className="text-zinc-500 font-medium mb-8">Complete these steps to launch your first broadcast campaign.</p>
 
                                 <div className="space-y-4">
-                                  <div className={cn("p-6 rounded-2xl border transition-all", 
-                                    hasChannelIntegrations ? "bg-zinc-50/50 border-zinc-200 opacity-60" : cn("bg-white shadow-xl ring-1", theme.borderColor)
+                                  <div className={cn("p-6 rounded-2xl border border-zinc-200/80 border-l-4 transition-all duration-300 bg-gradient-to-br from-white", 
+                                    hasChannelIntegrations 
+                                      ? "bg-zinc-50/50 border-zinc-200 opacity-60" 
+                                      : cn("hover:border-zinc-300/80 hover:-translate-y-0.5", accentBorderClass, cardGradientClass)
                                   )}>
                                     <div className="flex items-start gap-4">
-                                      <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
-                                        hasChannelIntegrations ? "bg-green-100 text-green-600" : cn(theme.lightBg, theme.iconColor)
+                                      <div className={cn("w-9 h-9 rounded-full flex items-center justify-center shrink-0 mt-0.5 font-bold text-sm ring-4 transition-all duration-300",
+                                        hasChannelIntegrations 
+                                          ? "bg-green-100 text-green-600 ring-green-500/10" 
+                                          : cn(theme.lightBg, theme.iconColor, ringClass)
                                       )}>
                                         {hasChannelIntegrations ? <CheckCircle2 className="w-5 h-5" /> : <span className="font-bold text-sm">1</span>}
                                       </div>
                                       <div className="flex-1">
                                         <h4 className="text-lg font-bold text-zinc-900">Connect a Gateway</h4>
-                                        <p className="text-sm text-zinc-500 mt-1 mb-4">Link your provider account to enable messaging.</p>
+                                        <p className="text-sm text-zinc-500 mt-1 mb-4 leading-relaxed">Link your provider account to enable messaging.</p>
                                         {!hasChannelIntegrations && (
-                                          <Button onClick={() => setActiveTab('providers')} className={cn("text-white font-bold rounded-xl h-10 px-6 shadow-md", theme.bgColor, theme.iconColor.replace('text-', 'shadow-').replace(']', ']/20'))}>
+                                          <Button onClick={() => setActiveTab('providers')} className="text-white font-bold rounded-xl h-10 px-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 active:scale-[0.98] transition-all duration-200">
                                             Connect Gateway
                                           </Button>
                                         )}
@@ -675,22 +704,26 @@ function StepWorkspace({
                                     </div>
                                   </div>
 
-                                  <div className={cn("p-6 rounded-2xl border transition-all shadow-sm hover:shadow-md", 
-                                    hasChannelTemplates ? "bg-zinc-50/50 border-zinc-200 opacity-60" : cn("bg-white shadow-xl ring-1", theme.borderColor)
+                                  <div className={cn("p-6 rounded-2xl border border-zinc-200/80 border-l-4 transition-all duration-300 bg-gradient-to-br from-white", 
+                                    hasChannelTemplates 
+                                      ? "bg-zinc-50/50 border-zinc-200 opacity-60" 
+                                      : cn("hover:border-zinc-300/80 hover:-translate-y-0.5", accentBorderClass, cardGradientClass)
                                   )}>
                                     <div className="flex items-start gap-4">
-                                      <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
-                                        hasChannelTemplates ? "bg-green-100 text-green-600" : cn(theme.lightBg, theme.iconColor)
+                                      <div className={cn("w-9 h-9 rounded-full flex items-center justify-center shrink-0 mt-0.5 font-bold text-sm ring-4 transition-all duration-300",
+                                        hasChannelTemplates 
+                                          ? "bg-green-100 text-green-600 ring-green-500/10" 
+                                          : cn(theme.lightBg, theme.iconColor, ringClass)
                                       )}>
                                         {hasChannelTemplates ? <CheckCircle2 className="w-5 h-5" /> : <span className="font-bold text-sm">2</span>}
                                       </div>
                                       <div className="flex-1">
                                         <h4 className="text-lg font-bold text-zinc-900">Create a Template</h4>
-                                        <p className="text-sm text-zinc-500 mt-1 mb-4">Design the message content you want to send.</p>
+                                        <p className="text-sm text-zinc-500 mt-1 mb-4 leading-relaxed">Design the message content you want to send.</p>
                                         {!hasChannelTemplates && (
                                           <Button 
                                             onClick={() => setActiveTab('templates')} 
-                                            className={cn("text-white font-bold rounded-xl h-10 px-6 shadow-md", theme.bgColor, theme.iconColor.replace('text-', 'shadow-').replace(']', ']/20'))}
+                                            className={cn("text-white font-bold rounded-xl h-10 px-6 active:scale-[0.98] transition-all duration-200", buttonGradientClass)}
                                           >
                                             Create Template
                                           </Button>
@@ -699,21 +732,25 @@ function StepWorkspace({
                                     </div>
                                   </div>
 
-                                  <div className={cn("p-6 rounded-2xl border transition-all shadow-sm hover:shadow-md", 
-                                    totalCampaigns > 0 ? "bg-zinc-50/50 border-zinc-200 opacity-60" : cn("bg-white shadow-xl ring-1", theme.borderColor)
+                                  <div className={cn("p-6 rounded-2xl border border-zinc-200/80 border-l-4 transition-all duration-300 bg-gradient-to-br from-white", 
+                                    totalCampaigns > 0 
+                                      ? "bg-zinc-50/50 border-zinc-200 opacity-60" 
+                                      : cn("hover:border-zinc-300/80 hover:-translate-y-0.5", accentBorderClass, cardGradientClass)
                                   )}>
                                     <div className="flex items-start gap-4">
-                                      <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
-                                        totalCampaigns > 0 ? "bg-green-100 text-green-600" : cn(theme.lightBg, theme.iconColor)
+                                      <div className={cn("w-9 h-9 rounded-full flex items-center justify-center shrink-0 mt-0.5 font-bold text-sm ring-4 transition-all duration-300",
+                                        totalCampaigns > 0 
+                                          ? "bg-green-100 text-green-600 ring-green-500/10" 
+                                          : cn(theme.lightBg, theme.iconColor, ringClass)
                                       )}>
                                         {totalCampaigns > 0 ? <CheckCircle2 className="w-5 h-5" /> : <span className="font-bold text-sm">3</span>}
                                       </div>
                                       <div className="flex-1">
                                         <h4 className="text-lg font-bold text-zinc-900">Launch Campaign</h4>
-                                        <p className="text-sm text-zinc-500 mt-1 mb-4">Select your audience and send out your broadcast.</p>
+                                        <p className="text-sm text-zinc-500 mt-1 mb-4 leading-relaxed">Select your audience and send out your broadcast.</p>
                                         <Button 
                                           onClick={() => setIsCreateModalOpen(true)} 
-                                          className={cn("text-white font-bold rounded-xl h-10 px-6 shadow-md", theme.bgColor, theme.iconColor.replace('text-', 'shadow-').replace(']', ']/20'))}
+                                          className={cn("text-white font-bold rounded-xl h-10 px-6 active:scale-[0.98] transition-all duration-200", buttonGradientClass)}
                                         >
                                           <Plus className="w-4 h-4 mr-2" />
                                           New Campaign
