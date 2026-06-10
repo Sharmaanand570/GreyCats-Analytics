@@ -162,6 +162,7 @@ export function AuthForm({
         const loginPayload: LoginRequest = {
           email: data.email,
           password: data.password,
+          ...(searchParams.get("inviteToken") ? { inviteToken: searchParams.get("inviteToken")! } : {}),
         };
         const response = await mutateLogin(loginPayload);
 
@@ -199,6 +200,7 @@ export function AuthForm({
             email: details.email,
             password: details.password,
             fullName: details.fullName,
+            ...(searchParams.get("inviteToken") ? { inviteToken: searchParams.get("inviteToken")! } : {}),
           };
           const response = await mutateSendOtp(payload);
           setSignupData(payload);
@@ -214,6 +216,7 @@ export function AuthForm({
           const response = await mutateVerifyOtp({
             email: signupData.email,
             otp: otpVal,
+            ...(searchParams.get("inviteToken") ? { inviteToken: searchParams.get("inviteToken")! } : {}),
           });
 
           const { setUser } = useUserStore.getState();

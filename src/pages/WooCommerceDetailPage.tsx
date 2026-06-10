@@ -30,7 +30,7 @@ import {
   useWooCommerceAccountInfo,
 } from "@/features/woocommerce/hooks/useWooCommerce";
 import { useRemoveAccount } from "@/hooks/useIntegrations";
-import { useClients } from "@/hooks/useClients";
+import { useAllClients } from "@/hooks/useClients";
 import {
   Table,
   TableBody,
@@ -73,7 +73,7 @@ const WooCommerceDetailPage = () => {
   const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
 
   // Get clients list; resolve clientId from URL param or fallback to first client
-  const { data: clientsData } = useClients();
+  const { data: clientsData } = useAllClients();
   const clients = clientsData || [];
 
   // State management — initialize from URL param so detail page shows the

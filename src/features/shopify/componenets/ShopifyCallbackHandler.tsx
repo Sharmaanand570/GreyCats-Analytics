@@ -122,7 +122,7 @@ export default function ShopifyCallbackHandler() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 p-4">
+    <div className="flex items-center justify-center min-h-[100dvh] bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 p-4">
       <Card className="w-full max-w-md bg-black/40 border-white/10 text-white">
         <CardHeader>
           <CardTitle>

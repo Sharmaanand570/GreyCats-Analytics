@@ -27,7 +27,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { useMetaAccounts } from "@/features/meta/hooks/useMetaData";
 import { useAdImages, useAdVideos, useUploadAdMedia } from "@/features/meta/hooks/useMetaMedia";
-import { useClients } from "@/hooks/useClients";
+import { useAllClients } from "@/hooks/useClients";
 import { cn } from "@/lib/utils";
 
 // Normalize act_ prefix — Meta returns it inconsistently across endpoints.
@@ -125,7 +125,7 @@ function MetaMediaLibraryPage() {
   const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
   const clientId = clientIdParam ? Number(clientIdParam) : null;
 
-  const { data: clientsData } = useClients();
+  const { data: clientsData } = useAllClients();
   const clients = clientsData || [];
 
   const { data: accountsData } = useMetaAccounts(clientId as number);

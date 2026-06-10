@@ -18,7 +18,7 @@ export default function AuthPage() {
   }, [searchParams, navigate]);
 
   return (
-    <div className="flex flex-col py-4 md:flex-row w-full min-h-screen overflow-hidden bg-background">
+    <div className="flex flex-col py-4 md:flex-row w-full min-h-[100dvh] overflow-y-auto bg-background">
       {/* ------------- LEFT AUTH SECTION ------------- */}
       <div className="relative flex flex-col items-center justify-center w-full md:w-1/2 px-6 md:px-16 py-12">
         {/* Logo */}

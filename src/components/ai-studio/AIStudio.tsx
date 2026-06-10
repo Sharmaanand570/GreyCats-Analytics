@@ -76,11 +76,12 @@ export default function AIStudio({ clientId }: Props) {
       {/* Main Content Area */}
       <div className="flex-1 bg-white relative flex flex-col min-h-0 overflow-hidden">
         <div className="flex-1 overflow-y-auto p-8 relative z-10">
-          {activeTab.startsWith("brand-") ? (
-            <BrandProfileView clientId={clientId} activeSubTab={activeTab.replace("brand-", "")} />
-          ) : (
-            <CreativeSuiteView clientId={clientId} activeSubTab={activeTab.replace("creative-", "")} />
-          )}
+          <div className={cn(activeTab.startsWith("brand-") ? "block" : "hidden")}>
+            <BrandProfileView clientId={clientId} activeSubTab={activeTab.startsWith("brand-") ? activeTab.replace("brand-", "") : "identity"} />
+          </div>
+          <div className={cn(activeTab.startsWith("creative-") ? "block" : "hidden")}>
+            <CreativeSuiteView clientId={clientId} activeSubTab={activeTab.startsWith("creative-") ? activeTab.replace("creative-", "") : "captions"} />
+          </div>
         </div>
       </div>
     </div>

@@ -120,7 +120,7 @@ const AdminNotificationsPage = lazy(() => import("./features/admin/pages/AdminNo
 const RoleGuard = lazy(() => import("./components/RoleGuard"));
 
 const LoadingFallback = () => (
-  <div className="flex items-center justify-center min-h-screen">
+  <div className="flex items-center justify-center min-h-[100dvh]">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
   </div>
 );
@@ -152,6 +152,11 @@ function App() {
               <Route path="forgot-password" element={<ForgotPassword />} />
               <Route path="*" element={<NotFoundPage />} />
             </Route>
+
+            {/* Alias for backend's hardcoded /signup emails */}
+            <Route path="signup" element={<AuthPage />} />
+            <Route path="/signup" element={<AuthPage />} />
+            <Route path="//signup" element={<AuthPage />} />
 
             {/* Protected routes with sidebar */}
             <Route path="/" element={<MainSideBar />}>
@@ -224,7 +229,10 @@ function App() {
               <Route path="account-setup" element={<SettingsPage />} />
               <Route path="social-media/scheduler/:clientId?" element={<SocialMediaSchedulerPage />} />
               <Route path="blog/scheduler/:clientId?" element={<BlogSchedulerPage />} />
-              <Route path="broadcasts/:clientId?" element={<BroadcastPage />} />
+              <Route path="broadcasts">
+                <Route index element={<Navigate to="whatsapp" replace />} />
+                <Route path=":channel/:clientId?" element={<BroadcastPage />} />
+              </Route>
             </Route>
 
             {/* 404 catch-all for protected area — outside sidebar */}

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React from 'react';
 import { api } from '../apiConfig';
 import type {
   Client,
@@ -22,7 +23,6 @@ export const clientKeys = {
 
 // Fetch all clients
 export const useClients = () => {
-  const { setClients } = useClientContext();
   const { user } = useUserStore();
 
   return useQuery({
@@ -45,7 +45,6 @@ export const useClients = () => {
           })
         );
 
-        setClients(detailedClients);
         return detailedClients;
       } catch (error: any) {
         console.error('Error fetching clients:', error);
@@ -57,7 +56,6 @@ export const useClients = () => {
           toast.info('Backend API not connected. Start your backend server to manage clients.', {
             duration: 5000,
           });
-          setClients([]);
           return []; // Return empty array instead of throwing
         }
 
@@ -626,4 +624,93 @@ export const useDeleteClient = () => {
       toast.error(error.response?.data?.message || 'Failed to delete client');
     },
   });
+};
+
+// Fetch shared clients (Collaborator View)
+export const useMySharedClientAccess = () => {
+  const { user } = useUserStore();
+
+  return useQuery({
+    queryKey: ['my-shared-client-access', user?.id],
+    queryFn: async () => {
+      try {
+        const response = await api.get<{ success: boolean; accessList: any[] }>('/collaborator-access/my-access');
+        const accessList = response.data.accessList || [];
+
+        // Fetch detailed data for each shared client to get integrations
+        const detailedSharedClients = await Promise.all(
+          accessList.map(async (sc) => {
+            try {
+              const detailResponse = await api.get<ClientDetailResponse>(`/clients/${sc.clientId}`);
+              const normalized = normalizeClientData(detailResponse.data.client);
+              return {
+                ...normalized,
+                id: sc.clientId,
+                _isShared: true,
+                sharedAccess: sc,
+              };
+            } catch (error) {
+              console.warn(`Failed to fetch details for shared client ${sc.clientId}, using basic info`, error);
+              return {
+                id: sc.clientId,
+                name: sc.clientName,
+                logo: sc.clientLogo,
+                isActive: sc.isActive,
+                createdAt: sc.grantedAt,
+                updatedAt: sc.grantedAt,
+                integrations: [],
+                _isShared: true,
+                sharedAccess: sc,
+              };
+            }
+          })
+        );
+
+        return detailedSharedClients;
+      } catch (error: any) {
+        if (error.code === 'ERR_NETWORK' || error.response?.status === 404 || error.response?.status === 500) {
+          return [];
+        }
+        throw error;
+      }
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+    enabled: !!user,
+  });
+};
+
+// Hook to get ALL clients (Owned + Shared) merged into a single array
+export const useAllClients = () => {
+  const { setClients } = useClientContext();
+  const clientsQuery = useClients();
+  const sharedQuery = useMySharedClientAccess();
+
+  const allClients = React.useMemo(() => {
+    const owned = clientsQuery.data || [];
+    const shared = sharedQuery.data || [];
+
+    // Combine them, filtering out duplicates just in case (e.g. if the user is owner and somehow also invited)
+    const map = new Map<number, ClientWithIntegrations>();
+    owned.forEach((c: ClientWithIntegrations) => map.set(c.id, c));
+    shared.forEach((c: any) => {
+      if (!map.has(c.id)) {
+        map.set(c.id, c as ClientWithIntegrations);
+      }
+    });
+    const result = Array.from(map.values());
+    setClients(result);
+    return result;
+  }, [clientsQuery.data, sharedQuery.data, setClients]);
+
+  return {
+    data: allClients,
+    isLoading: clientsQuery.isLoading || sharedQuery.isLoading,
+    isError: clientsQuery.isError || sharedQuery.isError,
+    refetch: () => {
+      clientsQuery.refetch();
+      sharedQuery.refetch();
+    }
+  };
 };

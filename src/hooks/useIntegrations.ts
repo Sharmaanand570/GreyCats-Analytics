@@ -133,6 +133,14 @@ export const useRemoveAccount = () => {
       queryClient.invalidateQueries({
         queryKey: ["sync-status", variables.clientId],
       });
+      // Invalidate blog targets if applicable
+      if (variables.integrationType === 'wordpress') {
+        queryClient.invalidateQueries({ queryKey: ['blog-wordpress-targets'] });
+        queryClient.invalidateQueries({ queryKey: ['blog-integrations'] });
+      } else if (variables.integrationType === 'telegram') {
+        queryClient.invalidateQueries({ queryKey: ['blog-telegram-targets'] });
+        queryClient.invalidateQueries({ queryKey: ['blog-integrations'] });
+      }
       toast.success('Account disconnected successfully');
     },
     onError: (error: any) => {

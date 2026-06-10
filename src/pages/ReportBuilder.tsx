@@ -112,6 +112,7 @@ import type {
 import { useIntegrations } from "@/features/DataSources/hooks/useIntegrations";
 import { useIntegrations as useBroadcastIntegrations } from "@/features/broadcasts/hooks/useBroadcasts";
 import { useTelegramTargets, useWordPressTargets } from "@/features/blog/hooks/useBlogPosts";
+import { useMySharedClientAccess } from "@/hooks/useClients";
 import { getPlatformConfig } from "@/utils/platformMapping";
 import { useAvailableMetrics } from "@/features/reports/hooks/useAvailableMetrics";
 
@@ -5579,7 +5580,7 @@ function ReportBuilderContent({ readOnly = false, providedReportId, shareToken, 
 
 
   return (
-    <div className="w-full h-screen flex flex-col bg-gray-50 overflow-hidden">
+    <div className="w-full h-[100dvh] flex flex-col bg-gray-50 overflow-hidden">
       {/* New Report Name Dialog */}
       <Dialog
         open={isNameDialogOpen}
@@ -6548,6 +6549,23 @@ const ReportBuilder = (props: ReportBuilderProps) => {
 
   const parsedClientId = clientId ? parseInt(clientId) : null;
   const { overallProgress } = useSyncStatus(parsedClientId);
+  
+  const { data: sharedClients } = useMySharedClientAccess();
+  
+  const isReadOnlyShared = useMemo(() => {
+    if (!parsedClientId || !sharedClients) return false;
+    const shared = sharedClients.find(c => c.id === parsedClientId);
+    if (shared && shared.sharedAccess?.role === 'READ_ONLY') {
+      return true;
+    }
+    return false;
+  }, [parsedClientId, sharedClients]);
+
+  const effectiveProps = {
+    ...props,
+    readOnly: props.readOnly || isReadOnlyShared
+  };
+
   const pendingClientId = localStorage.getItem("pending_oauth_client_id");
   const pendingIntegration = localStorage.getItem("pending_oauth_integration");
   const hasPendingOAuthForClient = Boolean(
@@ -6557,7 +6575,7 @@ const ReportBuilder = (props: ReportBuilderProps) => {
     pendingIntegration
   );
 
-  if (parsedClientId && (overallProgress.isSyncing || hasPendingOAuthForClient) && !props.readOnly) {
+  if (parsedClientId && (overallProgress.isSyncing || hasPendingOAuthForClient) && !effectiveProps.readOnly) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/95 backdrop-blur-sm">
         <div className="flex flex-col items-center max-w-md p-8 text-center bg-white rounded-xl shadow-xl border border-zinc-200">
@@ -6594,7 +6612,7 @@ const ReportBuilder = (props: ReportBuilderProps) => {
     );
   }
 
-  return <ReportBuilderContent {...props} />;
+  return <ReportBuilderContent {...effectiveProps} />;
 };
 
 export default ReportBuilder;

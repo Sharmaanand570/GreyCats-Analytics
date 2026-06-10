@@ -20,6 +20,8 @@ import ClientFormModal from '../components/clients/ClientFormModal';
 import AIStudio from '../components/ai-studio/AIStudio';
 import { getProfileImageUrl } from "@/utils/imageUtils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { TeamAccessTab } from '../components/TeamAccessTab';
+import { Users } from 'lucide-react';
 
 import { clientKeys } from '../hooks/useClients';
 import type { Client } from "@/types/client.types";
@@ -243,6 +245,12 @@ const ClientDetailPage: React.FC = () => {
                                     <Sparkles className="w-4 h-4 mr-2" />
                                     AI Studio
                                 </TabsTrigger>
+                                {(!client?._isShared || client?.sharedAccess?.role === 'ADMIN') && (
+                                    <TabsTrigger value="team-access" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                                        <Users className="w-4 h-4 mr-2" />
+                                        Team Access
+                                    </TabsTrigger>
+                                )}
                             </TabsList>
                             {isReportAccessLocked && (
                                 <p className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
@@ -317,6 +325,14 @@ const ClientDetailPage: React.FC = () => {
                                 <div className="min-h-[700px] pb-8">
                                     {parsedClientId && (
                                         <AIStudio clientId={parsedClientId} />
+                                    )}
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="team-access" className="space-y-4 focus-visible:outline-none">
+                                <div className="min-h-[700px] pb-8">
+                                    {parsedClientId && (
+                                        <TeamAccessTab clientId={parsedClientId} />
                                     )}
                                 </div>
                             </TabsContent>

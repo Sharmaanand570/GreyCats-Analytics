@@ -28,7 +28,7 @@ import {
 } from "@/features/YouTube/hooks/google/useGoogleAnalyticsData";
 import { useRemoveAccount } from "@/hooks/useIntegrations";
 import { useClient } from "@/hooks/useClients";
-import { useClients } from "@/hooks/useClients";
+import { useAllClients } from "@/hooks/useClients";
 import {
   Select,
   SelectContent,
@@ -70,7 +70,7 @@ function GoogleAnalyticsDetailPage() {
   const selectedClientId = clientIdParam ? Number(clientIdParam) : null;
 
   // Fetch all clients for selector
-  const { data: clients } = useClients();
+  const { data: clients } = useAllClients();
   const { data: client } = useClient(selectedClientId);
 
   // Handle client selection - update URL

@@ -15,7 +15,8 @@ import {
   listAdminIntegrations,
   createIntegration,
   deleteIntegration,
-  deleteAdminIntegration
+  deleteAdminIntegration,
+  syncTemplates
 } from '../api/broadcastApi';
 import type { 
   CreateBroadcastPayload, 
@@ -83,6 +84,7 @@ export const useCreateBroadcastCsv = () => {
       columnName?: string;
       subject?: string;
       clientId?: number;
+      variableMapping?: Record<string, string>;
     }) => createBroadcastCsv(
       data.file,
       data.name,
@@ -91,7 +93,8 @@ export const useCreateBroadcastCsv = () => {
       data.integrationId,
       data.columnName,
       data.subject,
-      data.clientId
+      data.clientId,
+      data.variableMapping
     ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['broadcasts'] });
@@ -172,6 +175,21 @@ export const useDeleteTemplate = () => {
   });
 };
 
+export const useSyncTemplates = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (clientId?: number) => syncTemplates(clientId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['broadcast-templates'] });
+      queryClient.invalidateQueries({ queryKey: ['broadcast-admin-templates'] });
+      toast.success('Templates synced successfully');
+    },
+    onError: (error: any) => {
+      toast.error(extractError(error, 'Failed to sync templates'));
+    }
+  });
+};
+
 export const useApproveTemplate = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -195,10 +213,11 @@ export const useIntegrations = (clientId?: number) => {
   });
 };
 
-export const useAdminIntegrations = () => {
+export const useAdminIntegrations = (enabled: boolean = true) => {
   return useQuery({
     queryKey: ['broadcast-integrations-admin'],
-    queryFn: listAdminIntegrations
+    queryFn: listAdminIntegrations,
+    enabled
   });
 };
 

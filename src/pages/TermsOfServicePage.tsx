@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 
 export default function TermsOfServicePage() {
     return (
-        <div className="flex flex-col min-h-screen bg-background">
+        <div className="flex flex-col min-h-[100dvh] bg-background">
             {/* Header */}
             <header className="flex items-center gap-4 px-6 py-4 border-b bg-background sticky top-0 z-10">
                 <Link

@@ -49,14 +49,14 @@ import {
 } from "@/features/shopify/hooks/useShopify";
 import { DataSyncBanner } from "@/components/DataSyncBanner";
 import { PlatformNotConnected } from "@/components/PlatformNotConnected";
-import { useClients } from "@/hooks/useClients";
+import { useAllClients } from "@/hooks/useClients";
 
 function ShopifyDetailPage() {
   const navigate = useNavigate();
   const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
 
   // Get clients and resolve clientId from URL param or fallback to first client
-  const { data: clientsData } = useClients();
+  const { data: clientsData } = useAllClients();
   const clients = clientsData || [];
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
 

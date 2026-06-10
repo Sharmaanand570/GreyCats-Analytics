@@ -63,7 +63,7 @@ import type { CampaignStatus } from "@/features/meta/API/metaAdsManagerApi";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { cn } from "@/lib/utils";
 import { useMetaAdsMeta, useMetaAdsSummary, useMetaAdsCampaigns, useMetaAdsTrends } from "@/features/meta/hooks/useMetaAdsData";
-import { useClients, useClient } from "@/hooks/useClients";
+import { useAllClients, useClient } from "@/hooks/useClients";
 import { DataSyncBanner } from "@/components/DataSyncBanner";
 import { PlatformNotConnected } from "@/components/PlatformNotConnected";
 import { AlertCircle, RefreshCw, BarChart3, Copy, ShieldCheck, Images } from "lucide-react";
@@ -194,7 +194,7 @@ function MetaDetailPage() {
     to: new Date(2025, 11, 31),
   });
 
-  const { data: clientsData } = useClients();
+  const { data: clientsData } = useAllClients();
   const clients = clientsData || [];
   const { data: clientData } = useClient(selectedClientId);
   

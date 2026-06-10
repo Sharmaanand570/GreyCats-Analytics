@@ -15,7 +15,7 @@ export default function GoogleAdsConnectPage() {
   }, [navigate]);
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background">
+    <div className="flex items-center justify-center min-h-[100dvh] bg-background">
       <div className="text-center space-y-3">
         <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
         <p className="text-sm font-medium">Finishing Google Ads connection...</p>

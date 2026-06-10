@@ -55,7 +55,7 @@ const LinkedinCallbackHandler = () => {
 
     if (noOrgFound) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-50">
+            <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-zinc-50">
                 <div className="max-w-md w-full bg-white rounded-2xl shadow-lg border border-zinc-200 p-8 text-center">
                     <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-5">
                         <AlertCircle className="w-7 h-7 text-red-500" />
@@ -76,7 +76,7 @@ const LinkedinCallbackHandler = () => {
     }
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-50">
+        <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-zinc-50">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-500 mb-4"></div>
             <p className="text-zinc-600 font-medium">Completing LinkedIn Connection...</p>
         </div>

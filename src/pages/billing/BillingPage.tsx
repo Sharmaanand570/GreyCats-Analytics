@@ -36,7 +36,7 @@ export default function BillingPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="min-h-[100dvh] flex items-center justify-center bg-white">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-[#4285F4]" />
           <p className="text-sm text-[#666]">Loading billing info…</p>
@@ -47,7 +47,7 @@ export default function BillingPage() {
 
   if (isError || !data) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white px-4">
+      <div className="min-h-[100dvh] flex items-center justify-center bg-white px-4">
         <div className="text-center space-y-3">
           <AlertTriangle className="w-10 h-10 text-[#EA4335] mx-auto" />
           <p className="text-[#111] font-medium">Failed to load billing information.</p>
@@ -80,7 +80,7 @@ export default function BillingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-[#111] font-sans">
+    <div className="min-h-[100dvh] bg-white text-[#111] font-sans">
       {/* Page Header */}
       <div className={`px-6 py-10 ${isCancelled ? "bg-[#333]" : "bg-[#111]"}`}>
         <div className="max-w-4xl mx-auto">

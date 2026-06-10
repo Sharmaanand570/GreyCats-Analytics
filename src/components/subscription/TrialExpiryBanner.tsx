@@ -60,9 +60,9 @@ export function TrialExpiryBanner() {
     <div
       className={`w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm font-medium ${bgClass} ${txtClass}`}
     >
-      <div className="flex items-center gap-2 flex-1 min-w-0">
-        <Zap className="w-4 h-4 flex-shrink-0" />
-        <span className="truncate">{message}</span>
+      <div className="flex items-start sm:items-center gap-2 flex-1 min-w-0">
+        <Zap className="w-4 h-4 flex-shrink-0 mt-0.5 sm:mt-0" />
+        <span className="text-xs sm:text-sm leading-snug pr-2">{message}</span>
       </div>
 
       <div className="flex items-center gap-3 flex-shrink-0">

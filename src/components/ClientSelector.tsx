@@ -17,38 +17,61 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover"
 import { useNavigate, useParams } from "react-router-dom"
-import { useClients } from "@/hooks/useClients"
+import { useClients, useMySharedClientAccess } from "@/hooks/useClients"
 import { Button } from "@/components/ui/button"
 import { useClientContext } from "@/context/ClientContext"
+import type { ClientWithIntegrations } from "@/types/client.types"
 
 export function ClientSelector({ isCollapsed }: { isCollapsed?: boolean }) {
     const [open, setOpen] = React.useState(false)
     const navigate = useNavigate()
     const { clientId } = useParams<{ clientId: string }>()
     const { data: clients, isError, refetch } = useClients()
+    const { data: sharedClients } = useMySharedClientAccess()
     const { currentClient, setCurrentClient } = useClientContext()
+
+    const mappedSharedClients = React.useMemo<ClientWithIntegrations[]>(() => {
+        return (sharedClients || []).map((sc: any) => {
+            if (sc._isShared && sc.name) return sc as ClientWithIntegrations;
+            return {
+                id: sc.clientId,
+                name: sc.clientName,
+                logo: sc.clientLogo,
+                isActive: sc.isActive,
+                createdAt: sc.grantedAt,
+                updatedAt: sc.grantedAt,
+                integrations: [],
+                _isShared: true,
+                sharedAccess: sc,
+            } as ClientWithIntegrations;
+        });
+    }, [sharedClients])
+
+    const allClients = React.useMemo(() => {
+        return [...(clients || []), ...mappedSharedClients]
+    }, [clients, mappedSharedClients])
 
     // Keep context in sync with the URL. ClientProvider sits above <Routes>, so its
     // own useParams() never resolves :clientId — without this sync, currentClient
     // goes stale the moment the user navigates between routes that have / don't
     // have a :clientId segment, and the sidebar visibly swaps clients on tab change.
     React.useEffect(() => {
-        if (!clientId || !clients) return;
-        const client = clients.find(c => c.id === Number(clientId));
+        if (!clientId || !allClients.length) return;
+        const client = allClients.find(c => c.id === Number(clientId));
         if (client && currentClient?.id !== client.id) {
             setCurrentClient(client);
             localStorage.setItem('lastClientId', String(client.id));
         }
-    }, [clientId, clients, currentClient?.id, setCurrentClient]);
+    }, [clientId, allClients, currentClient?.id, setCurrentClient]);
 
     const selectedClient = React.useMemo(() => {
         // Prefer URL param match, fall back to global context client
-        const fromUrl = clients?.find(c => c.id === Number(clientId));
+        const fromUrl = allClients.find(c => c.id === Number(clientId));
         return fromUrl || currentClient || null;
-    }, [clients, clientId, currentClient]);
+    }, [allClients, clientId, currentClient]);
 
     const handleSelectClient = (id: number) => {
-        const client = clients?.find(c => c.id === id)
+        const client = allClients.find(c => c.id === id)
         if (client) {
             setCurrentClient(client)
             localStorage.setItem('lastClientId', String(id))
@@ -101,28 +124,60 @@ export function ClientSelector({ isCollapsed }: { isCollapsed?: boolean }) {
                                 </CommandItem>
                             </CommandGroup>
                             <CommandSeparator className="bg-zinc-800" />
-                            <CommandGroup heading="Clients" className="text-zinc-400">
-                                {clients?.map((client) => (
-                                    <CommandItem
-                                        key={client.id}
-                                        onSelect={() => handleSelectClient(client.id)}
-                                        className="cursor-pointer text-zinc-100 data-[selected=true]:bg-zinc-800 data-[selected=true]:text-zinc-50"
-                                    >
-                                        <div className="flex items-center gap-2 w-full">
-                                            <Avatar className="h-6 w-6 rounded-full border border-zinc-700">
-                                                <AvatarImage src={getProfileImageUrl(client.logo)} className="object-contain" />
-                                                <AvatarFallback className="bg-zinc-800 text-[10px] font-bold text-zinc-300">
-                                                    {client.name.substring(0, 2).toUpperCase()}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <span>{client.name}</span>
-                                        </div>
-                                        {selectedClient?.id === client.id && (
-                                            <Check className="ml-auto h-4 w-4" />
-                                        )}
-                                    </CommandItem>
-                                ))}
-                            </CommandGroup>
+                            {clients && clients.length > 0 && (
+                                <CommandGroup heading="Owned Clients" className="text-zinc-400">
+                                    {clients.map((client) => (
+                                        <CommandItem
+                                            key={`owned-${client.id}`}
+                                            onSelect={() => handleSelectClient(client.id)}
+                                            className="cursor-pointer text-zinc-100 data-[selected=true]:bg-zinc-800 data-[selected=true]:text-zinc-50"
+                                        >
+                                            <div className="flex items-center gap-2 w-full">
+                                                <Avatar className="h-6 w-6 rounded-full border border-zinc-700">
+                                                    <AvatarImage src={getProfileImageUrl(client.logo)} className="object-contain" />
+                                                    <AvatarFallback className="bg-zinc-800 text-[10px] font-bold text-zinc-300">
+                                                        {client.name.substring(0, 2).toUpperCase()}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <span>{client.name}</span>
+                                            </div>
+                                            {selectedClient?.id === client.id && (
+                                                <Check className="ml-auto h-4 w-4" />
+                                            )}
+                                        </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                            )}
+                            {mappedSharedClients.length > 0 && (
+                                <>
+                                    <CommandSeparator className="bg-zinc-800" />
+                                    <CommandGroup heading="Shared With Me" className="text-zinc-400">
+                                        {mappedSharedClients.map((client) => (
+                                            <CommandItem
+                                                key={`shared-${client.id}`}
+                                                onSelect={() => handleSelectClient(client.id)}
+                                                className="cursor-pointer text-zinc-100 data-[selected=true]:bg-zinc-800 data-[selected=true]:text-zinc-50"
+                                            >
+                                                <div className="flex items-center gap-2 w-full">
+                                                    <Avatar className="h-6 w-6 rounded-full border border-zinc-700">
+                                                        <AvatarImage src={getProfileImageUrl(client.logo)} className="object-contain" />
+                                                        <AvatarFallback className="bg-zinc-800 text-[10px] font-bold text-zinc-300">
+                                                            {client.name.substring(0, 2).toUpperCase()}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <div className="flex flex-col">
+                                                        <span>{client.name}</span>
+                                                        <span className="text-[10px] text-zinc-500">Shared by {client.sharedAccess?.ownerName}</span>
+                                                    </div>
+                                                </div>
+                                                {selectedClient?.id === client.id && (
+                                                    <Check className="ml-auto h-4 w-4" />
+                                                )}
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </>
+                            )}
                         </CommandList>
                     </Command>
                 </PopoverContent>
@@ -157,7 +212,7 @@ export function ClientSelector({ isCollapsed }: { isCollapsed?: boolean }) {
                     <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-zinc-950 border-zinc-800" align="start">
+            <PopoverContent side="bottom" className="w-[--radix-popover-trigger-width] p-0 bg-zinc-950 border-zinc-800" align="start">
                 <Command className="bg-zinc-950">
                     <CommandInput placeholder="Search client..." className="text-zinc-100 placeholder:text-zinc-500" />
                     <CommandList className="max-h-[300px] overflow-y-auto custom-scrollbar">
@@ -177,28 +232,60 @@ export function ClientSelector({ isCollapsed }: { isCollapsed?: boolean }) {
                             </CommandItem>
                         </CommandGroup>
                         <CommandSeparator className="bg-zinc-800" />
-                        <CommandGroup heading="Clients" className="text-zinc-400">
-                            {clients?.map((client) => (
-                                <CommandItem
-                                    key={client.id}
-                                    onSelect={() => handleSelectClient(client.id)}
-                                    className="cursor-pointer text-zinc-100 data-[selected=true]:bg-zinc-800 data-[selected=true]:text-zinc-50"
-                                >
-                                    <div className="flex items-center gap-2 w-full">
-                                        <Avatar className="h-6 w-6 rounded-full border border-zinc-700">
-                                            <AvatarImage src={getProfileImageUrl(client.logo)} className="object-contain" />
-                                            <AvatarFallback className="bg-zinc-800 text-[10px] font-bold text-zinc-300">
-                                                {client.name.substring(0, 2).toUpperCase()}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        <span>{client.name}</span>
-                                    </div>
-                                    {selectedClient?.id === client.id && (
-                                        <Check className="ml-auto h-4 w-4" />
-                                    )}
-                                </CommandItem>
-                            ))}
-                        </CommandGroup>
+                        {clients && clients.length > 0 && (
+                            <CommandGroup heading="Owned Clients" className="text-zinc-400">
+                                {clients.map((client) => (
+                                    <CommandItem
+                                        key={`owned-${client.id}`}
+                                        onSelect={() => handleSelectClient(client.id)}
+                                        className="cursor-pointer text-zinc-100 data-[selected=true]:bg-zinc-800 data-[selected=true]:text-zinc-50"
+                                    >
+                                        <div className="flex items-center gap-2 w-full">
+                                            <Avatar className="h-6 w-6 rounded-full border border-zinc-700">
+                                                <AvatarImage src={getProfileImageUrl(client.logo)} className="object-contain" />
+                                                <AvatarFallback className="bg-zinc-800 text-[10px] font-bold text-zinc-300">
+                                                    {client.name.substring(0, 2).toUpperCase()}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <span>{client.name}</span>
+                                        </div>
+                                        {selectedClient?.id === client.id && (
+                                            <Check className="ml-auto h-4 w-4" />
+                                        )}
+                                    </CommandItem>
+                                ))}
+                            </CommandGroup>
+                        )}
+                        {mappedSharedClients.length > 0 && (
+                            <>
+                                <CommandSeparator className="bg-zinc-800" />
+                                <CommandGroup heading="Shared With Me" className="text-zinc-400">
+                                    {mappedSharedClients.map((client) => (
+                                        <CommandItem
+                                            key={`shared-${client.id}`}
+                                            onSelect={() => handleSelectClient(client.id)}
+                                            className="cursor-pointer text-zinc-100 data-[selected=true]:bg-zinc-800 data-[selected=true]:text-zinc-50"
+                                        >
+                                            <div className="flex items-center gap-2 w-full">
+                                                <Avatar className="h-6 w-6 rounded-full border border-zinc-700">
+                                                    <AvatarImage src={getProfileImageUrl(client.logo)} className="object-contain" />
+                                                    <AvatarFallback className="bg-zinc-800 text-[10px] font-bold text-zinc-300">
+                                                        {client.name.substring(0, 2).toUpperCase()}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <div className="flex flex-col">
+                                                    <span>{client.name}</span>
+                                                    <span className="text-[10px] text-zinc-500">Shared by {client.sharedAccess?.ownerName}</span>
+                                                </div>
+                                            </div>
+                                            {selectedClient?.id === client.id && (
+                                                <Check className="ml-auto h-4 w-4" />
+                                            )}
+                                        </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                            </>
+                        )}
                         <CommandSeparator className="bg-zinc-800" />
                         <CommandGroup>
                             <CommandItem onSelect={() => {

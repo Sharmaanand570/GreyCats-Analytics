@@ -33,7 +33,7 @@ import { toast } from "sonner";
 import { subDays, format } from "date-fns";
 import { useAvailableMetrics } from "@/features/reports/hooks/useAvailableMetrics";
 import { getMetricAggregation } from '@/utils/facebookMetrics';
-import { useClients } from "@/hooks/useClients";
+import { useAllClients } from "@/hooks/useClients";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "./ui/skeleton";
 import {
@@ -479,7 +479,7 @@ function Dashboard({
   const setDateRange = onDateRangeChange || setInternalDateRange;
 
   // Fetch clients only if no clientId is provided
-  const { data: clients, isLoading: isLoadingClients, isError: isClientsError, refetch: refetchClients } = useClients();
+  const { data: clients, isLoading: isLoadingClients, isError: isClientsError, refetch: refetchClients } = useAllClients();
 
   const { groupedMetrics } = useAvailableMetrics(clientId ?? null);
 
@@ -2108,11 +2108,11 @@ function Dashboard({
   );
 
   if (!withLayout) {
-    return <div className="w-full min-h-screen bg-slate-50/50">{content}</div>;
+    return <div className="w-full min-h-[100dvh] bg-slate-50/50">{content}</div>;
   }
 
   return (
-    <div className="w-full h-screen flex flex-col overflow-x-hidden bg-slate-50">
+    <div className="w-full h-[100dvh] flex flex-col overflow-x-hidden bg-slate-50">
       {!hideHeader && (
         <div className="w-full h-[4.8em] bg-white/80 backdrop-blur-md border-b flex justify-between items-center px-6 sticky top-0 z-20">
           <span className="font-bold text-lg text-zinc-800 tracking-tight">Overview</span>

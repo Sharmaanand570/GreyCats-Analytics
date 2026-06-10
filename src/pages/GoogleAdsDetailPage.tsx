@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { useGoogleAdsSummary, useGoogleAdsCampaigns, useDisconnectGoogleAds } from "@/features/googleAds/hooks/useGoogleAds";
-import { useClients, useClient } from "@/hooks/useClients";
+import { useAllClients, useClient } from "@/hooks/useClients";
 import { PlatformNotConnected } from "@/components/PlatformNotConnected";
 import { toast } from "sonner";
 import type { GoogleAdsCampaign } from "@/features/googleAds/API/googleAdsApi";
@@ -116,7 +116,7 @@ export default function GoogleAdsDetailPage() {
 
     const selectedClientId = clientIdParam ? Number(clientIdParam) : null;
 
-    const { data: clients } = useClients();
+    const { data: clients } = useAllClients();
     const { data: clientData } = useClient(selectedClientId);
 
     const hasGoogleAdsIntegration = !!clientData?.integrations?.some(

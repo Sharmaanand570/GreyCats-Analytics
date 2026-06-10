@@ -9,10 +9,11 @@ import {
 } from '../hooks/useBroadcasts';
 import { useConnectTelegram, useTelegramTargets } from '@/features/blog/hooks/useBlogPosts';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SiTelegram } from 'react-icons/si';
+import { SiTelegram, SiWhatsapp } from 'react-icons/si';
+import { WhatsAppIntegrationCard } from './WhatsAppIntegrationCard';
 import {
   Plus,
   Loader2,
@@ -35,12 +36,13 @@ import { useClientContext } from '@/context/ClientContext';
 interface ProviderManagerProps {
   admin?: boolean;
   clientId?: number;
+  fixedChannel?: BroadcastChannel;
 }
 
-export function ProviderManager({ admin = false, clientId }: ProviderManagerProps = {}) {
+export function ProviderManager({ admin = false, clientId, fixedChannel }: ProviderManagerProps = {}) {
   const { clients } = useClientContext();
   const userQuery = useIntegrations(clientId);
-  const adminQuery = useAdminIntegrations();
+  const adminQuery = useAdminIntegrations(admin);
   const { data: integrations, isLoading } = admin ? adminQuery : userQuery;
   
   const createIntegration = useCreateIntegration();
@@ -52,8 +54,13 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
   );
   const [isCreating, setIsCreating] = useState(false);
   const [name, setName] = useState('');
-  const [type, setType] = useState<BroadcastChannel>('SMS');
-  const [provider, setProvider] = useState<BroadcastProvider>('ADBIZZ');
+  const [type, setType] = useState<BroadcastChannel>(fixedChannel || 'SMS');
+  const [provider, setProvider] = useState<BroadcastProvider>(
+    fixedChannel === 'EMAIL' ? 'SMTP' :
+    fixedChannel === 'WHATSAPP' ? 'META' :
+    fixedChannel === 'TELEGRAM' ? 'TELEGRAM' :
+    'ADBIZZ'
+  );
   
   // Dynamic config state
   const [twilioSid, setTwilioSid] = useState('');
@@ -90,6 +97,18 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
     }
     smtpFieldsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
+
+  useEffect(() => {
+    if (fixedChannel) {
+      setType(fixedChannel);
+      setProvider(
+        fixedChannel === 'EMAIL' ? 'SMTP' :
+        fixedChannel === 'WHATSAPP' ? 'META' :
+        fixedChannel === 'TELEGRAM' ? 'TELEGRAM' :
+        'ADBIZZ'
+      );
+    }
+  }, [fixedChannel]);
 
   useEffect(() => {
     if (!isCreating) {
@@ -212,13 +231,14 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
 
   const renderIntegrationCard = (i: BroadcastIntegration) => {
     const isSms = i.type === 'SMS';
+    const isWhatsapp = i.type === 'WHATSAPP';
     const scopedClientName = clientNameById(i.clientId);
     return (
       <Card key={i.id} className="group border-gray-200 dark:border-white/10 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden bg-white dark:bg-[#111]">
         <CardContent className="p-8 flex flex-col h-full relative">
           <div className={cn(
             "absolute top-0 right-0 text-white text-[8px] font-black uppercase tracking-widest px-3 py-1 rounded-bl-xl shadow-lg flex items-center gap-1.5",
-            isSms ? "bg-orange-500 shadow-orange-500/20" : "bg-indigo-500 shadow-indigo-500/20"
+            isWhatsapp ? "bg-green-500 shadow-green-500/20" : isSms ? "bg-orange-500 shadow-orange-500/20" : "bg-indigo-500 shadow-indigo-500/20"
           )}>
             <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
             Active
@@ -235,9 +255,9 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
           <div className="flex items-center gap-6 mb-8 mt-2">
             <div className={cn(
               "w-14 h-14 rounded-2xl flex items-center justify-center border border-gray-100 dark:border-white/10 group-hover:scale-110 transition-all duration-500",
-              isSms ? "bg-orange-500/5 text-orange-600" : "bg-indigo-500/5 text-indigo-600"
+              isWhatsapp ? "bg-green-500/5 text-green-600" : isSms ? "bg-orange-500/5 text-orange-600" : "bg-indigo-500/5 text-indigo-600"
             )}>
-              {isSms ? <MessageSquare className="w-7 h-7" /> : <Mail className="w-7 h-7" />}
+              {isWhatsapp ? <SiWhatsapp className="w-7 h-7" /> : isSms ? <MessageSquare className="w-7 h-7" /> : <Mail className="w-7 h-7" />}
             </div>
             <div>
               <h3 className="font-bold text-gray-900 dark:text-white text-lg tracking-tight leading-none mb-2">{i.name}</h3>
@@ -274,7 +294,7 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
             {i.isDefault && (
               <div className={cn(
                 "flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg",
-                isSms ? "bg-orange-500/5 text-orange-600" : "bg-indigo-500/5 text-indigo-600"
+                isWhatsapp ? "bg-green-500/5 text-green-600" : isSms ? "bg-orange-500/5 text-orange-600" : "bg-indigo-500/5 text-indigo-600"
               )}>
                 <ShieldCheck className="w-3.5 h-3.5" />
                 System Default
@@ -502,6 +522,22 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
         </div>
       );
     }
+    if (provider === 'META') {
+      return (
+        <div className="col-span-full py-10 flex flex-col items-center justify-center text-center">
+          <div className="w-16 h-16 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-600 mb-6">
+            <SiWhatsapp className="w-8 h-8" />
+          </div>
+          <h3 className="text-xl font-extrabold text-zinc-900 dark:text-white mb-2">Connect via Meta</h3>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium max-w-sm mb-8">
+            WhatsApp Business uses a secure OAuth connection. Click below to securely connect your Meta Business account.
+          </p>
+          <div className="w-full max-w-sm">
+             <WhatsAppIntegrationCard clientId={clientId} onConnected={() => { setIsCreating(false); userQuery.refetch(); }} variant="button" />
+          </div>
+        </div>
+      );
+    }
     return null;
   };
 
@@ -520,7 +556,18 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
             </div>
           </div>
           <Button 
-            onClick={() => setIsCreating(!isCreating)}
+            onClick={() => {
+              if (!isCreating && fixedChannel) {
+                setType(fixedChannel);
+                setProvider(
+                  fixedChannel === 'EMAIL' ? 'SMTP' :
+                  fixedChannel === 'WHATSAPP' ? 'META' :
+                  fixedChannel === 'TELEGRAM' ? 'TELEGRAM' :
+                  'ADBIZZ'
+                );
+              }
+              setIsCreating(!isCreating);
+            }}
             className={cn(
               "rounded-2xl px-6 h-12 font-bold transition-all flex items-center gap-2",
               isCreating ? "bg-white/10 hover:bg-white/20 text-white" : "bg-white text-zinc-900 hover:bg-zinc-100"
@@ -558,6 +605,7 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
                     />
                   </div>
                 </div>
+                {!fixedChannel && (
                 <div className="space-y-3">
                   <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-1">Channel Type</label>
                   <div className="relative">
@@ -569,6 +617,7 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
                         setProvider(
                           newType === 'SMS' ? 'ADBIZZ' :
                           newType === 'EMAIL' ? 'SMTP' :
+                          newType === 'WHATSAPP' ? 'META' :
                           'TELEGRAM'
                         );
                       }}
@@ -577,10 +626,12 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
                       <option value="SMS">SMS Gateway</option>
                       <option value="EMAIL">Email Gateway</option>
                       <option value="TELEGRAM">Telegram Channel</option>
+                      <option value="WHATSAPP">WhatsApp Business API</option>
                     </select>
                     <ChevronDown className="w-5 h-5 text-gray-600 dark:text-gray-300 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
                 </div>
+                )}
                 <div className="space-y-3">
                   <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-1">Service Provider</label>
                   <div className="relative">
@@ -589,6 +640,8 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
                         <option value="ADBIZZ">Adbizz</option>
                       ) : type === 'EMAIL' ? (
                         <option value="SMTP">SMTP (Gmail/Outlook/Custom/Zoho)</option>
+                      ) : type === 'WHATSAPP' ? (
+                        <option value="META">Meta Business SDK</option>
                       ) : (
                         <option value="TELEGRAM">Telegram Bot</option>
                       )}
@@ -615,17 +668,17 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
                 </div>
               </div>
   
-              <div className="flex justify-end pt-8 mt-8 border-t border-gray-100 dark:border-white/5">
-                <Button
-                  onClick={handleSubmit}
-                  disabled={!name || createIntegration.isPending || connectTelegramMutation.isPending}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-10 h-12 font-bold shadow-lg shadow-indigo-500/20 min-w-[200px]"
-                >
-                  {createIntegration.isPending || connectTelegramMutation.isPending
-                    ? <Loader2 className="w-5 h-5 animate-spin" />
-                    : 'Activate Integration'}
-                </Button>
-              </div>
+              {provider !== 'META' && (
+                <div className="flex justify-end pt-6 border-t border-gray-100 dark:border-white/5 mt-8">
+                  <Button 
+                    onClick={handleSubmit} 
+                    disabled={!name || createIntegration.isPending || connectTelegramMutation.isPending}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-10 rounded-xl h-12"
+                  >
+                    {createIntegration.isPending || connectTelegramMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Activate Integration'}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </DialogContent>
@@ -648,7 +701,8 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
           </div>
         ) : (
           <div className="col-span-full">
-            <Tabs defaultValue="email" className="w-full space-y-8">
+            <Tabs defaultValue={fixedChannel?.toLowerCase() || "email"} value={fixedChannel?.toLowerCase()} className="w-full space-y-8">
+              {!fixedChannel && (
               <TabsList className="bg-zinc-100/50 p-1.5 rounded-2xl inline-flex h-auto w-full md:w-auto">
                 <TabsTrigger value="email" className="rounded-xl px-6 py-2.5 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-indigo-600 transition-all flex items-center gap-2">
                   <Mail className="w-3.5 h-3.5" /> Email Channels
@@ -661,7 +715,13 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
                     <SiTelegram className="w-3.5 h-3.5" /> Telegram Bots
                   </TabsTrigger>
                 )}
+                {!admin && (
+                  <TabsTrigger value="whatsapp" className="rounded-xl px-6 py-2.5 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-green-600 transition-all flex items-center gap-2">
+                    <SiWhatsapp className="w-3.5 h-3.5" /> WhatsApp Business
+                  </TabsTrigger>
+                )}
               </TabsList>
+              )}
 
               <TabsContent value="email" className="mt-0 outline-none">
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -780,6 +840,21 @@ export function ProviderManager({ admin = false, clientId }: ProviderManagerProp
                             <p className="text-sm font-bold text-gray-600 dark:text-gray-300">Connect Another Channel</p>
                           </div>
                         </button>
+                      )}
+                    </div>
+                  </div>
+                </TabsContent>
+              )}
+              {!admin && (
+                <TabsContent value="whatsapp" className="mt-0 outline-none">
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                      {(integrations as BroadcastIntegration[])?.filter(i => i.type === 'WHATSAPP').map(i => renderIntegrationCard(i))}
+                      {(integrations as BroadcastIntegration[])?.filter(i => i.type === 'WHATSAPP').length === 0 && (
+                        <WhatsAppIntegrationCard clientId={clientId} onConnected={() => userQuery.refetch()} />
+                      )}
+                      {(integrations as BroadcastIntegration[])?.filter(i => i.type === 'WHATSAPP').length > 0 && (
+                        <WhatsAppIntegrationCard clientId={clientId} onConnected={() => userQuery.refetch()} hasExisting={true} />
                       )}
                     </div>
                   </div>

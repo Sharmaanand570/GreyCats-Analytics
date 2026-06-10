@@ -70,7 +70,7 @@ import {
     useFacebookPostInsights,
 } from "@/features/meta/hooks/useMetaBusinessData";
 import { useFacebookPageInfo } from "@/features/meta/hooks/useFacebookPageInfo";
-import { useClients, useClient } from "@/hooks/useClients";
+import { useAllClients, useClient } from "@/hooks/useClients";
 import { PlatformNotConnected } from "@/components/PlatformNotConnected";
 import { CommentsManager } from "@/features/meta/components/CommentsManager";
 
@@ -107,7 +107,7 @@ function MetaBusinessDetailPage() {
     const [selectedIgMediaId, setSelectedIgMediaId] = useState<string | null>(null);
 
     // 1. Fetch Client Data
-    const { data: clients } = useClients();
+    const { data: clients } = useAllClients();
 
     // 2. Fetch Selected Client Details
     const { data: clientData } = useClient(selectedClientId);

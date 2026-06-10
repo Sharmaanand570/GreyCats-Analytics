@@ -45,7 +45,7 @@ const TwitterCallbackHandler = () => {
     }, [location, navigate]);
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-50">
+        <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-zinc-50">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-500 mb-4"></div>
             <p className="text-zinc-600 font-medium">Completing Twitter Connection...</p>
         </div>

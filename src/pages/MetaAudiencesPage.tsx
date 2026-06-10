@@ -34,7 +34,7 @@ import {
   UserSquare,
 } from "lucide-react";
 import { useAudiences } from "@/features/meta/hooks/useMetaAdsManager";
-import { useClients } from "@/hooks/useClients";
+import { useAllClients } from "@/hooks/useClients";
 import { AudienceCard } from "@/features/meta/components/audiences/AudienceCard";
 import { CreateCustomerListModal } from "@/features/meta/components/audiences/CreateCustomerListModal";
 import { CreateWebsiteTrafficModal } from "@/features/meta/components/audiences/CreateWebsiteTrafficModal";
@@ -49,7 +49,7 @@ function MetaAudiencesPage() {
   const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
   const clientId = clientIdParam ? Number(clientIdParam) : null;
 
-  const { data: clientsData } = useClients();
+  const { data: clientsData } = useAllClients();
   const clients = clientsData || [];
 
   const {

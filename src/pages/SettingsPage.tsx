@@ -34,7 +34,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="w-full h-screen flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 ">
+    <div className="w-full h-[100dvh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 ">
       <div className="w-full  rounded-l-2xl overflow-hidden h-full my-4 bg-card text-card-foreground  flex flex-col shadow-sm">
         {/* Header */}
         <div className="h-[4em] border-b px-8 flex items-center justify-between bg-card/50 backdrop-blur-sm">

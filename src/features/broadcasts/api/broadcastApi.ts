@@ -41,7 +41,8 @@ export const createBroadcastCsv = async (
   integrationId?: number,
   columnName?: string,
   subject?: string,
-  clientId?: number
+  clientId?: number,
+  variableMapping?: Record<string, string>
 ): Promise<Broadcast> => {
   const formData = new FormData();
   formData.append('file', file);
@@ -52,6 +53,7 @@ export const createBroadcastCsv = async (
   if (columnName) formData.append('columnName', columnName);
   if (subject) formData.append('subject', subject);
   if (clientId) formData.append('clientId', String(clientId));
+  if (variableMapping) formData.append('variableMapping', JSON.stringify(variableMapping));
 
   const response = await api.post('/broadcasts/csv', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -139,6 +141,14 @@ export const listAdminTemplates = async (): Promise<BroadcastTemplate[]> => {
  */
 export const deleteTemplate = async (id: number): Promise<void> => {
   await api.delete(`/broadcasts/templates/${id}`);
+};
+
+/**
+ * Sync templates from external providers like WhatsApp.
+ * POST /broadcasts/templates/sync
+ */
+export const syncTemplates = async (clientId?: number): Promise<void> => {
+  await api.post('/broadcasts/templates/sync', clientId ? { clientId } : {});
 };
 
 /**

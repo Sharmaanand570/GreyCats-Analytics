@@ -37,7 +37,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
-import { useClients } from "@/hooks/useClients";
+import { useAllClients } from "@/hooks/useClients";
 import {
   useGoogleConsoleTopPages,
   useGoogleConsoleTopQueries,
@@ -71,7 +71,7 @@ function GoogleConsoleDetailPage() {
   const selectedClientId = clientIdParam ? Number(clientIdParam) : currentClient?.id;
 
   // Fetch all clients for selector
-  const { data: clients } = useClients();
+  const { data: clients } = useAllClients();
   const { data: client } = useClient(selectedClientId || null);
 
   // Auto-select first GSC-connected client only when neither URL param nor

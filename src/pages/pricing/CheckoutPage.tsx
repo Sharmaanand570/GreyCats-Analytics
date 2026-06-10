@@ -120,7 +120,7 @@ export default function CheckoutPage() {
 
   if (plansLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="min-h-[100dvh] flex items-center justify-center bg-white">
         <Loader2 className="w-10 h-10 animate-spin text-[#4285F4]" />
       </div>
     );
@@ -128,7 +128,7 @@ export default function CheckoutPage() {
 
   if (!selectedPlan) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-white p-6 text-center space-y-4">
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-white p-6 text-center space-y-4">
         <h1 className="text-2xl font-bold">Plan not found</h1>
         <p className="text-gray-600">The plan you're looking for doesn't exist or has been moved.</p>
         <Link to="/pricing" className="text-[#4285F4] font-semibold hover:underline">
@@ -139,7 +139,7 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#fcfcfc] text-[#111] font-sans selection:bg-[#4285F4] selection:text-white">
+    <div className="min-h-[100dvh] bg-[#fcfcfc] text-[#111] font-sans selection:bg-[#4285F4] selection:text-white">
       {/* Navbar */}
       <nav className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-xl border-b border-[#e5e5e5]">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useClients } from '../hooks/useClients';
+import { useAllClients } from '../hooks/useClients';
 import { useClientContext } from '@/context/ClientContext';
 import { useSyncStatus } from '../features/reports/hooks/useSyncStatus';
 import { FileText, ArrowUpDown, Search, Loader2 } from 'lucide-react';
@@ -30,7 +30,7 @@ import {
 
 const ReportsLandingPage: React.FC = () => {
     const navigate = useNavigate();
-    const { data: clients, isLoading } = useClients();
+    const { data: clients, isLoading } = useAllClients();
     const { currentClient } = useClientContext();
     const [searchQuery, setSearchQuery] = useState("");
     const [sortBy, setSortBy] = useState("name-asc");
@@ -69,7 +69,7 @@ const ReportsLandingPage: React.FC = () => {
     }, [clients, searchQuery, sortBy]);
 
     return (
-        <div className="w-full min-h-screen flex flex-col overflow-x-hidden bg-white">
+        <div className="w-full min-h-[100dvh] flex flex-col overflow-x-hidden bg-white">
             <div className="w-full h-full flex flex-col">
                 {/* Header */}
                     <div className="w-full h-[4.8em] border-b flex justify-between items-center px-5 bg-white backdrop-blur-sm sticky top-0 z-10">

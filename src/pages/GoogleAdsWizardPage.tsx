@@ -53,7 +53,7 @@ import {
   useSubmitGoogleAdsPublish,
 } from "@/features/googleAds/hooks/useGoogleAdsManager";
 import { useGoogleAdsAccounts } from "@/features/googleAds/hooks/useGoogleAds";
-import { useClients } from "@/hooks/useClients";
+import { useAllClients } from "@/hooks/useClients";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const TOTAL_STEPS = 6;
@@ -194,7 +194,7 @@ function GoogleAdsWizardPage() {
   const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
   const clientId = clientIdParam ? Number(clientIdParam) : null;
 
-  const { data: clientsData } = useClients();
+  const { data: clientsData } = useAllClients();
   const clients = clientsData || [];
 
   // Connected Google Ads accounts. Auto-select the first when only one exists.

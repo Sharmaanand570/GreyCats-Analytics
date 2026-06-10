@@ -45,7 +45,7 @@ import {
   useExecuteAdRule,
 } from "@/features/meta/hooks/useMetaAdmin";
 import type { AdRuleCreatePayload } from "@/features/meta/API/metaAdminApi";
-import { useClients } from "@/hooks/useClients";
+import { useAllClients } from "@/hooks/useClients";
 
 // Default new-rule shape — Mon-Fri daily at 09:00 schedule, pause on
 // CPC > $5 over the last 3 days, scoped to all campaigns by default.
@@ -105,7 +105,7 @@ function MetaAutomationPage() {
   const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
   const clientId = clientIdParam ? Number(clientIdParam) : null;
 
-  const { data: clientsData } = useClients();
+  const { data: clientsData } = useAllClients();
   const clients = clientsData || [];
 
   const { data: rules, isLoading } = useAdRules(clientId);

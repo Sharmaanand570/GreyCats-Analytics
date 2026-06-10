@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useTemplates, useAdminTemplates, useCreateTemplate, useCreateSystemTemplate, useDeleteTemplate, useApproveTemplate } from '../hooks/useBroadcasts';
+import { useTemplates, useAdminTemplates, useCreateTemplate, useCreateSystemTemplate, useDeleteTemplate, useApproveTemplate, useSyncTemplates } from '../hooks/useBroadcasts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
@@ -19,7 +19,8 @@ import {
   Search,
   Info,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  RefreshCcw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { creativeApi } from '@/api/creativeApi';
@@ -27,7 +28,7 @@ import type { BroadcastChannel } from '../api/types';
 import { useUserStore } from '@/utils/useUserStore';
 import { cn } from '@/lib/utils';
 
-export function TemplateManager() {
+export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: BroadcastChannel, clientId?: number } = {}) {
   const { user } = useUserStore();
   const isAdmin = user?.role?.toUpperCase() === 'ADMIN' || user?.role?.toUpperCase() === 'SUPER_ADMIN';
 
@@ -36,10 +37,11 @@ export function TemplateManager() {
   const createSystemTemplate = useCreateSystemTemplate();
   const deleteTemplate = useDeleteTemplate();
   const approveTemplate = useApproveTemplate();
+  const syncTemplates = useSyncTemplates();
 
   const [isCreating, setIsCreating] = useState(false);
   const [name, setName] = useState('');
-  const [channel, setChannel] = useState<BroadcastChannel>('SMS');
+  const [channel, setChannel] = useState<BroadcastChannel>(fixedChannel || 'SMS');
   const [content, setContent] = useState('');
   const [externalId, setExternalId] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
@@ -50,9 +52,16 @@ export function TemplateManager() {
   const [editingExternalIds, setEditingExternalIds] = useState<Record<number, string>>({});
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (fixedChannel) {
+      setChannel(fixedChannel);
+    }
+  }, [fixedChannel]);
+
   const filteredTemplates = templates?.filter(t => 
-    t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.content.toLowerCase().includes(searchQuery.toLowerCase())
+    (t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    t.content.toLowerCase().includes(searchQuery.toLowerCase())) &&
+    (!fixedChannel || t.channel.toUpperCase() === fixedChannel.toUpperCase())
   );
 
   useEffect(() => {
@@ -142,6 +151,15 @@ export function TemplateManager() {
                 className="pl-9 pr-4 py-2 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all w-64 outline-none"
               />
             </div>
+            <Button
+              variant="outline"
+              onClick={() => syncTemplates.mutate(undefined)}
+              disabled={syncTemplates.isPending}
+              className="rounded-xl px-4 h-10 font-bold transition-all flex items-center gap-2"
+            >
+              <RefreshCcw className={cn("w-4 h-4", syncTemplates.isPending && "animate-spin")} />
+              Sync Meta Templates
+            </Button>
             <Button 
               onClick={() => setIsCreating(!isCreating)}
               variant={isCreating ? "outline" : "default"}
@@ -171,6 +189,7 @@ export function TemplateManager() {
                   className="w-full px-5 py-4 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none"
                 />
               </div>
+              {!fixedChannel && (
               <div className="space-y-3">
                 <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-1">Communication Channel</label>
                 <div className="flex bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-1.5">
@@ -182,6 +201,7 @@ export function TemplateManager() {
                   </button>
                 </div>
               </div>
+              )}
             </div>
             
             <div className="space-y-3 mb-4">
@@ -200,11 +220,11 @@ export function TemplateManager() {
                     if (content.trim()) {
                       setAiLoading(true);
                       if (channel === 'SMS') {
-                        creativeApi.generateCaptions({ clientId: 0, platform: 'linkedin', goal: 'engagement', topic: `Rewrite this SMS message to be more engaging (max 160 chars): ${content}`, count: 1 })
+                        creativeApi.generateCaptions({ clientId: clientId || 0, platform: 'linkedin', goal: 'engagement', topic: `Rewrite this SMS message to be more engaging (max 160 chars): ${content}`, count: 1 })
                           .then((res) => { const t = res.data.data.captions[0]?.text; if (t) { setContent(t.slice(0, 160)); toast.success('SMS improved!'); } })
                           .catch(() => toast.error('Failed')).finally(() => setAiLoading(false));
                       } else {
-                        creativeApi.generateContent({ clientId: 0, contentType: 'article', topic: `Rewrite and improve this email as clean, responsive HTML email template with inline styles. Keep it professional. Original: ${content.slice(0, 500)}`, platform: 'linkedin' })
+                        creativeApi.generateContent({ clientId: clientId || 0, contentType: 'article', topic: `Rewrite and improve this email as clean, responsive HTML email template with inline styles. Keep it professional. Original: ${content.slice(0, 500)}`, platform: 'linkedin' })
                           .then((res) => { if (res.data.data.content) { setContent(res.data.data.content); toast.success('Email template improved!'); } })
                           .catch(() => toast.error('Failed')).finally(() => setAiLoading(false));
                       }
@@ -229,11 +249,11 @@ export function TemplateManager() {
                         if (e.key === 'Enter' && aiTopic.trim()) {
                           e.preventDefault(); setAiLoading(true); setShowAiInput(false);
                           if (channel === 'SMS') {
-                            creativeApi.generateCaptions({ clientId: 0, platform: 'linkedin', goal: 'engagement', topic: `Write a short SMS message (max 160 chars) about: ${aiTopic.trim()}`, count: 1 })
+                            creativeApi.generateCaptions({ clientId: clientId || 0, platform: 'linkedin', goal: 'engagement', topic: `Write a short SMS message (max 160 chars) about: ${aiTopic.trim()}`, count: 1 })
                               .then((res) => { const t = res.data.data.captions[0]?.text; if (t) { setContent(t.slice(0, 160)); toast.success('SMS generated!'); } })
                               .catch(() => toast.error('Failed')).finally(() => { setAiLoading(false); setAiTopic(''); });
                           } else {
-                            creativeApi.generateContent({ clientId: 0, contentType: 'article', topic: `Write a clean, responsive HTML email template with inline styles about: ${aiTopic.trim()}. Include a header, body with paragraphs, and a call-to-action button. Use professional styling.`, platform: 'linkedin' })
+                            creativeApi.generateContent({ clientId: clientId || 0, contentType: 'article', topic: `Write a clean, responsive HTML email template with inline styles about: ${aiTopic.trim()}. Include a header, body with paragraphs, and a call-to-action button. Use professional styling.`, platform: 'linkedin' })
                               .then((res) => { if (res.data.data.content) { setContent(res.data.data.content); toast.success('Email template generated!'); } })
                               .catch(() => toast.error('Failed')).finally(() => { setAiLoading(false); setAiTopic(''); });
                           }
@@ -244,11 +264,11 @@ export function TemplateManager() {
                       <button type="button" disabled={!aiTopic.trim()} onClick={() => {
                         setAiLoading(true); setShowAiInput(false);
                         if (channel === 'SMS') {
-                          creativeApi.generateCaptions({ clientId: 0, platform: 'linkedin', goal: 'engagement', topic: `Write a short SMS message (max 160 chars) about: ${aiTopic.trim()}`, count: 1 })
+                          creativeApi.generateCaptions({ clientId: clientId || 0, platform: 'linkedin', goal: 'engagement', topic: `Write a short SMS message (max 160 chars) about: ${aiTopic.trim()}`, count: 1 })
                             .then((res) => { const t = res.data.data.captions[0]?.text; if (t) { setContent(t.slice(0, 160)); toast.success('SMS generated!'); } })
                             .catch(() => toast.error('Failed')).finally(() => { setAiLoading(false); setAiTopic(''); });
                         } else {
-                          creativeApi.generateContent({ clientId: 0, contentType: 'article', topic: `Write a clean, responsive HTML email template with inline styles about: ${aiTopic.trim()}. Include a header, body with paragraphs, and a call-to-action button. Use professional styling.`, platform: 'linkedin' })
+                          creativeApi.generateContent({ clientId: clientId || 0, contentType: 'article', topic: `Write a clean, responsive HTML email template with inline styles about: ${aiTopic.trim()}. Include a header, body with paragraphs, and a call-to-action button. Use professional styling.`, platform: 'linkedin' })
                             .then((res) => { if (res.data.data.content) { setContent(res.data.data.content); toast.success('Email template generated!'); } })
                             .catch(() => toast.error('Failed')).finally(() => { setAiLoading(false); setAiTopic(''); });
                         }

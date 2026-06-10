@@ -25,7 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { FaInstagram, FaFacebook, FaLinkedin } from 'react-icons/fa6';
 import { toast } from 'sonner';
-import { useCreateClient, useDeleteClient, useClient, useClients } from '../hooks/useClients';
+import { useCreateClient, useDeleteClient, useClient, useAllClients } from '../hooks/useClients';
 import { useClientContext } from '@/context/ClientContext';
 import { useAvailableAccounts, useAssignAccount, useRemoveAccount } from '@/hooks/useIntegrations';
 import { loginMetaBusiness } from '@/features/meta/API/metaBusinessApi';
@@ -1099,8 +1099,8 @@ export default function SocialMediaSchedulerPage() {
   const navigate = useNavigate();
   const { currentStep, setCurrentStep, resetDraft } = useSocialMediaStore();
   const { currentClient, setCurrentClient: _setCurrentClient, clients: allClients, isLoading: isLoadingContext } = useClientContext();
-  const { isLoading: isLoadingClientsFetch } = useClients();
-  const isLoadingClients = isLoadingContext || isLoadingClientsFetch;
+  const { isLoading } = useAllClients();
+  const isLoadingClients = isLoadingContext || isLoading;
 
   // Sync URL clientId with state on mount or change
   useEffect(() => {
@@ -1115,7 +1115,8 @@ export default function SocialMediaSchedulerPage() {
     // If we have a valid client in the URL, automatically route the step
     // to the workspace calendar (or connection onboarding if they have no integrations)
     if (currentStep === 'select-client') {
-      const hasIntegrations = client.integrations && client.integrations.length > 0;
+      const targetClient = (currentClient && currentClient.id === client.id) ? currentClient : client;
+      const hasIntegrations = targetClient.integrations && targetClient.integrations.length > 0;
       setCurrentStep(hasIntegrations ? 'workspace' : 'connect-platforms');
     }
   }, [urlClientId, allClients.length, currentClient?.id, currentStep]);
@@ -1132,6 +1133,7 @@ export default function SocialMediaSchedulerPage() {
         navigate(`/social-media/scheduler/${client.id}`);
       }
     } else {
+      localStorage.removeItem('lastClientId');
       navigate('/social-media/scheduler');
     }
   };
@@ -1150,9 +1152,12 @@ export default function SocialMediaSchedulerPage() {
       const ctxIntCount = (currentClient as ClientWithIntegrations).integrations?.length ?? 0;
       if (liveIntCount !== ctxIntCount) {
         setCurrentClient(liveClient as ClientWithIntegrations);
+        if (currentStep === 'connect-platforms' && liveIntCount > 0) {
+          setCurrentStep('workspace');
+        }
       }
     }
-  }, [liveClient]);
+  }, [liveClient, currentClient, currentStep, setCurrentClient, setCurrentStep]);
 
   const activeClient = (liveClient || currentClient) as ClientWithIntegrations | null;
 
@@ -1229,6 +1234,7 @@ export default function SocialMediaSchedulerPage() {
           onBack={() => {
             setCurrentClient(null);
             setCurrentStep('select-client');
+            navigate('/social-media/scheduler');
           }}
         />
       );
@@ -1242,6 +1248,7 @@ export default function SocialMediaSchedulerPage() {
           onSwitchWorkspace={() => {
             setCurrentClient(null);
             setCurrentStep('select-client');
+            navigate('/social-media/scheduler');
           }}
         />
       );
@@ -1253,7 +1260,7 @@ export default function SocialMediaSchedulerPage() {
   };
 
   return (
-    <div className="w-full h-screen flex flex-col overflow-hidden bg-white">
+    <div className="w-full h-[100dvh] flex flex-col overflow-hidden bg-white">
       <div className="w-full sm:rounded-l-2xl overflow-hidden h-full sm:my-4 bg-[#fdfdfd]">
         <div className="w-full h-full flex flex-col relative">
           <div className="flex-1 overflow-y-auto relative h-full">

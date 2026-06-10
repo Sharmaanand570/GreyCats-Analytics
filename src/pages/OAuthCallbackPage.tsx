@@ -81,14 +81,14 @@ const OAuthCallbackPage: React.FC = () => {
 
     if (!clientId || !integrationType) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
+            <div className="flex items-center justify-center min-h-[100dvh]">
                 <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
             </div>
         );
     }
 
     return (
-        <div className="flex items-center justify-center min-h-screen">
+        <div className="flex items-center justify-center min-h-[100dvh]">
             {!showSuccessDialog && (
                 <div className="text-center">
                     <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mx-auto mb-4" />

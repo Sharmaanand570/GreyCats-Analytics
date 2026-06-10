@@ -95,7 +95,7 @@ export default function NotFoundPage() {
   };
 
   return (
-    <div className="min-h-screen  bg-black text-zinc-100 font-sans selection:bg-zinc-800 selection:text-white flex flex-col relative overflow-hidden">
+    <div className="min-h-[100dvh]  bg-black text-zinc-100 font-sans selection:bg-zinc-800 selection:text-white flex flex-col relative overflow-hidden">
       {/* Subtle Grid Background */}
       <div
         className="absolute inset-0 z-0 opacity-[0.03]"

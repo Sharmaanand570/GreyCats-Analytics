@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useClients, useDeleteClient } from '../hooks/useClients';
+import { useAllClients, useDeleteClient } from '../hooks/useClients';
 import { useBlogIntegrations, useWordPressTargets, useTelegramTargets } from '../features/blog/hooks/useBlogPosts';
 import { Plus, Building2, Activity, ArrowUpDown, Trash2, Edit2 } from 'lucide-react';
 import { FiSearch } from "react-icons/fi";
@@ -53,7 +53,7 @@ const getClientHealth = (client: any) => {
 
 const ClientsPage: React.FC = () => {
     const navigate = useNavigate();
-    const { data: clients, isLoading, isError, refetch } = useClients();
+    const { data: clients, isLoading, isError, refetch } = useAllClients();
     const { data: blogInts } = useBlogIntegrations();
     const { data: wpTargets } = useWordPressTargets();
     const { data: tgTargets } = useTelegramTargets();
@@ -73,7 +73,41 @@ const ClientsPage: React.FC = () => {
 
         let result = clients.map(client => {
             const enrichedClient = { ...client };
-            const existingIntegrations = Array.isArray(enrichedClient.integrations) ? [...enrichedClient.integrations] : [];
+            let existingIntegrations = Array.isArray(enrichedClient.integrations) ? [...enrichedClient.integrations] : [];
+            
+            // Split meta-business into facebook and instagram
+            const splitIntegrations: any[] = [];
+            existingIntegrations.forEach(integration => {
+                if (integration.integrationType === 'meta-business') {
+                    // Look up raw account to check for Instagram
+                    const rawAccount = enrichedClient.metaBusinessAccounts?.find(
+                        (acc: any) => acc.metaAccountId === integration.accountId || acc.id === integration.accountId
+                    );
+                    
+                    // Always push Facebook Page
+                    splitIntegrations.push({
+                        ...integration,
+                        integrationType: 'meta-facebook',
+                        accountName: rawAccount?.metaAccount?.pageName || integration.accountName,
+                        _originalIntegrationType: 'meta-business'
+                    });
+
+                    // If it has Instagram, push an Instagram row
+                    if (rawAccount?.metaAccount?.instagramBusinessId || rawAccount?.metaAccount?.instagramUsername) {
+                        splitIntegrations.push({
+                            ...integration,
+                            integrationType: 'meta-instagram',
+                            accountName: `@${rawAccount.metaAccount.instagramUsername || rawAccount.metaAccount.instagramBusinessId}`,
+                            _originalIntegrationType: 'meta-business'
+                        });
+                    }
+                } else {
+                    splitIntegrations.push(integration);
+                }
+            });
+            
+            existingIntegrations = splitIntegrations;
+            
             const processedKeys = new Set(existingIntegrations.map(i => `${i.integrationType}-${i.accountId}`));
 
             if (blogInts) {
@@ -176,7 +210,7 @@ const ClientsPage: React.FC = () => {
     }, [clients, searchQuery, sortBy, filterStatus, blogInts, wpTargets, tgTargets]);
 
     return (
-        <div className="w-full min-h-screen flex flex-col overflow-x-hidden bg-white">
+        <div className="w-full min-h-[100dvh] flex flex-col overflow-x-hidden bg-white">
             <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
                 <div className="w-full h-full flex flex-col">
                     {/* Header */}

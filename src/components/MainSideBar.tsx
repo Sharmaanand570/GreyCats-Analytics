@@ -6,6 +6,7 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -27,11 +28,12 @@ import {
   ChevronDown,
   CalendarDays,
   PenLine,
-  Send,
   Megaphone,
+  MessageSquare,
+  Mail,
 } from "lucide-react";
 import { FiMenu } from "react-icons/fi";
-import { SiGoogleads } from "react-icons/si";
+import { SiGoogleads, SiWhatsapp, SiTelegram } from "react-icons/si";
 import { useEffect, useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
@@ -97,11 +99,13 @@ function MainSideBar(): React.JSX.Element {
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     Analytics: true,
-    Settings: false,
   });
 
   const toggleGroup = (label: string) => {
-    setOpenGroups((prev) => ({ ...prev, [label]: !prev[label] }));
+    setOpenGroups((prev) => {
+      // If clicking the already open group, close it. Otherwise, open only the clicked group.
+      return { [label]: !prev[label] };
+    });
   };
 
   const navigate = useNavigate();
@@ -213,33 +217,52 @@ function MainSideBar(): React.JSX.Element {
       </main>
     );
 
+  const isShared = currentClient?._isShared;
+  const access = currentClient?.sharedAccess;
+
+  const hasAnalyticsAccess = !isShared || access?.accessAnalytics !== false;
+  const hasAlertsAccess = !isShared || access?.accessAlerts !== false;
+  const hasReportsAccess = !isShared || access?.accessReports !== false;
+  const hasSchedulerAccess = !isShared || access?.accessScheduler !== false;
+  const hasAdsAccess = !isShared || access?.accessAds !== false;
+
+  const analyticsItems = [];
+  if (hasAnalyticsAccess) analyticsItems.push({ label: "Clients", path: "/clients", icon: <Layers /> });
+  if (hasAlertsAccess) analyticsItems.push({ label: "Alerts", path: "/alerts", icon: <Bell /> });
+  if (hasReportsAccess) analyticsItems.push({ label: "Reports", path: "/reports", icon: <FileText /> });
+
   const menuGroups = [
-    {
+    ...(analyticsItems.length > 0 ? [{
       label: "Analytics",
       isCollapsible: true,
-      items: [
-        { label: "Clients", path: "/clients", icon: <Layers /> },
-        { label: "Alerts", path: "/alerts", icon: <Bell /> },
-        { label: "Reports", path: "/reports", icon: <FileText /> },
-      ],
-    },
-    {
+      items: analyticsItems,
+    }] : []),
+    ...(hasSchedulerAccess ? [{
       label: "Scheduler",
       isCollapsible: true,
       items: [
         { label: "Social Media", path: "/social-media/scheduler", icon: <CalendarDays /> },
         { label: "Blog", path: "/blog/scheduler", icon: <PenLine /> },
-        { label: "Broadcasts", path: "/broadcasts", icon: <Send /> },
       ],
-    },
-    {
+    }] : []),
+    ...(hasSchedulerAccess ? [{
+      label: "Broadcast",
+      isCollapsible: true,
+      items: [
+        { label: "WhatsApp", path: "/broadcasts/whatsapp", icon: <SiWhatsapp /> },
+        { label: "SMS", path: "/broadcasts/sms", icon: <MessageSquare /> },
+        { label: "Email", path: "/broadcasts/email", icon: <Mail /> },
+        { label: "Telegram", path: "/broadcasts/telegram", icon: <SiTelegram /> },
+      ],
+    }] : []),
+    ...(hasAdsAccess ? [{
       label: "Ads Manager",
       isCollapsible: true,
       items: [
         { label: "Meta Ads", path: "/data-sources/meta-ads", icon: <Megaphone /> },
         { label: "Google Ads", path: "/data-sources/google-ads", icon: <SiGoogleads className="w-[18px] h-[18px]" /> },
       ],
-    },
+    }] : []),
     {
       label: "Settings",
       isCollapsible: true,
@@ -255,25 +278,21 @@ function MainSideBar(): React.JSX.Element {
   ];
 
   return (
-    <div className="flex relative bg-gradient-to-b from-black via-zinc-950 to-zinc-800 ">
+    <div className="flex relative h-[100dvh] overflow-hidden bg-gradient-to-b from-black via-zinc-950 to-zinc-800 ">
       {/* ---------- 🖥️ DESKTOP SIDEBAR ---------- */}
       {is404Page ? null : (
         <SidebarProvider
-          className={` transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] hidden md:block ${!collabsState ? "w-[16rem]" : "w-24"
+          className={` transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] hidden lg:block ${!collabsState ? "w-[16rem]" : "w-24"
             }`}
         >
           <Sidebar
             className={`transition-all border-none duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${!collabsState ? "w-[16rem] " : "w-24"
-              } h-screen`}
+              } h-[100dvh] bg-gradient-to-b from-black via-zinc-950 to-zinc-800`}
           >
-            <SidebarContent
-              className={`bg-gradient-to-b from-black via-zinc-950 to-zinc-800 text-white transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${collabsState ? "px-0" : "px-2"
-                }`}
-            >
-              {/* className="bg-black" */}
-              {/* Header */}
-              <SidebarGroup>
-                <SidebarGroupLabel className="p-0 w-full relative justify-between px-2 py-8 pb-4">
+            {/* Header */}
+            <SidebarHeader className={`pt-4 pb-4 ${collabsState ? "px-0" : "px-2"}`}>
+              <SidebarGroup className="p-0">
+                <SidebarGroupLabel className="p-0 w-full relative justify-between px-2 pt-6 pb-8">
                   <div
                     onClick={() => navigate("/")}
                     role="button"
@@ -300,22 +319,26 @@ function MainSideBar(): React.JSX.Element {
                   </span>
                 </SidebarGroupLabel>
               </SidebarGroup>
+            </SidebarHeader>
 
+            <SidebarContent
+              className={`text-white transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] scrollbar-thin scrollbar-thumb-zinc-700 hover:scrollbar-thumb-zinc-600 scrollbar-track-transparent ${collabsState ? "px-0" : "px-2"}`}
+            >
               {/* Client Selector Area */}
-              <div className={`transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] mb-6 ${collabsState ? "px-0 flex justify-center" : "px-2"}`}>
+              <div className={`transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] mt-4 mb-6 ${collabsState ? "px-0 flex justify-center" : "px-2"}`}>
                 <ClientSelector isCollapsed={collabsState} />
               </div>
 
               {/* Menu Groups */}
               {menuGroups.map((group) => {
-                const isOpen = openGroups[group.label] !== false;
+                const isOpen = openGroups[group.label] === true;
                 return (
-                <SidebarGroup key={group.label}>
+                <SidebarGroup key={group.label} className="py-1">
                   {!collabsState && (
                     <div
                       role="button"
                       onClick={() => group.isCollapsible && toggleGroup(group.label)}
-                      className={`flex items-center justify-between w-full h-8 px-3 mt-1 mb-1 rounded-md transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                      className={`flex items-center justify-between w-full h-8 px-3 mb-1 rounded-md transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
                         group.isCollapsible ? "cursor-pointer bg-zinc-800/40 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/50 shadow-sm" : "text-zinc-500 font-semibold uppercase text-xs"
                       } ${
                         collabsState ? "opacity-0 max-h-0 overflow-hidden hidden" : "opacity-100 max-h-20 flex"
@@ -335,108 +358,115 @@ function MainSideBar(): React.JSX.Element {
                       )}
                     </div>
                   )}
-                  <SidebarGroupContent className={`transition-all duration-300 ease-in-out overflow-hidden ${group.isCollapsible && !isOpen && !collabsState ? "max-h-0 opacity-0" : "max-h-[1000px] opacity-100"}`}>
-                    <SidebarMenu>
-                      {group.items.map((item, index) => (
-                        <SidebarMenuItem key={item.path}>
-                          <SidebarMenuButton
-                            onClick={() => handleChangeURL(item.path, (item as any).isComingSoon)}
-                            className={`group text-[13px] [&_svg]:w-[18px] [&_svg]:h-[18px] rounded-[0.375rem] font-normal h-9 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:text-zinc-100 ${
-                              (item as any).isComingSoon ? "opacity-50 cursor-not-allowed grayscale" : ""
-                            } ${!collabsState
-                              ? "px-3"
-                              : "flex justify-center items-center"
-                              } ${isItemActive(item.path, activeTab)
-                                ? "bg-zinc-800 text-white"
-                                : "text-zinc-300"
-                                }`}
-                            style={{
-                              transitionDelay: collabsState
-                                ? "0ms"
-                                : `${index * 20}ms`,
-                            }}
-                          >
-                            <span className="transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-110">
-                              {item.icon}
-                            </span>
-                            {!collabsState && (
-                              <div className="ml-2 flex items-center justify-between w-full">
-                                <span className="hidden md:hidden lg:block transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]">
-                                  {item.label}
-                                </span>
-                                {(item as any).isComingSoon && (
-                                  <span className="text-[10px] bg-zinc-700 text-zinc-400 px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter">
-                                    Soon
+                  <SidebarGroupContent 
+                    className={`grid transition-all duration-300 ease-in-out ${
+                      group.isCollapsible && !isOpen && !collabsState ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
+                    }`}
+                  >
+                    <div className="overflow-hidden">
+                      <SidebarMenu>
+                        {group.items.map((item, index) => (
+                          <SidebarMenuItem key={item.path}>
+                            <SidebarMenuButton
+                              onClick={() => handleChangeURL(item.path, (item as any).isComingSoon)}
+                              className={`group text-[13px] [&_svg]:w-[18px] [&_svg]:h-[18px] rounded-[0.375rem] font-normal h-9 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:text-zinc-100 ${
+                                (item as any).isComingSoon ? "opacity-50 cursor-not-allowed grayscale" : ""
+                              } ${!collabsState
+                                ? "px-3"
+                                : "flex justify-center items-center"
+                                } ${isItemActive(item.path, activeTab)
+                                  ? "bg-zinc-800 text-white"
+                                  : "text-zinc-300"
+                                  }`}
+                              style={{
+                                transitionDelay: collabsState
+                                  ? "0ms"
+                                  : `${index * 20}ms`,
+                              }}
+                            >
+                              <span className="transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-110">
+                                {item.icon}
+                              </span>
+                              {!collabsState && (
+                                <div className="ml-2 flex items-center justify-between w-full">
+                                  <span className="hidden md:hidden lg:block transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]">
+                                    {item.label}
                                   </span>
-                                )}
-                              </div>
-                            )}
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      ))}
-                    </SidebarMenu>
+                                  {(item as any).isComingSoon && (
+                                    <span className="text-[10px] bg-zinc-700 text-zinc-400 px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter">
+                                      Soon
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        ))}
+                      </SidebarMenu>
+                    </div>
                   </SidebarGroupContent>
                 </SidebarGroup>
               )})}
 
-              {/* Footer */}
-              <SidebarFooter className="mt-auto border-t border-zinc-700 pt-4">
-                <div
-                  onClick={() => handleChangeURL("/account-setup")}
-                  className="flex items-center gap-3 rounded-md px-2 py-3 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800/50 cursor-pointer"
-                >
-                  <div className="relative flex-shrink-0">
-                    <Avatar className="h-9 w-9 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:scale-110">
-                      <AvatarImage src={getProfileImageUrl(user?.profilePicture || user?.companyLogo)} alt={user?.fullName} />
-                      <AvatarFallback className="bg-zinc-700 text-xs font-medium text-zinc-100">
-                        {userInitials}
-                      </AvatarFallback>
-                    </Avatar>
-                    {/* Plan badge pill shown in collapsed mode below avatar */}
-                    {collabsState && currentPlanName && (
-                      <span
-                        onClick={(e) => { e.stopPropagation(); handleChangeURL("/billing"); }}
-                        className="absolute -bottom-1 -right-1 cursor-pointer"
-                      >
-                        <PlanBadge planName={currentPlanName} size="sm" className="text-[9px] px-1 py-px" />
-                      </span>
-                    )}
-                  </div>
-                  {!collabsState && (
-                    <div
-                      className={`min-w-0 md:hidden lg:block transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${collabsState
-                        ? "opacity-0 max-w-0 overflow-hidden"
-                        : "opacity-100 max-w-full"
-                        }`}
+            </SidebarContent>
+            
+            {/* Footer */}
+            <SidebarFooter className={`mt-auto border-t border-zinc-800 pt-4 pb-4 ${collabsState ? "px-0" : "px-4"}`}>
+              <div
+                onClick={() => handleChangeURL("/account-setup")}
+                className="flex items-center gap-3 rounded-md px-2 py-3 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800/50 cursor-pointer"
+              >
+                <div className="relative flex-shrink-0">
+                  <Avatar className="h-9 w-9 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:scale-110 border border-zinc-700/50">
+                    <AvatarImage src={getProfileImageUrl(user?.profilePicture || user?.companyLogo)} alt={user?.fullName} />
+                    <AvatarFallback className="bg-zinc-800 text-xs font-medium text-zinc-100">
+                      {userInitials}
+                    </AvatarFallback>
+                  </Avatar>
+                  {/* Plan badge pill shown in collapsed mode below avatar */}
+                  {collabsState && currentPlanName && (
+                    <span
+                      onClick={(e) => { e.stopPropagation(); handleChangeURL("/billing"); }}
+                      className="absolute -bottom-1 -right-1 cursor-pointer"
                     >
-                      <div className="text-sm font-medium leading-tight text-white transition-colors duration-300">
-                        {user?.fullName || "User"}
-                      </div>
-                      <div className="text-xs text-zinc-400 leading-tight transition-colors duration-300">
-                        {user?.jobTitle || "Viewer"}
-                      </div>
-                      {currentPlanName && (
-                        <div className="mt-1">
-                          <PlanBadge
-                            planName={currentPlanName}
-                            displayName={currentPlanDisplay}
-                            size="sm"
-                            className="cursor-pointer hover:opacity-80"
-                          />
-                        </div>
-                      )}
-                    </div>
+                      <PlanBadge planName={currentPlanName} size="sm" className="text-[9px] px-1 py-px" />
+                    </span>
                   )}
                 </div>
-              </SidebarFooter>
-            </SidebarContent>
+                {!collabsState && (
+                  <div
+                    className={`min-w-0 md:hidden lg:block transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${collabsState
+                      ? "opacity-0 max-w-0 overflow-hidden"
+                      : "opacity-100 max-w-full"
+                      }`}
+                  >
+                    <div className="text-sm font-medium leading-tight text-white transition-colors duration-300">
+                      {user?.fullName || "User"}
+                    </div>
+                    <div className="text-xs text-zinc-400 leading-tight transition-colors duration-300">
+                      {user?.jobTitle || "Viewer"}
+                    </div>
+                    {currentPlanName && (
+                      <div className="mt-1">
+                        <PlanBadge
+                          planName={currentPlanName}
+                          displayName={currentPlanDisplay}
+                          size="sm"
+                          className="cursor-pointer hover:opacity-80"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </SidebarFooter>
           </Sidebar>
         </SidebarProvider>
       )}
 
       {/* ---------- 📱 MOBILE SIDEBAR (ShadCN Sheet) ---------- */}
       {is404Page ? null : (
-        <div className="md:hidden absolute top-4 left-4 z-50">
+        <div className="lg:hidden absolute top-4 left-4 z-50">
           <Sheet>
             {/* Menu Button */}
             <SheetTrigger asChild>
@@ -459,9 +489,9 @@ function MainSideBar(): React.JSX.Element {
               </h2>
 
               {/* Menu Groups */}
-              <nav className="flex flex-col space-y-6 grow">
+              <nav className="flex flex-col space-y-2 grow">
                 {menuGroups.map((group, groupIndex) => {
-                  const isOpen = openGroups[group.label] !== false;
+                  const isOpen = openGroups[group.label] === true;
                   return (
                   <div
                     key={group.label}
@@ -473,7 +503,7 @@ function MainSideBar(): React.JSX.Element {
                     }}
                   >
                     <div 
-                      className={`flex items-center justify-between w-full h-8 px-3 mb-2 rounded-md transition-all duration-300 ${
+                      className={`flex items-center justify-between w-full h-8 px-3 mb-1 rounded-md transition-all duration-300 ${
                         group.isCollapsible ? "cursor-pointer bg-zinc-800/40 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/50 shadow-sm" : "text-zinc-500 uppercase text-xs font-semibold"
                       }`}
                       onClick={() => group.isCollapsible && toggleGroup(group.label)}
@@ -491,37 +521,43 @@ function MainSideBar(): React.JSX.Element {
                         <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
                       )}
                     </div>
-                    <div className={`flex flex-col space-y-1 overflow-hidden transition-all duration-300 ${group.isCollapsible && !isOpen ? "max-h-0 opacity-0" : "max-h-[500px] opacity-100"}`}>
-                      {group.items.map((item, itemIndex) => (
-                        <button
-                          key={item.path}
-                          onClick={() => handleChangeURL(item.path, (item as any).isComingSoon)}
-                          className={`flex items-center justify-between w-full px-3 py-1.5 rounded-md text-[13px] font-normal transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:translate-x-1 [&_svg]:w-[18px] [&_svg]:h-[18px] ${
-                            (item as any).isComingSoon ? "opacity-50 cursor-not-allowed" : ""
-                          } ${isItemActive(item.path, activeTab)
-                            ? "bg-zinc-800 translate-x-1 text-white"
-                            : "text-zinc-300"
-                            }`}
-                          style={{
-                            transitionDelay: `${groupIndex * 60 + itemIndex * 30
-                              }ms`,
-                          }}
-                        >
-                          <div className="flex items-center space-x-3">
-                            <span className="transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-110">
-                              {item.icon}
-                            </span>
-                            <span className="transition-colors duration-300">
-                              {item.label}
-                            </span>
-                          </div>
-                          {(item as any).isComingSoon && (
-                            <span className="text-[9px] bg-zinc-800 text-zinc-500 px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter border border-zinc-700">
-                              Soon
-                            </span>
-                          )}
-                        </button>
-                      ))}
+                    <div 
+                      className={`grid transition-all duration-300 ease-in-out ${
+                        group.isCollapsible && !isOpen ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
+                      }`}
+                    >
+                      <div className="overflow-hidden flex flex-col space-y-1">
+                        {group.items.map((item, itemIndex) => (
+                          <button
+                            key={item.path}
+                            onClick={() => handleChangeURL(item.path, (item as any).isComingSoon)}
+                            className={`flex items-center justify-between w-full px-3 py-1.5 rounded-md text-[13px] font-normal transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:translate-x-1 [&_svg]:w-[18px] [&_svg]:h-[18px] ${
+                              (item as any).isComingSoon ? "opacity-50 cursor-not-allowed" : ""
+                            } ${isItemActive(item.path, activeTab)
+                              ? "bg-zinc-800 translate-x-1 text-white"
+                              : "text-zinc-300"
+                              }`}
+                            style={{
+                              transitionDelay: `${groupIndex * 60 + itemIndex * 30
+                                }ms`,
+                            }}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <span className="transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-110">
+                                {item.icon}
+                              </span>
+                              <span className="transition-colors duration-300">
+                                {item.label}
+                              </span>
+                            </div>
+                            {(item as any).isComingSoon && (
+                              <span className="text-[9px] bg-zinc-800 text-zinc-500 px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter border border-zinc-700">
+                                Soon
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )})}
@@ -559,7 +595,7 @@ function MainSideBar(): React.JSX.Element {
           the page content appears as a floating rounded panel lifted off the
           sidebar. Each page's own bg class then fills the inner panel. */}
       <div className="flex-1 flex flex-col bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] py-4">
-        <main className="flex-1 rounded-l-2xl overflow-y-auto bg-[#F9FAFB]">
+        <main className="flex-1 rounded-l-2xl overflow-y-auto custom-scrollbar bg-[#F9FAFB]">
           <TrialExpiryBanner />
           <ImpersonationBanner />
           <GlobalOAuthHandler />

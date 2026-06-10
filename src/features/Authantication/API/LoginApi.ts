@@ -15,13 +15,15 @@ export type LoginResponse = {
 export type LoginRequest = {
   email: string;
   password: string;
+  inviteToken?: string;
 }
 
 
-export const loginUser = async ({ email, password }: LoginRequest): Promise<LoginResponse> => {
+export const loginUser = async ({ email, password, inviteToken }: LoginRequest): Promise<LoginResponse> => {
   const response = await api.post<LoginResponse>("/auth/login", {
     email,
     password,
+    ...(inviteToken ? { inviteToken } : {}),
   });
 
   return response.data;

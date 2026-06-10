@@ -97,6 +97,10 @@ export interface ClientWithIntegrations extends Client {
   googleAdsAccounts?: any[];
   twitterAccounts?: any[];
   linkedinAccounts?: any[];
+  
+  // Shared access fields
+  _isShared?: boolean;
+  sharedAccess?: SharedAccessClient;
 }
 
 // API Response Types
@@ -137,4 +141,54 @@ export interface AssignAccountResponse {
     [key: string]: any;
   };
   message?: string;
+}
+
+export interface Collaborator {
+  id: number;
+  clientId: number;
+  userId: number;
+  role: 'READ_ONLY' | 'READ_WRITE' | 'ADMIN';
+  accessAnalytics: boolean;
+  accessAlerts: boolean;
+  accessReports: boolean;
+  accessScheduler: boolean;
+  accessAds: boolean;
+  createdAt: string;
+  updatedAt: string;
+  user: {
+    id: number;
+    email: string;
+    fullName: string;
+    profilePicture?: string;
+  };
+}
+
+export interface Invitation {
+  id: number;
+  email: string;
+  role: 'READ_ONLY' | 'READ_WRITE' | 'ADMIN';
+  expiresAt: string;
+  createdAt: string;
+  accessAnalytics: boolean;
+  accessAlerts: boolean;
+  accessReports: boolean;
+  accessScheduler: boolean;
+  accessAds: boolean;
+  token?: string;
+}
+
+export interface SharedAccessClient {
+  clientId: number;
+  clientName: string;
+  clientLogo?: string;
+  isActive: boolean;
+  ownerName: string;
+  ownerEmail: string;
+  role: 'READ_ONLY' | 'READ_WRITE' | 'ADMIN';
+  accessAnalytics: boolean;
+  accessAlerts: boolean;
+  accessReports: boolean;
+  accessScheduler: boolean;
+  accessAds: boolean;
+  grantedAt: string;
 }

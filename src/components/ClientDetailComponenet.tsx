@@ -9,6 +9,7 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { TeamAccessTab } from './TeamAccessTab';
 
 type ClientDetailRow = {
   metric: string;
@@ -40,7 +41,7 @@ const TAB_NAMES = [
   'Benchmarks',
   'Alerts',
   'Data Sources',
-  'Users',
+  'Team Access',
 ] as const;
 
 // Static headers array - moved outside component to avoid recreation
@@ -418,7 +419,7 @@ function ClientDetailComponenet(): React.JSX.Element {
   }, [isMobile, showSidebar]);
 
   return (
-    <div className="w-full min-h-screen flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
+    <div className="w-full min-h-[100dvh] flex flex-col overflow-x-hidden bg-gradient-to-bl from-black via-zinc-950 to-zinc-800">
       <div className="w-full rounded-l-2xl overflow-hidden h-full my-2 sm:my-3 md:my-4 bg-[#fdfdfd]">
         <div className="w-full h-full flex flex-col">
           <ClientHeader
@@ -461,7 +462,11 @@ function ClientDetailComponenet(): React.JSX.Element {
               </Sheet>
             )}
             <div className="flex-1 overflow-auto min-h-0">
-              <MainContent clientData={clientData} headers={TABLE_HEADERS} />
+              {activeTab === 'Team Access' ? (
+                <TeamAccessTab clientId={parseInt(id || '0')} />
+              ) : (
+                <MainContent clientData={clientData} headers={TABLE_HEADERS} />
+              )}
             </div>
           </div>
         </div>

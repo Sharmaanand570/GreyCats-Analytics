@@ -21,7 +21,7 @@ export default function RoleGuard({ allowedRoles }: RoleGuardProps) {
 
     if (isLoading) { // isLoading is from store
         return (
-            <div className="flex items-center justify-center min-h-screen">
+            <div className="flex items-center justify-center min-h-[100dvh]">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
             </div>
         );
@@ -34,7 +34,7 @@ export default function RoleGuard({ allowedRoles }: RoleGuardProps) {
         // we redirect only if we are sure we are not authenticated.
         if (hasToken) {
             return (
-                <div className="flex items-center justify-center min-h-screen">
+                <div className="flex items-center justify-center min-h-[100dvh]">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
                 </div>
             );

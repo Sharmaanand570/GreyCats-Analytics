@@ -493,7 +493,7 @@ function EditDashboard() {
   }
 
   return (
-    <div className="w-full h-screen flex flex-col overflow-hidden bg-white">
+    <div className="w-full h-[100dvh] flex flex-col overflow-hidden bg-white">
       {/* Top Header */}
       <div className="w-full h-[4.8em] border-b flex justify-between items-center px-6 bg-white shrink-0 z-30">
         <div className="flex items-center gap-4">

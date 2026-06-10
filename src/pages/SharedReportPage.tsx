@@ -67,7 +67,7 @@ function SharedReportPage() {
 
     if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+            <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-gradient-to-br from-slate-50 to-slate-100">
                 <div className="flex flex-col items-center gap-4 animate-in fade-in duration-700">
                     <div className="relative">
                         <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full"></div>
@@ -95,7 +95,7 @@ function SharedReportPage() {
         }
 
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-4">
+            <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-slate-50 p-4">
                 <div className="bg-white/80 backdrop-blur-xl p-8 rounded-2xl shadow-xl shadow-slate-200/50 max-w-md w-full text-center border border-white/50">
                     <div className="flex justify-center mb-6">
                         <div className="p-4 bg-slate-50 rounded-full shadow-inner ring-1 ring-slate-100">
@@ -115,7 +115,7 @@ function SharedReportPage() {
     }
 
     return (
-        <div className="w-full min-h-screen bg-slate-50">
+        <div className="w-full min-h-[100dvh] bg-slate-50">
             <ReportBuilder
                 readOnly={true}
                 providedReportId={reportId}

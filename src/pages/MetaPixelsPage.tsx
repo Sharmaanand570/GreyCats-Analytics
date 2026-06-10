@@ -61,7 +61,7 @@ import {
   useVerifyDomain,
 } from "@/features/meta/hooks/useMetaPixelsAdmin";
 import type { CreateCustomConversionPayload } from "@/features/meta/API/metaPixelsApi";
-import { useClients } from "@/hooks/useClients";
+import { useAllClients } from "@/hooks/useClients";
 import { cn } from "@/lib/utils";
 
 const CUSTOM_EVENT_TYPES = [
@@ -100,7 +100,7 @@ function MetaPixelsPage() {
   const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
   const clientId = clientIdParam ? Number(clientIdParam) : null;
 
-  const { data: clientsData } = useClients();
+  const { data: clientsData } = useAllClients();
   const clients = clientsData || [];
 
   const { data: pixelsData } = useMetaPixels(clientId);

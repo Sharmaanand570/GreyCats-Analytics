@@ -44,7 +44,7 @@ import {
   useDrafts,
   useRejectDraft,
 } from "@/features/meta/hooks/useMetaAdmin";
-import { useClients } from "@/hooks/useClients";
+import { useAllClients } from "@/hooks/useClients";
 import { formatDistanceToNow } from "date-fns";
 
 function MetaCompliancePage() {
@@ -52,7 +52,7 @@ function MetaCompliancePage() {
   const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
   const clientId = clientIdParam ? Number(clientIdParam) : null;
 
-  const { data: clientsData } = useClients();
+  const { data: clientsData } = useAllClients();
   const clients = clientsData || [];
 
   const [tab, setTab] = useState("approvals");

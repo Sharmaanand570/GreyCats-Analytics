@@ -118,12 +118,12 @@ export default function AdminLayout() {
     );
 
     return (
-        <div className="flex h-screen w-full bg-[#FAFAFA] dark:bg-[#0A0A0A] font-sans">
+        <div className="flex h-[100dvh] w-full bg-[#FAFAFA] dark:bg-[#0A0A0A] font-sans">
             {/* Sidebar */}
             <aside
                 className={cn(
-                    "fixed inset-y-0 left-0 z-50 w-72 transform bg-white/80 dark:bg-black/80 backdrop-blur-xl border-r border-gray-100 dark:border-white/5 transition-transform duration-300 ease-in-out md:relative md:translate-x-0",
-                    !isSidebarOpen && "-translate-x-full md:hidden"
+                    "fixed inset-y-0 left-0 z-50 w-72 transform bg-white/80 dark:bg-black/80 backdrop-blur-xl border-r border-gray-100 dark:border-white/5 transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0",
+                    !isSidebarOpen && "-translate-x-full lg:hidden"
                 )}
             >
                 <div className="flex h-20 items-center px-8">
@@ -142,7 +142,7 @@ export default function AdminLayout() {
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="ml-auto md:hidden"
+                        className="ml-auto lg:hidden"
                         onClick={() => setIsSidebarOpen(false)}
                     >
                         <X className="h-5 w-5" />
@@ -214,7 +214,7 @@ export default function AdminLayout() {
             {/* Main Content */}
             <div className="flex-1 flex flex-col overflow-hidden bg-[#FAFAFA] dark:bg-[#0A0A0A]">
                 <ImpersonationBanner />
-                <header className="flex h-16 items-center justify-between px-6 bg-white/50 dark:bg-black/50 backdrop-blur-md sticky top-0 z-40 md:hidden border-b border-gray-100 dark:border-white/5">
+                <header className="flex h-16 items-center justify-between px-6 bg-white/50 dark:bg-black/50 backdrop-blur-md sticky top-0 z-40 lg:hidden border-b border-gray-100 dark:border-white/5">
                     <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)}>
                         <Menu className="h-5 w-5" />
                     </Button>

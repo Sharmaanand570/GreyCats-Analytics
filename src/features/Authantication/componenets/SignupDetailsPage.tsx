@@ -148,7 +148,7 @@ export default function SignupDetailsPage() {
     // ---------------------------
 
     return (
-        <div className="min-h-screen w-full flex items-center justify-center bg-background p-4">
+        <div className="min-h-[100dvh] w-full flex items-center justify-center bg-background p-4">
             <div className="w-full max-w-lg space-y-8">
 
                 {/* Header / Progress */}

@@ -6,6 +6,7 @@ export type SendOtpRequest = {
   email: string;
   password: string;
   fullName: string;
+  inviteToken?: string;
 };
 
 export type SendOtpResponse = {
@@ -17,6 +18,7 @@ export type SendOtpResponse = {
 export type VerifyOtpRequest = {
   email: string;
   otp: string;
+  inviteToken?: string;
 };
 
 export type VerifyOtpResponse = {

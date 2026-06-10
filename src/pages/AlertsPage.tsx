@@ -142,7 +142,7 @@ const AlertsPage: React.FC = () => {
 
 
   return (
-    <div className="w-full h-full min-h-screen flex flex-col bg-zinc-50/50">
+    <div className="w-full h-full min-h-[100dvh] flex flex-col bg-zinc-50/50">
       <div className="w-full h-full flex flex-col">
 
         {/* Header */}

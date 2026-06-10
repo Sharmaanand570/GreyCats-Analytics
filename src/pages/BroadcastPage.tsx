@@ -21,7 +21,7 @@ import {
   UserPlus,
   RefreshCcw
 } from 'lucide-react';
-import { SiTelegram } from 'react-icons/si';
+import { SiTelegram, SiWhatsapp } from 'react-icons/si';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -38,6 +38,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { useClientContext } from '@/context/ClientContext';
 import { useBroadcastStore } from '@/store/useBroadcastStore';
+import { useTelegramTargets } from '@/features/blog/hooks/useBlogPosts';
 import { useCreateClient, useDeleteClient, useClient, useClients } from '../hooks/useClients';
 import { getProfileImageUrl } from '@/utils/imageUtils';
 import type { ClientWithIntegrations } from '@/types/client.types';
@@ -404,14 +405,17 @@ function StepPickExistingClient({
    ═══════════════════════════════════════════════════ */
 function StepWorkspace({
   client,
+  channel,
   onSwitchWorkspace,
 }: {
   client: ClientWithIntegrations;
+  channel: string;
   onSwitchWorkspace: () => void;
 }) {
   const { data: broadcasts, isLoading, refetch, isRefetching } = useBroadcasts(client.id);
   const { data: integrations } = useIntegrations(client.id);
   const { data: templates } = useTemplates();
+  const { data: telegramTargets = [] } = useTelegramTargets(client.id);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -420,8 +424,58 @@ function StepWorkspace({
   const [activeTab, setActiveTab] = useState('campaigns');
 
   const filteredBroadcasts = broadcasts?.filter(b =>
-    b.name.toLowerCase().includes(searchQuery.toLowerCase())
+    b.name.toLowerCase().includes(searchQuery.toLowerCase()) && 
+    (b.channel ? b.channel.toLowerCase() === channel.toLowerCase() : true)
   );
+  
+  const totalCampaigns = filteredBroadcasts?.length || 0;
+
+  const hasChannelIntegrations = channel.toUpperCase() === 'TELEGRAM'
+    ? (telegramTargets && telegramTargets.length > 0)
+    : integrations?.some(i => i.type.toUpperCase() === channel.toUpperCase());
+
+  const hasChannelTemplates = templates?.some(t => t.channel.toUpperCase() === channel.toUpperCase());
+  
+  const channelThemes = {
+    whatsapp: {
+      iconColor: "text-[#128C7E]",
+      bgColor: "bg-[#128C7E]",
+      lightBg: "bg-[#128C7E]/10",
+      borderColor: "border-[#128C7E]/20",
+      title: "WhatsApp Campaigns",
+      name: "WhatsApp",
+      icon: SiWhatsapp
+    },
+    telegram: {
+      iconColor: "text-sky-500",
+      bgColor: "bg-sky-500",
+      lightBg: "bg-sky-50",
+      borderColor: "border-sky-200",
+      title: "Telegram Broadcasting",
+      name: "Telegram",
+      icon: SiTelegram
+    },
+    sms: {
+      iconColor: "text-orange-600",
+      bgColor: "bg-orange-600",
+      lightBg: "bg-orange-50",
+      borderColor: "border-orange-200",
+      title: "SMS Marketing",
+      name: "SMS",
+      icon: MessageSquare
+    },
+    email: {
+      iconColor: "text-blue-600",
+      bgColor: "bg-blue-600",
+      lightBg: "bg-blue-50",
+      borderColor: "border-blue-200",
+      title: "Email Automation",
+      name: "Email",
+      icon: Mail
+    }
+  };
+  const theme = channelThemes[channel.toLowerCase() as keyof typeof channelThemes] || channelThemes.whatsapp;
+  const ChannelIcon = theme.icon;
 
   return (
     <div className="h-full flex flex-col">
@@ -440,105 +494,87 @@ function StepWorkspace({
             </div>
             <div className="min-w-0">
               <h3 className="font-bold text-sm text-zinc-900 truncate leading-tight">{client.name}</h3>
-              <p className="text-[11px] text-zinc-400 font-medium truncate">Broadcast Workspace</p>
+              <p className="text-[11px] text-zinc-400 font-medium truncate">{theme.name} Broadcast Workspace</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onSwitchWorkspace}
-              className="text-[11px] font-semibold text-zinc-600 hover:text-zinc-900 h-8 px-4 shrink-0 rounded-lg border-zinc-200 hover:bg-zinc-50 gap-1.5"
-            >
-              <ArrowLeft className="w-3 h-3" />
-              Switch Workspace
-            </Button>
-            <Button 
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
                 size="sm"
-                onClick={() => setIsCreateModalOpen(true)}
-                className="bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg px-4 h-8 flex items-center gap-2 font-bold transition-all text-[11px]"
+                onClick={onSwitchWorkspace}
+                className="text-[11px] font-semibold text-zinc-600 hover:text-zinc-900 h-8 px-4 shrink-0 rounded-lg border-zinc-200 hover:bg-zinc-50 gap-1.5"
               >
-                <Plus className="w-3.5 h-3.5" />
-                New Campaign
-            </Button>
-          </div>
+                <ArrowLeft className="w-3 h-3" />
+                Switch Workspace
+              </Button>
+              {(totalCampaigns > 0 || activeTab !== 'campaigns') && (
+                <Button 
+                  size="sm"
+                  onClick={() => setIsCreateModalOpen(true)}
+                  className="bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg px-4 h-8 flex items-center gap-2 font-bold transition-all text-[11px]"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  New Campaign
+                </Button>
+              )}
+            </div>
         </div>
       </div>
 
       <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
         <div className="max-w-[1400px] mx-auto w-full">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="bg-zinc-100/50 p-1 border border-zinc-200/50 rounded-xl mb-8">
-              <TabsTrigger value="campaigns" className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Campaigns</TabsTrigger>
-              <TabsTrigger value="templates" className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Templates</TabsTrigger>
-              <TabsTrigger value="providers" className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Gateways</TabsTrigger>
-            </TabsList>
+            {(totalCampaigns > 0 || activeTab !== 'campaigns') && (
+              <TabsList className="bg-zinc-100/50 p-1 border border-zinc-200/50 rounded-xl mb-8">
+                <TabsTrigger value="campaigns" className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Campaigns</TabsTrigger>
+                <TabsTrigger value="templates" className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Templates</TabsTrigger>
+                <TabsTrigger value="providers" className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Gateways</TabsTrigger>
+              </TabsList>
+            )}
 
             <TabsContent value="campaigns" className="space-y-8 focus-visible:outline-none">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                <div className="bg-white p-6 rounded-[28px] border border-zinc-200/50 shadow-sm">
+              {(totalCampaigns > 0 || isLoading) && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                <div className={cn("bg-white p-6 rounded-[28px] border shadow-sm transition-all hover:shadow-md", theme.borderColor)}>
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center">
-                      <BarChart3 className="w-5 h-5 text-blue-600" />
+                    <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center", theme.lightBg)}>
+                      <BarChart3 className={cn("w-5 h-5", theme.iconColor)} />
                     </div>
                     <p className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Total Campaigns</p>
                   </div>
-                  <p className="text-4xl font-extrabold text-zinc-900 tracking-tight">{broadcasts?.length || 0}</p>
+                  <p className="text-4xl font-extrabold text-zinc-900 tracking-tight">{filteredBroadcasts?.length || 0}</p>
                 </div>
-                <div className="bg-white p-6 rounded-[28px] border border-zinc-200/50 shadow-sm">
+                <div className={cn("bg-white p-6 rounded-[28px] border shadow-sm transition-all hover:shadow-md", theme.borderColor)}>
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center", theme.lightBg)}>
+                      <CheckCircle2 className={cn("w-5 h-5", theme.iconColor)} />
                     </div>
                     <p className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Messages Sent</p>
                   </div>
                   <p className="text-4xl font-extrabold text-zinc-900 tracking-tight">
-                    {broadcasts?.reduce((acc, b) => acc + b.sentCount, 0).toLocaleString() || 0}
+                    {filteredBroadcasts?.reduce((acc, b) => acc + b.sentCount, 0).toLocaleString() || 0}
                   </p>
                 </div>
-                <div className="bg-white p-6 rounded-[28px] border border-zinc-200/50 shadow-sm">
+                <div className={cn("bg-white p-6 rounded-[28px] border shadow-sm transition-all hover:shadow-md", theme.borderColor)}>
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center">
-                      <AlertCircle className="w-5 h-5 text-red-600" />
+                    <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center", theme.lightBg)}>
+                      <AlertCircle className={cn("w-5 h-5", theme.iconColor)} />
                     </div>
                     <p className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Failures</p>
                   </div>
                   <p className="text-4xl font-extrabold text-zinc-900 tracking-tight">
-                    {broadcasts?.reduce((acc, b) => acc + b.failedCount, 0).toLocaleString() || 0}
+                    {filteredBroadcasts?.reduce((acc, b) => acc + b.failedCount, 0).toLocaleString() || 0}
                   </p>
                 </div>
               </div>
 
-              {/* Supported Channels Strip */}
-              <div className="bg-zinc-50 rounded-[24px] border border-zinc-200 p-4 mb-8 flex flex-col md:flex-row items-center gap-4 justify-between">
-                <div className="flex items-center gap-4">
-                  <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">Supported Channels:</span>
-                  <div className="flex items-wrap gap-5">
-                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
-                      <MessageSquare className="w-3.5 h-3.5 text-orange-500" /> SMS
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
-                      <Mail className="w-3.5 h-3.5 text-blue-500" /> Email
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
-                      <SiTelegram className="w-3.5 h-3.5 text-sky-500" /> Telegram
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-400">
-                      <MessageSquare className="w-3.5 h-3.5" /> WhatsApp (Soon)
-                    </span>
-                  </div>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  className="text-[11px] font-bold text-zinc-500 hover:text-zinc-900 h-8"
-                  onClick={() => setActiveTab('providers')}
-                >
-                  Manage Gateways <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                </Button>
-              </div>
+              </>
+              )}
 
               <div className="bg-white rounded-[32px] border border-zinc-200/60 shadow-xl shadow-zinc-200/20 overflow-hidden min-h-[500px]">
-                <div className="p-6 border-b border-zinc-100 bg-zinc-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                {(totalCampaigns > 0 || isLoading) && (
+                  <div className="p-6 border-b border-zinc-100 bg-zinc-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="relative w-full md:w-96">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                     <input 
@@ -567,19 +603,22 @@ function StepWorkspace({
                       Filter
                     </Button>
                   </div>
-                </div>
+                  </div>
+                )}
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
-                    <thead>
-                      <tr className="bg-zinc-50/50">
-                        <th className="px-8 py-4 text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Campaign Details</th>
-                        <th className="px-8 py-4 text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Channel</th>
-                        <th className="px-8 py-4 text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Status</th>
-                        <th className="px-8 py-4 text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Progress</th>
-                        <th className="px-8 py-4 text-[11px] font-bold text-zinc-400 uppercase tracking-widest text-right">Date Created</th>
-                      </tr>
-                    </thead>
+                    {(totalCampaigns > 0 || isLoading) && (
+                      <thead>
+                        <tr className="bg-zinc-50/50">
+                          <th className="px-8 py-4 text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Campaign Details</th>
+                          <th className="px-8 py-4 text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Channel</th>
+                          <th className="px-8 py-4 text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Status</th>
+                          <th className="px-8 py-4 text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Progress</th>
+                          <th className="px-8 py-4 text-[11px] font-bold text-zinc-400 uppercase tracking-widest text-right">Date Created</th>
+                        </tr>
+                      </thead>
+                    )}
                     <tbody className="divide-y divide-zinc-100">
                       {isLoading ? (
                         <tr>
@@ -591,32 +630,100 @@ function StepWorkspace({
                       ) : filteredBroadcasts?.length === 0 ? (
                         <tr>
                           <td colSpan={5} className="py-20 text-center">
-                            <div className="w-20 h-20 bg-zinc-50 rounded-[32px] flex items-center justify-center mx-auto mb-6 border border-dashed border-zinc-200">
-                              <Send className="w-8 h-8 text-zinc-300" />
-                            </div>
-                            <h3 className="text-zinc-900 font-bold text-lg mb-1">No campaigns found</h3>
-                            <p className="text-zinc-500 text-sm font-medium mb-6">Create your first broadcast to reach your customers.</p>
-                            
-                            {/* Smart Onboarding Helpers */}
-                            {(!integrations?.length || !templates?.length) && (
-                              <div className="max-w-md mx-auto bg-amber-50/50 border border-amber-100 rounded-2xl p-5 text-left flex gap-4">
-                                <AlertCircle className="w-6 h-6 text-amber-500 shrink-0" />
-                                <div>
-                                  <h4 className="text-sm font-bold text-amber-900">Setup Required</h4>
-                                  <p className="text-xs text-amber-700/80 mt-1 mb-3">Before you can send your first campaign, you need to configure a few things.</p>
-                                  <ul className="space-y-2">
-                                    {!integrations?.length && (
-                                      <li className="flex items-center gap-2 text-xs font-bold text-amber-900">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Need to configure a Gateway in the Gateways tab
-                                      </li>
-                                    )}
-                                    {!templates?.length && (
-                                      <li className="flex items-center gap-2 text-xs font-bold text-amber-900">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Need to create a Template in the Templates tab
-                                      </li>
-                                    )}
-                                  </ul>
+                            {(!hasChannelIntegrations || !hasChannelTemplates) ? (
+                              <div className="max-w-3xl mx-auto text-left py-8 px-4">
+                                <h3 className="text-2xl font-extrabold text-zinc-900 tracking-tight mb-2 flex items-center gap-2">
+                                  <ChannelIcon className={`w-7 h-7 ${theme.iconColor}`} />
+                                  Getting Started with {theme.name}
+                                </h3>
+                                <p className="text-zinc-500 font-medium mb-8">Complete these steps to launch your first broadcast campaign.</p>
+
+                                <div className="space-y-4">
+                                  <div className={cn("p-6 rounded-2xl border transition-all", 
+                                    hasChannelIntegrations ? "bg-zinc-50/50 border-zinc-200 opacity-60" : cn("bg-white shadow-xl ring-1", theme.borderColor)
+                                  )}>
+                                    <div className="flex items-start gap-4">
+                                      <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
+                                        hasChannelIntegrations ? "bg-green-100 text-green-600" : cn(theme.lightBg, theme.iconColor)
+                                      )}>
+                                        {hasChannelIntegrations ? <CheckCircle2 className="w-5 h-5" /> : <span className="font-bold text-sm">1</span>}
+                                      </div>
+                                      <div className="flex-1">
+                                        <h4 className="text-lg font-bold text-zinc-900">Connect a Gateway</h4>
+                                        <p className="text-sm text-zinc-500 mt-1 mb-4">Link your provider account to enable messaging.</p>
+                                        {!hasChannelIntegrations && (
+                                          <Button onClick={() => setActiveTab('providers')} className={cn("text-white font-bold rounded-xl h-10 px-6 shadow-md", theme.bgColor, theme.iconColor.replace('text-', 'shadow-').replace(']', ']/20'))}>
+                                            Connect Gateway
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className={cn("p-6 rounded-2xl border transition-all", 
+                                    hasChannelTemplates ? "bg-zinc-50/50 border-zinc-200 opacity-60" : (!hasChannelIntegrations ? "bg-white border-zinc-100 opacity-40 grayscale" : cn("bg-white shadow-xl ring-1", theme.borderColor))
+                                  )}>
+                                    <div className="flex items-start gap-4">
+                                      <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
+                                        hasChannelTemplates ? "bg-green-100 text-green-600" : (!hasChannelIntegrations ? "bg-zinc-100 text-zinc-400" : cn(theme.lightBg, theme.iconColor))
+                                      )}>
+                                        {hasChannelTemplates ? <CheckCircle2 className="w-5 h-5" /> : <span className="font-bold text-sm">2</span>}
+                                      </div>
+                                      <div className="flex-1">
+                                        <h4 className="text-lg font-bold text-zinc-900">Create a Template</h4>
+                                        <p className="text-sm text-zinc-500 mt-1 mb-4">Design the message content you want to send.</p>
+                                        {!hasChannelTemplates && (
+                                          <Button 
+                                            onClick={() => setActiveTab('templates')} 
+                                            disabled={!hasChannelIntegrations}
+                                            className={cn("text-white font-bold rounded-xl h-10 px-6 shadow-md disabled:opacity-50", theme.bgColor, theme.iconColor.replace('text-', 'shadow-').replace(']', ']/20'))}
+                                          >
+                                            Create Template
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className={cn("p-6 rounded-2xl border transition-all", 
+                                    !hasChannelIntegrations || !hasChannelTemplates ? "bg-white border-zinc-100 opacity-40 grayscale" : "bg-white border-blue-200 shadow-xl shadow-blue-900/5 ring-1 ring-blue-100"
+                                  )}>
+                                    <div className="flex items-start gap-4">
+                                      <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
+                                        !hasChannelIntegrations || !hasChannelTemplates ? "bg-zinc-100 text-zinc-400" : "bg-blue-100 text-blue-600"
+                                      )}>
+                                        <span className="font-bold text-sm">3</span>
+                                      </div>
+                                      <div className="flex-1">
+                                        <h4 className="text-lg font-bold text-zinc-900">Launch Campaign</h4>
+                                        <p className="text-sm text-zinc-500 mt-1 mb-4">Select your audience and send out your broadcast.</p>
+                                        <Button 
+                                          onClick={() => setIsCreateModalOpen(true)} 
+                                          disabled={!hasChannelIntegrations || !hasChannelTemplates}
+                                          className="bg-zinc-900 hover:bg-zinc-800 text-white font-bold rounded-xl h-10 px-6 shadow-md shadow-zinc-900/20 disabled:opacity-50"
+                                        >
+                                          <Plus className="w-4 h-4 mr-2" />
+                                          New Campaign
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
+                              </div>
+                            ) : (
+                              <div className="py-16">
+                                <div className="w-20 h-20 bg-zinc-50 rounded-[32px] flex items-center justify-center mx-auto mb-6 border border-dashed border-zinc-200">
+                                  <Send className="w-8 h-8 text-zinc-300" />
+                                </div>
+                                <h3 className="text-zinc-900 font-bold text-lg mb-1">No campaigns found</h3>
+                                <p className="text-zinc-500 text-sm font-medium mb-6">Create your first broadcast to reach your customers.</p>
+                                <Button 
+                                  onClick={() => setIsCreateModalOpen(true)} 
+                                  className="bg-zinc-900 hover:bg-zinc-800 text-white font-bold rounded-xl h-11 px-6 shadow-md shadow-zinc-900/20"
+                                >
+                                  <Plus className="w-4 h-4 mr-2" />
+                                  New Campaign
+                                </Button>
                               </div>
                             )}
                           </td>
@@ -689,11 +796,11 @@ function StepWorkspace({
             </TabsContent>
 
             <TabsContent value="templates" className="focus-visible:outline-none">
-              <TemplateManager />
+              <TemplateManager fixedChannel={channel.toUpperCase() as any} />
             </TabsContent>
 
             <TabsContent value="providers" className="focus-visible:outline-none">
-              <ProviderManager clientId={client.id} />
+              <ProviderManager clientId={client.id} fixedChannel={channel.toUpperCase() as any} />
             </TabsContent>
           </Tabs>
         </div>
@@ -703,13 +810,14 @@ function StepWorkspace({
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         clientId={client.id}
+        fixedChannel={channel.toUpperCase() as any}
       />
     </div>
   );
 }
 
 export default function BroadcastPage() {
-  const { clientId: urlClientId } = useParams<{ clientId: string }>();
+  const { clientId: urlClientId, channel: urlChannel = 'whatsapp' } = useParams<{ clientId: string; channel: string }>();
   const navigate = useNavigate();
   const { currentStep, setCurrentStep } = useBroadcastStore();
   const { currentClient, setCurrentClient: _setCurrentClient, clients: allClients, isLoading: isLoadingContext } = useClientContext();
@@ -722,32 +830,33 @@ export default function BroadcastPage() {
   const createClient = useCreateClient();
   const deleteClient = useDeleteClient();
 
+  const activeChannel = urlChannel || 'whatsapp';
+
+  // Parse the URL clientId and fetch it directly — bypasses allClients race conditions
+  const urlClientIdNum = urlClientId ? parseInt(urlClientId, 10) : null;
+  const { data: urlDirectClient, isLoading: isLoadingUrlClient } = useClient(urlClientIdNum);
+
   const setCurrentClient = (client: ClientWithIntegrations | null) => {
     _setCurrentClient(client);
     if (client) {
       localStorage.setItem('lastBroadcastClientId', String(client.id));
-      if (urlClientId !== String(client.id)) {
-        navigate(`/broadcasts/${client.id}`);
+      const expectedPath = `/broadcasts/${activeChannel}/${client.id}`;
+      if (window.location.pathname !== expectedPath) {
+        navigate(expectedPath);
       }
     } else {
-      navigate('/broadcasts');
+      navigate(`/broadcasts/${activeChannel}`);
     }
   };
 
-  // Sync URL clientId with state on mount or change
   useEffect(() => {
     if (!urlClientId || allClients.length === 0) return;
     const client = allClients.find(c => String(c.id) === urlClientId);
     if (!client) return;
-
     if (!currentClient || currentClient.id !== client.id) {
       _setCurrentClient(client as ClientWithIntegrations);
     }
-
-    if (currentStep === 'select-client') {
-      setCurrentStep('workspace');
-    }
-  }, [urlClientId, allClients.length, currentClient?.id, currentStep]);
+  }, [urlClientId, allClients.length]);
 
   useEffect(() => {
     if (liveClient && currentClient && liveClient.id === currentClient.id) {
@@ -759,10 +868,49 @@ export default function BroadcastPage() {
     }
   }, [liveClient]);
 
+  // ─── If URL has a clientId, show workspace directly ────────────────────────
+  if (urlClientIdNum) {
+    if (isLoadingUrlClient) {
+      return (
+        <div className="w-full h-screen flex items-center justify-center bg-white">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="w-8 h-8 text-zinc-300 animate-spin" />
+            <p className="text-sm text-zinc-400 font-medium">Loading workspace…</p>
+          </div>
+        </div>
+      );
+    }
+
+    const workspaceClient = (urlDirectClient || liveClient || currentClient) as ClientWithIntegrations | null;
+
+    if (workspaceClient) {
+      return (
+        <div className="w-full h-screen flex flex-col overflow-hidden bg-white">
+          <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
+            <div className="w-full h-full flex flex-col relative">
+              <div className="flex-1 overflow-y-auto relative h-full custom-scrollbar">
+                <StepWorkspace
+                  client={workspaceClient}
+                  channel={activeChannel}
+                  onSwitchWorkspace={() => {
+                    _setCurrentClient(null);
+                    setCurrentStep('select-client');
+                    navigate(`/broadcasts/${activeChannel}`);
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+  }
+
+  // ─── No clientId in URL — show the select/create workspace flow ────────────
   const activeClient = (liveClient || currentClient) as ClientWithIntegrations | null;
 
   const renderContent = () => {
-    if (currentStep === 'select-client') {
+    if (currentStep === 'select-client' || !activeClient) {
       if (subStep === 'create') {
         return (
           <StepCreateClient
@@ -813,20 +961,17 @@ export default function BroadcastPage() {
       );
     }
 
-    if (currentStep === 'workspace' && activeClient) {
-      return (
-        <StepWorkspace
-          client={activeClient}
-          onSwitchWorkspace={() => {
-            setCurrentClient(null);
-            setCurrentStep('select-client');
-          }}
-        />
-      );
-    }
-
-    setCurrentStep('select-client');
-    return null;
+    return (
+      <StepWorkspace
+        client={activeClient}
+        channel={activeChannel}
+        onSwitchWorkspace={() => {
+          setCurrentClient(null);
+          setCurrentStep('select-client');
+          navigate(`/broadcasts/${activeChannel}`);
+        }}
+      />
+    );
   };
 
   return (

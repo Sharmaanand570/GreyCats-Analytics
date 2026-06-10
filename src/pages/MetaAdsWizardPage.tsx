@@ -43,7 +43,7 @@ import {
   usePublishAd,
   useUpdateCampaign,
 } from "@/features/meta/hooks/useMetaAdsManager";
-import { useClients } from "@/hooks/useClients";
+import { useAllClients } from "@/hooks/useClients";
 import { Skeleton } from "@/components/ui/skeleton";
 import type {
   PublishAdPayload,
@@ -262,7 +262,7 @@ function MetaAdsWizardPage() {
   const campaignId = campaignIdParam ?? null;
   const isEditMode = !!campaignId;
 
-  const { data: clientsData } = useClients();
+  const { data: clientsData } = useAllClients();
   const clients = clientsData || [];
 
   const [step, setStep] = useState(0);

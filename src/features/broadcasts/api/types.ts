@@ -1,6 +1,6 @@
-export type BroadcastChannel = 'SMS' | 'EMAIL' | 'TELEGRAM';
+export type BroadcastChannel = 'SMS' | 'EMAIL' | 'TELEGRAM' | 'WHATSAPP';
 export type BroadcastStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'RUNNING';
-export type BroadcastProvider = 'TWILIO' | 'ADBIZZ' | 'MSG91' | 'SHARED' | 'SMTP' | 'TELEGRAM';
+export type BroadcastProvider = 'TWILIO' | 'ADBIZZ' | 'MSG91' | 'SHARED' | 'SMTP' | 'TELEGRAM' | 'META';
 export type TemplateStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface BroadcastOwner {
@@ -72,6 +72,7 @@ export interface CreateBroadcastCsvPayload {
   subject?: string;
   templateId: number;
   columnName?: string;
+  variableMapping?: Record<string, string>;
   clientId?: number;
 }
 

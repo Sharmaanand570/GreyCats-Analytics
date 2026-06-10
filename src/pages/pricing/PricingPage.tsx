@@ -85,7 +85,7 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-[#111] font-sans selection:bg-[#4285F4] selection:text-white overflow-x-hidden relative">
+    <div className="min-h-[100dvh] bg-white text-[#111] font-sans selection:bg-[#4285F4] selection:text-white overflow-x-hidden relative">
       {/* Mouse particle background */}
       <ParticleBackground />
 

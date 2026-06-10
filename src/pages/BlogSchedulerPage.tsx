@@ -23,7 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 import { toast } from 'sonner';
-import { useCreateClient, useDeleteClient, useClient, useClients } from '../hooks/useClients';
+import { useCreateClient, useDeleteClient, useClient, useAllClients } from '../hooks/useClients';
 import { useClientContext } from '@/context/ClientContext';
 import { getProfileImageUrl } from '@/utils/imageUtils';
 import type { ClientWithIntegrations } from '@/types/client.types';
@@ -464,8 +464,8 @@ export default function BlogSchedulerPage() {
   const navigate = useNavigate();
   const { currentStep, setCurrentStep, resetDraft } = useBlogSchedulerStore();
   const { currentClient, setCurrentClient: _setCurrentClient, clients: allClients, isLoading: isLoadingContext } = useClientContext();
-  const { isLoading: isLoadingClientsFetch } = useClients();
-  const isLoadingClients = isLoadingContext || isLoadingClientsFetch;
+  const { isLoading } = useAllClients();
+  const isLoadingClients = isLoadingContext || isLoading;
 
   const setCurrentClient = (client: ClientWithIntegrations | null) => {
     _setCurrentClient(client);
@@ -477,6 +477,7 @@ export default function BlogSchedulerPage() {
         navigate(`/blog/scheduler/${client.id}`);
       }
     } else {
+      localStorage.removeItem('lastClientId');
       navigate('/blog/scheduler');
     }
   };
@@ -586,7 +587,7 @@ export default function BlogSchedulerPage() {
   };
 
   return (
-    <div className="w-full h-screen flex flex-col overflow-hidden bg-white">
+    <div className="w-full h-[100dvh] flex flex-col overflow-hidden bg-white">
       <div className="w-full rounded-l-2xl overflow-hidden h-full my-4 bg-[#fdfdfd]">
         <div className="w-full h-full flex flex-col relative">
           <div className="flex-1 overflow-y-auto relative h-full">

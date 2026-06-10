@@ -21,7 +21,7 @@ import {
 } from "../components/ui/alert-dialog";
 
 import { useParams } from "react-router-dom";
-import { useClient, useClients } from "../hooks/useClients";
+import { useClient, useAllClients } from "../hooks/useClients";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { ScrollArea } from "../components/ui/scroll-area";
@@ -33,7 +33,7 @@ import { SyncProgressBar } from "@/components/SyncProgressBar";
 import type { ConnectedIntegration } from "@/types/client.types";
 import { useShopifyPolling } from "@/features/shopify/hooks/useShopifyPolling";
 import { useWordPressTargets, useTelegramTargets } from "@/features/blog/hooks/useBlogPosts";
-import { useIntegrations as useBroadcastIntegrations } from "@/features/broadcasts/hooks/useBroadcasts";
+import { useIntegrations as useBroadcastIntegrations, useDeleteIntegration as useDeleteBroadcastIntegration } from "@/features/broadcasts/hooks/useBroadcasts";
 import { FaWordpress } from "react-icons/fa6";
 import { SiTelegram } from "react-icons/si";
 import { Mail, MessageSquare } from "lucide-react";
@@ -118,6 +118,7 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
   const { data: broadcastIntegrations = [] } = useBroadcastIntegrations(clientId ?? undefined);
   console.log("client", client);
   const removeAccount = useRemoveAccount();
+  const deleteBroadcastIntegration = useDeleteBroadcastIntegration();
   const [disconnectTarget, setDisconnectTarget] = useState<ConnectedIntegration | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -126,18 +127,22 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
     if (!disconnectTarget || !clientId) return;
 
     try {
-      await removeAccount.mutateAsync({
-        clientId,
-        integrationType: disconnectTarget.integrationType,
-        accountId: disconnectTarget.accountId,
-      });
+      if ((disconnectTarget as any)._isBroadcastIntegration) {
+        await deleteBroadcastIntegration.mutateAsync(Number(disconnectTarget.accountId));
+      } else {
+        await removeAccount.mutateAsync({
+          clientId,
+          integrationType: disconnectTarget.integrationType,
+          accountId: disconnectTarget.accountId,
+        });
+      }
       setDisconnectTarget(null);
     } catch (error) {
       console.error("Failed to disconnect", error);
     }
   };
 
-  const { data: clients, isLoading: isLoadingClients } = useClients();
+  const { data: clients, isLoading: isLoadingClients } = useAllClients();
   const navigate = useNavigate();
 
   if (!clientId) {
@@ -369,7 +374,20 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
           ),
           renderActions: () => (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-400 italic">Managed via Blog Scheduler</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDisconnectTarget({
+                    ...integration,
+                    integrationType: 'wordpress'
+                  });
+                }}
+              >
+                Disconnect
+              </Button>
             </div>
           ),
         };
@@ -389,7 +407,20 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
           ),
           renderActions: () => (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-400 italic">Managed via Broadcasts</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDisconnectTarget({
+                    ...integration,
+                    integrationType: 'telegram'
+                  });
+                }}
+              >
+                Disconnect
+              </Button>
             </div>
           ),
         };
@@ -410,7 +441,20 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
           ),
           renderActions: () => (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-400 italic">Managed via Broadcasts</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDisconnectTarget({
+                    ...integration,
+                    integrationType: isSms ? 'broadcast-sms' : 'broadcast-email'
+                  });
+                }}
+              >
+                Disconnect
+              </Button>
             </div>
           ),
         };
@@ -668,7 +712,7 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
   }
 
   return (
-    <div className="w-full min-h-screen flex flex-col overflow-x-hidden bg-white">
+    <div className="w-full min-h-[100dvh] flex flex-col overflow-x-hidden bg-white">
       <div className="w-full h-full">
         {content}
       </div>
