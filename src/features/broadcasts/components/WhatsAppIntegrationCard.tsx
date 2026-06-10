@@ -144,12 +144,12 @@ export function WhatsAppIntegrationCard({ clientId, onConnected, hasExisting, va
           placeholder="6-digit PIN (Optional)"
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-          className="h-12 w-full px-4 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black text-sm font-medium focus:ring-2 focus:ring-[#25D366]/20 focus:border-[#25D366] transition-all outline-none"
+          className="h-11 w-full px-4 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-black text-sm font-medium focus:ring-2 focus:ring-[#25D366]/20 focus:border-[#25D366] transition-all outline-none"
         />
         <Button
           onClick={launchWhatsAppSignup}
           disabled={isConnecting}
-          className="w-full bg-[#25D366] hover:bg-[#1DA851] text-white font-bold h-14 rounded-2xl flex items-center gap-2 shadow-lg shadow-[#25D366]/20 transition-all hover:scale-[1.02]"
+          className="w-full bg-[#25D366] hover:bg-[#1DA851] text-white font-bold h-11 rounded-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
         >
           {isConnecting ? (
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -164,9 +164,9 @@ export function WhatsAppIntegrationCard({ clientId, onConnected, hasExisting, va
 
   return (
     <div
-      className="h-[240px] w-full border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center p-6 hover:border-green-500/30 transition-all group"
+      className="h-[240px] w-full border border-dashed border-gray-200 dark:border-white/10 rounded-2xl flex flex-col items-center justify-center p-6 hover:border-green-500/30 transition-all group"
     >
-      <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-white/5 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+      <div className="w-12 h-12 rounded-xl bg-gray-50 dark:bg-white/5 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
         {isConnecting ? (
           <Loader2 className="w-6 h-6 text-green-500 animate-spin" />
         ) : (
