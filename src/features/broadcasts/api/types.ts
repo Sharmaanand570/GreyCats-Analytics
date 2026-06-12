@@ -29,6 +29,8 @@ export interface Broadcast {
   user?: BroadcastOwner; // Only present on admin endpoints
 }
 
+export type WhatsAppTemplateCategory = 'UTILITY' | 'MARKETING';
+
 export interface BroadcastTemplate {
   id: number;
   name: string;
@@ -36,6 +38,8 @@ export interface BroadcastTemplate {
   content: string;
   externalId?: string; // DLT Template ID
   status: TemplateStatus;
+  category?: WhatsAppTemplateCategory; // WhatsApp only
+  language?: string; // WhatsApp Meta language code e.g. en_US
   createdAt: string;
   userId?: number | null; // null = system template (visible to everyone)
 }
@@ -81,6 +85,8 @@ export interface CreateTemplateRequest {
   channel: BroadcastChannel;
   content: string;
   externalId?: string;
+  category?: WhatsAppTemplateCategory; // WhatsApp only — sent to Meta
+  language?: string; // WhatsApp only — Meta language code e.g. en_US
 }
 
 export interface CreateIntegrationRequest {

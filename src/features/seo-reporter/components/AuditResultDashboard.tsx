@@ -685,12 +685,16 @@ export const AuditResultDashboard: React.FC<AuditResultDashboardProps> = ({ audi
       </Tabs>
 
       {/* Tech Stack Footer */}
-      {audit.details.technology?.stack && audit.details.technology.stack.length > 0 && (
+      {(audit.details.technology?.frameworks?.length > 0 || audit.details.technology?.analytics?.length > 0 || audit.details.technology?.cms) && (
         <div className="bg-card/80 backdrop-blur-md rounded-3xl border border-border p-8 shadow-sm">
           <h3 className="text-xl font-bold text-foreground mb-2">Detected Technologies</h3>
           <p className="text-muted-foreground text-sm mb-6">Frameworks and server infrastructure identified on this webpage.</p>
           <div className="flex flex-wrap gap-2">
-            {audit.details.technology.stack.map((tech, i) => (
+            {Array.from(new Set([
+              ...(audit.details.technology.frameworks || []),
+              ...(audit.details.technology.analytics || []),
+              ...(audit.details.technology.cms ? [audit.details.technology.cms] : [])
+            ])).map((tech: string, i: number) => (
               <Badge key={i} variant="secondary" className="px-4 py-2 rounded-xl text-sm font-medium bg-secondary text-foreground hover:bg-secondary/80">
                 {tech}
               </Badge>

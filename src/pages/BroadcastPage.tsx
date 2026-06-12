@@ -39,7 +39,7 @@ import { format } from 'date-fns';
 import { useClientContext } from '@/context/ClientContext';
 import { useBroadcastStore } from '@/store/useBroadcastStore';
 import { useTelegramTargets } from '@/features/blog/hooks/useBlogPosts';
-import { useCreateClient, useDeleteClient, useClient, useClients } from '../hooks/useClients';
+import { useCreateClient, useDeleteClient, useClient, useAllClients } from '../hooks/useClients';
 import { getProfileImageUrl } from '@/utils/imageUtils';
 import type { ClientWithIntegrations } from '@/types/client.types';
 
@@ -876,8 +876,9 @@ export default function BroadcastPage() {
   const { clientId: urlClientId, channel: urlChannel = 'whatsapp' } = useParams<{ clientId: string; channel: string }>();
   const navigate = useNavigate();
   const { currentStep, setCurrentStep } = useBroadcastStore();
-  const { currentClient, setCurrentClient: _setCurrentClient, clients: allClients, isLoading: isLoadingContext } = useClientContext();
-  const { isLoading: isLoadingClientsFetch } = useClients();
+  const { currentClient, setCurrentClient: _setCurrentClient, clients: contextClients, isLoading: isLoadingContext } = useClientContext();
+  const { data: allClientsFetched = [], isLoading: isLoadingClientsFetch } = useAllClients();
+  const allClients = allClientsFetched.length > 0 ? allClientsFetched : contextClients;
   const isLoadingClients = isLoadingContext || isLoadingClientsFetch;
 
   const [subStep, setSubStep] = useState<'main' | 'create' | 'existing'>('main');
@@ -892,7 +893,7 @@ export default function BroadcastPage() {
   const urlClientIdNum = urlClientId ? parseInt(urlClientId, 10) : null;
   const { data: urlDirectClient, isLoading: isLoadingUrlClient } = useClient(urlClientIdNum);
 
-  const setCurrentClient = (client: ClientWithIntegrations | null) => {
+  const setCurrentClient = React.useCallback((client: ClientWithIntegrations | null) => {
     _setCurrentClient(client);
     if (client) {
       localStorage.setItem('lastBroadcastClientId', String(client.id));
@@ -903,7 +904,7 @@ export default function BroadcastPage() {
     } else {
       navigate(`/broadcasts/${activeChannel}`);
     }
-  };
+  }, [_setCurrentClient, activeChannel, navigate]);
 
   useEffect(() => {
     if (!urlClientId || allClients.length === 0) return;
@@ -912,7 +913,7 @@ export default function BroadcastPage() {
     if (!currentClient || currentClient.id !== client.id) {
       _setCurrentClient(client as ClientWithIntegrations);
     }
-  }, [urlClientId, allClients.length]);
+  }, [urlClientId, allClients, currentClient, _setCurrentClient]);
 
   useEffect(() => {
     if (liveClient && currentClient && liveClient.id === currentClient.id) {
@@ -922,7 +923,7 @@ export default function BroadcastPage() {
         setCurrentClient(liveClient as ClientWithIntegrations);
       }
     }
-  }, [liveClient]);
+  }, [liveClient, currentClient, setCurrentClient]);
 
   // ─── If URL has a clientId, show workspace directly ────────────────────────
   if (urlClientIdNum) {

@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
 import type { AuditResult } from '../types';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+
 export interface AuditHistoryItem {
   id: string;
   domain: string;
@@ -40,7 +42,7 @@ export const useAudit = () => {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const res = await fetch('/api/seo-report/audit', {
+      const res = await fetch(`${API_BASE_URL}/seo-report/audit`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ url, forceRefresh }),
@@ -68,7 +70,7 @@ export const useAudit = () => {
     setError(null);
     setAudit(null);
     try {
-      const res = await fetch(`/api/seo-report/audit/${id}`);
+      const res = await fetch(`${API_BASE_URL}/seo-report/audit/${id}`);
       if (!res.ok) throw new Error('Audit not found');
       setAudit(await res.json());
     } catch (e: any) {
@@ -84,7 +86,7 @@ export const useAudit = () => {
       const token = getToken();
       if (!token) return; // No history for anonymous
 
-      const res = await fetch('/api/seo-report/my-audits', {
+      const res = await fetch(`${API_BASE_URL}/seo-report/my-audits`, {
         method: 'GET',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -107,7 +109,7 @@ export const useAudit = () => {
   }, []);
 
   const downloadPDF = (id: string) => {
-    window.open(`/api/seo-report/audit/${id}/pdf`, '_blank');
+    window.open(`${API_BASE_URL}/seo-report/audit/${id}/pdf`, '_blank');
   };
 
   return { audit, loading, error, history, historyLoading, runAudit, fetchAuditById, fetchMyHistory, downloadPDF, setAudit };

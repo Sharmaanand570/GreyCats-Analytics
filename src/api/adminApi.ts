@@ -262,8 +262,32 @@ export const adminApi = {
         return response.data;
     },
 
+    getEmailStats: async (days: number = 30) => {
+        const response = await api.get(`/superadmin/email-stats?days=${days}`);
+        return response.data;
+    },
+
     updateSystemConfig: async (config: any) => {
         const response = await api.patch('/superadmin/config', config);
+        return response.data;
+    },
+
+    // Per-key system config — GET all, find by key
+    getSystemConfigKey: async (key: string): Promise<{ key: string; value: boolean | string | number }> => {
+        const response = await api.get('/superadmin/config');
+        const configs = response.data;
+        // Response may be an array or an object map
+        if (Array.isArray(configs)) {
+            const found = configs.find((c: any) => c.key === key);
+            return found ?? { key, value: true };
+        }
+        // If it's a plain object { email_mx_validation_enabled: true, ... }
+        return { key, value: configs[key] ?? true };
+    },
+
+    // PATCH /superadmin/config — correct endpoint per backend
+    updateSystemConfigKey: async (key: string, value: boolean | string | number) => {
+        const response = await api.patch('/superadmin/config', { key, value });
         return response.data;
     },
 

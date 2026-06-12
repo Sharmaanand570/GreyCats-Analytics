@@ -1117,6 +1117,9 @@ export default function SocialMediaSchedulerPage() {
     const client = allClients.find(c => String(c.id) === urlClientId);
     if (!client) return;
 
+    // Prevent race condition where URL hasn't updated yet but we've requested to clear the client
+    if (isClearingClient.current) return;
+
     // Reset the flag since we have a valid client
     isClearingClient.current = false;
 
@@ -1129,11 +1132,11 @@ export default function SocialMediaSchedulerPage() {
     if (currentStep === 'select-client') {
       setCurrentStep('workspace');
     }
-  }, [urlClientId, allClients.length, currentClient?.id, currentStep, navigate]);
+  }, [urlClientId, allClients, currentClient, currentStep, navigate, _setCurrentClient, setCurrentStep]);
 
   // Wrap setCurrentClient to persist lastClientId, update URL, and reset the post draft.
   // This ensures no form state bleeds across client switches.
-  const setCurrentClient = (client: ClientWithIntegrations | null) => {
+  const setCurrentClient = React.useCallback((client: ClientWithIntegrations | null) => {
     if (!client) {
       isClearingClient.current = true;
     } else {
@@ -1152,7 +1155,7 @@ export default function SocialMediaSchedulerPage() {
       localStorage.removeItem('lastClientId');
       navigate('/social-media/scheduler');
     }
-  };
+  }, [_setCurrentClient, resetDraft, urlClientId, navigate]);
   const [subStep, setSubStep] = useState<'main' | 'create' | 'existing'>('main');
 
   const { data: liveClient } = useClient(currentClient?.id || null);
@@ -1178,8 +1181,28 @@ export default function SocialMediaSchedulerPage() {
   const activeClient = (liveClient || currentClient) as ClientWithIntegrations | null;
 
   const renderContent = () => {
-    // Step 1: Select / Add Client
-    if (currentStep === 'select-client') {
+    // 1. Show loading spinner if clients are loading
+    if (isLoadingClients) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[50vh] py-12">
+          <Loader2 className="w-8 h-8 text-zinc-300 animate-spin mb-3" />
+          <p className="text-zinc-400 text-xs font-semibold uppercase tracking-wider">Loading workspace...</p>
+        </div>
+      );
+    }
+
+    // 2. If a client ID is in URL but we don't have activeClient yet, we're loading the client data
+    if (urlClientId && !activeClient) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[50vh] py-12">
+          <Loader2 className="w-8 h-8 text-zinc-300 animate-spin mb-3" />
+          <p className="text-zinc-400 text-xs font-semibold uppercase tracking-wider">Loading client workspace...</p>
+        </div>
+      );
+    }
+
+    // 3. Select / Add Client
+    if (currentStep === 'select-client' || !urlClientId) {
       if (subStep === 'create') {
         return (
           <StepCreateClient
@@ -1236,7 +1259,7 @@ export default function SocialMediaSchedulerPage() {
       );
     }
 
-    // Step 2: Connect Platforms
+    // 4. Step 2: Connect Platforms
     if (currentStep === 'connect-platforms' && activeClient) {
       return (
         <StepConnectPlatforms
@@ -1245,13 +1268,12 @@ export default function SocialMediaSchedulerPage() {
           onBack={() => {
             setCurrentClient(null);
             setCurrentStep('select-client');
-            navigate('/social-media/scheduler');
           }}
         />
       );
     }
 
-    // Step 3: Workspace / Calendar
+    // 5. Step 3: Workspace / Calendar
     if (currentStep === 'workspace' && activeClient) {
       return (
         <StepWorkspace
@@ -1259,15 +1281,30 @@ export default function SocialMediaSchedulerPage() {
           onSwitchWorkspace={() => {
             setCurrentClient(null);
             setCurrentStep('select-client');
-            navigate('/social-media/scheduler');
           }}
         />
       );
     }
 
-    // Fallback
-    setCurrentStep('select-client');
-    return null;
+    // Safe fallback
+    return (
+      <StepSelectClient
+        clients={allClients}
+        isLoading={isLoadingClients}
+        isError={false}
+        onSelect={(client: ClientWithIntegrations) => {
+          setCurrentClient(client);
+          setCurrentStep('workspace');
+        }}
+        onAddExisting={() => setSubStep('existing')}
+        onAddNew={() => setSubStep('create')}
+        onDelete={(client: ClientWithIntegrations) => {
+          if (window.confirm(`Delete "${client.name}" and all their data?`)) {
+            deleteClient.mutate(client.id);
+          }
+        }}
+      />
+    );
   };
 
   return (

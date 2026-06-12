@@ -43,6 +43,7 @@ import {
 import { cn } from '@/lib/utils';
 import { InlineTemplateCreator } from './InlineTemplateCreator';
 import { InlineGatewayCreator } from './InlineGatewayCreator';
+import { WhatsAppTemplateCreator } from './WhatsAppTemplateCreator';
 
 interface CreateBroadcastModalProps {
   isOpen: boolean;
@@ -508,20 +509,30 @@ export function CreateBroadcastModal({ isOpen, onClose, clientId, fixedChannel }
                     {filteredTemplates.length === 0 && (
                       <div className="mt-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 flex flex-col gap-1.5">
                         <p className="text-xs text-amber-700 font-semibold flex items-center gap-1.5">
-                          <AlertCircle className="w-4 h-4" /> No templates found.
+                          <AlertCircle className="w-4 h-4" /> No approved templates found.
                         </p>
                         {isWhatsapp ? (
-                          <div className="flex flex-col gap-1 mt-1">
-                            <p className="text-[11px] text-amber-700/80 font-medium leading-relaxed">WhatsApp templates must be created in Meta Business Manager. Click below to sync them here.</p>
-                            <Button 
-                              onClick={() => syncTemplates.mutate(clientId)}
-                              disabled={syncTemplates.isPending}
-                              size="sm"
-                              className="bg-amber-500 hover:bg-amber-600 text-white rounded-md h-8 text-[11px] font-semibold self-start mt-1"
-                            >
-                              <RefreshCcw className={cn("w-3 h-3 mr-1.5", syncTemplates.isPending && "animate-spin")} />
-                              Sync Templates from Meta
-                            </Button>
+                          <div className="flex flex-col gap-1.5 mt-1">
+                            <p className="text-[11px] text-amber-700/80 font-medium leading-relaxed">WhatsApp templates must be approved by Meta before use. You can sync existing ones from Meta Business Manager, or create a new template directly.</p>
+                            <div className="flex gap-2 flex-wrap">
+                              <Button 
+                                onClick={() => syncTemplates.mutate(clientId)}
+                                disabled={syncTemplates.isPending}
+                                size="sm"
+                                className="bg-amber-500 hover:bg-amber-600 text-white rounded-md h-8 text-[11px] font-semibold self-start mt-1"
+                              >
+                                <RefreshCcw className={cn("w-3 h-3 mr-1.5", syncTemplates.isPending && "animate-spin")} />
+                                Sync from Meta
+                              </Button>
+                              <Button
+                                onClick={() => setShowTemplateManager(true)}
+                                size="sm"
+                                variant="outline"
+                                className="border-amber-300 text-amber-700 hover:bg-amber-50 rounded-md h-8 text-[11px] font-semibold self-start mt-1"
+                              >
+                                + Create New Template
+                              </Button>
+                            </div>
                           </div>
                         ) : (
                           <div className="flex flex-col gap-1 mt-1">
@@ -542,19 +553,39 @@ export function CreateBroadcastModal({ isOpen, onClose, clientId, fixedChannel }
               </div>
 
               {isTelegram && (
-                <div className="space-y-2">
+                <div className="space-y-2 animate-in fade-in duration-500">
                   <div className="flex items-center justify-between px-1">
                     <label className="text-xs font-semibold text-zinc-600">Message Content <span className="text-red-500">*</span></label>
                     <span className={cn("text-xs font-medium", message.length > 4000 ? "text-red-500" : "text-zinc-400")}>
                       {message.length} / 4096
                     </span>
                   </div>
-                  <Textarea 
-                    value={message}
-                    onChange={e => setMessage(e.target.value)}
-                    placeholder="Type your Telegram message..."
-                    className="min-h-[120px] p-3 rounded-lg border-zinc-200 bg-white focus:ring-1 focus:ring-zinc-900 focus:border-zinc-900 text-sm font-medium resize-none transition-all shadow-sm"
-                  />
+                  <div className="relative group">
+                    <Textarea 
+                      value={message}
+                      onChange={e => setMessage(e.target.value)}
+                      placeholder="Type your Telegram message. Supports *bold*, _italic_, and emojis..."
+                      className="min-h-[120px] p-3 pr-10 rounded-lg border-zinc-200 bg-white focus:ring-1 focus:ring-sky-500 focus:border-sky-500 text-sm font-medium resize-none transition-all shadow-sm"
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const topic = message.trim() || name.trim();
+                        if (!topic) { toast.error('Enter a message or campaign name first'); return; }
+                        creativeApi.generateCaptions({ clientId: clientId || 0, platform: 'linkedin', goal: 'engagement', topic: `Write an engaging Telegram broadcast message about: ${topic}. Use emojis and bold formatting.`, count: 1 })
+                          .then((res) => { const t = res.data.data.captions[0]?.text; if (t) { setMessage(t); toast.success('Message generated!'); } })
+                          .catch(() => toast.error('Failed'));
+                      }}
+                      title={message ? "Rewrite with AI" : "Generate with AI"}
+                      className="absolute right-2 top-3 p-1.5 text-zinc-400 hover:text-sky-500 hover:bg-sky-50 rounded-md transition-colors"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1 px-1">
+                    <Info className="w-3 h-3 text-sky-500" />
+                    <span className="text-[10px] text-zinc-500 font-medium">Telegram allows rich formatting. Use *text* for bold and _text_ for italics.</span>
+                  </div>
                 </div>
               )}
             </div>

@@ -113,7 +113,7 @@ function MainSideBar(): React.JSX.Element {
     getInitialCollapseState()
   );
 
-  const getInitialOpenGroup = () => {
+  const getInitialOpenGroup = (): Record<string, boolean> => {
     const path = location.pathname;
     if (path.startsWith('/social-media') || path.startsWith('/blog')) return { Scheduler: true };
     if (path.startsWith('/broadcasts')) return { Broadcast: true };

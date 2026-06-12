@@ -20,7 +20,8 @@ import {
   Info,
   AlertCircle,
   Sparkles,
-  RefreshCcw
+  RefreshCcw,
+  Globe
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { creativeApi } from '@/api/creativeApi';
@@ -28,12 +29,13 @@ import { SiTelegram, SiWhatsapp } from 'react-icons/si';
 import type { BroadcastChannel } from '../api/types';
 import { useUserStore } from '@/utils/useUserStore';
 import { cn } from '@/lib/utils';
+import { WhatsAppTemplateCreator } from './WhatsAppTemplateCreator';
 
 export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: BroadcastChannel, clientId?: number } = {}) {
   const { user } = useUserStore();
   const isAdmin = user?.role?.toUpperCase() === 'ADMIN' || user?.role?.toUpperCase() === 'SUPER_ADMIN';
 
-  const { data: templates, isLoading } = isAdmin ? useAdminTemplates() : useTemplates();
+  const { data: templates, isLoading, isFetching } = isAdmin ? useAdminTemplates() : useTemplates();
   const createTemplate = useCreateTemplate();
   const createSystemTemplate = useCreateSystemTemplate();
   const deleteTemplate = useDeleteTemplate();
@@ -41,6 +43,7 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
   const syncTemplates = useSyncTemplates();
 
   const [isCreating, setIsCreating] = useState(false);
+  const [showWaCreator, setShowWaCreator] = useState(false);
   const [name, setName] = useState('');
   const [channel, setChannel] = useState<BroadcastChannel>(fixedChannel || 'SMS');
   const [content, setContent] = useState('');
@@ -128,8 +131,18 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
     }
   };
 
+  // Determine if any templates are PENDING (to show polling indicator)
+  const hasPendingTemplates = templates?.some(t => t.status === 'PENDING');
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {/* WhatsApp Template Creator Modal */}
+      <WhatsAppTemplateCreator
+        isOpen={showWaCreator}
+        onClose={() => setShowWaCreator(false)}
+        clientId={clientId}
+      />
+
       {/* Header & Search */}
       <Card className="border-gray-200 dark:border-white/10 shadow-sm overflow-hidden bg-white dark:bg-[#111]">
         <CardContent className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -140,10 +153,17 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
             <div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Message Templates</h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Standardize communications across all channels.</p>
+              {/* Smart polling indicator */}
+              {hasPendingTemplates && (
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <RefreshCcw className="w-3 h-3 text-amber-500 animate-spin" />
+                  <span className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Auto-checking approval status…</span>
+                </div>
+              )}
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 flex-wrap justify-end">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input 
@@ -163,6 +183,16 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
               <RefreshCcw className={cn("w-4 h-4", syncTemplates.isPending && "animate-spin")} />
               Sync Meta Templates
             </Button>
+            {/* WhatsApp-specific template creator */}
+            {(!fixedChannel || fixedChannel === 'WHATSAPP') && (
+              <Button
+                onClick={() => setShowWaCreator(true)}
+                className="rounded-xl px-4 h-10 font-bold transition-all flex items-center gap-2 bg-gradient-to-r from-[#128C7E] to-[#25D366] hover:from-[#0c6b60] hover:to-[#1da851] text-white shadow-md shadow-green-500/20"
+              >
+                <SiWhatsapp className="w-4 h-4" />
+                Create WhatsApp Template
+              </Button>
+            )}
             <Button 
               onClick={() => setIsCreating(!isCreating)}
               variant={isCreating ? "outline" : "default"}
@@ -309,6 +339,13 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
               </div>
             )}
 
+            {channel === 'TELEGRAM' && (
+              <div className="flex items-center gap-2 mb-8 ml-1 text-[10px] font-bold text-sky-600 dark:text-sky-400 uppercase tracking-widest bg-sky-500/5 p-3 rounded-xl border border-sky-500/10">
+                <Info className="w-3.5 h-3.5" />
+                Telegram templates support rich formatting! You can use *bold* text, _italic_ text, and [links](http://example.com) to increase engagement.
+              </div>
+            )}
+
             <div className="flex flex-col md:flex-row items-center justify-between gap-6 pt-8 border-t border-gray-100 dark:border-white/5">
               <div className="flex items-center gap-6">
                 {channel === 'SMS' && (
@@ -389,7 +426,7 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
                       </div>
                       <div>
                         <h3 className="font-bold text-gray-900 dark:text-white text-base tracking-tight leading-tight">{t.name}</h3>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
                           {!t.userId && (
                             <div className="flex items-center gap-1 text-[8px] font-black text-blue-600 uppercase tracking-widest bg-blue-500/5 px-1.5 py-0.5 rounded">
                               <ShieldCheck className="w-2 h-2" />
@@ -399,6 +436,19 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
                           <span className={cn("text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded", chanCfg.badge)}>
                             {t.channel}
                           </span>
+                          {/* WhatsApp: show category badge */}
+                          {t.channel === 'WHATSAPP' && t.category && (
+                            <span className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-600 border border-violet-500/20">
+                              {t.category}
+                            </span>
+                          )}
+                          {/* WhatsApp: show language */}
+                          {t.channel === 'WHATSAPP' && t.language && (
+                            <span className="flex items-center gap-0.5 text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-500">
+                              <Globe className="w-2 h-2" />
+                              {t.language}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>

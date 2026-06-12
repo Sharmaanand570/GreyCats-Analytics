@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import logoBlack from "../assets/images/greycats-black-logo.png";
 import { isAuthenticated, StorageKey } from "@/utils/storage";
 import ParticleBackground from "@/components/ParticleBackground";
-import { DottedSurface } from "@/components/ui/dotted-surface";
+import { motion, AnimatePresence } from "motion/react";
 import { 
   BarChart3, 
   Database, 
@@ -44,6 +44,20 @@ const LandingPage = () => {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const authed = isAuthenticated(StorageKey.ANALYTICS_TOKEN);
+  const [activeTab, setActiveTab] = useState("Client");
+  const [activeIntegrationCategory, setActiveIntegrationCategory] = useState("Analytics");
+  const tabs = ["Client", "Social media", "Broadcast", "Report", "AI Suite"];
+  
+  useEffect(() => {
+    const autoPlayTabs = ["Client", "Social media", "Broadcast", "Report", "AI Suite"];
+    const timer = setTimeout(() => {
+      setActiveTab((current) => {
+        const currentIndex = autoPlayTabs.indexOf(current);
+        return autoPlayTabs[(currentIndex + 1) % autoPlayTabs.length];
+      });
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [activeTab]);
   
   const spotlightRef = useRef<HTMLDivElement>(null);
 
@@ -198,6 +212,42 @@ const LandingPage = () => {
       icon: () => (
         <svg viewBox="0 0 24 24" className="w-8 h-8" fill="#229ED9">
           <path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm5.891 7.007l-2.012 9.487c-.15.674-.551.841-1.116.523l-3.07-2.261-1.482 1.426c-.164.164-.301.301-.617.301l.221-3.131 5.7-5.15c.248-.221-.053-.344-.385-.123l-7.045 4.434-3.036-.949c-.661-.207-.674-.661.138-.977l11.868-4.573c.551-.207 1.034.123.832.997z"/>
+        </svg>
+      )
+    },
+    {
+      name: "WordPress",
+      color: "#21759b",
+      icon: () => (
+        <svg viewBox="0 0 24 24" className="w-8 h-8" fill="#21759b">
+          <path d="M12.158 12.786l-2.698 7.84c.806.236 1.657.365 2.54.365 1.047 0 2.05-.18 2.986-.51-.024-.037-.046-.078-.065-.123l-2.763-7.572zm5.723-6.605c-.15 0-.3.008-.452.025.26.54.406 1.137.406 1.765 0 1.258-.65 2.278-1.573 3.414l-2.023 2.56-3.08-8.625c.783-.162 1.6-.247 2.44-.247 1.542 0 3.012.308 4.354.872-.023-.053-.047-.107-.072-.164zm-5.88 0c-.84 0-1.658.085-2.44.248l3.08 8.626 2.024-2.56c.923-1.137 1.573-2.157 1.573-3.415 0-.628-.146-1.226-.406-1.766-.15-.017-.302-.025-.452-.025zm11.233 5.819c0 6.627-5.373 12-12 12s-12-5.373-12-12 5.373-12 12-12 12 5.373 12 12zm-3.09 0c0-3.64-2.31-6.732-5.59-8.118l-1.925 5.39 3.047 8.527c2.613-1.424 4.468-4.323 4.468-7.799zm-13.82-3.834c-1.393 1.83-2.226 4.14-2.226 6.653 0 2.26.696 4.357 1.88 6.082l3.412-9.55c-.24-.265-.436-.576-.566-.92l-2.5-2.265z"/>
+        </svg>
+      )
+    },
+    {
+      name: "WhatsApp",
+      color: "#25D366",
+      icon: () => (
+        <svg viewBox="0 0 24 24" className="w-8 h-8" fill="#25D366">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+        </svg>
+      )
+    },
+    {
+      name: "SMS",
+      color: "#8A2BE2",
+      icon: () => (
+        <svg viewBox="0 0 24 24" className="w-8 h-8" fill="#8A2BE2">
+          <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+        </svg>
+      )
+    },
+    {
+      name: "Email",
+      color: "#D44638",
+      icon: () => (
+        <svg viewBox="0 0 24 24" className="w-8 h-8" fill="#D44638">
+          <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
         </svg>
       )
     }
@@ -375,97 +425,299 @@ const LandingPage = () => {
         </div>
       )}
 
-      {/* Zero-Gravity Hero Section */}
-      <section className="relative min-h-[90vh] pt-28 md:pt-40 pb-20 px-4 md:px-6 flex flex-col items-center justify-center overflow-hidden z-10">
+      {/* New Minimal Hero Section */}
+      <section className="relative pt-32 pb-20 flex flex-col items-center overflow-hidden z-10">
+        {/* White top that fades into the transparent background */}
+        <div className="absolute inset-0 bg-gradient-to-b from-white via-white/50 to-transparent pointer-events-none -z-10" />
+        
         {/* Cinematic Background Layers - Balanced Visibility */}
         <div className="absolute inset-0 bg-grid-dots opacity-45 pointer-events-none mask-image-[linear-gradient(to_bottom,white,transparent)]" style={{ WebkitMaskImage: 'linear-gradient(to bottom, black, transparent)' }} />
         
         {/* Softer Dynamic Spotlight */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(66,133,244,0.04),transparent_60%)] pointer-events-none" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-[#4285F4] opacity-[0.02] blur-[100px] rounded-full pointer-events-none" />
-
-        <DottedSurface className="absolute inset-0 top-[35%] size-full pointer-events-none z-0" />
-
-        <div className="max-w-5xl mx-auto flex flex-col items-center text-center relative z-10 mt-12 md:mt-16">
-          <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-[#4285F4]/10 to-[#34A853]/10 blur opacity-50 group-hover:opacity-75 transition duration-1000 group-hover:duration-200 rounded-full"></div>
-            <div className="relative inline-flex items-center gap-2 px-6 py-2 rounded-full border border-[#111] bg-white text-[10px] font-bold text-[#111] mb-8 md:mb-12 uppercase tracking-[0.3em]">
-              GreyCats Analytics
-            </div>
+        <div className="max-w-4xl mx-auto text-center px-4 mb-16">
+          <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full border border-[#111] bg-white text-[10px] font-bold text-[#111] mb-8 md:mb-12 uppercase tracking-[0.3em] cursor-pointer hover:bg-[#f4f4f5] transition-colors">
+            GreyCats Analytics
           </div>
-
-          <h1 className="text-4xl sm:text-6xl md:text-[5rem] lg:text-[6rem] font-medium tracking-tighter mb-8 leading-[1.1] text-[#111] min-h-[2.2em] md:min-h-[auto] px-4">
-            All your marketing data. <br className="hidden md:block" /> One clear reporting platform.
+          
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-medium tracking-tighter mb-8 leading-[1.1] text-[#111] px-4">
+            All your marketing data. <br /> One clear reporting platform.
           </h1>
+          
           <p className="text-lg md:text-2xl text-[#111] mb-12 max-w-4xl mx-auto leading-relaxed font-semibold px-4">
             Connect channels, track KPIs, and deliver client-ready reports faster.
           </p>
           
-          <div className="flex justify-center w-full sm:w-auto">
-            <Link to={authed ? "/clients" : "/pricing"} className="w-full sm:w-auto">
-              <Button className="w-full px-10 py-5 text-lg font-semibold bg-[#111] hover:bg-[#333] text-white border-none shadow-none">
-                {authed ? "Go to Dashboard" : "Start Free Trial"}
-              </Button>
+          <div className="flex items-center justify-center gap-4">
+            <Link to={authed ? "/clients" : "/pricing"}>
+              <button className="inline-flex items-center justify-center rounded-lg text-[15px] font-medium transition-all duration-200 ease-in-out h-11 px-6 bg-[#18181b] text-white hover:bg-[#27272a] shadow-sm">
+                {authed ? "Go to Dashboard" : "Start for free"}
+              </button>
+            </Link>
+            <Link to="/contact">
+              <button className="inline-flex items-center justify-center rounded-lg text-[15px] font-medium transition-all duration-200 ease-in-out h-11 px-6 bg-white text-[#18181b] border border-[#e4e4e7] hover:bg-[#f4f4f5]">
+                Contact us
+              </button>
             </Link>
           </div>
-          {!authed && (
-            <div className="mt-8">
-              <Link to="/auth/login" className="text-[#666] hover:text-[#111] transition-colors text-sm font-medium">Already have an account? <span className="text-[#4285F4] underline">Sign in</span></Link>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Sine Wave Marquee Integrations - Compact Version */}
-      <section id="integrations" className="py-24 border-y border-[#f0f0f0] relative z-10 overflow-hidden">
-        <div className="text-center mb-16 relative z-20 px-6 reveal-on-scroll">
-          <div className="inline-flex items-center px-4 py-1.5 rounded-full border border-[#111] bg-white text-[10px] font-bold text-[#111] mb-6 uppercase tracking-[0.3em]">
-            Unified Connectivity
-          </div>
-          <h2 className="text-3xl md:text-5xl font-medium tracking-tighter mb-4 text-[#111] leading-[1.1]">
-            Connect the platforms <br /> you already use.
-          </h2>
         </div>
 
-        <div className="relative h-[200px] flex items-center">
-          <style>{`
-            @keyframes float-wave {
-              0%, 100% { transform: translateY(0); }
-              50% { transform: translateY(-30px); }
-            }
-          `}</style>
+        {/* Tabbed UI Mockup */}
+        <div className="w-full max-w-[1200px] mx-auto px-4 mb-24">
           
-          <div className="flex w-fit animate-marquee hover:[animation-play-state:paused] transition-all cursor-default py-12 relative z-20">
-            {[...integrations, ...integrations, ...integrations, ...integrations].map((item, i) => {
-              return (
-                <div 
-                  key={i} 
-                  className="px-6 flex-shrink-0"
-                  style={{ 
-                    animation: `float-wave 4s ease-in-out infinite`,
-                    animationDelay: `${i * 0.15}s`
-                  }}
-                >
-                  <div 
-                    className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-white border border-[#f0f0f0] shadow-sm flex items-center justify-center hover:scale-110 hover:border-[#111] transition-all duration-500 group"
+          {/* Tabs */}
+          <div className="flex justify-center border-b border-[#e4e4e7] mb-0 relative">
+            {tabs.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-8 py-4 text-sm font-medium relative transition-colors ${
+                  activeTab === tab 
+                    ? "text-[#18181b]" 
+                    : "text-[#71717a] hover:text-[#18181b]"
+                }`}
+              >
+                {tab}
+                {activeTab === tab && (
+                  <motion.div 
+                    layoutId="tab-underline"
+                    className="absolute bottom-[-1px] left-0 w-full h-[2px] bg-[#e4e4e7] overflow-hidden" 
                   >
-                    <div className="scale-110 group-hover:scale-125 transition-transform duration-500">
-                      <item.icon />
+                    <motion.div
+                      key={activeTab}
+                      initial={{ width: "0%" }}
+                      animate={{ width: "100%" }}
+                      transition={{ duration: 4, ease: "linear" }}
+                      className="h-full bg-[#18181b]"
+                    />
+                  </motion.div>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Mockup Container with Bottom Fade */}
+          <div className="relative mt-8">
+            <div className="w-full bg-white border border-[#e4e4e7] rounded-t-xl rounded-b-none shadow-sm h-[500px] flex overflow-hidden text-left">
+            
+            {/* Sidebar Mockup */}
+            <div className="w-64 border-r border-[#e4e4e7] bg-[#fafafa] flex flex-col pt-4 overflow-y-auto overflow-x-hidden pb-4 custom-scrollbar">
+              <div className="px-4 pb-4 border-b border-[#e4e4e7] mb-4 flex items-center gap-2">
+                 <div className="w-6 h-6 bg-[#18181b] rounded-md flex items-center justify-center text-white font-bold text-xs">G</div>
+                 <span className="text-sm font-semibold text-[#18181b]">GreyCats Workspace <span>v</span></span>
+              </div>
+              
+              <div className="px-2 space-y-5">
+                {[
+                  { group: "Analytics", items: ["Clients", "Alerts", "Reports"] },
+                  { group: "Scheduler", items: ["Social Media", "Blog"] },
+                  { group: "Broadcast", items: ["WhatsApp", "SMS", "Email", "Telegram"] },
+                  { group: "Ads Manager", items: ["Meta Ads", "Google Ads"] },
+                  { group: "Intelligence", items: ["SEO Reporter", "AI Suite"] }
+                ].map((section, idx) => (
+                  <div key={idx}>
+                    <div className="px-3 mb-1 text-[11px] font-semibold text-[#a1a1aa] uppercase tracking-wider">
+                      {section.group}
+                    </div>
+                    <div className="space-y-0.5">
+                      {section.items.map((item) => {
+                        const isHighlighted = 
+                          (activeTab === "Client" && item === "Clients") ||
+                          (activeTab === "Social media" && item === "Social Media") ||
+                          (activeTab === "Broadcast" && item === "WhatsApp") ||
+                          (activeTab === "Report" && item === "Reports") ||
+                          (activeTab === "AI Suite" && item === "AI Suite");
+                          
+                        return (
+                          <motion.div 
+                            key={item} 
+                            whileHover={{ scale: 1.02, x: 2 }}
+                            className={`px-3 py-1.5 text-[13px] rounded-md cursor-pointer flex items-center gap-2 transition-colors ${
+                              isHighlighted 
+                                ? "bg-[#e4e4e7]/80 text-[#18181b] font-semibold shadow-sm" 
+                                : "text-[#71717a] hover:bg-[#e4e4e7]/50 hover:text-[#18181b]"
+                            }`}
+                          >
+                             {isHighlighted && <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1"></span>}
+                             <span className={!isHighlighted ? "ml-2.5" : ""}>{item}</span>
+                          </motion.div>
+                        );
+                      })}
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-          
-          {/* Fading Edges */}
-          <div className="absolute left-0 top-0 bottom-0 w-64 bg-gradient-to-r from-white via-white/80 to-transparent z-30" />
-          <div className="absolute right-0 top-0 bottom-0 w-64 bg-gradient-to-l from-white via-white/80 to-transparent z-30" />
-        </div>
+                ))}
+              </div>
+            </div>
 
-        <div className="text-center mt-12 relative z-20">
-          <p className="text-[9px] text-[#999] font-medium tracking-wide">More integrations added regularly to our reporting suite.</p>
+            {/* Main Content Mockup */}
+            <div className="flex-1 bg-white p-8 relative overflow-y-auto overflow-x-hidden custom-scrollbar">
+              <div className="flex items-center justify-between mb-8 text-sm">
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold text-[#18181b] text-lg">{activeTab} view</span>
+                  <span className="text-[#a1a1aa] px-1.5 py-0.5 border border-[#e4e4e7] rounded text-xs bg-gray-50">⌘ K</span>
+                </div>
+                <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="px-4 py-2 bg-[#18181b] text-white rounded-md text-xs font-medium shadow-sm">
+                  Create New
+                </motion.button>
+              </div>
+
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
+                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                  exit={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                  className="h-full"
+                >
+                  {activeTab === "Client" && (
+                    <div className="border border-[#e4e4e7] rounded-xl overflow-hidden bg-white shadow-sm">
+                       <div className="bg-[#fafafa] border-b border-[#e4e4e7] flex px-4 py-3 text-xs font-semibold text-[#71717a]">
+                          <div className="w-8"></div>
+                          <div className="flex-1">Company</div>
+                          <div className="flex-1">Domains</div>
+                          <div className="flex-1">Integrations</div>
+                          <div className="w-32">Status</div>
+                       </div>
+                       {[
+                         { name: "Vercel", domain: "vercel.com", ints: 4, status: "Excellent", color: "text-purple-700 bg-purple-50" },
+                         { name: "DigitalOcean", domain: "digitalocean.com", ints: 2, status: "Medium", color: "text-blue-700 bg-blue-50" },
+                         { name: "GitHub", domain: "github.com", ints: 6, status: "Good", color: "text-emerald-700 bg-emerald-50" },
+                         { name: "Stripe", domain: "stripe.com", ints: 3, status: "Evaluating", color: "text-[#71717a] bg-[#f4f4f5]" },
+                       ].map((row, i) => (
+                         <motion.div 
+                           initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 + 0.1 }}
+                           key={i} 
+                           className="border-b border-[#e4e4e7] last:border-0 flex px-4 py-3.5 text-sm items-center hover:bg-gray-50 transition-colors cursor-pointer group"
+                         >
+                            <div className="w-8"><div className="w-4 h-4 border border-[#e4e4e7] rounded-[4px] group-hover:border-gray-400 transition-colors"></div></div>
+                            <div className="flex-1 font-medium flex items-center gap-3 text-[#18181b]">
+                               <div className="w-6 h-6 bg-[#18181b] rounded-md flex items-center justify-center text-white text-[10px] shadow-sm">{row.name[0]}</div>
+                               {row.name}
+                            </div>
+                            <div className="flex-1 text-[#4285F4] text-xs"><span className="px-2.5 py-1 bg-[#4285F4]/10 rounded-full font-medium">{row.domain}</span></div>
+                            <div className="flex-1 text-[#71717a] text-xs flex items-center gap-1.5"><div className="w-2 h-2 bg-green-500 rounded-full"></div> {row.ints} Connected</div>
+                            <div className="w-32"><span className={`px-2.5 py-1 rounded-md text-[11px] font-semibold ${row.color}`}>{row.status}</span></div>
+                         </motion.div>
+                       ))}
+                    </div>
+                  )}
+
+                  {activeTab === "Social media" && (
+                    <div className="h-full flex flex-col">
+                       <div className="text-[#18181b] font-medium mb-4 flex items-center gap-2">
+                         Post Scheduler <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] rounded-full uppercase tracking-wider font-bold">Active</span>
+                       </div>
+                       <div className="flex gap-6">
+                          <motion.div whileHover={{ y: -2 }} className="w-72 h-72 border border-[#e4e4e7] rounded-xl p-5 bg-[#fafafa] shadow-sm flex flex-col relative overflow-hidden">
+                             <div className="flex items-center gap-3 mb-4">
+                               <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500"></div>
+                               <div>
+                                 <div className="w-20 h-2 bg-gray-300 rounded mb-1"></div>
+                                 <div className="w-12 h-1.5 bg-gray-200 rounded"></div>
+                               </div>
+                             </div>
+                             <div className="w-full h-32 bg-white border border-[#e4e4e7] rounded-lg mb-3 shadow-sm"></div>
+                             <div className="w-3/4 h-2 bg-gray-300 rounded mb-1.5"></div>
+                             <div className="w-1/2 h-2 bg-gray-200 rounded"></div>
+                          </motion.div>
+                          <div className="flex-1 border border-[#e4e4e7] rounded-xl p-6 bg-white shadow-sm flex flex-col justify-between">
+                             <div className="space-y-4">
+                               <div className="w-1/3 h-4 bg-gray-200 rounded"></div>
+                               <div className="w-full h-24 border border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 text-xs bg-gray-50">Drop media here</div>
+                             </div>
+                             <div className="flex justify-end gap-3 mt-6">
+                               <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="px-4 py-2 bg-white border border-[#e4e4e7] rounded-md text-xs font-medium text-[#18181b] shadow-sm">Preview</motion.button>
+                               <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="px-4 py-2 bg-[#4285F4] text-white rounded-md text-xs font-medium shadow-sm hover:bg-[#3367d6]">Schedule Post</motion.button>
+                             </div>
+                          </div>
+                       </div>
+                    </div>
+                  )}
+
+                  {activeTab === "Broadcast" && (
+                    <div className="flex flex-col h-full border border-[#e4e4e7] rounded-xl p-6 bg-[#fafafa]">
+                      <div className="text-sm font-semibold mb-6 text-[#18181b]">Active Campaigns</div>
+                      <div className="space-y-3">
+                        {[1, 2, 3].map((i) => (
+                          <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }} className="p-4 bg-white border border-[#e4e4e7] rounded-lg flex justify-between items-center shadow-sm hover:shadow transition-shadow cursor-pointer">
+                            <div className="flex items-center gap-4">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white ${i===1?'bg-blue-500':i===2?'bg-purple-500':'bg-orange-500'}`}>
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                              </div>
+                              <div>
+                                <div className="text-sm font-medium text-[#18181b]">Newsletter Q{i}</div>
+                                <div className="text-xs text-gray-500">Sent to 4,2{i}0 subscribers</div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-semibold text-green-600">{60 + i * 5}% Open</div>
+                              <div className="text-xs text-gray-400">2h ago</div>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {activeTab === "Report" && (
+                    <div className="grid grid-cols-2 gap-4 h-[calc(100%-2rem)]">
+                      <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.1 }} className="border border-[#e4e4e7] rounded-xl p-5 bg-white shadow-sm flex flex-col justify-between hover:shadow transition-shadow">
+                        <div className="text-xs font-medium text-gray-500">Total Revenue</div>
+                        <div className="text-3xl font-bold text-[#18181b] mt-2">$124,500</div>
+                        <div className="mt-4 h-24 bg-gradient-to-t from-green-50 to-transparent flex items-end rounded-lg">
+                          <div className="w-full flex justify-between items-end h-full gap-1 px-2">
+                            {[40, 60, 45, 80, 65, 90, 100].map((h, i) => <motion.div initial={{ height: 0 }} animate={{ height: `${h}%` }} transition={{ delay: 0.2 + (i*0.05), type: "spring" }} key={i} className="w-full bg-green-400 rounded-t-sm"></motion.div>)}
+                          </div>
+                        </div>
+                      </motion.div>
+                      <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2 }} className="border border-[#e4e4e7] rounded-xl p-5 bg-[#fafafa] shadow-sm flex flex-col hover:shadow transition-shadow">
+                        <div className="text-xs font-medium text-gray-500">Conversion Rate</div>
+                        <div className="text-3xl font-bold text-[#18181b] mt-2">4.2%</div>
+                        <div className="flex-1 mt-4 border border-dashed border-gray-300 rounded-lg flex items-center justify-center text-xs text-gray-400 bg-white shadow-sm">
+                          Funnel Analysis Dashboard
+                        </div>
+                      </motion.div>
+                    </div>
+                  )}
+                  
+                  {activeTab === "AI Suite" && (
+                    <div className="flex flex-col h-full border border-[#e4e4e7] rounded-xl overflow-hidden bg-white shadow-sm relative">
+                       <div className="p-4 border-b border-[#e4e4e7] bg-[#fafafa] flex items-center gap-2">
+                         <span className="text-lg">✨</span>
+                         <span className="font-semibold text-sm text-[#18181b]">GreyCats Intelligence</span>
+                       </div>
+                       <div className="flex-1 p-6 flex flex-col justify-end space-y-4">
+                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="self-end max-w-[80%] bg-[#18181b] text-white px-4 py-2.5 rounded-2xl rounded-tr-sm text-sm shadow-sm">
+                           How do I win my deal with Greenleaf?
+                         </motion.div>
+                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="self-start max-w-[80%] bg-[#f4f4f5] text-[#18181b] px-4 py-3 rounded-2xl rounded-tl-sm text-sm border border-[#e4e4e7] shadow-sm">
+                           <div className="flex gap-2 items-center mb-2">
+                             <div className="w-4 h-4 rounded bg-purple-100 flex items-center justify-center text-[10px]">✨</div>
+                             <span className="font-semibold text-xs">Analysis</span>
+                           </div>
+                           Greenleaf values fast integration. Focus on our 1-click connectors. Here's a custom slide deck you can use:
+                           <motion.div whileHover={{ scale: 1.02 }} className="mt-3 p-2 bg-white rounded border border-[#e4e4e7] flex items-center gap-2 cursor-pointer hover:bg-gray-50 transition-colors shadow-sm">
+                             <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded flex items-center justify-center font-bold text-[10px]">PPT</div>
+                             <div className="flex-1"><div className="text-xs font-semibold">Greenleaf_Pitch.pptx</div><div className="text-[10px] text-gray-500">Generated just now</div></div>
+                           </motion.div>
+                         </motion.div>
+                       </div>
+                    </div>
+                  )}
+                  
+                </motion.div>
+              </AnimatePresence>
+
+            </div>
+            {/* Close Flex Container */}
+          </div>
+            
+          {/* Bottom Fade Overlay to merge with background */}
+          <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none rounded-b-xl" />
         </div>
+      </div>
       </section>
 
       {/* What We Do - Verified & Static Content */}
@@ -503,10 +755,10 @@ const LandingPage = () => {
               </div>
 
               <div className="flex items-center gap-8">
-                <Link to="/pricing">
-                  <Button className="px-10 py-5 text-sm font-bold bg-[#111] hover:bg-[#333] text-white">
-                    Explore Platform
-                  </Button>
+                <Link to="/contact">
+                  <button className="px-8 py-4 bg-white border border-[#e4e4e7] text-[#18181b] rounded-full font-medium hover:bg-gray-50 transition-colors shadow-sm">
+                    Contact us
+                  </button>
                 </Link>
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1">
@@ -555,128 +807,327 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Redesigned Action Hub - Premium 2-Column Layout */}
-      <section id="action-hub" className="py-40 px-6 relative z-10 overflow-hidden border-y border-[#f0f0f0]">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-32 reveal-on-scroll">
-            <h2 className="text-5xl md:text-7xl font-medium tracking-tighter mb-8 text-[#111] leading-[1.05]">
-              Everything you need <br /> to deliver results
-            </h2>
-            <p className="text-xl text-[#666] font-light max-w-3xl mx-auto leading-relaxed">
-              Don’t just track. Take action on your insights. GreyCats connects your data directly to execution.
-            </p>
+      {/* Integrations Bento Cards Slider */}
+      <section id="integrations" className="py-24 relative z-10 overflow-hidden border-y border-[#f0f0f0]">
+        <style>{`
+          #integrations-slider::-webkit-scrollbar { display: none; }
+        `}</style>
+        <div className="max-w-[1200px] mx-auto px-6">
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 reveal-on-scroll gap-6">
+            <div className="max-w-xl">
+              <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[#111] mb-2">
+                There's an integration for that.
+              </h2>
+              <p className="text-[#666] text-lg font-medium">
+                Use your favorite tools without even opening them.
+              </p>
+            </div>
+            
+            {/* Category Tabs & Arrows */}
+            <div className="flex flex-wrap gap-4 items-center">
+              <div className="hidden md:flex flex-wrap gap-1 items-center bg-[#f5f5f5] p-1.5 rounded-full border border-[#e5e5e5]">
+                {["Analytics", "Scheduler", "Broadcast"].map((cat, i) => (
+                  <button 
+                    key={i} 
+                    onClick={() => setActiveIntegrationCategory(cat)}
+                    className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${activeIntegrationCategory === cat ? "bg-white text-[#111] shadow-sm border border-[#e5e5e5]" : "text-[#666] hover:text-[#111]"}`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => document.getElementById('integrations-slider')?.scrollBy({ left: -350, behavior: 'smooth' })}
+                  className="w-10 h-10 rounded-full border border-[#e5e5e5] bg-white flex items-center justify-center text-[#111] hover:bg-[#f5f5f5] transition-colors shadow-sm hover:scale-105"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                </button>
+                <button 
+                  onClick={() => document.getElementById('integrations-slider')?.scrollBy({ left: 350, behavior: 'smooth' })}
+                  className="w-10 h-10 rounded-full border border-[#e5e5e5] bg-white flex items-center justify-center text-[#111] hover:bg-[#f5f5f5] transition-colors shadow-sm hover:scale-105"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+              </div>
+            </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-10">
-            {/* Card 1: Scheduled Report Delivery */}
-            <div className="reveal-on-scroll">
-              <Link to={authed ? "/clients" : "/pricing"} className="group rounded-[2.5rem] border border-[#f0f0f0] bg-white p-4 pb-12 transition-all duration-700 hover:shadow-2xl hover:shadow-zinc-200/50 flex flex-col h-full block cursor-pointer">
-                <div className="rounded-[2rem] bg-[#f8faff] h-[400px] flex items-center justify-center p-12 relative overflow-hidden mb-12">
-                   {/* UI Mockup: Scheduled Reports */}
-                   <div className="w-full max-w-[340px] bg-white rounded-2xl shadow-2xl border border-blue-100 p-6 group-hover:-translate-y-4 transition-transform duration-700">
-                      <div className="flex items-center gap-4 mb-6">
-                         <div className="w-12 h-12 rounded-xl bg-blue-500 flex items-center justify-center">
-                            <Send className="text-white w-5 h-5" />
-                         </div>
-                         <div>
-                            <div className="text-sm font-bold text-[#111]">Scheduled Reports</div>
-                            <div className="text-[10px] text-[#999] uppercase font-bold tracking-widest">3 Active</div>
-                         </div>
+          <style>{`
+            @keyframes slideInRight {
+              from { opacity: 0; transform: translateX(50px); }
+              to { opacity: 1; transform: translateX(0); }
+            }
+            .animate-slide-in-right {
+              animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+            }
+          `}</style>
+          <div id="integrations-slider" className="flex overflow-x-auto gap-6 reveal-on-scroll pb-12 pt-4 -mx-6 px-6 sm:mx-0 sm:px-0 snap-x snap-proximity scroll-smooth transition-all duration-500" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', maskImage: 'linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%)' }}>
+            {[
+              {
+                name: "Google Analytics",
+                category: "Analytics",
+                color: "#F9AB00",
+                desc: "Track website traffic and user behavior effortlessly in one unified dashboard.",
+                graphic: (color: string) => (
+                  <div className="w-full h-28 flex items-end justify-between px-4 gap-2">
+                    {[30, 50, 40, 70, 55, 90].map((h, i) => (
+                      <div key={i} className="flex-1 rounded-t-sm transition-all duration-500 group-hover:scale-y-110 origin-bottom" style={{ height: `${h}%`, backgroundColor: color, opacity: 0.2 + (i * 0.15) }}></div>
+                    ))}
+                  </div>
+                )
+              },
+              {
+                name: "Search Console",
+                category: "Analytics",
+                color: "#4285F4",
+                desc: "Monitor and optimize your site's presence in Google Search results directly.",
+                graphic: (color: string) => (
+                   <div className="w-full relative h-32 rounded-xl border overflow-hidden flex items-center px-4" style={{ borderColor: `${color}20`, backgroundColor: `${color}05` }}>
+                     <div className="w-full opacity-70 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-2 mb-3">
+                           <div className="w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold text-white shadow-sm" style={{ backgroundColor: color }}>G</div>
+                           <div className="w-24 h-2 rounded-full" style={{ backgroundColor: `${color}20` }}></div>
+                        </div>
+                        <div className="pl-7 space-y-2">
+                           <div className="w-full h-1.5 rounded-full" style={{ backgroundColor: `${color}40` }}></div>
+                           <div className="w-2/3 h-1.5 rounded-full" style={{ backgroundColor: `${color}20` }}></div>
+                        </div>
+                     </div>
+                   </div>
+                )
+              },
+              {
+                name: "Google Ads",
+                category: "Analytics",
+                color: "#FBBC05",
+                desc: "Track ad spend, conversions, and keyword performance in real time.",
+                graphic: (color: string) => (
+                  <div className="relative w-full h-24 flex items-center justify-center">
+                     <div className="absolute inset-0 flex flex-col justify-end px-8 pb-4 gap-2">
+                        {[40, 70, 100].map((w, i) => (
+                           <div key={i} className="h-4 rounded-r-md group-hover:scale-x-110 origin-left transition-transform duration-500" style={{ width: `${w}%`, backgroundColor: color, opacity: 0.4 + (i * 0.2) }}></div>
+                        ))}
+                     </div>
+                  </div>
+                )
+              },
+              {
+                name: "YouTube",
+                category: "Analytics",
+                color: "#EA4335",
+                desc: "Analyze video views, subscriber growth, and audience retention.",
+                graphic: (color: string) => (
+                   <div className="relative w-32 h-24 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform duration-500 border-2" style={{ borderColor: `${color}30`, backgroundColor: `${color}05` }}>
+                      <div className="w-12 h-8 rounded-lg flex items-center justify-center transition-all duration-300 group-hover:shadow-[0_0_20px_currentColor]" style={{ backgroundColor: color, color: color }}>
+                         <div className="w-0 h-0 border-y-4 border-y-transparent border-l-[6px] border-l-white ml-1"></div>
                       </div>
-                      <div className="space-y-3">
-                         <div className="flex items-center justify-between p-3 rounded-xl bg-blue-50/50 border border-blue-100">
-                            <div>
-                               <div className="text-xs font-bold text-[#111]">Acme Global · Monthly</div>
-                               <div className="text-[10px] text-[#999] mt-0.5">Next: 1st of every month</div>
-                            </div>
-                            <div className="text-[9px] font-bold text-blue-600 uppercase px-2 py-1 rounded-full bg-white">PDF</div>
-                         </div>
-                         <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50/80 border border-gray-100">
-                            <div>
-                               <div className="text-xs font-bold text-[#111]">Lumen Co · Weekly</div>
-                               <div className="text-[10px] text-[#999] mt-0.5">Every Monday · 9:00 AM</div>
-                            </div>
-                            <div className="text-[9px] font-bold text-zinc-600 uppercase px-2 py-1 rounded-full bg-white">PDF</div>
-                         </div>
-                         <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50/80 border border-gray-100">
-                            <div>
-                               <div className="text-xs font-bold text-[#111]">Nova Studio · Weekly</div>
-                               <div className="text-[10px] text-[#999] mt-0.5">Every Friday · 5:00 PM</div>
-                            </div>
-                            <div className="text-[9px] font-bold text-zinc-600 uppercase px-2 py-1 rounded-full bg-white">PDF</div>
-                         </div>
+                      <div className="absolute bottom-2 left-2 right-2 h-1 rounded-full overflow-hidden" style={{ backgroundColor: `${color}20` }}>
+                         <div className="h-full w-1/3 rounded-full" style={{ backgroundColor: color }}></div>
                       </div>
                    </div>
-                </div>
-
-                <div className="px-6 flex-1">
-                   <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-3xl font-medium tracking-tight text-[#111]">Reports delivered on autopilot</h3>
-                      <div className="w-14 h-14 rounded-full bg-[#111] flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-500">
-                         <ArrowUpRight size={28} />
-                      </div>
+                )
+              },
+              {
+                name: "Meta Ads",
+                category: "Analytics",
+                color: "#0668E1",
+                desc: "Monitor ad spend, ROAS, and campaign performance across Meta.",
+                graphic: (color: string) => (
+                  <div className="w-full space-y-3 px-6">
+                    {[80, 60, 40].map((w, i) => (
+                       <div key={i} className="h-3 w-full rounded-full overflow-hidden" style={{ backgroundColor: `${color}15` }}>
+                         <div className="h-full group-hover:w-full transition-all duration-1000 ease-in-out rounded-full" style={{ width: `${w}%`, backgroundColor: color }}></div>
+                       </div>
+                    ))}
+                  </div>
+                )
+              },
+              {
+                name: "Facebook",
+                category: "Scheduler",
+                color: "#1877F2",
+                desc: "Monitor page engagement, post reach, and audience demographics.",
+                graphic: (color: string) => (
+                   <div className="w-full h-full flex items-center justify-center">
+                     <div className="w-24 h-24 rounded-xl flex flex-col gap-3 p-3 group-hover:-translate-y-2 transition-transform duration-500" style={{ backgroundColor: `${color}10`, border: `1px solid ${color}30` }}>
+                        <div className="flex items-center gap-2">
+                           <div className="w-6 h-6 rounded-full" style={{ backgroundColor: color }}></div>
+                           <div className="space-y-1 flex-1">
+                              <div className="h-2 w-full rounded-full" style={{ backgroundColor: `${color}40` }}></div>
+                              <div className="h-2 w-2/3 rounded-full" style={{ backgroundColor: `${color}20` }}></div>
+                           </div>
+                        </div>
+                        <div className="flex-1 rounded-md" style={{ backgroundColor: `${color}20` }}></div>
+                     </div>
                    </div>
-                   <p className="text-xl text-[#666] font-light leading-relaxed">
-                      Generate branded PDF reports on a schedule and deliver them straight to your clients — daily, weekly, or monthly.
-                   </p>
-                </div>
-              </Link>
-            </div>
-
-            {/* Card 2: Client Issue Detection */}
-            <div className="reveal-on-scroll" style={{ transitionDelay: '0.1s' }}>
-              <Link to={authed ? "/clients" : "/pricing"} className="group rounded-[2.5rem] border border-[#f0f0f0] bg-white p-4 pb-12 transition-all duration-700 hover:shadow-2xl hover:shadow-zinc-200/50 flex flex-col h-full block cursor-pointer">
-                <div className="rounded-[2rem] bg-[#fffcf8] h-[400px] flex items-center justify-center p-12 relative overflow-hidden mb-12">
-                   {/* UI Mockup: Dashboard View */}
-                   <div className="w-full h-full bg-white rounded-2xl shadow-2xl border border-amber-100 overflow-hidden flex flex-col group-hover:-translate-y-4 transition-transform duration-700">
-                      <div className="bg-gray-50 border-b border-gray-100 px-4 py-3 flex items-center justify-between">
-                         <div className="flex gap-1.5">
-                            <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-                            <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                            <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
-                         </div>
-                         <div className="text-[9px] font-bold text-[#111] uppercase tracking-widest bg-white px-3 py-1 rounded-full border border-gray-100">Overview</div>
-                      </div>
-                      <div className="p-6 flex-1 flex flex-col gap-6">
-                         <div className="flex gap-4">
-                            <div className="flex-1 p-4 rounded-xl bg-amber-50 border border-amber-100">
-                               <div className="text-[9px] font-bold text-amber-700 uppercase mb-2">Alert</div>
-                               <div className="text-sm font-bold text-[#111]">Threshold Crossed</div>
-                            </div>
-                            <div className="flex-1 p-4 rounded-xl bg-gray-50 border border-gray-100">
-                               <div className="text-[9px] font-bold text-gray-500 uppercase mb-2">Metrics</div>
-                               <div className="text-sm font-bold text-[#111]">ROAS +12%</div>
-                            </div>
-                         </div>
-                         <div className="flex-1 border-t border-gray-50 pt-4">
-                            <div className="grid grid-cols-5 gap-2 h-full">
-                               {[...Array(5)].map((_, i) => (
-                                 <div key={i} className="bg-gray-50 rounded-lg flex items-end p-2">
-                                    <div className="w-full bg-blue-500/20 rounded-t-sm" style={{ height: `${20 + (i * 15)}%` }} />
-                                 </div>
-                               ))}
-                            </div>
-                         </div>
-                      </div>
+                )
+              },
+              {
+                name: "Instagram",
+                category: "Scheduler",
+                color: "#E4405F",
+                desc: "Schedule posts, track engagement, and analyze your audience growth seamlessly.",
+                graphic: (color: string) => (
+                  <div className="w-32 h-32 rounded-full border-[2px] border-dashed group-hover:rotate-[360deg] transition-transform duration-[4s] ease-linear flex items-center justify-center relative" style={{ borderColor: `${color}40` }}>
+                     <div className="absolute inset-4 rounded-full border flex items-center justify-center" style={{ borderColor: `${color}30` }}>
+                        <div className="w-3 h-3 rounded-full shadow-lg" style={{ backgroundColor: color, boxShadow: `0 0 15px ${color}` }}></div>
+                     </div>
+                     <div className="absolute top-0 right-1/2 w-2 h-2 rounded-full shadow-lg" style={{ backgroundColor: color, boxShadow: `0 0 10px ${color}` }}></div>
+                  </div>
+                )
+              },
+              {
+                name: "WooCommerce",
+                category: "Analytics",
+                color: "#7F54B3",
+                desc: "Analyze store revenue, top products, and conversion funnels.",
+                graphic: (color: string) => (
+                  <div className="grid grid-cols-2 gap-2 w-24 h-24 p-2 rotate-45 group-hover:rotate-0 transition-transform duration-700 ease-in-out">
+                     {[1, 2, 3, 4].map(i => (
+                       <div key={i} className="rounded-lg shadow-sm" style={{ backgroundColor: i % 3 === 0 ? color : `${color}30` }}></div>
+                     ))}
+                  </div>
+                )
+              },
+              {
+                name: "LinkedIn",
+                category: "Scheduler",
+                color: "#0A66C2",
+                desc: "Track professional network growth and B2B engagement metrics.",
+                graphic: (color: string) => (
+                   <div className="relative w-32 h-24 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                     <div className="absolute top-2 left-4 w-3 h-3 rounded-full z-10" style={{ backgroundColor: color }}></div>
+                     <div className="absolute bottom-4 left-10 w-4 h-4 rounded-full z-10" style={{ backgroundColor: `${color}90` }}></div>
+                     <div className="absolute top-8 right-6 w-5 h-5 rounded-full z-10" style={{ backgroundColor: `${color}80` }}></div>
+                     <div className="absolute bottom-6 right-12 w-3 h-3 rounded-full z-10" style={{ backgroundColor: color }}></div>
+                     <svg className="absolute inset-0 w-full h-full" style={{ stroke: `${color}40`, strokeWidth: 2 }}>
+                       <line x1="22" y1="14" x2="46" y2="76" />
+                       <line x1="46" y1="76" x2="104" y2="42" />
+                       <line x1="104" y1="42" x2="84" y2="72" />
+                       <line x1="46" y1="76" x2="84" y2="72" />
+                     </svg>
                    </div>
-                </div>
-
-                <div className="px-6 flex-1">
-                   <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-3xl font-medium tracking-tight text-[#111]">Spot client issues—before they do</h3>
-                      <div className="w-14 h-14 rounded-full bg-[#111] flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-500">
-                         <ArrowUpRight size={28} />
-                      </div>
+                )
+              },
+              {
+                name: "WordPress",
+                category: "Scheduler",
+                color: "#21759b",
+                desc: "Publish posts, track site metrics, and manage your blog presence.",
+                graphic: (color: string) => (
+                   <div className="relative w-28 h-28 rounded-full border-4 flex items-center justify-center group-hover:rotate-12 transition-transform duration-500" style={{ borderColor: color, backgroundColor: `${color}10` }}>
+                      <div className="absolute inset-2 rounded-full border-2 border-dashed" style={{ borderColor: `${color}50` }}></div>
+                      <div className="font-serif text-5xl font-bold italic" style={{ color: color }}>W</div>
                    </div>
-                   <p className="text-xl text-[#666] font-light leading-relaxed">
-                      Catch performance dips instantly with threshold-based alerts and automated KPI triggers across your entire portfolio.
-                   </p>
+                )
+              },
+              {
+                name: "Telegram",
+                category: "Broadcast",
+                color: "#229ED9",
+                desc: "Broadcast reports and alerts directly to your team or clients instantly.",
+                graphic: (color: string) => (
+                   <div className="relative w-28 h-28 flex items-center justify-center">
+                     <div className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ backgroundColor: color, animationDuration: '3s' }}></div>
+                     <div className="absolute inset-4 rounded-full animate-ping opacity-40" style={{ backgroundColor: color, animationDuration: '3s', animationDelay: '1s' }}></div>
+                     <div className="absolute inset-8 rounded-full flex items-center justify-center backdrop-blur-sm z-10" style={{ backgroundColor: `${color}10` }}>
+                        <Send className="w-6 h-6 group-hover:scale-110 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform duration-300" style={{ color: color }} />
+                     </div>
+                   </div>
+                )
+              },
+              {
+                name: "WhatsApp",
+                category: "Broadcast",
+                color: "#25D366",
+                desc: "Send personalized WhatsApp campaigns and automated alerts to customers.",
+                graphic: (color: string) => (
+                   <div className="relative w-28 h-28 flex items-center justify-center">
+                     <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-green-400 to-green-600 opacity-20 animate-pulse"></div>
+                     <div className="absolute inset-2 rounded-full border border-green-500 opacity-40 animate-ping" style={{ animationDuration: '2s' }}></div>
+                     <div className="absolute inset-6 rounded-full flex items-center justify-center backdrop-blur-sm z-10" style={{ backgroundColor: `${color}15` }}>
+                        <svg className="w-8 h-8 text-[#25D366] group-hover:scale-110 transition-transform duration-300" viewBox="0 0 24 24" fill="currentColor">
+                           <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                        </svg>
+                     </div>
+                   </div>
+                )
+              },
+              {
+                name: "SMS",
+                category: "Broadcast",
+                color: "#8A2BE2",
+                desc: "Deliver high-open-rate text messages directly to mobile devices.",
+                graphic: (color: string) => (
+                   <div className="relative w-28 h-28 flex items-center justify-center group-hover:-translate-y-2 transition-transform duration-500">
+                     <div className="w-16 h-12 rounded-2xl rounded-bl-sm flex items-center justify-center shadow-lg relative z-10" style={{ backgroundColor: color }}>
+                        <div className="flex gap-1.5">
+                           <div className="w-1.5 h-1.5 rounded-full bg-white animate-bounce"></div>
+                           <div className="w-1.5 h-1.5 rounded-full bg-white animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                           <div className="w-1.5 h-1.5 rounded-full bg-white animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        </div>
+                     </div>
+                     <div className="absolute top-4 right-4 w-12 h-8 rounded-xl rounded-br-sm opacity-40" style={{ backgroundColor: color }}></div>
+                   </div>
+                )
+              },
+              {
+                name: "Email",
+                category: "Broadcast",
+                color: "#D44638",
+                desc: "Design and send targeted email marketing campaigns effortlessly.",
+                graphic: (color: string) => (
+                   <div className="relative w-28 h-20 rounded-lg flex items-center justify-center overflow-hidden border-2 group-hover:scale-105 transition-transform duration-500" style={{ borderColor: `${color}40`, backgroundColor: `${color}05` }}>
+                      <div className="absolute top-0 left-0 right-0 h-10 border-b-2 flex justify-center" style={{ borderColor: `${color}40` }}>
+                         <div className="w-4 h-4 rotate-45 border-b-2 border-r-2 translate-y-8" style={{ borderColor: `${color}40`, backgroundColor: `${color}05` }}></div>
+                      </div>
+                      <div className="absolute top-4 w-16 h-2 rounded-full opacity-50" style={{ backgroundColor: color }}></div>
+                      <div className="absolute bottom-4 left-4 w-12 h-1.5 rounded-full opacity-30" style={{ backgroundColor: color }}></div>
+                      <div className="absolute bottom-4 right-4 w-8 h-1.5 rounded-full opacity-30" style={{ backgroundColor: color }}></div>
+                   </div>
+                )
+              }
+            ].filter(card => card.category === activeIntegrationCategory).map((card, idx) => (
+              <div 
+                key={activeIntegrationCategory + '-' + card.name} 
+                className="flex-shrink-0 w-[300px] md:w-[320px] snap-center group relative h-[420px] rounded-[2rem] overflow-hidden p-6 transition-all cursor-pointer flex flex-col shadow-sm hover:-translate-y-1 hover:shadow-xl border animate-slide-in-right"
+                style={{ backgroundColor: 'white', borderColor: `${card.color}20`, animationDelay: `${idx * 0.05}s` }}
+              >
+                {/* Soft Pastel Overlay */}
+                <div className="absolute inset-0 pointer-events-none transition-opacity duration-500 group-hover:opacity-50" style={{ background: `linear-gradient(135deg, transparent 30%, ${card.color}15)` }}></div>
+                
+                <div className="flex items-center justify-between mb-6 relative z-10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-[14px] bg-white border shadow-sm flex items-center justify-center p-2.5 group-hover:scale-110 transition-transform duration-300 backdrop-blur-md" style={{ borderColor: `${card.color}30` }}>
+                      {integrations.find(i => i.name === card.name)?.icon()}
+                    </div>
+                    <span className="text-[#111] font-bold text-[18px] tracking-wide">{card.name}</span>
+                  </div>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[#666] group-hover:bg-[#111] group-hover:border-[#111] group-hover:text-white group-hover:-rotate-45 transition-all duration-300 shadow-sm border bg-white" style={{ borderColor: `${card.color}30` }}>
+                    <ArrowRight size={14} />
+                  </div>
                 </div>
-              </Link>
-            </div>
+                
+                <p className="text-[#666] text-[15px] leading-relaxed mb-8 relative z-10 font-medium">
+                  {card.desc}
+                </p>
+                
+                <div className="flex-1 relative z-10 flex items-center justify-center w-full">
+                   {card.graphic(card.color)}
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div className="mt-4 text-left px-4">
+            <Link to="/integrations" className="text-[13px] font-bold text-[#666] hover:text-[#111] transition-colors inline-flex items-center gap-2 group tracking-wide">
+              Browse thousands more <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </Link>
           </div>
         </div>
       </section>
+
 
       <section className="py-40 px-6 relative z-10 border-t border-[#f0f0f0]">
         <div className="max-w-7xl mx-auto">

@@ -11,7 +11,9 @@ import {
     Menu,
     Send,
     Bell,
-    X
+    Settings,
+    X,
+    Mail
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import GreycatsBlackLogo from "@/assets/images/greycats-black-logo.png";
@@ -94,6 +96,12 @@ export default function AdminLayout() {
             roles: ["SUPER_ADMIN"],
         },
         {
+            title: "Email Stats",
+            href: "/admin/monitoring/email-stats",
+            icon: Mail,
+            roles: ["SUPER_ADMIN"],
+        },
+        {
             title: "Integrations",
             href: "/admin/monitoring/integrations",
             icon: ShieldAlert,
@@ -110,6 +118,12 @@ export default function AdminLayout() {
             href: "/admin/notifications",
             icon: Bell,
             roles: ["ADMIN", "SUPER_ADMIN"],
+        },
+        {
+            title: "System Config",
+            href: "/admin/system",
+            icon: Settings,
+            roles: ["SUPER_ADMIN"],
         },
     ];
 

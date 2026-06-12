@@ -116,6 +116,7 @@ const SystemStatsPage = lazy(() => import("./features/admin/pages/SystemStatsPag
 const ActivityTimelinePage = lazy(() => import("./features/admin/pages/ActivityTimelinePage"));
 const IntegrationHealthPage = lazy(() => import("./features/admin/pages/IntegrationHealthPage"));
 const SystemConfigPage = lazy(() => import("./features/admin/pages/SystemConfigPage"));
+const EmailStatsPage = lazy(() => import("./features/admin/pages/EmailStatsPage"));
 const AdminBroadcastPage = lazy(() => import("./features/admin/pages/AdminBroadcastPage"));
 const AdminNotificationsPage = lazy(() => import("./features/admin/pages/AdminNotificationsPage"));
 const RoleGuard = lazy(() => import("./components/RoleGuard"));
@@ -255,6 +256,7 @@ function App() {
                 <Route path="subscriptions/users" element={<UserSubscriptionsPage />} />
                 <Route path="monitoring/stats" element={<SystemStatsPage />} />
                 <Route path="monitoring/activity" element={<ActivityTimelinePage />} />
+                <Route path="monitoring/email-stats" element={<EmailStatsPage />} />
                 <Route path="monitoring/integrations" element={<IntegrationHealthPage />} />
                 <Route path="broadcasts" element={<AdminBroadcastPage />} />
                 <Route path="notifications" element={<AdminNotificationsPage />} />

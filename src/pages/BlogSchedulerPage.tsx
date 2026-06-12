@@ -469,7 +469,7 @@ export default function BlogSchedulerPage() {
 
   const isClearingClient = React.useRef(false);
 
-  const setCurrentClient = (client: ClientWithIntegrations | null) => {
+  const setCurrentClient = React.useCallback((client: ClientWithIntegrations | null) => {
     if (!client) {
       isClearingClient.current = true;
     } else {
@@ -485,10 +485,10 @@ export default function BlogSchedulerPage() {
         navigate(`/blog/scheduler/${client.id}`);
       }
     } else {
-      localStorage.removeItem('lastClientId');
+      localStorage.removeItem('lastBlogClientId');
       navigate('/blog/scheduler');
     }
-  };
+  }, [_setCurrentClient, resetDraft, urlClientId, navigate]);
 
   // Sync URL clientId with state on mount or change
   useEffect(() => {
@@ -512,7 +512,7 @@ export default function BlogSchedulerPage() {
     if (currentStep === 'select-client') {
       setCurrentStep('workspace');
     }
-  }, [urlClientId, allClients.length, currentClient?.id, currentStep, navigate]);
+  }, [urlClientId, allClients, currentClient, currentStep, navigate, _setCurrentClient, setCurrentStep]);
 
   const [subStep, setSubStep] = useState<'main' | 'create' | 'existing'>('main');
 
@@ -528,12 +528,33 @@ export default function BlogSchedulerPage() {
         setCurrentClient(liveClient as ClientWithIntegrations);
       }
     }
-  }, [liveClient]);
+  }, [liveClient, currentClient, setCurrentClient]);
 
   const activeClient = (liveClient || currentClient) as ClientWithIntegrations | null;
 
   const renderContent = () => {
-    if (currentStep === 'select-client') {
+    // 1. Show loading spinner if clients are loading
+    if (isLoadingClients) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[50vh] py-12">
+          <Loader2 className="w-8 h-8 text-zinc-300 animate-spin mb-3" />
+          <p className="text-zinc-400 text-xs font-semibold uppercase tracking-wider">Loading workspace...</p>
+        </div>
+      );
+    }
+
+    // 2. If a client ID is in URL but we don't have activeClient yet, we're loading the client data
+    if (urlClientId && !activeClient) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[50vh] py-12">
+          <Loader2 className="w-8 h-8 text-zinc-300 animate-spin mb-3" />
+          <p className="text-zinc-400 text-xs font-semibold uppercase tracking-wider">Loading client workspace...</p>
+        </div>
+      );
+    }
+
+    // 3. Render select-client screens
+    if (currentStep === 'select-client' || !urlClientId) {
       if (subStep === 'create') {
         return (
           <StepCreateClient
@@ -585,6 +606,7 @@ export default function BlogSchedulerPage() {
       );
     }
 
+    // 4. Workspace Step
     if (currentStep === 'workspace' && activeClient) {
       return (
         <StepWorkspace
@@ -597,8 +619,25 @@ export default function BlogSchedulerPage() {
       );
     }
 
-    setCurrentStep('select-client');
-    return null;
+    // Safe fallback
+    return (
+      <StepSelectClient
+        clients={allClients}
+        isLoading={isLoadingClients}
+        isError={false}
+        onSelect={(client) => {
+          setCurrentClient(client);
+          setCurrentStep('workspace');
+        }}
+        onAddExisting={() => setSubStep('existing')}
+        onAddNew={() => setSubStep('create')}
+        onDelete={(client) => {
+          if (window.confirm(`Delete "${client.name}" and all their data?`)) {
+            deleteClient.mutate(client.id);
+          }
+        }}
+      />
+    );
   };
 
   return (

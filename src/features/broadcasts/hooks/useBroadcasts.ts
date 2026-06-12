@@ -119,14 +119,24 @@ export const useBroadcastStatus = (id: number, enabled: boolean) => {
 export const useTemplates = () => {
   return useQuery({
     queryKey: ['broadcast-templates'],
-    queryFn: listTemplates
+    queryFn: listTemplates,
+    refetchInterval: (query) => {
+      // Poll every 12s only while any template is PENDING (e.g. awaiting Meta approval)
+      const hasPending = query?.state?.data?.some(t => t.status === 'PENDING');
+      return hasPending ? 12000 : false;
+    },
   });
 };
 
 export const useAdminTemplates = () => {
   return useQuery({
     queryKey: ['broadcast-admin-templates'],
-    queryFn: listAdminTemplates
+    queryFn: listAdminTemplates,
+    refetchInterval: (query) => {
+      // Poll every 12s only while any template is PENDING
+      const hasPending = query?.state?.data?.some(t => t.status === 'PENDING');
+      return hasPending ? 12000 : false;
+    },
   });
 };
 

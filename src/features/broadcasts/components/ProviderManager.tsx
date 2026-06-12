@@ -378,45 +378,105 @@ export function ProviderManager({ admin = false, clientId, fixedChannel }: Provi
     }
     if (provider === 'TELEGRAM') {
       return (
-        <>
+        <div className="space-y-8 col-span-full">
+          <div className="bg-sky-50/30 dark:bg-sky-500/5 border border-sky-100/50 dark:border-sky-500/10 rounded-2xl overflow-hidden transition-all duration-300">
+            <details className="group">
+              <summary className="flex items-center justify-between px-6 py-4 cursor-pointer list-none select-none">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-sky-600/10 flex items-center justify-center text-sky-600">
+                    <Info className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest leading-none mb-1">Configuration Helper</p>
+                    <h4 className="text-sm font-bold text-zinc-900 dark:text-white">Telegram Bot Setup Guide</h4>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest group-open:hidden">Show Guide</span>
+                  <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest hidden group-open:block">Hide Guide</span>
+                  <div className="w-8 h-8 rounded-full hover:bg-white/50 flex items-center justify-center transition-all">
+                    <ChevronDown className="w-4 h-4 text-zinc-400 group-open:rotate-180 transition-transform duration-300" />
+                  </div>
+                </div>
+              </summary>
+              
+              <div className="px-6 pb-6 space-y-6 border-t border-sky-100/50 dark:border-sky-500/10 pt-6 animate-in slide-in-from-top-2 duration-300">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="p-5 bg-white/50 dark:bg-black/20 rounded-2xl border border-sky-100/50 flex flex-col h-full">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center text-sky-600">
+                        <SiTelegram className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest leading-none mb-1">Step 1</p>
+                        <h4 className="text-sm font-bold text-zinc-900 dark:text-white">Create a Bot</h4>
+                      </div>
+                    </div>
+                    <ol className="text-[11px] text-zinc-600 dark:text-zinc-400 space-y-2 font-medium list-decimal ml-4">
+                      <li>Message <a href="https://t.me/botfather" target="_blank" rel="noopener noreferrer" className="font-bold text-sky-600 hover:underline">@BotFather</a> on Telegram</li>
+                      <li>Send <span className="font-bold">/newbot</span> and follow the instructions</li>
+                      <li>Copy the generated <span className="text-sky-600 font-bold">Bot Token</span></li>
+                      <li className="text-[10px] text-zinc-400 italic">Paste the token in the form below</li>
+                    </ol>
+                  </div>
+
+                  <div className="p-5 bg-white/50 dark:bg-black/20 rounded-2xl border border-sky-100/50 flex flex-col h-full">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center text-sky-600">
+                        <ShieldCheck className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest leading-none mb-1">Step 2</p>
+                        <h4 className="text-sm font-bold text-zinc-900 dark:text-white">Add to Channel</h4>
+                      </div>
+                    </div>
+                    <ol className="text-[11px] text-zinc-600 dark:text-zinc-400 space-y-2 font-medium list-decimal ml-4">
+                      <li>Go to your Telegram Channel or Group</li>
+                      <li>Go to <span className="font-bold">Settings &gt; Administrators</span></li>
+                      <li>Add your new bot as an Administrator</li>
+                      <li className="text-[10px] text-zinc-400 italic">Get your Channel ID (e.g. @mychannel)</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
+
           {errorDisplay}
-          <div className="space-y-3">
-            <label className={labelClasses}>Bot Token <span className="text-red-500">*</span></label>
-            <input
-              type="password"
-              value={tgBotToken}
-              onChange={e => setTgBotToken(e.target.value)}
-              className={inputClasses}
-              placeholder="123456:ABC-DEF..."
-            />
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-3">
+              <label className={labelClasses}>Bot Token <span className="text-red-500">*</span></label>
+              <input
+                type="password"
+                value={tgBotToken}
+                onChange={e => setTgBotToken(e.target.value)}
+                className={inputClasses}
+                placeholder="123456:ABC-DEF..."
+              />
+            </div>
+            <div className="space-y-3">
+              <label className={labelClasses}>Channel ID / Username <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                value={tgChatId}
+                onChange={e => setTgChatId(e.target.value)}
+                className={inputClasses}
+                placeholder="@mychannel or -100..."
+              />
+            </div>
+            <div className="space-y-3">
+              <label className={labelClasses}>Display Name</label>
+              <input
+                type="text"
+                value={tgDisplayName}
+                onChange={e => setTgDisplayName(e.target.value)}
+                className={inputClasses}
+                placeholder="My Channel (Optional)"
+              />
+            </div>
           </div>
-          <div className="space-y-3">
-            <label className={labelClasses}>Channel ID / Username <span className="text-red-500">*</span></label>
-            <input
-              type="text"
-              value={tgChatId}
-              onChange={e => setTgChatId(e.target.value)}
-              className={inputClasses}
-              placeholder="@mychannel or -100..."
-            />
-          </div>
-          <div className="space-y-3">
-            <label className={labelClasses}>Display Name (optional)</label>
-            <input
-              type="text"
-              value={tgDisplayName}
-              onChange={e => setTgDisplayName(e.target.value)}
-              className={inputClasses}
-              placeholder="My Channel"
-            />
-          </div>
-          <div className="col-span-full flex items-center gap-3 p-4 bg-sky-500/5 rounded-xl border border-sky-500/10">
-            <Info className="w-4 h-4 text-sky-500" />
-            <p className="text-xs font-medium text-sky-900/60 dark:text-sky-300/60">
-              Get your Bot Token from <span className="font-mono font-bold">@BotFather</span> on Telegram. Add the bot as an admin to your channel before connecting.
-            </p>
-          </div>
-        </>
+        </div>
       );
     }
     if (provider === 'SMTP') {
