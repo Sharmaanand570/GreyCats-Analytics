@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, useScroll, useTransform, AnimatePresence, useMotionValueEvent } from 'framer-motion';
+import { Link } from 'react-router-dom';
+import logo from '../assets/images/greycats-black-logo.png';
+import { isAuthenticated, StorageKey } from '@/utils/storage';
 import { 
   Target, TrendingUp, Database, MousePointerClick, 
   PieChart, Send, Lock, ShieldCheck, BarChart2, 
@@ -832,10 +835,12 @@ const FeatureScrollSection = () => {
 
 // --- Main Landing Page Component ---
 
+const tabs = ["Client", "Social media", "Broadcast", "Report", "AI Suite"];
+
 export default function LandingPage() {
+  const isAuth = isAuthenticated(StorageKey.ANALYTICS_TOKEN);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("Client");
-  const tabs = ["Client", "Social media", "Broadcast", "Report", "AI Suite"];
   
   const productSectionRef = useRef(null);
   const { scrollYProgress: productScroll } = useScroll({ target: productSectionRef, offset: ["start 80%", "end 50%"] });
@@ -925,14 +930,18 @@ export default function LandingPage() {
       <nav className="fixed top-0 left-0 right-0 z-50 w-full bg-white/80 backdrop-blur-xl border-b border-[#e5e5e5] transition-all duration-300">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="font-bold text-xl tracking-tight text-[#111]">GreyCats</div>
+            <img src={logo} alt="GreyCats Logo" className="h-8" />
           </div>
           <div className="hidden md:flex items-center gap-8">
-            <a href="#plans" className="text-sm font-semibold text-[#666] hover:text-[#111] transition-colors">Plans</a>
-            <a href="#support" className="text-sm font-semibold text-[#666] hover:text-[#111] transition-colors">Support</a>
+            <Link to="/pricing" className="text-sm font-semibold text-[#666] hover:text-[#111] transition-colors">Plans</Link>
+            <Link to="/contact" className="text-sm font-semibold text-[#666] hover:text-[#111] transition-colors">Support</Link>
             <div className="flex items-center gap-2">
-              <a href="#login" className="px-4 py-2 text-sm font-semibold text-[#111] hover:text-[#4285F4] transition-colors">Sign in</a>
-              <Button className="px-5 py-2.5 text-sm font-semibold bg-[#4285F4] hover:bg-[#3367D6] text-white border-none">Start Free Trial</Button>
+              {!isAuth && <Link to="/auth/login" className="px-4 py-2 text-sm font-semibold text-[#111] hover:text-[#4285F4] transition-colors">Sign in</Link>}
+              <Link to={isAuth ? "/clients" : "/auth/signup"}>
+                <Button className="px-5 py-2.5 text-sm font-semibold bg-[#4285F4] hover:bg-[#3367D6] text-white border-none">
+                  {isAuth ? "Go to Dashboard" : "Start Free Trial"}
+                </Button>
+              </Link>
             </div>
           </div>
           <button className="md:hidden text-[#111]" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
@@ -944,12 +953,16 @@ export default function LandingPage() {
       {/* Mobile Menu */}
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-40 bg-white/95 backdrop-blur-md pt-24 px-6 flex flex-col gap-6">
-          <a href="#plans" onClick={() => setMobileMenuOpen(false)} className="text-2xl font-bold text-[#111]">Plans</a>
-          <a href="#support" onClick={() => setMobileMenuOpen(false)} className="text-2xl font-bold text-[#111]">Support</a>
+          <Link to="/pricing" onClick={() => setMobileMenuOpen(false)} className="text-2xl font-bold text-[#111]">Plans</Link>
+          <Link to="/contact" onClick={() => setMobileMenuOpen(false)} className="text-2xl font-bold text-[#111]">Support</Link>
           <div className="h-px w-full bg-[#e5e5e5] my-4" />
           <div className="flex flex-col gap-4">
-            <Button variant="secondary" onClick={() => setMobileMenuOpen(false)} className="w-full py-4 text-lg">Sign in</Button>
-            <Button onClick={() => setMobileMenuOpen(false)} className="w-full py-4 text-lg bg-[#4285F4] text-white hover:bg-[#3367D6]">Start Free Trial</Button>
+            {!isAuth && <Link to="/auth/login" onClick={() => setMobileMenuOpen(false)}><Button variant="secondary" className="w-full py-4 text-lg">Sign in</Button></Link>}
+            <Link to={isAuth ? "/clients" : "/auth/signup"} onClick={() => setMobileMenuOpen(false)}>
+              <Button className="w-full py-4 text-lg bg-[#4285F4] text-white hover:bg-[#3367D6]">
+                {isAuth ? "Go to Dashboard" : "Start Free Trial"}
+              </Button>
+            </Link>
           </div>
         </div>
       )}
@@ -970,8 +983,14 @@ export default function LandingPage() {
             Connect channels, track KPIs, and deliver client-ready reports faster.
           </p>
           <div className="flex items-center justify-center gap-4">
-            <button className="inline-flex items-center justify-center rounded-lg text-[15px] font-medium transition-all duration-200 ease-in-out h-11 px-6 bg-[#18181b] text-white hover:bg-[#27272a] shadow-sm">Start for free</button>
-            <button className="inline-flex items-center justify-center rounded-lg text-[15px] font-medium transition-all duration-200 ease-in-out h-11 px-6 bg-white text-[#18181b] border border-[#e4e4e7] hover:bg-[#f4f4f5]">Contact us</button>
+            <Link to={isAuth ? "/clients" : "/auth/signup"}>
+              <button className="inline-flex items-center justify-center rounded-lg text-[15px] font-medium transition-all duration-200 ease-in-out h-11 px-6 bg-[#18181b] text-white hover:bg-[#27272a] shadow-sm">
+                {isAuth ? "Go to Dashboard" : "Start for free"}
+              </button>
+            </Link>
+            <Link to="/contact">
+              <button className="inline-flex items-center justify-center rounded-lg text-[15px] font-medium transition-all duration-200 ease-in-out h-11 px-6 bg-white text-[#18181b] border border-[#e4e4e7] hover:bg-[#f4f4f5]">Contact us</button>
+            </Link>
           </div>
         </div>
 
@@ -1208,7 +1227,7 @@ export default function LandingPage() {
             ))}
           </div>
           <div className="mt-4 text-left px-4">
-            <a href="#integrations" className="text-[13px] font-bold text-[#666] hover:text-[#111] transition-colors inline-flex items-center gap-2 group tracking-wide">Browse thousands more <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></a>
+            <Link to="/integrations" className="text-[13px] font-bold text-[#666] hover:text-[#111] transition-colors inline-flex items-center gap-2 group tracking-wide">Browse thousands more <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></Link>
           </div>
         </div>
       </section>
@@ -1385,8 +1404,8 @@ export default function LandingPage() {
             <div className="text-center p-8 bg-white rounded-[2rem] border border-[#f0f0f0] max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
               <p className="text-[#111] font-medium text-lg">Manage or disconnect your integrations at any time.</p>
               <div className="flex gap-4">
-                <a href="#privacy" className="text-xs font-bold uppercase tracking-widest text-[#111] hover:underline">Privacy Policy</a>
-                <a href="#cookies" className="text-xs font-bold uppercase tracking-widest text-[#111] hover:underline">Cookie Policy</a>
+                <Link to="/privacy-policy" className="text-xs font-bold uppercase tracking-widest text-[#111] hover:underline">Privacy Policy</Link>
+                <Link to="/cookies" className="text-xs font-bold uppercase tracking-widest text-[#111] hover:underline">Cookie Policy</Link>
               </div>
             </div>
           </div>
@@ -1396,9 +1415,9 @@ export default function LandingPage() {
                 <h2 className="text-4xl md:text-5xl font-medium tracking-tighter text-[#111] mb-8">Security and privacy by design.</h2>
                 <p className="text-xl text-[#666] leading-relaxed font-light mb-10">GreyCats Analytics uses authenticated access controls and encrypted data transmission to protect account and integration data.</p>
                 <div className="flex flex-wrap gap-4">
-                  <a href="#privacy" className="inline-flex items-center px-6 py-3 rounded-full border border-[#f0f0f0] hover:border-[#111] text-[10px] font-bold uppercase tracking-widest transition-all">Privacy Policy</a>
-                  <a href="#terms" className="inline-flex items-center px-6 py-3 rounded-full border border-[#f0f0f0] hover:border-[#111] text-[10px] font-bold uppercase tracking-widest transition-all">Terms of Service</a>
-                  <a href="#support" className="inline-flex items-center px-6 py-3 rounded-full border border-[#f0f0f0] hover:border-[#111] text-[10px] font-bold uppercase tracking-widest transition-all">Support</a>
+                  <Link to="/privacy-policy" className="inline-flex items-center px-6 py-3 rounded-full border border-[#f0f0f0] hover:border-[#111] text-[10px] font-bold uppercase tracking-widest transition-all">Privacy Policy</Link>
+                  <Link to="/terms-of-service" className="inline-flex items-center px-6 py-3 rounded-full border border-[#f0f0f0] hover:border-[#111] text-[10px] font-bold uppercase tracking-widest transition-all">Terms of Service</Link>
+                  <Link to="/contact" className="inline-flex items-center px-6 py-3 rounded-full border border-[#f0f0f0] hover:border-[#111] text-[10px] font-bold uppercase tracking-widest transition-all">Support</Link>
                 </div>
               </div>
               <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1431,9 +1450,11 @@ export default function LandingPage() {
               <h2 className="text-3xl sm:text-5xl md:text-7xl font-medium tracking-tighter mb-8 text-[#111] max-w-4xl leading-[1.1]">Ready to simplify your reporting workflow?</h2>
               <p className="text-xl text-[#666] mb-12 max-w-3xl font-light leading-relaxed">Ideal for marketing agencies, in-house growth teams, performance marketers, and analysts who need reliable reporting across multiple platforms, accounts, and clients.</p>
               <div className="flex justify-center relative z-10 mt-8">
-                <a href="#plans" className="w-full sm:w-auto">
-                  <Button variant="primary" className="w-full px-16 py-6 text-xl font-semibold hover:bg-[#333] hover:scale-105 border-none shadow-none">Start Free Trial</Button>
-                </a>
+                <Link to={isAuth ? "/clients" : "/pricing"} className="w-full sm:w-auto">
+                  <Button variant="primary" className="w-full px-16 py-6 text-xl font-semibold hover:bg-[#333] hover:scale-105 border-none shadow-none">
+                    {isAuth ? "Go to Dashboard" : "Start Free Trial"}
+                  </Button>
+                </Link>
               </div>
             </div>
           </div>
@@ -1446,7 +1467,7 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-4 gap-12 mb-20">
             <div className="col-span-2">
               <div className="flex items-center gap-3 mb-6">
-                <div className="font-bold text-xl tracking-tight text-[#111]">GreyCats</div>
+                <img src={logo} alt="GreyCats Logo" className="h-8" />
               </div>
               <p className="text-[#666] mb-2 font-medium">Operated by Greycats Tech LLP</p>
               <a href="mailto:info@greycats.tech" className="text-[#4285F4] font-semibold hover:underline">info@greycats.tech</a>
@@ -1454,10 +1475,10 @@ export default function LandingPage() {
             <div>
               <h4 className="font-bold text-[#111] mb-6 uppercase tracking-widest text-xs">Legal & Support</h4>
               <ul className="space-y-4 text-[#666] font-medium">
-                <li><a href="#pricing" className="hover:text-[#111] transition-colors">Plans & Pricing</a></li>
-                <li><a href="#privacy" className="hover:text-[#111] transition-colors">Privacy Policy</a></li>
-                <li><a href="#terms" className="hover:text-[#111] transition-colors">Terms of Service</a></li>
-                <li><a href="#support" className="hover:text-[#111] transition-colors">Support</a></li>
+                <li><Link to="/pricing" className="hover:text-[#111] transition-colors">Plans & Pricing</Link></li>
+                <li><Link to="/privacy-policy" className="hover:text-[#111] transition-colors">Privacy Policy</Link></li>
+                <li><Link to="/terms-of-service" className="hover:text-[#111] transition-colors">Terms of Service</Link></li>
+                <li><Link to="/contact" className="hover:text-[#111] transition-colors">Support</Link></li>
               </ul>
             </div>
           </div>
