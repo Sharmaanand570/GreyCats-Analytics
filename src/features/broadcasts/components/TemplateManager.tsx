@@ -35,7 +35,7 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
   const { user } = useUserStore();
   const isAdmin = user?.role?.toUpperCase() === 'ADMIN' || user?.role?.toUpperCase() === 'SUPER_ADMIN';
 
-  const { data: templates, isLoading, isFetching } = isAdmin ? useAdminTemplates() : useTemplates();
+  const { data: templates, isLoading } = isAdmin ? useAdminTemplates() : useTemplates();
   const createTemplate = useCreateTemplate();
   const createSystemTemplate = useCreateSystemTemplate();
   const deleteTemplate = useDeleteTemplate();
@@ -174,15 +174,17 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
                 className="pl-9 pr-4 py-2 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all w-64 outline-none"
               />
             </div>
-            <Button
-              variant="outline"
-              onClick={() => syncTemplates.mutate(undefined)}
-              disabled={syncTemplates.isPending}
-              className="rounded-xl px-4 h-10 font-bold transition-all flex items-center gap-2"
-            >
-              <RefreshCcw className={cn("w-4 h-4", syncTemplates.isPending && "animate-spin")} />
-              Sync Meta Templates
-            </Button>
+            {(!fixedChannel || fixedChannel === 'WHATSAPP') && (
+              <Button
+                variant="outline"
+                onClick={() => syncTemplates.mutate(undefined)}
+                disabled={syncTemplates.isPending}
+                className="rounded-xl px-4 h-10 font-bold transition-all flex items-center gap-2"
+              >
+                <RefreshCcw className={cn("w-4 h-4", syncTemplates.isPending && "animate-spin")} />
+                Sync Meta Templates
+              </Button>
+            )}
             {/* WhatsApp-specific template creator */}
             {(!fixedChannel || fixedChannel === 'WHATSAPP') && (
               <Button

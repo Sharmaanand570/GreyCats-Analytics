@@ -550,7 +550,7 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
                         setAiTitleLoading(true);
                         creativeApi.generateCaptions({ clientId, platform: 'linkedin', goal: 'engagement', topic: `Generate a catchy blog title about: ${title}`, count: 1 })
                           .then((res) => { const t = res.data.data.captions[0]?.text; if (t) { updateDraft({ title: t.replace(/^["']|["']$/g, '').slice(0, 300) }); toast.success('Title improved!'); } })
-                          .catch(() => toast.error('Failed')).finally(() => setAiTitleLoading(false));
+                          .catch((err: any) => toast.error(err.response?.data?.message || err.response?.data?.error || err.message || 'Failed')).finally(() => setAiTitleLoading(false));
                       } else {
                         setShowAiTitleInput(true);
                       }
@@ -573,7 +573,7 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
                             e.preventDefault(); setAiTitleLoading(true); setShowAiTitleInput(false);
                             creativeApi.generateCaptions({ clientId, platform: 'linkedin', goal: 'engagement', topic: `Generate a catchy blog post title about: ${aiTitleTopic.trim()}`, count: 1 })
                               .then((res) => { const t = res.data.data.captions[0]?.text; if (t) { updateDraft({ title: t.replace(/^["']|["']$/g, '').slice(0, 300) }); toast.success('Title generated!'); } })
-                              .catch(() => toast.error('Failed')).finally(() => { setAiTitleLoading(false); setAiTitleTopic(''); });
+                              .catch((err: any) => toast.error(err.response?.data?.message || err.response?.data?.error || err.message || 'Failed')).finally(() => { setAiTitleLoading(false); setAiTitleTopic(''); });
                           } else if (e.key === 'Escape') { setShowAiTitleInput(false); }
                         }}
                       />
@@ -614,7 +614,7 @@ export function BlogPostModal({ isOpen, onClose, clientId, editingPost }: BlogPo
                             updateDraft({ content: res.data.data.content });
                             toast.success(`Blog body ${textContent ? 'improved' : 'generated'}! (${res.data.data.wordCount} words)`);
                           }
-                        }).catch(() => toast.error('Failed to generate')).finally(() => setAiBodyLoading(false));
+                        }).catch((err: any) => toast.error(err.response?.data?.message || err.response?.data?.error || err.message || 'Failed')).finally(() => setAiBodyLoading(false));
                     }}
                     className="absolute bottom-3 right-3 px-3 py-2 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white shadow-md hover:shadow-lg transition-all z-10 flex items-center gap-2 text-xs font-bold tracking-wide"
                   >

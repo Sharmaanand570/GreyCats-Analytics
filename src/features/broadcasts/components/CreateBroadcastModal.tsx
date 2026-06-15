@@ -43,7 +43,7 @@ import {
 import { cn } from '@/lib/utils';
 import { InlineTemplateCreator } from './InlineTemplateCreator';
 import { InlineGatewayCreator } from './InlineGatewayCreator';
-import { WhatsAppTemplateCreator } from './WhatsAppTemplateCreator';
+// import { WhatsAppTemplateCreator } from './WhatsAppTemplateCreator';
 
 interface CreateBroadcastModalProps {
   isOpen: boolean;

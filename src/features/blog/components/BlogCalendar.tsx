@@ -307,6 +307,7 @@ export function BlogCalendar({ clientId, canPost }: BlogCalendarProps) {
       setSelectedDayPosts(dayPosts);
       setDaySheetOpen(true);
     } else {
+      if (!canPost) return;
       setEditingPost(null);
       updateDraft({ date: day });
       setIsModalOpen(true);
@@ -761,6 +762,7 @@ export function BlogCalendar({ clientId, canPost }: BlogCalendarProps) {
         onStatusClick={setStatusFilter}
         isPast={isPastDate(selectedDay)}
         isDeleting={deleteMutation.isPending}
+        canPost={canPost}
       />
 
       <ConfirmDialog

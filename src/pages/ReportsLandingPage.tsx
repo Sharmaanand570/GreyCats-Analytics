@@ -1,8 +1,7 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAllClients } from '../hooks/useClients';
-import { useClientContext } from '@/context/ClientContext';
 import { useSyncStatus } from '../features/reports/hooks/useSyncStatus';
 import { FileText, ArrowUpDown, Search, Loader2 } from 'lucide-react';
 import { NotificationsPopover } from '../components/NotificationsPopover';
@@ -31,16 +30,11 @@ import {
 const ReportsLandingPage: React.FC = () => {
     const navigate = useNavigate();
     const { data: clients, isLoading } = useAllClients();
-    const { currentClient } = useClientContext();
     const [searchQuery, setSearchQuery] = useState("");
     const [sortBy, setSortBy] = useState("name-asc");
 
-    // If a client is already selected, go straight to their reports
-    useEffect(() => {
-        if (currentClient?.id) {
-            navigate(`/clients/${currentClient.id}/reports`, { replace: true });
-        }
-    }, [currentClient, navigate]);
+
+
 
     const handleClientClick = (clientId: number) => {
         navigate(`/clients/${clientId}/reports`);

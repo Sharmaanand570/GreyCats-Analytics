@@ -832,10 +832,11 @@ const FeatureScrollSection = () => {
 
 // --- Main Landing Page Component ---
 
+const tabs = ["Client", "Social media", "Broadcast", "Report", "AI Suite"];
+
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("Client");
-  const tabs = ["Client", "Social media", "Broadcast", "Report", "AI Suite"];
   
   const productSectionRef = useRef(null);
   const { scrollYProgress: productScroll } = useScroll({ target: productSectionRef, offset: ["start 80%", "end 50%"] });

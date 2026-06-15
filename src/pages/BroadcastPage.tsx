@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -893,7 +893,7 @@ export default function BroadcastPage() {
   const urlClientIdNum = urlClientId ? parseInt(urlClientId, 10) : null;
   const { data: urlDirectClient, isLoading: isLoadingUrlClient } = useClient(urlClientIdNum);
 
-  const setCurrentClient = React.useCallback((client: ClientWithIntegrations | null) => {
+  const setCurrentClient = useCallback((client: ClientWithIntegrations | null) => {
     _setCurrentClient(client);
     if (client) {
       localStorage.setItem('lastBroadcastClientId', String(client.id));
