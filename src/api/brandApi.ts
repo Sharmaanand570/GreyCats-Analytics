@@ -75,6 +75,14 @@ export interface UpsertBrandProfilePayload {
 // API calls
 // ─────────────────────────────────────────────
 
+export interface BrandSuggestion {
+  field: string;
+  type: "missing" | "improve" | "inconsistency";
+  priority: "high" | "medium" | "low";
+  message: string;
+  suggestion: string;
+}
+
 export const brandApi = {
   scrapeWebsite: (url: string) =>
     api.post<{ success: boolean; data: Record<string, any>; message: string }>(
@@ -82,6 +90,20 @@ export const brandApi = {
       { url },
       { timeout: 30_000 }
     ),
+
+  optimizeProfile: (clientId: number, currentProfile?: Record<string, any>) =>
+    api.post<{
+      success: boolean;
+      data: {
+        completionPct: number;
+        filledCount: number;
+        totalCount: number;
+        suggestions: BrandSuggestion[];
+      };
+    }>("/ai/brand/optimize", { clientId, currentProfile }, { timeout: 30_000 }),
+
+  saveOptimizationData: (clientId: number, optimizationData: any) =>
+    api.put("/ai/brand/optimize", { clientId, optimizationData }),
 
   getProfile: (clientId: number) =>
     api.get<{ success: boolean; data: BrandProfile | null }>(
