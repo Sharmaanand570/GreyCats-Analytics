@@ -36,6 +36,15 @@ export interface BrandProfile {
   createdAt: string;
   updatedAt: string;
   knowledgeBase?: BrandKnowledge[];
+  optimizationData?: OptimizationData;
+}
+
+export interface OptimizationData {
+  completionPct: number;
+  suggestions: BrandSuggestion[];
+  appliedFields: string[];
+  dismissedFields: string[];
+  generatedAt: string;
 }
 
 export interface BrandKnowledge {
@@ -99,6 +108,9 @@ export const brandApi = {
         filledCount: number;
         totalCount: number;
         suggestions: BrandSuggestion[];
+        appliedFields: string[];
+        dismissedFields: string[];
+        generatedAt: string;
       };
     }>("/ai/brand/optimize", { clientId, currentProfile }, { timeout: 30_000 }),
 

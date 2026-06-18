@@ -7,6 +7,7 @@ import { useVerifyPaymentMutation } from "@/hooks/subscription/useVerifyPaymentM
 import { useActivateFreePlanMutation } from "@/hooks/subscription/useActivateFreePlanMutation";
 import { openRazorpayCheckout } from "@/lib/payments/openRazorpayCheckout";
 import { AuthForm } from "@/features/Authantication/componenets/AuthForm";
+import { userApi } from "@/api/userApi";
 import { Button } from "@/components/ui/button";
 import { isAuthenticated, StorageKey } from "@/utils/storage";
 import { useUserStore } from "@/utils/useUserStore";
@@ -54,12 +55,22 @@ export default function CheckoutPage() {
     }
   }, [planId, plans, navigate]);
 
-  const handlePaymentSuccess = () => {
-    // If user doesn't have companyName, they are "new" in terms of setup
-    if (!user?.companyName) {
-      navigate("/auth/signup-details", { replace: true });
-    } else {
-      navigate("/clients", { replace: true });
+  const handlePaymentSuccess = async () => {
+    try {
+      const res = await userApi.getProfile();
+      if (!res.data?.companyName) {
+        navigate("/auth/signup-details", { replace: true });
+      } else {
+        useUserStore.getState().setUser(res.data as any);
+        navigate("/clients", { replace: true });
+      }
+    } catch (err) {
+      // fallback
+      if (!user?.companyName) {
+        navigate("/auth/signup-details", { replace: true });
+      } else {
+        navigate("/clients", { replace: true });
+      }
     }
   };
 
@@ -80,7 +91,7 @@ export default function CheckoutPage() {
           success: `Successfully activated ${selectedPlan.displayName}`,
           error: "Failed to activate plan",
         });
-        handlePaymentSuccess();
+        await handlePaymentSuccess();
       } else {
         const orderData = await createOrder.mutateAsync(selectedPlan.id);
         await openRazorpayCheckout({
@@ -89,7 +100,7 @@ export default function CheckoutPage() {
             try {
               await verifyPayment.mutateAsync(payload);
               toast.success(`Successfully subscribed to ${selectedPlan.displayName}!`);
-              handlePaymentSuccess();
+              await handlePaymentSuccess();
             } catch (err) {
               toast.error("Payment verification failed. Please contact support.");
             } finally {

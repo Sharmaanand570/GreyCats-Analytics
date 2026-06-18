@@ -16,7 +16,7 @@ interface CreateCampaignProps {
 export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProps) {
   const [selectedObjective, setSelectedObjective] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [openTooltipId, setOpenTooltipId] = useState<string | null>(null);
+
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [youtubeGoal, setYoutubeGoal] = useState<"views" | "reach" | "subs">("views");
   const [storeLocationType, setStoreLocationType] = useState<"business" | "affiliate">("business");
@@ -54,6 +54,12 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
         { id: 'purchases', name: 'Purchases', icon: ShoppingCart, source: 'Website', actions: 2, warning: false },
       ];
 
+  const customConversionGoalsList = [
+    { id: 'contacts', name: 'Contacts (account default)', icon: Users, source: 'Call from Ads', actions: 1, warning: true, source2: 'Website', actions2: 1, warning2: true },
+    { id: 'pageviews', name: 'Page views (account default)', icon: Eye, source: 'Website', actions: 1, warning: true },
+    { id: 'phonecalls', name: 'Phone call leads (account default)', icon: Smartphone, source: 'Call from Ads', actions: 2, warning: true },
+  ];
+
 
   const objectives = [
     { id: "sales", title: "Sales", desc: "Drive sales online, in app, by phone, or in store", icon: Tag },
@@ -66,7 +72,7 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
   ];
 
   if (wizardMode) {
-    const displayType = 
+    let displayType = 
       customCampaignType === "pmax" ? "Performance Max" : 
       customCampaignType === "search" ? "Search" : 
       customCampaignType === "shopping" ? "Shopping" : 
@@ -74,11 +80,19 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
       customCampaignType === "display" ? "Display" :
       customCampaignType === "demand" ? "Demand Gen" :
       "Campaign";
+      
+    if (selectedObjective === "youtube") {
+      displayType = 
+        youtubeGoal === "subs" ? "Demand Gen" :
+        youtubeGoal === "reach" && customCampaignType === "display" ? "Display" : 
+        "Video";
+    }
 
     return <GoogleAdsCampaignWizard onCancel={onCancel} campaignType={displayType} />;
   }
 
   return (
+    <div className="flex-1 overflow-y-auto bg-[#f1f3f4]">
     <div className="w-full max-w-[1000px] mx-auto py-8 flex flex-col">
       <h1 className="text-2xl font-normal text-slate-800 mb-6 order-1">What's your campaign objective?</h1>
       
@@ -144,114 +158,38 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
                   <th className="pb-3 w-1/3">Conversion Goals</th>
                   <th className="pb-3 w-1/3">Conversion Source</th>
                   <th className="pb-3 w-1/3">Conversion Actions</th>
+                  <th className="w-10"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-[13px]">
-                {conversionGoalsList.map((goal) => {
+                {(selectedObjective === "custom" ? customConversionGoalsList : conversionGoalsList).map((goal) => {
                   const Icon = goal.icon;
                   return (
-                    <tr key={goal.id} className="hover:bg-slate-50 relative">
-                      <td className="py-4 font-medium text-slate-700 flex items-center gap-2">
-                        <Icon className="w-4 h-4 text-slate-500" />
-                        {goal.name} <span className="text-slate-400 font-normal">(account default)</span>
-                      </td>
-                      <td className="py-4 text-slate-600">{goal.source}</td>
-                      <td className="py-4 text-slate-600 flex items-center justify-between">
-                        <div className="relative">
-                          <div 
-                            className="flex items-center gap-2 cursor-pointer"
-                            onClick={() => {
-                              setOpenTooltipId(openTooltipId === goal.id ? null : goal.id);
-                              setOpenMenuId(null);
-                            }}
-                          >
-                            {goal.warning && <TriangleAlert className="w-4 h-4 text-amber-500 fill-amber-100" />}
-                            <span className="border-b border-dashed border-slate-400">{goal.actions} action{goal.actions > 1 ? 's' : ''}</span>
-                          </div>
-
-                          {/* Action Tooltip Popup */}
-                          {openTooltipId === goal.id && (
-                            <div className="absolute top-full left-0 mt-2 w-[420px] bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden flex flex-col">
-                              {goal.warning ? (
-                                <>
-                                  <div className="bg-[#fef9eb] border-b border-[#fef0c8] p-4 flex gap-3">
-                                    <TriangleAlert className="w-5 h-5 text-amber-600 fill-amber-100 shrink-0" />
-                                    <div className="text-[13px] text-slate-800 font-medium">
-                                      {goal.actions} inactive or unverified conversion action<br/>from <strong>{goal.source}</strong> for the <strong>{goal.name}</strong> goal
-                                    </div>
-                                  </div>
-                                  <div className="p-4">
-                                    <div className="flex items-center gap-2 text-[13px] font-medium text-slate-800 mb-2">
-                                      <ChevronUp className="w-4 h-4 text-slate-500" />
-                                      {goal.actions} inactive conversion action
-                                    </div>
-                                    <div className="pl-6 mb-4">
-                                      <div className="text-[13px] font-medium text-slate-800">{goal.name.replace(/\s+/g, '_')}</div>
-                                      <div className="text-[12px] text-slate-500 flex items-center gap-1.5 mt-0.5">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                                        No recent conversions, Value: ₹0.00
-                                      </div>
-                                    </div>
-                                    <div className="text-[12px] text-slate-500 pt-2 border-t border-slate-100">
-                                      You can <button onClick={() => setIsEditModalOpen(true)} className="text-blue-600 hover:underline">edit this goal</button> on your Conversions page
-                                    </div>
-                                  </div>
-                                </>
-                              ) : (
-                                <div className="p-4">
-                                  <div className="text-[13px] text-slate-700 mb-4">
-                                    {goal.actions} active conversion action{goal.actions > 1 ? 's' : ''} from {goal.source} for the {goal.name} goal
-                                  </div>
-                                  
-                                  <div className="flex flex-col gap-4 mb-4">
-                                    <div>
-                                      <div className="text-[13px] font-semibold text-slate-700">Google Shopping App Page View</div>
-                                      <div className="text-[12px] text-slate-500 flex items-start gap-1.5 mt-0.5">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1 shrink-0"></div>
-                                        <span>Recording (processing enhanced conversions), Value:<br/>Dynamic</span>
-                                      </div>
-                                    </div>
-                                    {goal.actions > 1 && (
-                                      <div>
-                                        <div className="text-[13px] font-semibold text-slate-700">Google Shopping App View Item</div>
-                                        <div className="text-[12px] text-slate-500 flex items-start gap-1.5 mt-0.5">
-                                          <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1 shrink-0"></div>
-                                          <span>Recording (processing enhanced conversions), Value:<br/>Dynamic</span>
-                                        </div>
-                                      </div>
-                                    )}
-                                    {goal.actions > 2 && (
-                                      <div>
-                                        <div className="text-[13px] font-semibold text-slate-700">Google Shopping App Search</div>
-                                        <div className="text-[12px] text-slate-500 flex items-start gap-1.5 mt-0.5">
-                                          <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1 shrink-0"></div>
-                                          <span>Recording (processing enhanced conversions), Value:<br/>Dynamic</span>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                  
-                                  <div className="text-[12px] text-slate-500 pt-1 pb-3">
-                                    You can <button onClick={() => setIsEditModalOpen(true)} className="text-blue-600 hover:underline">edit this goal</button> on your Conversions page
-                                  </div>
-                                  
-                                  <div className="pt-3 border-t border-slate-200">
-                                    <div className="text-[13px] font-semibold text-slate-700 mb-1">Dynamic value</div>
-                                    <div className="text-[12px] text-slate-500 leading-relaxed">
-                                      A unique value is recorded for each conversion. The average<br/>value recorded for these conversions is (Multiple values avg).
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
+                    <tr key={goal.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="py-4">
+                        <div className="flex items-center gap-3">
+                          <Icon className="w-4 h-4 text-slate-500" />
+                          <span className="text-[13px] font-medium text-slate-800">{goal.name}</span>
                         </div>
-
+                      </td>
+                      <td className="py-4">
+                        <div className="flex flex-col gap-4">
+                          <span className="text-[13px] text-slate-600">{goal.source}</span>
+                        </div>
+                      </td>
+                      <td className="py-4">
+                        <div className="flex flex-col gap-4">
+                          <div className="flex items-center gap-2">
+                            {goal.warning && <TriangleAlert className="w-3.5 h-3.5 text-amber-500" />}
+                            <span className="text-[13px] text-slate-600">{goal.actions} action{goal.actions !== 1 ? 's' : ''}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 text-right">
                         <div className="relative">
                           <button 
                             onClick={() => {
                               setOpenMenuId(openMenuId === goal.id ? null : goal.id);
-                              setOpenTooltipId(null);
                             }}
                             className="text-slate-400 hover:text-slate-700 p-1 rounded hover:bg-slate-200 transition-colors"
                           >
@@ -816,6 +754,30 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Custom Panel: Final URL (Only for custom Pmax without products) */}
+      {selectedObjective === "custom" && customCampaignType === "pmax" && !advertiseProducts && (
+        <div className="bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden mb-6 order-6">
+          <div className="bg-white px-6 py-4 border-b border-slate-200">
+            <h2 className="text-sm font-semibold text-slate-800">Where should people go after clicking your ads?</h2>
+          </div>
+          <div className="p-6">
+            <p className="text-[13px] text-slate-600 mb-6 leading-relaxed">
+              Think about the product or service you want to sell and enter the URL you want people to see after clicking your ads. This might be your homepage or a more specific page on your website.
+            </p>
+            <div className="relative w-full max-w-[400px]">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Link2 className="w-4 h-4 text-slate-500" />
+              </div>
+              <input 
+                type="text" 
+                placeholder="Final URL"
+                className="w-full border border-slate-300 rounded px-3 py-2.5 pl-10 text-[13px] text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none placeholder:text-slate-500"
+              />
+            </div>
           </div>
         </div>
       )}
@@ -1458,22 +1420,30 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
               
               {/* Type: Video (Always shown for Views/Reach, not for Subs) */}
               {(youtubeGoal === "views" || youtubeGoal === "reach") && (
-                <div className="relative p-4 border border-blue-600 rounded-md bg-blue-50/30 w-[240px] shrink-0">
-                  <div className="absolute -top-2 -right-2 bg-white rounded-full">
-                    <CheckCircle2 className="w-5 h-5 text-white fill-blue-600" />
-                  </div>
+                <div 
+                  onClick={() => setCustomCampaignType("video")}
+                  className={`relative p-4 border rounded-md cursor-pointer ${customCampaignType !== "display" || youtubeGoal === "views" ? "border-blue-600 bg-blue-50/30" : "border-slate-200 bg-white hover:bg-slate-50"} w-[240px] shrink-0`}
+                >
+                  {(customCampaignType !== "display" || youtubeGoal === "views") && (
+                    <div className="absolute -top-2 -right-2 bg-white rounded-full">
+                      <CheckCircle2 className="w-5 h-5 text-white fill-blue-600" />
+                    </div>
+                  )}
                   <div className="flex gap-2 mb-2 items-center">
                     <Play className="w-4 h-4 text-red-500 fill-red-500" />
                     <Layout className="w-4 h-4 text-green-600" />
                   </div>
-                  <h3 className="text-sm font-medium text-blue-700 mb-1">Video</h3>
+                  <h3 className={`text-sm font-medium mb-1 ${customCampaignType !== "display" || youtubeGoal === "views" ? "text-blue-700" : "text-slate-800"}`}>Video</h3>
                   <p className="text-[12px] text-slate-500 leading-snug">Reach viewers on YouTube and get conversions</p>
                 </div>
               )}
 
               {/* Type: Demand Gen (Only for Subs) */}
               {youtubeGoal === "subs" && (
-                <div className="relative p-4 border border-blue-600 rounded-md bg-blue-50/30 w-[240px] shrink-0">
+                <div 
+                  onClick={() => setCustomCampaignType("demand")}
+                  className="relative p-4 border border-blue-600 rounded-md bg-blue-50/30 w-[240px] shrink-0"
+                >
                   <div className="absolute -top-2 -right-2 bg-white rounded-full">
                     <CheckCircle2 className="w-5 h-5 text-white fill-blue-600" />
                   </div>
@@ -1490,14 +1460,22 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
 
               {/* Type: Display (Only for Reach) */}
               {youtubeGoal === "reach" && (
-                <div className="relative p-4 border border-slate-200 rounded-md bg-white hover:bg-slate-50 cursor-pointer w-[240px] shrink-0">
+                <div 
+                  onClick={() => setCustomCampaignType("display")}
+                  className={`relative p-4 border rounded-md cursor-pointer ${customCampaignType === "display" ? "border-blue-600 bg-blue-50/30" : "border-slate-200 bg-white hover:bg-slate-50"} w-[240px] shrink-0`}
+                >
+                  {customCampaignType === "display" && (
+                    <div className="absolute -top-2 -right-2 bg-white rounded-full">
+                      <CheckCircle2 className="w-5 h-5 text-white fill-blue-600" />
+                    </div>
+                  )}
                   <div className="flex gap-1.5 mb-2 items-center">
                     <Play className="w-4 h-4 text-red-500 fill-red-500" />
                     <Mail className="w-4 h-4 text-red-500" />
                     <Sparkles className="w-4 h-4 text-amber-500" />
                     <Layout className="w-4 h-4 text-green-600" />
                   </div>
-                  <h3 className="text-sm font-medium text-slate-800 mb-1">Display</h3>
+                  <h3 className={`text-sm font-medium mb-1 ${customCampaignType === "display" ? "text-blue-700" : "text-slate-800"}`}>Display</h3>
                   <p className="text-[12px] text-slate-500 leading-snug">Reach potential customers across 3 million sites and apps with your creative</p>
                 </div>
               )}
@@ -1534,26 +1512,33 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
               <div className="p-6 pt-4">
                 {customCampaignType === "pmax" && (
                   <label className="flex items-center gap-3 cursor-pointer mb-5">
-                    <input type="checkbox" defaultChecked className="w-4 h-4 rounded text-blue-600" />
+                    <input 
+                      type="checkbox" 
+                      checked={advertiseProducts} 
+                      onChange={(e) => setAdvertiseProducts(e.target.checked)}
+                      className="w-4 h-4 rounded text-blue-600" 
+                    />
                     <span className="text-[13px] text-slate-800">Advertise products from a Merchant Center account</span>
                   </label>
                 )}
                 
-                <div className={customCampaignType === "pmax" ? "ml-7" : ""}>
-                  <div className="text-[13px] text-slate-800 mb-2 flex items-center gap-1">
-                    Select a Merchant Center account <Info className="w-3.5 h-3.5 text-slate-500" />
-                  </div>
-                  <div className="border border-slate-300 rounded max-w-[400px] flex items-center justify-between p-2.5 mb-4 bg-white">
-                    <div className="flex items-center gap-2">
-                      <div className="bg-[#4285f4] rounded p-1"><Layout className="w-3 h-3 text-white" /></div>
-                      <span className="text-[13px] font-medium text-slate-800">5513827312 - kashmirorganicnuts</span>
+                {advertiseProducts && (
+                  <div className={customCampaignType === "pmax" ? "ml-7" : ""}>
+                    <div className="text-[13px] text-slate-800 mb-2 flex items-center gap-1">
+                      Select a Merchant Center account <Info className="w-3.5 h-3.5 text-slate-500" />
                     </div>
-                    <X className="w-4 h-4 text-slate-500 cursor-pointer" />
+                    <div className="border border-slate-300 rounded max-w-[400px] flex items-center justify-between p-2.5 mb-4 bg-white">
+                      <div className="flex items-center gap-2">
+                        <div className="bg-[#4285f4] rounded p-1"><Layout className="w-3 h-3 text-white" /></div>
+                        <span className="text-[13px] font-medium text-slate-800">5513827312 - kashmirorganicnuts</span>
+                      </div>
+                      <X className="w-4 h-4 text-slate-500 cursor-pointer" />
+                    </div>
+                    <div className="text-[12px] text-slate-600">
+                      All products from the selected account will be available to advertise in this campaign. <a href="#" className="text-blue-600 hover:underline">Select a feed label</a>
+                    </div>
                   </div>
-                  <div className="text-[12px] text-slate-600">
-                    All products from the selected account will be available to advertise in this campaign. <a href="#" className="text-blue-600 hover:underline">Select a feed label</a>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           )}
@@ -1863,6 +1848,22 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
             </div>
           )}
 
+          {/* Custom Campaign name for PMax */}
+          {selectedObjective === "custom" && customCampaignType === "pmax" && (
+            <div className="bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden order-7">
+              <div className="bg-white px-6 py-4 border-b border-slate-200">
+                <h2 className="text-sm font-semibold text-slate-800">Campaign name</h2>
+              </div>
+              <div className="p-6">
+                <input 
+                  type="text" 
+                  defaultValue="Performance Max 3"
+                  className="w-full max-w-[400px] border border-slate-300 rounded px-3 py-2 text-[13px] text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                />
+              </div>
+            </div>
+          )}
+
           {/* Shared Panel: Campaign Name (Shopping or App) */}
           {["shopping", "app"].includes(customCampaignType) && (
             <div className="bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden mb-6 order-7">
@@ -1944,5 +1945,6 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
       )}
 
     </div>
+  </div>
   );
 }

@@ -329,15 +329,15 @@ export function ProviderManager({ admin = false, clientId, fixedChannel }: Provi
           {errorDisplay}
           <div className="space-y-3">
             <label className={labelClasses}>Account SID <span className="text-red-500">*</span></label>
-            <input type="text" value={twilioSid} onChange={e => setTwilioSid(e.target.value)} className={inputClasses} placeholder="AC..." />
+            <input autoComplete="off" data-1p-ignore data-lpignore="true" type="text" value={twilioSid} onChange={e => setTwilioSid(e.target.value)} className={inputClasses} placeholder="AC..." />
           </div>
           <div className="space-y-3">
             <label className={labelClasses}>Auth Token <span className="text-red-500">*</span></label>
-            <input type="password" value={twilioToken} onChange={e => setTwilioToken(e.target.value)} className={inputClasses} placeholder="••••••••" />
+            <input autoComplete="new-password" data-1p-ignore data-lpignore="true" type="password" value={twilioToken} onChange={e => setTwilioToken(e.target.value)} className={inputClasses} placeholder="••••••••" />
           </div>
           <div className="space-y-3">
             <label className={labelClasses}>From Number <span className="text-red-500">*</span></label>
-            <input type="text" value={twilioFrom} onChange={e => setTwilioFrom(e.target.value)} className={inputClasses} placeholder="+1..." />
+            <input autoComplete="off" data-1p-ignore data-lpignore="true" type="text" value={twilioFrom} onChange={e => setTwilioFrom(e.target.value)} className={inputClasses} placeholder="+1..." />
           </div>
         </>
       );
@@ -348,11 +348,11 @@ export function ProviderManager({ admin = false, clientId, fixedChannel }: Provi
           {errorDisplay}
           <div className="space-y-3">
             <label className={labelClasses}>Auth Key <span className="text-red-500">*</span></label>
-            <input type="password" value={msg91Key} onChange={e => setMsg91Key(e.target.value)} className={inputClasses} placeholder="••••••••" />
+            <input autoComplete="new-password" data-1p-ignore data-lpignore="true" type="password" value={msg91Key} onChange={e => setMsg91Key(e.target.value)} className={inputClasses} placeholder="••••••••" />
           </div>
           <div className="space-y-3">
             <label className={labelClasses}>Sender ID <span className="text-red-500">*</span></label>
-            <input type="text" value={msg91Sender} onChange={e => setMsg91Sender(e.target.value)} className={inputClasses} placeholder="GRYCAT" />
+            <input autoComplete="off" data-1p-ignore data-lpignore="true" type="text" value={msg91Sender} onChange={e => setMsg91Sender(e.target.value)} className={inputClasses} placeholder="GRYCAT" />
           </div>
         </>
       );
@@ -363,15 +363,15 @@ export function ProviderManager({ admin = false, clientId, fixedChannel }: Provi
           {errorDisplay}
           <div className="space-y-3">
             <label className={labelClasses}>Adbizz Username <span className="text-red-500">*</span></label>
-            <input type="text" value={adbizzUser} onChange={e => setAdbizzUser(e.target.value)} className={inputClasses} placeholder="Your username" />
+            <input autoComplete="off" data-1p-ignore data-lpignore="true" type="text" value={adbizzUser} onChange={e => setAdbizzUser(e.target.value)} className={inputClasses} placeholder="Your username" />
           </div>
           <div className="space-y-3">
             <label className={labelClasses}>API Key <span className="text-red-500">*</span></label>
-            <input type="password" value={adbizzKey} onChange={e => setAdbizzKey(e.target.value)} className={inputClasses} placeholder="••••••••" />
+            <input autoComplete="new-password" data-1p-ignore data-lpignore="true" type="password" value={adbizzKey} onChange={e => setAdbizzKey(e.target.value)} className={inputClasses} placeholder="••••••••" />
           </div>
           <div className="space-y-3">
             <label className={labelClasses}>Sender ID <span className="text-red-500">*</span></label>
-            <input type="text" value={adbizzSender} onChange={e => setAdbizzSender(e.target.value)} className={inputClasses} placeholder="GREYCATS" />
+            <input autoComplete="off" data-1p-ignore data-lpignore="true" type="text" value={adbizzSender} onChange={e => setAdbizzSender(e.target.value)} className={inputClasses} placeholder="GREYCATS" />
           </div>
         </>
       );
@@ -559,23 +559,23 @@ export function ProviderManager({ admin = false, clientId, fixedChannel }: Provi
           <div ref={smtpFieldsRef} className="grid grid-cols-1 md:grid-cols-3 gap-6 scroll-mt-24">
             <div className="space-y-3">
               <label className={labelClasses}>SMTP Host <span className="text-red-500">*</span></label>
-              <input type="text" value={smtpHost} onChange={e => setSmtpHost(e.target.value)} className={inputClasses} placeholder="smtp.gmail.com" />
+              <input autoComplete="off" data-1p-ignore data-lpignore="true" type="text" value={smtpHost} onChange={e => setSmtpHost(e.target.value)} className={inputClasses} placeholder="smtp.gmail.com" />
             </div>
             <div className="space-y-3">
               <label className={labelClasses}>Port <span className="text-red-500">*</span></label>
-              <input type="text" value={smtpPort} onChange={e => setSmtpPort(e.target.value)} className={inputClasses} placeholder="587" />
+              <input autoComplete="off" data-1p-ignore data-lpignore="true" type="text" value={smtpPort} onChange={e => setSmtpPort(e.target.value)} className={inputClasses} placeholder="587" />
             </div>
             <div className="space-y-3">
               <label className={labelClasses}>Display Name</label>
-              <input type="text" value={smtpFromName} onChange={e => setSmtpFromName(e.target.value)} className={inputClasses} placeholder="Your Name" />
+              <input autoComplete="off" data-1p-ignore data-lpignore="true" type="text" value={smtpFromName} onChange={e => setSmtpFromName(e.target.value)} className={inputClasses} placeholder="Your Name" />
             </div>
             <div className="space-y-3">
               <label className={labelClasses}>Username / Email <span className="text-red-500">*</span></label>
-              <input type="text" value={smtpUser} onChange={e => setSmtpUser(e.target.value)} className={inputClasses} placeholder="user@gmail.com" />
+              <input autoComplete="off" data-1p-ignore data-lpignore="true" type="text" value={smtpUser} onChange={e => setSmtpUser(e.target.value)} className={inputClasses} placeholder="user@gmail.com" />
             </div>
             <div className="space-y-3">
               <label className={labelClasses}>Password / App Secret <span className="text-red-500">*</span></label>
-              <input type="password" value={smtpPass} onChange={e => setSmtpPass(e.target.value)} className={inputClasses} placeholder="••••••••" />
+              <input autoComplete="new-password" data-1p-ignore data-lpignore="true" type="password" value={smtpPass} onChange={e => setSmtpPass(e.target.value)} className={inputClasses} placeholder="••••••••" />
             </div>
             <div className="flex items-center gap-3 pt-8">
               <input 

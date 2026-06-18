@@ -1,15 +1,22 @@
 import { useState, useEffect } from "react";
-import { ChevronUp, ChevronDown, HelpCircle, Search, X, Settings } from "lucide-react";
+import { ChevronUp, ChevronDown, HelpCircle, Search, X, Settings, Info } from "lucide-react";
 
 interface CampaignSettingsStepProps {
   onNext: () => void;
   activeSubStep?: string;
   onSubStepChange?: (step: string) => void;
+  campaignType?: string;
 }
 
-export default function GoogleAdsCampaignSettingsStep({ onNext, activeSubStep, onSubStepChange }: CampaignSettingsStepProps) {
+export default function GoogleAdsCampaignSettingsStep({ onNext, activeSubStep, onSubStepChange, campaignType = "Search" }: CampaignSettingsStepProps) {
   const [location, setLocation] = useState("all");
-  const [euPolitical, setEuPolitical] = useState("no");
+  const [euPolitical, setEuPolitical] = useState("yes"); // Defaults to yes based on screenshot? Wait, first screenshot had nothing, second has Yes, third has No. Let's do 'no' by default.
+  
+  // Actually, second screenshot shows "Yes, this campaign has EU political ads" selected. Third screenshot shows "No, this campaign doesn't have EU political ads" selected. Let's make "no" default.
+  
+  const [isLanguagesOpen, setIsLanguagesOpen] = useState(false);
+
+  const isPMax = campaignType === "Performance Max";
 
   // Intersection Observer for scroll spy
   useEffect(() => {
@@ -34,51 +41,53 @@ export default function GoogleAdsCampaignSettingsStep({ onNext, activeSubStep, o
   }, [onSubStepChange]);
 
   return (
-    <div className="flex flex-col h-full max-w-[800px]">
-      <div className="mb-8">
-        <h1 className="text-[22px] text-slate-800 font-normal mb-1">Campaign settings</h1>
+    <div className="flex flex-col h-full max-w-[800px] pb-20 relative">
+      <div className="mb-6">
+        <h1 className="text-[24px] text-slate-800 font-normal mb-2">Campaign settings</h1>
         <p className="text-[13px] text-slate-600">To reach the right people, start by defining key settings for your campaign</p>
       </div>
 
       <div className="flex flex-col gap-4">
-        {/* Networks Panel */}
-        <div 
-          id="panel-networks" 
-          onClick={() => onSubStepChange?.('networks')}
-          className={`settings-panel-section bg-white border shadow-sm rounded-md overflow-hidden transition-all duration-200 ${activeSubStep === 'networks' ? 'border-blue-500 shadow-md ring-1 ring-blue-500' : 'border-slate-200'}`}
-        >
-          <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-50">
-             <h2 className={`text-[14px] ${activeSubStep === 'networks' ? 'text-blue-700 font-medium' : 'text-slate-800 font-medium'}`}>Networks</h2>
-             <ChevronUp className="w-5 h-5 text-slate-500" />
-          </div>
-          <div className="p-6">
-             <div className="flex flex-col gap-5">
-               <label className="flex items-start gap-3 cursor-pointer">
-                 <input 
-                   type="checkbox" 
-                   defaultChecked
-                   className="mt-1 w-4 h-4 rounded border-slate-300 text-blue-600" 
-                 />
-                 <div>
-                   <div className="text-[13px] text-slate-800 font-medium">Google Search Partners Network (recommended)</div>
-                   <div className="text-[11px] text-slate-500 leading-relaxed mt-0.5">Ads can appear near Google Search results and on other <a href="#" className="text-blue-600 hover:underline">Google Search Partners</a> websites when people search for terms that are relevant to your keywords. Search Partners can include hundreds of non-Google websites, Parked Domains, as well as YouTube and other Google sites.</div>
-                 </div>
-               </label>
+        {/* Networks Panel - Hidden for PMax */}
+        {!isPMax && (
+          <div 
+            id="panel-networks" 
+            onClick={() => onSubStepChange?.('networks')}
+            className={`settings-panel-section bg-white border shadow-sm rounded-md overflow-hidden transition-all duration-200 ${activeSubStep === 'networks' ? 'border-blue-500 shadow-md ring-1 ring-blue-500' : 'border-slate-200'}`}
+          >
+            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-50">
+               <h2 className={`text-[14px] ${activeSubStep === 'networks' ? 'text-blue-700 font-medium' : 'text-slate-800 font-medium'}`}>Networks</h2>
+               <ChevronUp className="w-5 h-5 text-slate-500" />
+            </div>
+            <div className="p-6">
+               <div className="flex flex-col gap-5">
+                 <label className="flex items-start gap-3 cursor-pointer">
+                   <input 
+                     type="checkbox" 
+                     defaultChecked
+                     className="mt-1 w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600" 
+                   />
+                   <div>
+                     <div className="text-[13px] text-slate-800 font-medium">Google Search Partners Network (recommended)</div>
+                     <div className="text-[11px] text-slate-500 leading-relaxed mt-0.5">Ads can appear near Google Search results and on other <a href="#" className="text-blue-600 hover:underline">Google Search Partners</a> websites when people search for terms that are relevant to your keywords. Search Partners can include hundreds of non-Google websites, Parked Domains, as well as YouTube and other Google sites.</div>
+                   </div>
+                 </label>
 
-               <label className="flex items-start gap-3 cursor-pointer">
-                 <input 
-                   type="checkbox" 
-                   defaultChecked
-                   className="mt-1 w-4 h-4 rounded border-slate-300 text-blue-600" 
-                 />
-                 <div>
-                   <div className="text-[13px] text-slate-800 font-medium">Google Display Network (recommended)</div>
-                   <div className="text-[11px] text-slate-500 leading-relaxed mt-0.5">Ads can appear on relevant sites, videos, and apps across Google (like YouTube) and the internet when you have leftover Search budget.</div>
-                 </div>
-               </label>
-             </div>
+                 <label className="flex items-start gap-3 cursor-pointer">
+                   <input 
+                     type="checkbox" 
+                     defaultChecked
+                     className="mt-1 w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600" 
+                   />
+                   <div>
+                     <div className="text-[13px] text-slate-800 font-medium">Google Display Network (recommended)</div>
+                     <div className="text-[11px] text-slate-500 leading-relaxed mt-0.5">Ads can appear on relevant sites, videos, and apps across Google (like YouTube) and the internet when you have leftover Search budget.</div>
+                   </div>
+                 </label>
+               </div>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Locations Panel */}
         <div 
@@ -88,66 +97,66 @@ export default function GoogleAdsCampaignSettingsStep({ onNext, activeSubStep, o
         >
           <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-50">
              <h2 className={`text-[14px] ${activeSubStep === 'locations' ? 'text-blue-700 font-medium' : 'text-slate-800'}`}>Locations</h2>
-             <ChevronUp className="w-5 h-5 text-slate-500" />
-          </div>
-          <div className="p-6">
-             <div className="flex items-center gap-1 mb-4">
-               <label className="text-[13px] text-slate-800">Select locations for this campaign</label>
-               <HelpCircle className="w-3.5 h-3.5 text-slate-500" />
-             </div>
-             
-             <div className="flex flex-col gap-3 ml-2">
-               <label className="flex items-center gap-3 cursor-pointer">
-                 <input 
-                   type="radio" 
-                   name="location" 
-                   checked={location === "all"}
-                   onChange={() => setLocation("all")}
-                   className="w-4 h-4 text-blue-600" 
-                 />
-                 <span className="text-[13px] text-slate-800">All countries and territories</span>
-               </label>
+               <ChevronUp className="w-5 h-5 text-slate-500" />
+            </div>
+            <div className="p-6">
+               <div className="flex items-center gap-1 mb-4">
+                 <label className="text-[13px] text-slate-800">Select locations for this campaign</label>
+                 <HelpCircle className="w-3.5 h-3.5 text-slate-500" />
+               </div>
                
-               <label className="flex items-center gap-3 cursor-pointer">
-                 <input 
-                   type="radio" 
-                   name="location" 
-                   checked={location === "india"}
-                   onChange={() => setLocation("india")}
-                   className="w-4 h-4 text-blue-600" 
-                 />
-                 <span className="text-[13px] text-slate-800">India</span>
-               </label>
+               <div className="flex flex-col gap-3 ml-2">
+                 <label className="flex items-center gap-3 cursor-pointer">
+                   <input 
+                     type="radio" 
+                     name="location" 
+                     checked={location === "all"}
+                     onChange={() => setLocation("all")}
+                     className="w-4 h-4 text-blue-600 accent-blue-600" 
+                   />
+                   <span className="text-[13px] text-slate-800">All countries and territories</span>
+                 </label>
+                 
+                 <label className="flex items-center gap-3 cursor-pointer">
+                   <input 
+                     type="radio" 
+                     name="location" 
+                     checked={location === "india"}
+                     onChange={() => setLocation("india")}
+                     className="w-4 h-4 text-blue-600 accent-blue-600" 
+                   />
+                   <span className="text-[13px] text-slate-800">India</span>
+                 </label>
 
-               <label className="flex items-center gap-3 cursor-pointer">
-                 <input 
-                   type="radio" 
-                   name="location" 
-                   checked={location === "another"}
-                   onChange={() => setLocation("another")}
-                   className="w-4 h-4 text-blue-600" 
-                 />
-                 <span className="text-[13px] text-slate-800">Enter another location</span>
-               </label>
-             </div>
+                 <label className="flex items-center gap-3 cursor-pointer">
+                   <input 
+                     type="radio" 
+                     name="location" 
+                     checked={location === "another"}
+                     onChange={() => setLocation("another")}
+                     className="w-4 h-4 text-blue-600 accent-blue-600" 
+                   />
+                   <span className="text-[13px] text-slate-800">Enter another location</span>
+                 </label>
+               </div>
 
-             <div className="mt-4 ml-2 flex items-center gap-1 text-blue-600 cursor-pointer hover:underline text-[13px] font-medium">
-                <ChevronDown className="w-4 h-4" /> Location options
-             </div>
+               <div className="mt-4 ml-2 flex items-center gap-1 text-blue-600 cursor-pointer hover:underline text-[13px] font-medium">
+                  <ChevronDown className="w-4 h-4" /> Location options
+               </div>
+            </div>
           </div>
-        </div>
 
         {/* Languages Panel */}
         <div 
           id="panel-languages" 
           onClick={() => onSubStepChange?.('languages')}
-          className={`settings-panel-section bg-white border shadow-sm rounded-md overflow-hidden transition-all duration-200 ${activeSubStep === 'languages' ? 'border-blue-500 shadow-md ring-1 ring-blue-500' : 'border-slate-200'}`}
+          className="settings-panel-section bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden"
         >
           <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-50">
              <h2 className={`text-[14px] ${activeSubStep === 'languages' ? 'text-blue-700 font-medium' : 'text-slate-800'}`}>Languages</h2>
              <ChevronUp className="w-5 h-5 text-slate-500" />
           </div>
-          <div className="p-6">
+          <div className="p-6 pb-8">
              <div className="flex items-center gap-1 mb-4">
                <label className="text-[13px] text-slate-800">Select the languages your customers speak.</label>
                <HelpCircle className="w-3.5 h-3.5 text-slate-500" />
@@ -155,13 +164,52 @@ export default function GoogleAdsCampaignSettingsStep({ onNext, activeSubStep, o
              
              <div className="relative w-full max-w-[400px]">
                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                 <Search className="h-4 w-4 text-slate-400" />
+                 <Search className="h-4 w-4 text-slate-500" />
                </div>
                <input 
                  type="text" 
-                 className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-md text-[13px] placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                 className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-sm text-[13px] placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                  placeholder="Start typing or select a language"
+                 onFocus={() => setIsLanguagesOpen(true)}
+                 onBlur={() => setTimeout(() => setIsLanguagesOpen(false), 200)}
                />
+               
+               {isLanguagesOpen && (
+                 <div className="absolute top-full left-0 w-full mt-1 bg-white border border-slate-200 shadow-lg rounded-sm max-h-[300px] overflow-y-auto z-[100] py-2">
+                   <div className="flex items-center gap-3 px-4 py-2 hover:bg-slate-50 cursor-pointer">
+                     <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600" />
+                     <span className="text-[13px] text-slate-800">All languages</span>
+                   </div>
+                   <div className="flex items-center gap-3 px-4 py-2 hover:bg-slate-50 cursor-pointer">
+                     <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600" />
+                     <span className="text-[13px] text-slate-800">Arabic</span>
+                   </div>
+                   <div className="flex items-center gap-3 px-4 py-2 hover:bg-slate-50 cursor-pointer">
+                     <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600" />
+                     <span className="text-[13px] text-slate-800">Bengali</span>
+                   </div>
+                   <div className="flex items-center gap-3 px-4 py-2 hover:bg-slate-50 cursor-pointer">
+                     <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600" />
+                     <span className="text-[13px] text-slate-800">Bulgarian</span>
+                   </div>
+                   <div className="flex items-center gap-3 px-4 py-2 hover:bg-slate-50 cursor-pointer">
+                     <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600" />
+                     <span className="text-[13px] text-slate-800">Catalan</span>
+                   </div>
+                   <div className="flex items-center gap-3 px-4 py-2 hover:bg-slate-50 cursor-pointer">
+                     <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600" />
+                     <span className="text-[13px] text-slate-800">Chinese (simplified)</span>
+                   </div>
+                   <div className="flex items-center gap-3 px-4 py-2 hover:bg-slate-50 cursor-pointer">
+                     <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600" />
+                     <span className="text-[13px] text-slate-800">Chinese (traditional)</span>
+                   </div>
+                   <div className="flex items-center gap-3 px-4 py-2 hover:bg-slate-50 cursor-pointer">
+                     <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600" />
+                     <span className="text-[13px] text-slate-800">Croatian</span>
+                   </div>
+                 </div>
+               )}
              </div>
 
              <div className="mt-4 flex flex-wrap gap-2">
@@ -173,84 +221,123 @@ export default function GoogleAdsCampaignSettingsStep({ onNext, activeSubStep, o
           </div>
         </div>
 
-        {/* EU political ads Panel */}
-        <div 
-          id="panel-eu-political-ads" 
-          onClick={() => onSubStepChange?.('eu-political-ads')}
-          className={`settings-panel-section bg-white border shadow-sm rounded-md overflow-hidden transition-all duration-200 ${activeSubStep === 'eu-political-ads' ? 'border-blue-500 shadow-md ring-1 ring-blue-500' : 'border-slate-200'}`}
-        >
-          <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-50">
-             <h2 className={`text-[14px] ${activeSubStep === 'eu-political-ads' ? 'text-blue-700 font-medium' : 'text-slate-800'}`}>EU political ads</h2>
-             <ChevronUp className="w-5 h-5 text-slate-500" />
+        {/* More Settings Button (Only for PMax) */}
+        {isPMax && (
+          <div className="mt-2">
+            <button className="flex items-center gap-2 px-4 py-2 text-[13px] font-medium text-blue-600 hover:bg-slate-100 rounded-md transition-colors">
+              <Settings className="w-4 h-4" />
+              More settings
+            </button>
           </div>
+        )}
+
+        {/* EU political ads Panel */}
+        {!isPMax && (
+          <div 
+            id="panel-eu-political-ads" 
+            onClick={() => onSubStepChange?.('eu-political-ads')}
+            className="settings-panel-section bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden"
+          >
+            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-50">
+               <h2 className={`text-[14px] ${activeSubStep === 'eu-political-ads' ? 'text-blue-700 font-medium' : 'text-slate-800'}`}>EU political ads</h2>
+               <ChevronUp className="w-5 h-5 text-slate-500" />
+            </div>
           <div className="p-6 flex gap-6">
              <div className="flex-1">
                <div className="text-[13px] text-slate-800 mb-1">Does your campaign have European Union political ads?</div>
                <div className="text-[11px] text-slate-500 mb-4">Required</div>
                
-               <div className="flex flex-col gap-3 ml-2">
-                 <label className="flex items-center gap-3 cursor-pointer">
-                   <input 
-                     type="radio" 
-                     name="eupolitical" 
-                     checked={euPolitical === "yes"}
-                     onChange={() => setEuPolitical("yes")}
-                     className="w-4 h-4 text-blue-600" 
-                   />
-                   <span className="text-[13px] text-slate-800">Yes, this campaign has EU political ads</span>
-                 </label>
+               <div className="flex flex-col gap-4 ml-1">
+                 <div>
+                   <label className="flex items-center gap-3 cursor-pointer mb-2">
+                     <input 
+                       type="radio" 
+                       name="eupolitical" 
+                       checked={euPolitical === "yes"}
+                       onChange={() => setEuPolitical("yes")}
+                       className="w-4 h-4 text-blue-600 accent-blue-600" 
+                     />
+                     <span className="text-[13px] text-slate-800">Yes, this campaign has EU political ads</span>
+                   </label>
+                   
+                   {euPolitical === "yes" && (
+                     <div className="ml-7 bg-[#f8fbff] border border-blue-100 rounded-md p-4 flex gap-3 max-w-[500px]">
+                       <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                       <div className="text-[12px] text-slate-700 leading-relaxed">
+                         <div className="font-medium text-slate-800 mb-1 text-[13px]">Your campaign can't run in the European Union</div>
+                         Google Ads doesn't allow campaigns with EU political ads to run in the EU. You can still run your campaign in other regions. <a href="#" className="text-blue-600 hover:underline">Learn more about the EU political ads policy</a>
+                       </div>
+                     </div>
+                   )}
+                 </div>
                  
-                 <label className="flex items-center gap-3 cursor-pointer">
-                   <input 
-                     type="radio" 
-                     name="eupolitical" 
-                     checked={euPolitical === "no"}
-                     onChange={() => setEuPolitical("no")}
-                     className="w-4 h-4 text-blue-600" 
-                   />
-                   <span className="text-[13px] text-slate-800">No, this campaign doesn't have EU political ads</span>
-                 </label>
+                 <div>
+                   <label className="flex items-center gap-3 cursor-pointer">
+                     <input 
+                       type="radio" 
+                       name="eupolitical" 
+                       checked={euPolitical === "no"}
+                       onChange={() => setEuPolitical("no")}
+                       className="w-4 h-4 text-blue-600 accent-blue-600" 
+                     />
+                     <span className="text-[13px] text-slate-800">No, this campaign doesn't have EU political ads</span>
+                   </label>
+                   
+                   {euPolitical === "no" && (
+                     <div className="ml-7 mt-2 text-[12px] text-slate-500 leading-relaxed max-w-[500px]">
+                       I don't plan to use this account to run EU political ads.<br />
+                       The same selection will be applied to all new and existing campaigns. You can change this for any campaign at any time.
+                     </div>
+                   )}
+                 </div>
                </div>
              </div>
 
-             <div className="w-[300px] shrink-0 border-l border-slate-200 pl-6 text-[12px] text-slate-600 flex flex-col justify-center">
-               <div className="text-slate-800 mb-1">EU regulation requires Google to ask this question</div>
+             <div className="w-[280px] shrink-0 border-l border-slate-200 pl-6 text-[12px] text-slate-600">
+               <div className="text-slate-800 mb-1 leading-snug">EU regulation requires Google to ask this question</div>
                <a href="#" className="text-blue-600 hover:underline">Learn how an EU political ad is defined</a>
              </div>
           </div>
         </div>
+        )}
 
-        {/* Audience segments Panel */}
-        <div 
-          id="panel-audience-segments" 
-          onClick={() => onSubStepChange?.('audience-segments')}
-          className={`settings-panel-section bg-white border shadow-sm rounded-md overflow-hidden transition-all duration-200 ${activeSubStep === 'audience-segments' ? 'border-blue-500 shadow-md ring-1 ring-blue-500' : 'border-slate-200'}`}
-        >
-          <div className="px-6 py-4 flex justify-between items-center cursor-pointer hover:bg-slate-50">
-             <div className="flex items-center">
-               <h2 className={`text-[14px] w-[180px] ${activeSubStep === 'audience-segments' ? 'text-blue-700 font-medium' : 'text-slate-800 font-medium'}`}>Audience segments</h2>
-               <span className="text-[13px] text-slate-600 ml-4">Select audience segments to add to your campaign.</span>
-             </div>
-             <ChevronDown className="w-5 h-5 text-slate-500" />
+        {/* Audience segments Panel - Hidden for PMax */}
+        {!isPMax && (
+          <div 
+            id="panel-audience-segments" 
+            onClick={() => onSubStepChange?.('audience-segments')}
+            className={`settings-panel-section bg-white border shadow-sm rounded-md overflow-hidden transition-all duration-200 ${activeSubStep === 'audience-segments' ? 'border-blue-500 shadow-md ring-1 ring-blue-500' : 'border-slate-200'}`}
+          >
+            <div className="px-6 py-4 flex justify-between items-center cursor-pointer hover:bg-slate-50">
+               <div className="flex items-center">
+                 <h2 className={`text-[14px] w-[180px] ${activeSubStep === 'audience-segments' ? 'text-blue-700 font-medium' : 'text-slate-800 font-medium'}`}>Audience segments</h2>
+                 <span className="text-[13px] text-slate-600 ml-4">Select audience segments to add to your campaign.</span>
+               </div>
+               <ChevronDown className="w-5 h-5 text-slate-500" />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* More settings */}
-        <div className="bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden cursor-pointer hover:bg-slate-50 transition-colors">
-          <div className="px-6 py-4 flex items-center gap-2 text-blue-600">
-             <Settings className="w-5 h-5" />
-             <span className="text-[14px] font-medium">More settings</span>
+        {!isPMax && (
+          <div className="bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden cursor-pointer hover:bg-slate-50 transition-colors">
+            <div className="px-6 py-4 flex items-center gap-2 text-blue-600">
+               <Settings className="w-5 h-5" />
+               <span className="text-[14px] font-medium">More settings</span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      <div className="mt-8 flex justify-between items-center w-full pb-8">
-         <div className="text-[12px] text-slate-500">
-            All changes saved
+      {/* Footer */}
+      <div className="mt-8 flex justify-between items-center w-full">
+         <div className="text-[11px] text-slate-500">
+           © Google, 2025.{" "}
+           <a href="#" className="text-blue-600 hover:underline" onClick={e => e.preventDefault()}>Leave feedback</a>
          </div>
          <button 
            onClick={onNext}
-           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium text-sm transition-colors"
+           className="bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-medium px-6 py-2 rounded shadow-sm transition-colors"
          >
            Next
          </button>

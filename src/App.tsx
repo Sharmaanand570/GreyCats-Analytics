@@ -47,8 +47,8 @@ const InstagramInsightsPage = lazy(
 );
 
 const GoogleAdsConnectPage = lazy(() => import("./pages/GoogleAdsConnectPage"));
-// GoogleAdsWizardPage and GoogleAdsDashboardPage are routed via AdsManagerComingSoonPage
-// for now — removed to fix TS6133.
+// Routing Google Ads to the newly available dashboard
+const GoogleAdsDashboardPage = lazy(() => import("./pages/GoogleAdsDashboardPage"));
 const AdsManagerComingSoonPage = lazy(() => import("./pages/AdsManagerComingSoonPage"));
 const ReportsLandingPage = lazy(() => import("./pages/ReportsLandingPage"));
 
@@ -202,14 +202,10 @@ function App() {
                   path="meta-instagram/:clientId?"
                   element={<InstagramInsightsPage />}
                 />
-                {/* Google Ads — Campaign Publisher Wizard live 2026-05-26.
-                    The wizard mirrors the Meta Ads flow with a 6-step
-                    objective → settings → bidding → ad group → creative →
-                    review pipeline. Until a dashboard/listing page ships,
-                    every Google Ads route lands directly in the wizard. */}
+                {/* Google Ads Dashboard */}
                 <Route path="google-ads">
-                  <Route index element={<AdsManagerComingSoonPage activeTab="google-ads" />} />
-                  <Route path="*" element={<AdsManagerComingSoonPage activeTab="google-ads" />} />
+                  <Route index element={<GoogleAdsDashboardPage />} />
+                  <Route path="*" element={<GoogleAdsDashboardPage />} />
                 </Route>
                 <Route path="twitter/:clientId?" element={<TwitterDetailPage />} />
                 <Route path="linkedin/:clientId?" element={<LinkedinDetailPage />} />

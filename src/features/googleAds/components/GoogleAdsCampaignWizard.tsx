@@ -8,6 +8,7 @@ import GoogleAdsSummaryStep from "./GoogleAdsSummaryStep";
 import GoogleAdsAIMaxStep from "./GoogleAdsAIMaxStep";
 import GoogleAdsKeywordAssetGenStep from "./GoogleAdsKeywordAssetGenStep";
 import GoogleAdsKeywordsAndAdsStep from "./GoogleAdsKeywordsAndAdsStep";
+import GoogleAdsVideoSettingsStep from "./GoogleAdsVideoSettingsStep";
 
 interface WizardProps {
   onCancel: () => void;
@@ -26,6 +27,11 @@ export default function GoogleAdsCampaignWizard({ campaignType }: WizardProps) {
     { id: 5, name: "Keywords and ads", component: GoogleAdsKeywordsAndAdsStep },
     { id: 6, name: "Budget", component: GoogleAdsBudgetStep },
     { id: 7, name: "Review", component: GoogleAdsSummaryStep },
+  ] : campaignType === "Video" ? [
+    { id: 1, name: "Campaign settings", component: GoogleAdsVideoSettingsStep },
+    { id: 2, name: "Ad group", component: GoogleAdsAssetGroupStep },
+    { id: 3, name: "Ads", component: GoogleAdsSummaryStep },
+    { id: 4, name: "Bid", component: GoogleAdsSummaryStep },
   ] : [
     { id: 1, name: "Bidding", component: GoogleAdsBiddingStep },
     { id: 2, name: "Campaign settings", component: GoogleAdsCampaignSettingsStep },
@@ -58,18 +64,26 @@ export default function GoogleAdsCampaignWizard({ campaignType }: WizardProps) {
            
            <div className="flex flex-col px-2">
              {steps.map((step) => (
-                <div key={step.id} className={`flex flex-col ${currentStep === step.id ? "bg-[#e8f0fe] rounded-md" : ""}`}>
+                <div key={step.id} className="flex flex-col">
                   <div 
                     className="flex items-center gap-3 px-4 py-3 cursor-pointer"
                     onClick={() => {
-                      setCurrentStep(step.id);
-                      if (step.id === 1) setActiveSubStep("bidding");
-                      if (step.id === 2) setActiveSubStep("networks");
-                      if (campaignType === "Search") {
-                         if (step.id === 6) setActiveSubStep("budget");
+                      if (campaignType === "Video") {
+                        // For Video, all content is in one scrollable page – scroll to section
+                        if (step.id === 1) { setActiveSubStep("name"); }
+                        else if (step.id === 2) { setActiveSubStep("ad-group-name"); setCurrentStep(2); }
+                        else if (step.id === 3) { setActiveSubStep("ads"); setCurrentStep(3); setTimeout(() => { document.getElementById('panel-ads')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50); }
+                        else if (step.id === 4) { setActiveSubStep("bid"); setCurrentStep(4); setTimeout(() => { document.getElementById('panel-bid')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50); }
                       } else {
-                         if (step.id === 3) setActiveSubStep("name");
-                         if (step.id === 4) setActiveSubStep("budget");
+                        setCurrentStep(step.id);
+                        if (step.id === 1) setActiveSubStep("bidding");
+                        if (step.id === 2) setActiveSubStep("networks");
+                        if (campaignType === "Search") {
+                           if (step.id === 6) setActiveSubStep("budget");
+                        } else {
+                           if (step.id === 3) setActiveSubStep("name");
+                           if (step.id === 4) setActiveSubStep("budget");
+                        }
                       }
                     }}
                   >
@@ -87,20 +101,20 @@ export default function GoogleAdsCampaignWizard({ campaignType }: WizardProps) {
                   {currentStep === step.id && step.id === 1 && (
                      <div className="flex flex-col pl-11 pb-2 gap-3 text-[13px] text-slate-600">
                         <div 
-                          className={`cursor-pointer transition-colors ${activeSubStep === 'bidding' ? 'text-blue-700 font-medium border-l-2 border-blue-600 -ml-[23px] pl-[21px]' : 'hover:text-slate-900'}`}
+                          className={`cursor-pointer transition-colors ${activeSubStep === 'bidding' ? 'text-blue-700 font-medium' : 'hover:text-slate-900'}`}
                           onClick={() => handleSubMenuClick('bidding')}
                         >
                           Bidding
                         </div>
                         <div 
-                          className={`cursor-pointer transition-colors ${activeSubStep === 'acquisition' ? 'text-blue-700 font-medium border-l-2 border-blue-600 -ml-[23px] pl-[21px]' : 'hover:text-slate-900'}`}
+                          className={`cursor-pointer transition-colors ${activeSubStep === 'acquisition' ? 'text-blue-700 font-medium' : 'hover:text-slate-900'}`}
                           onClick={() => handleSubMenuClick('acquisition')}
                         >
                           Customer acquisition
                         </div>
                         {campaignType === "Performance Max" && (
                           <div 
-                            className={`cursor-pointer transition-colors ${activeSubStep === 'retention' ? 'text-blue-700 font-medium border-l-2 border-blue-600 -ml-[23px] pl-[21px]' : 'hover:text-slate-900'}`}
+                            className={`cursor-pointer transition-colors ${activeSubStep === 'retention' ? 'text-blue-700 font-medium' : 'hover:text-slate-900'}`}
                             onClick={() => handleSubMenuClick('retention')}
                           >
                             Customer retention
@@ -109,46 +123,99 @@ export default function GoogleAdsCampaignWizard({ campaignType }: WizardProps) {
                      </div>
                   )}
 
-                  {/* Active Step Sub-menu (for Campaign settings) */}
-                  {currentStep === step.id && step.id === 2 && (
+                  {/* Active Step Sub-menu (for Campaign settings - Non Video) */}
+                  {currentStep === step.id && step.id === 2 && campaignType !== "Video" && (
                      <div className="flex flex-col pl-11 pb-2 gap-3 text-[13px] text-slate-600">
+                        {campaignType !== "Performance Max" && (
+                          <div 
+                            className={`cursor-pointer transition-colors ${activeSubStep === 'networks' ? 'text-blue-700 font-medium' : 'hover:text-slate-900'}`}
+                            onClick={() => handleSubMenuClick('networks')}
+                          >
+                            Network
+                          </div>
+                        )}
                         <div 
-                          className={`cursor-pointer transition-colors ${activeSubStep === 'networks' ? 'text-blue-700 font-medium border-l-2 border-blue-600 -ml-[23px] pl-[21px]' : 'hover:text-slate-900'}`}
-                          onClick={() => handleSubMenuClick('networks')}
-                        >
-                          Network
-                        </div>
-                        <div 
-                          className={`cursor-pointer transition-colors ${activeSubStep === 'locations' ? 'text-blue-700 font-medium border-l-2 border-blue-600 -ml-[23px] pl-[21px]' : 'hover:text-slate-900'}`}
+                          className={`cursor-pointer transition-colors ${activeSubStep === 'locations' ? 'text-blue-700 font-medium' : 'hover:text-slate-900'}`}
                           onClick={() => handleSubMenuClick('locations')}
                         >
                           Locations
                         </div>
                         <div 
-                          className={`cursor-pointer transition-colors ${activeSubStep === 'languages' ? 'text-blue-700 font-medium border-l-2 border-blue-600 -ml-[23px] pl-[21px]' : 'hover:text-slate-900'}`}
+                          className={`cursor-pointer transition-colors ${activeSubStep === 'languages' ? 'text-blue-700 font-medium' : 'hover:text-slate-900'}`}
                           onClick={() => handleSubMenuClick('languages')}
                         >
                           Languages
                         </div>
-                        <div 
-                          className={`cursor-pointer transition-colors ${activeSubStep === 'eu-political-ads' ? 'text-blue-700 font-medium border-l-2 border-blue-600 -ml-[23px] pl-[21px]' : 'hover:text-slate-900'}`}
-                          onClick={() => handleSubMenuClick('eu-political-ads')}
-                        >
-                          EU political ads
-                        </div>
-                        <div 
-                          className={`cursor-pointer transition-colors ${activeSubStep === 'audience-segments' ? 'text-blue-700 font-medium border-l-2 border-blue-600 -ml-[23px] pl-[21px]' : 'hover:text-slate-900'}`}
-                          onClick={() => handleSubMenuClick('audience-segments')}
-                        >
-                          Audiences
-                        </div>
+                        {campaignType !== "Performance Max" && (
+                          <>
+                            <div 
+                              className={`cursor-pointer transition-colors ${activeSubStep === 'eu-political-ads' ? 'text-blue-700 font-medium' : 'hover:text-slate-900'}`}
+                              onClick={() => handleSubMenuClick('eu-political-ads')}
+                            >
+                              EU political ads
+                            </div>
+                            <div 
+                              className={`cursor-pointer transition-colors ${activeSubStep === 'audience-segments' ? 'text-blue-700 font-medium' : 'hover:text-slate-900'}`}
+                              onClick={() => handleSubMenuClick('audience-segments')}
+                            >
+                              Audiences
+                            </div>
+                          </>
+                        )}
                      </div>
                   )}
 
-                  {/* Active Step Sub-menu */}
-                  {currentStep === step.id && (
+                  {/* Active Step Sub-menu (for Video Campaign settings) */}
+                  {currentStep === step.id && step.id === 1 && campaignType === "Video" && (
                      <div className="flex flex-col pl-11 pb-2 gap-3 text-[13px] text-slate-600">
-                        {step.id === 3 && campaignType !== "Search" && (
+                        {['name', 'ad-formats', 'bid-strategy', 'budget-dates', 'networks', 'locations', 'languages', 'related-videos'].map(sub => (
+                           <div 
+                             key={sub}
+                             className={`cursor-pointer transition-colors capitalize ${activeSubStep === sub ? 'text-blue-700 font-medium' : 'hover:text-slate-900'}`}
+                             onClick={() => handleSubMenuClick(sub)}
+                           >
+                             {sub.replace(/-/g, ' ')}
+                           </div>
+                        ))}
+                     </div>
+                  )}
+
+                  {/* Active Step Sub-menu (for Video Ad group) */}
+                  {currentStep === step.id && step.id === 2 && campaignType === "Video" && (
+                     <div className="flex flex-col pl-11 pb-2 gap-3 text-[13px] text-slate-600">
+                        {['ad-group-name', 'audience', 'content'].map(sub => (
+                           <div key={sub} className="flex flex-col gap-3">
+                             <div 
+                               className={`cursor-pointer transition-colors capitalize ${activeSubStep === sub || (sub === 'content' && ['keywords', 'topics', 'placements'].includes(activeSubStep)) ? 'text-blue-700 font-medium border-l-2 border-blue-600 -ml-[23px] pl-[21px]' : 'hover:text-slate-900'}`}
+                               onClick={() => handleSubMenuClick(sub)}
+                             >
+                               <div className="flex items-center gap-1 -ml-4">
+                                 {sub === 'content' ? <svg viewBox="0 0 24 24" fill="currentColor" className={`w-3 h-3 text-slate-400 transition-transform ${['content', 'keywords', 'topics', 'placements'].includes(activeSubStep) ? 'rotate-90' : ''}`}><path d="M8 5v14l11-7z"/></svg> : <div className="w-3 h-3"></div>}
+                                 {sub.replace(/-/g, ' ')}
+                               </div>
+                             </div>
+                             {sub === 'content' && ['content', 'keywords', 'topics', 'placements'].includes(activeSubStep) && (
+                               <div className="flex flex-col gap-3 mt-1">
+                                 {['keywords', 'topics', 'placements'].map(nested => (
+                                   <div 
+                                     key={nested}
+                                     className={`cursor-pointer transition-colors capitalize ${activeSubStep === nested ? 'text-blue-700 font-medium border-l-2 border-blue-600 -ml-[23px] pl-[21px]' : 'hover:text-slate-900 pl-[21px] -ml-[23px]'}`}
+                                     onClick={() => handleSubMenuClick(nested)}
+                                   >
+                                     {nested}
+                                   </div>
+                                 ))}
+                               </div>
+                             )}
+                           </div>
+                        ))}
+                     </div>
+                  )}
+
+                  {/* Active Step Sub-menu — only render when there are sub-items */}
+                  {currentStep === step.id && !(campaignType === "Video" && (step.id === 3 || step.id === 4)) && (
+                     <div className="flex flex-col pl-11 pb-2 gap-3 text-[13px] text-slate-600">
+                        {step.id === 3 && campaignType !== "Search" && campaignType !== "Video" && (
                           ['name', 'listing-groups', 'final-url', 'brand-guidelines', 'assets', 'asset-optimization', 'search-themes', 'audience-signal'].map(sub => (
                              <div 
                                key={sub}
@@ -198,34 +265,55 @@ export default function GoogleAdsCampaignWizard({ campaignType }: WizardProps) {
 
         {/* Main Content Area */}
         <div className="flex-1 overflow-y-auto px-10 py-6 pb-20 scroll-smooth">
-           <CurrentStepComponent 
-             onNext={() => {
-               setCurrentStep(prev => {
-                 const next = prev + 1;
-                 if (next === 2) setActiveSubStep("networks");
-                 if (campaignType === "Search") {
-                    if (next === 6) setActiveSubStep("budget");
-                 } else {
-                    if (next === 3) setActiveSubStep("name");
-                    if (next === 4) setActiveSubStep("budget");
+           {campaignType === "Video" ? (
+             <GoogleAdsVideoSettingsStep 
+               onNext={() => {}} 
+               activeSubStep={activeSubStep}
+               onSubStepChange={(subStepId: string) => {
+                 setActiveSubStep(subStepId);
+                 if (['name', 'ad-formats', 'bid-strategy', 'budget-dates', 'networks', 'locations', 'languages', 'related-videos'].includes(subStepId)) {
+                   setCurrentStep(1);
+                 } else if (['ad-group', 'ad-group-name', 'audience', 'content', 'keywords', 'topics', 'placements'].includes(subStepId)) {
+                   setCurrentStep(2);
+                 } else if (subStepId === 'ads') {
+                   setCurrentStep(3);
+                 } else if (subStepId === 'bid') {
+                   setCurrentStep(4);
                  }
-                 return next;
-               });
-             }} 
-             activeSubStep={activeSubStep}
-             onSubStepChange={setActiveSubStep}
-             campaignType={campaignType}
-             onNavigateToStep={(stepId: number, subStepId: string) => {
-               setCurrentStep(stepId);
-               setActiveSubStep(subStepId);
-               setTimeout(() => {
-                 const element = document.getElementById(`panel-${subStepId}`);
-                 if (element) {
-                   element.scrollIntoView({ behavior: "smooth", block: "start" });
-                 }
-               }, 100);
-             }}
-           />
+               }}
+             />
+           ) : (
+             <CurrentStepComponent 
+               onNext={() => {
+                 setCurrentStep(prev => {
+                   const next = prev + 1;
+                   if (next === 2) {
+                     setActiveSubStep(campaignType === "Performance Max" ? "languages" : "networks");
+                   }
+                   if (campaignType === "Search") {
+                      if (next === 6) setActiveSubStep("budget");
+                   } else {
+                      if (next === 3) setActiveSubStep("name");
+                      if (next === 4) setActiveSubStep("budget");
+                   }
+                   return next;
+                 });
+               }} 
+               activeSubStep={activeSubStep}
+               onSubStepChange={setActiveSubStep}
+               campaignType={campaignType}
+               onNavigateToStep={(stepId: number, subStepId: string) => {
+                 setCurrentStep(stepId);
+                 setActiveSubStep(subStepId);
+                 setTimeout(() => {
+                   const element = document.getElementById(`panel-${subStepId}`);
+                   if (element) {
+                     element.scrollIntoView({ behavior: "smooth", block: "start" });
+                   }
+                 }, 100);
+               }}
+             />
+           )}
         </div>
 
         {/* Right Sidebar */}

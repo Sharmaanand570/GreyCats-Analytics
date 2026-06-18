@@ -20,7 +20,7 @@ export default function SeoReporterPage() {
   };
 
   return (
-    <div className="relative flex flex-col items-center py-16 px-4 md:px-8 min-h-full bg-background overflow-hidden">
+    <div className="relative flex flex-col items-center py-16 px-4 md:px-8 min-h-full bg-background overflow-x-clip">
       {/* Premium Background Gradients */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />

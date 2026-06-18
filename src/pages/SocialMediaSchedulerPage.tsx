@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSocialMediaStore } from '@/store/useSocialMediaStore';
 import { SocialMediaCalendar } from '@/features/social-media/components/SocialMediaCalendar';
@@ -1136,7 +1136,7 @@ export default function SocialMediaSchedulerPage() {
 
   // Wrap setCurrentClient to persist lastClientId, update URL, and reset the post draft.
   // This ensures no form state bleeds across client switches.
-  const setCurrentClient = React.useCallback((client: ClientWithIntegrations | null) => {
+  const setCurrentClient = useCallback((client: ClientWithIntegrations | null) => {
     if (!client) {
       isClearingClient.current = true;
     } else {

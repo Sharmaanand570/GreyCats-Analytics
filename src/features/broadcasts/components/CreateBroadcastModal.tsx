@@ -43,7 +43,7 @@ import {
 import { cn } from '@/lib/utils';
 import { InlineTemplateCreator } from './InlineTemplateCreator';
 import { InlineGatewayCreator } from './InlineGatewayCreator';
-import { WhatsAppTemplateCreator } from './WhatsAppTemplateCreator';
+// import { WhatsAppTemplateCreator } from './WhatsAppTemplateCreator';
 
 interface CreateBroadcastModalProps {
   isOpen: boolean;
@@ -618,6 +618,14 @@ export function CreateBroadcastModal({ isOpen, onClose, clientId, fixedChannel }
               </div>
 
               <div className="max-w-2xl mx-auto mt-6">
+                {(isSms || isWhatsapp) && (
+                  <div className="flex items-start gap-2 p-3 mb-4 bg-amber-50 border border-amber-100 rounded-xl">
+                    <Info className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                    <p className="text-xs text-amber-800 leading-relaxed font-medium">
+                      {isWhatsapp ? "WhatsApp numbers" : "SMS numbers"} should include their country code prefix (e.g., 91 for India). International numbers should use their respective country codes.
+                    </p>
+                  </div>
+                )}
                 {recipientMode === 'manual' ? (
                   <div className="space-y-3">
                      <div className="relative group">

@@ -26,6 +26,7 @@ interface DayBlogPostsSheetProps {
   onStatusClick?: (status: BlogPostStatus) => void;
   isPast?: boolean;
   isDeleting?: boolean;
+  canPost?: boolean;
 }
 
 export function DayBlogPostsSheet({
@@ -39,6 +40,7 @@ export function DayBlogPostsSheet({
   onStatusClick,
   isPast = false,
   isDeleting = false,
+  canPost = true,
 }: DayBlogPostsSheetProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -53,7 +55,7 @@ export function DayBlogPostsSheet({
                 {posts.length} blog {posts.length === 1 ? 'post' : 'posts'} scheduled
               </p>
             </div>
-            {!isPast && (
+            {!isPast && canPost && (
               <Button
                 size="sm"
                 onClick={onNewPost}
@@ -167,7 +169,7 @@ export function DayBlogPostsSheet({
                       ) : null}
                     </div>
                     <div className="flex items-center gap-1.5">
-                      {post.status === 'PENDING' && (
+                      {post.status === 'PENDING' && canPost && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -178,16 +180,18 @@ export function DayBlogPostsSheet({
                           Edit
                         </Button>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-3 text-xs font-semibold text-red-500 hover:text-red-700 hover:bg-red-50 gap-1.5 rounded-lg"
-                        onClick={() => onDelete(post)}
-                        disabled={isDeleting}
-                      >
-                        {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                        Delete
-                      </Button>
+                      {canPost && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-3 text-xs font-semibold text-red-500 hover:text-red-700 hover:bg-red-50 gap-1.5 rounded-lg"
+                          onClick={() => onDelete(post)}
+                          disabled={isDeleting}
+                        >
+                          {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                          Delete
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -266,6 +266,7 @@ function MainSideBar(): React.JSX.Element {
     }] : []),
     {
       label: "SEO Tools",
+      badge: "Beta",
       isCollapsible: true,
       items: [
         { label: "SEO Reporter", path: "/seo-report", icon: <Search /> }
@@ -291,10 +292,11 @@ function MainSideBar(): React.JSX.Element {
     }] : []),
     ...(hasAdsAccess ? [{
       label: "Ads Manager",
+      badge: "Soon",
       isCollapsible: true,
       items: [
-        { label: "Meta Ads", path: "/data-sources/meta-ads", icon: <Megaphone /> },
-        { label: "Google Ads", path: "/data-sources/google-ads", icon: <SiGoogleads className="w-[18px] h-[18px]" /> },
+        { label: "Meta Ads", path: "/data-sources/meta-ads", icon: <Megaphone />, isComingSoon: true },
+        { label: "Google Ads", path: "/data-sources/google-ads", icon: <SiGoogleads className="w-[18px] h-[18px]" />, isComingSoon: true },
       ],
     }] : []),
     {
@@ -379,9 +381,16 @@ function MainSideBar(): React.JSX.Element {
                       }`}
                     >
                       {group.isCollapsible ? (
-                        <span className="text-[13px] font-medium tracking-wide">
-                          {group.label}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[13px] font-medium tracking-wide">
+                            {group.label}
+                          </span>
+                          {group.badge && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-400 px-1.5 py-px rounded shadow-sm border border-blue-500/30">
+                              {group.badge}
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-[11px] tracking-wider uppercase">
                           {group.label}
@@ -629,7 +638,7 @@ function MainSideBar(): React.JSX.Element {
           the page content appears as a floating rounded panel lifted off the
           sidebar. Each page's own bg class then fills the inner panel. */}
       <div className="flex-1 flex flex-col bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] py-4">
-        <main className="flex-1 rounded-l-2xl overflow-y-auto custom-scrollbar bg-[#F9FAFB]">
+        <main className="flex-1 rounded-l-2xl overflow-y-auto custom-scrollbar bg-[#F9FAFB] flex flex-col">
           <TrialExpiryBanner />
           <ImpersonationBanner />
           <GlobalOAuthHandler />

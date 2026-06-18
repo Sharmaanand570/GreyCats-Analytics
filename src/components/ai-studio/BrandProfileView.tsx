@@ -26,6 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { formatDistanceToNow } from "date-fns";
 import {
   Loader2,
   Upload,
@@ -42,8 +44,6 @@ import {
   Shield,
   BookOpen,
   Check,
-  AlertTriangle,
-  ArrowUp,
   XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -216,6 +216,8 @@ export function BrandProfileView({ clientId, activeSubTab, onNavigate }: Props) 
   const [suggestions, setSuggestions] = useState<BrandSuggestion[]>([]);
   const [appliedFields, setAppliedFields] = useState<string[]>([]);
   const [dismissedFields, setDismissedFields] = useState<string[]>([]);
+  const [completionPct, setCompletionPct] = useState<number>(0);
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const pendingSaveRef = useRef(false);
 
 
@@ -344,6 +346,8 @@ export function BrandProfileView({ clientId, activeSubTab, onNavigate }: Props) 
       setSuggestions(data.suggestions || []);
       setAppliedFields(data.appliedFields || []);
       setDismissedFields(data.dismissedFields || []);
+      setCompletionPct(data.completionPct || 0);
+      setGeneratedAt((data as any).generatedAt || new Date().toISOString());
       setOptimizeOpen(true);
     },
     onError: (err: any) => toast.error(err?.response?.data?.message || "Optimization failed"),
@@ -352,13 +356,14 @@ export function BrandProfileView({ clientId, activeSubTab, onNavigate }: Props) 
   // Close panel when switching tabs
   useEffect(() => { setOptimizeOpen(false); }, [activeSubTab]);
 
-  // Load persisted optimization data from profile
   useEffect(() => {
     if (profileQuery.data?.optimizationData) {
       const d = profileQuery.data.optimizationData as any;
       if (d.suggestions?.length) setSuggestions(d.suggestions);
       if (d.appliedFields) setAppliedFields(d.appliedFields);
       if (d.dismissedFields) setDismissedFields(d.dismissedFields);
+      if (d.completionPct !== undefined) setCompletionPct(d.completionPct);
+      if (d.generatedAt) setGeneratedAt(d.generatedAt);
     }
   }, [profileQuery.data]);
 
@@ -375,23 +380,24 @@ export function BrandProfileView({ clientId, activeSubTab, onNavigate }: Props) 
       valueProposition: setValueProposition, missionStatement: setMissionStatement,
       brandStory: setBrandStory, additionalContext: setAdditionalContext,
     };
-    if (s.field === "brandVoice" && ["PROFESSIONAL","FRIENDLY","BOLD","LUXURY","QUIRKY","MINIMALIST"].includes(s.suggestion)) {
-      setBrandVoice(s.suggestion as BrandVoice);
+    const textToApply = (s as any).suggestedValue || s.suggestion || "";
+    if (s.field === "brandVoice" && ["PROFESSIONAL","FRIENDLY","BOLD","LUXURY","QUIRKY","MINIMALIST"].includes(textToApply)) {
+      setBrandVoice(textToApply as BrandVoice);
     } else if (s.field === "doList") {
-      setDoList(prev => [...new Set([...prev, ...s.suggestion.split(/[;,]/).map(x => x.trim()).filter(Boolean)])]);
+      setDoList(prev => [...new Set([...prev, ...textToApply.split(/[;,]/).map((x: string) => x.trim()).filter(Boolean)])]);
     } else if (s.field === "dontList") {
-      setDontList(prev => [...new Set([...prev, ...s.suggestion.split(/[;,]/).map(x => x.trim()).filter(Boolean)])]);
+      setDontList(prev => [...new Set([...prev, ...textToApply.split(/[;,]/).map((x: string) => x.trim()).filter(Boolean)])]);
     } else if (setters[s.field]) {
-      setters[s.field](s.suggestion);
+      setters[s.field](textToApply);
     }
     const newApplied = [...new Set([...appliedFields, s.field])];
     setAppliedFields(newApplied);
-    setSuggestions(prev => prev.filter(x => x.field !== s.field));
     pendingSaveRef.current = true;
     // Persist optimization state
     brandApi.saveOptimizationData(clientId, {
-      suggestions: suggestions.filter(x => x.field !== s.field),
+      suggestions,
       appliedFields: newApplied, dismissedFields,
+      completionPct, generatedAt
     }).catch(() => {});
     toast.success(`Applied suggestion for ${FIELD_LABELS[s.field] || s.field}`);
   };
@@ -399,10 +405,10 @@ export function BrandProfileView({ clientId, activeSubTab, onNavigate }: Props) 
   const handleDismissSuggestion = (s: BrandSuggestion) => {
     const newDismissed = [...new Set([...dismissedFields, s.field])];
     setDismissedFields(newDismissed);
-    setSuggestions(prev => prev.filter(x => x.field !== s.field));
     brandApi.saveOptimizationData(clientId, {
-      suggestions: suggestions.filter(x => x.field !== s.field),
+      suggestions,
       appliedFields, dismissedFields: newDismissed,
+      completionPct, generatedAt
     }).catch(() => {});
   };
 
@@ -444,24 +450,44 @@ export function BrandProfileView({ clientId, activeSubTab, onNavigate }: Props) 
     <div className="max-w-4xl pb-24 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
       {/* ── Optimize Bar ── */}
-      {activeSubTab !== "knowledge" && <div className="mb-6 flex items-center justify-end gap-3">
-        {suggestions.length > 0 && (
-          <button onClick={() => setOptimizeOpen(true)} className="flex items-center gap-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 px-3 py-1.5 rounded-full transition-all">
-            <Sparkles className="h-3.5 w-3.5" />
-            {suggestions.length} suggestion{suggestions.length !== 1 ? "s" : ""}
-          </button>
-        )}
-        <Button
-          onClick={() => {
-            if (!hasProfile) { toast.error("Save your brand profile first"); return; }
-            optimizeMutation.mutate();
-          }}
-          disabled={optimizeMutation.isPending}
-          className="gap-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-semibold shadow-md"
-        >
-          {optimizeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          Optimize with AI
-        </Button>
+      {activeSubTab !== "knowledge" && <div className="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3 w-full sm:w-1/2">
+          <div className="text-sm font-bold text-zinc-700 min-w-[40px] text-right">{completionPct}%</div>
+          <Progress 
+            value={completionPct} 
+            className="flex-1"
+            indicatorClassName={
+              completionPct < 40 ? "bg-red-500" :
+              completionPct < 75 ? "bg-amber-500" :
+              "bg-green-500"
+            }
+          />
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-3 w-full sm:w-auto">
+          {generatedAt && (
+            <span className="text-xs font-medium text-zinc-500">
+              Last analyzed: {formatDistanceToNow(new Date(generatedAt))} ago
+            </span>
+          )}
+          {suggestions.length > 0 && (
+            <button onClick={() => setOptimizeOpen(true)} className="flex items-center gap-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 px-3 py-1.5 rounded-full transition-all">
+              <Sparkles className="h-3.5 w-3.5" />
+              {suggestions.length} suggestion{suggestions.length !== 1 ? "s" : ""}
+            </button>
+          )}
+          <Button
+            onClick={() => {
+              if (!hasProfile) { toast.error("Save your brand profile first"); return; }
+              if (appliedFields.length > 0 && !window.confirm("Re-analyzing will overwrite your current suggestions and clear pending items. Continue?")) return;
+              optimizeMutation.mutate();
+            }}
+            disabled={optimizeMutation.isPending}
+            className="gap-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-semibold shadow-md"
+          >
+            {optimizeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            Optimize with AI
+          </Button>
+        </div>
       </div>}
 
       {/* ── Optimization Side Panel ── */}
@@ -482,16 +508,35 @@ export function BrandProfileView({ clientId, activeSubTab, onNavigate }: Props) 
             ) : (
               suggestions.map((s, i) => {
                 const typeInfo = TYPE_LABELS[s.type] || TYPE_LABELS.improve;
+                const isApplied = appliedFields.includes(s.field);
+                const isDismissed = dismissedFields.includes(s.field);
+                const suggestionText = (s as any).suggestedValue || s.suggestion || "";
+                const messageText = (s as any).reason || s.message || "";
+                
+                if (isDismissed) {
+                  return (
+                    <div key={`${s.field}-${i}`} className="border rounded-xl p-4 bg-zinc-50 border-l-4 border-l-zinc-300 opacity-60">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-bold text-zinc-500 line-through">{FIELD_LABELS[s.field] || s.field}</span>
+                        <Badge variant="secondary" className="bg-zinc-200 text-zinc-600">Dismissed</Badge>
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
                   <div key={`${s.field}-${i}`} className={cn("border rounded-xl p-4 bg-white border-l-4", PRIORITY_COLORS[s.priority] || "border-l-zinc-300")}>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-bold text-zinc-900">{FIELD_LABELS[s.field] || s.field}</span>
-                      <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", typeInfo.color)}>{typeInfo.label}</span>
+                      <div className="flex items-center gap-2">
+                        {isApplied && <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none"><Check className="w-3 h-3 mr-1"/> Applied</Badge>}
+                        <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", typeInfo.color)}>{typeInfo.label}</span>
+                      </div>
                     </div>
-                    <p className="text-xs text-zinc-500 mb-2">{s.message}</p>
-                    {s.field !== "knowledgeBase" && (
+                    <p className="text-xs text-zinc-500 mb-2">{messageText}</p>
+                    {s.field !== "knowledgeBase" && suggestionText && (
                       <div className="bg-zinc-50 rounded-lg p-3 text-sm text-zinc-700 mb-3 border border-zinc-100">
-                        {s.suggestion.length > 200 ? s.suggestion.slice(0, 200) + "..." : s.suggestion}
+                        {suggestionText.length > 200 ? suggestionText.slice(0, 200) + "..." : suggestionText}
                       </div>
                     )}
                     <div className="flex gap-2">
@@ -500,11 +545,11 @@ export function BrandProfileView({ clientId, activeSubTab, onNavigate }: Props) 
                           <Upload className="h-3 w-3" /> Go to Knowledge
                         </Button>
                       ) : (
-                        <Button size="sm" className="text-xs rounded-lg gap-1 bg-zinc-900 hover:bg-zinc-800" onClick={() => handleApplySuggestion(s)}>
+                        <Button size="sm" disabled={isApplied} className="text-xs rounded-lg gap-1 bg-zinc-900 hover:bg-zinc-800" onClick={() => handleApplySuggestion(s)}>
                           <Check className="h-3 w-3" /> Apply
                         </Button>
                       )}
-                      <Button size="sm" variant="ghost" className="text-xs rounded-lg text-zinc-400 hover:text-red-500" onClick={() => handleDismissSuggestion(s)}>
+                      <Button size="sm" disabled={isApplied} variant="ghost" className="text-xs rounded-lg text-zinc-400 hover:text-red-500" onClick={() => handleDismissSuggestion(s)}>
                         <XCircle className="h-3 w-3" /> Dismiss
                       </Button>
                     </div>

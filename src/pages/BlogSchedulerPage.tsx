@@ -386,9 +386,11 @@ function StepPickExistingClient({
 function StepWorkspace({
   client,
   onSwitchWorkspace,
+  canPost = true,
 }: {
   client: ClientWithIntegrations;
   onSwitchWorkspace: () => void;
+  canPost?: boolean;
 }) {
   // Derive "connected platforms" from the per-platform target endpoints.
   // Match BlogPostModal's behavior (no clientId filter) so the icon list
@@ -448,7 +450,7 @@ function StepWorkspace({
         <div className="max-w-[1400px] mx-auto h-full">
           <BlogCalendar
             clientId={client.id}
-            canPost
+            canPost={canPost}
           />
         </div>
       </div>
@@ -608,6 +610,9 @@ export default function BlogSchedulerPage() {
 
     // 4. Workspace Step
     if (currentStep === 'workspace' && activeClient) {
+      const isReadOnly = activeClient._isShared && activeClient.sharedAccess?.role === 'READ_ONLY';
+      const canPost = !isReadOnly;
+
       return (
         <StepWorkspace
           client={activeClient}
@@ -615,6 +620,7 @@ export default function BlogSchedulerPage() {
             setCurrentClient(null);
             setCurrentStep('select-client');
           }}
+          canPost={canPost}
         />
       );
     }
