@@ -156,7 +156,7 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
 
     return (
       <div className="flex flex-col items-center justify-center min-h-[80vh] bg-gradient-to-b from-gray-50 to-white">
-        <Card className="w-full max-w-2xl shadow-xl border-zinc-200">
+        <Card id="tour-select-client-for-integration" className="w-full max-w-2xl shadow-xl border-zinc-200">
           <CardHeader className="text-center pb-8 border-b bg-white rounded-t-xl">
             <div className="mx-auto w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mb-4">
               <Building2 className="w-6 h-6 text-blue-600" />
@@ -538,7 +538,7 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
             </span>
             <span className="ml-4">
               <ConnectDataSource clientId={clientId}>
-                <Button className="rounded-[0.4rem]">
+                <Button id="tour-connect-platform" className="rounded-[0.4rem]">
                   Connect Data Source
                 </Button>
               </ConnectDataSource>
@@ -566,7 +566,7 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
         <div className="flex items-center gap-4">
           {hideHeader && (
             <ConnectDataSource clientId={clientId}>
-              <Button className="rounded-[0.4rem]">
+              <Button id="tour-connect-platform" className="rounded-[0.4rem]">
                 Connect Data Source
               </Button>
             </ConnectDataSource>

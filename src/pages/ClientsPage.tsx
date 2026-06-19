@@ -249,6 +249,7 @@ const ClientsPage: React.FC = () => {
                             <div className="flex items-center border-l pl-4 gap-3">
                                 <NotificationsPopover />
                                 <Button
+                                    id="tour-create-client"
                                     onClick={() => {
                                         setEditingClient(null);
                                         setIsModalOpen(true);

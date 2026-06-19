@@ -5,7 +5,10 @@ import type {
   BroadcastTemplate,
   BroadcastIntegration,
   CreateTemplateRequest,
-  CreateIntegrationRequest
+  CreateIntegrationRequest,
+  BroadcastStats,
+  SendTestPayload,
+  SendTestResponse
 } from './types';
 
 // Tolerate both wrapped ({ success, x }) and unwrapped (x) backend response shapes.
@@ -32,6 +35,7 @@ export const createBroadcast = async (payload: CreateBroadcastPayload): Promise<
 /**
  * Create a broadcast campaign via CSV upload.
  * POST /broadcasts/csv
+ * Returns the Broadcast object AND the raw server message (for truncation detection).
  */
 export const createBroadcastCsv = async (
   file: File,
@@ -43,7 +47,7 @@ export const createBroadcastCsv = async (
   subject?: string,
   clientId?: number,
   variableMapping?: Record<string, string>
-): Promise<Broadcast> => {
+): Promise<{ broadcast: Broadcast; serverMessage?: string }> => {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('name', name);
@@ -58,7 +62,10 @@ export const createBroadcastCsv = async (
   const response = await api.post('/broadcasts/csv', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
-  return pickOne<Broadcast>(response.data, 'broadcast');
+  return {
+    broadcast: pickOne<Broadcast>(response.data, 'broadcast'),
+    serverMessage: response.data?.message as string | undefined,
+  };
 };
 
 /**
@@ -202,4 +209,25 @@ export const deleteIntegration = async (id: number): Promise<void> => {
  */
 export const deleteAdminIntegration = async (id: number): Promise<void> => {
   await api.delete(`/broadcasts/admin/integrations/${id}`);
+};
+
+/**
+ * Get engagement stats for the current user's broadcasts.
+ * GET /broadcasts/stats
+ */
+export const getBroadcastStats = async (clientId?: number): Promise<BroadcastStats> => {
+  const response = await api.get('/broadcasts/stats', {
+    params: clientId ? { clientId } : undefined,
+  });
+  // Tolerate wrapped or unwrapped response
+  return (response.data?.stats ?? response.data?.data ?? response.data) as BroadcastStats;
+};
+
+/**
+ * Send a single test message for a campaign.
+ * POST /broadcasts/test
+ */
+export const sendTestMessage = async (payload: SendTestPayload): Promise<SendTestResponse> => {
+  const response = await api.post('/broadcasts/test', payload);
+  return response.data as SendTestResponse;
 };

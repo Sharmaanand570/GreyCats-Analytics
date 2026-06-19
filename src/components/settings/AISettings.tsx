@@ -99,7 +99,7 @@ const TEXT_PROVIDERS = [
 ] as const;
 
 const IMAGE_PROVIDERS = [
-  { id: "openai", label: "OpenAI DALL-E", models: ["dall-e-3", "dall-e-2"] },
+  { id: "openai", label: "OpenAI DALL-E", models: ["gpt-image-1", "dall-e-3", "dall-e-2"] },
   { id: "stability", label: "Stability AI", models: ["stable-diffusion-xl-1024-v1-0", "sd3-medium"] },
   { id: "together", label: "Together AI (Flux)", models: ["black-forest-labs/FLUX.1-schnell", "black-forest-labs/FLUX.1-dev"] },
 ];
@@ -150,7 +150,7 @@ export default function AISettings() {
       textBaseUrl: config?.textBaseUrl || "",
       textOrgId: config?.textOrgId || "",
       imageProvider: config?.imageProvider || "openai",
-      imageModel: config?.imageModel || "dall-e-3",
+      imageModel: config?.imageModel || "gpt-image-1",
       imageApiKey: "",
     },
   });
@@ -284,7 +284,7 @@ export default function AISettings() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
 
         {/* Text AI Configuration */}
-        <Card className="shadow-none border-none bg-transparent">
+        <Card id="tour-ai-providers" className="shadow-none border-none bg-transparent">
           <CardHeader className="px-0 pt-0">
             <CardTitle>Text AI Provider</CardTitle>
             <CardDescription>
@@ -476,7 +476,7 @@ export default function AISettings() {
                 <input
                   id="imageModel"
                   list="image-model-list"
-                  placeholder={imageProviderModels[0] || "e.g. dall-e-3"}
+                  placeholder={imageProviderModels[0] || "e.g. gpt-image-1"}
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   {...register("imageModel")}
                 />
@@ -518,7 +518,7 @@ export default function AISettings() {
 
         {/* Save */}
         <div className="flex justify-end">
-          <Button type="submit" disabled={saveMutation.isPending}>
+          <Button id="tour-ai-config" type="submit" disabled={saveMutation.isPending}>
             {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             Save AI Configuration
           </Button>

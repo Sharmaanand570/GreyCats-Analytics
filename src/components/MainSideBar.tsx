@@ -51,13 +51,14 @@ import { PlanBadge } from "@/components/subscription/PlanBadge";
 import { useSubscriptionQuery } from "@/hooks/subscription/useSubscriptionQuery";
 import { useQueryClient } from "@tanstack/react-query";
 import { useClientContext } from "@/context/ClientContext";
-
-
+import { useProductTour } from "./ProductTour";
+import { HelpCircle } from "lucide-react";
 function MainSideBar(): React.JSX.Element {
   const location = useLocation();
   const [activeTab, setActive] = useState(location.pathname);
   const is404Page = location.pathname.startsWith("/404");
   const { user, fetchProfile, logout } = useUserStore();
+  const { startTour } = useProductTour();
   const queryClient = useQueryClient();
   const { setClients, setCurrentClient, currentClient } = useClientContext();
   const { data: subscriptionData } = useSubscriptionQuery();
@@ -253,6 +254,17 @@ function MainSideBar(): React.JSX.Element {
   const hasSchedulerAccess = !isShared || access?.accessScheduler !== false;
   const hasAdsAccess = !isShared || access?.accessAds !== false;
 
+  const getTourId = (label: string) => {
+    switch (label) {
+      case "Clients": return "tour-sidebar-clients";
+      case "Integrations": return "tour-sidebar-integrations";
+      case "Settings": return "tour-sidebar-settings";
+      case "Account Setup": return "tour-sidebar-settings";
+      case "Alerts": return "tour-sidebar-alerts";
+      default: return undefined;
+    }
+  };
+
   const analyticsItems = [];
   if (hasAnalyticsAccess) analyticsItems.push({ label: "Clients", path: "/clients", icon: <Layers /> });
   if (hasAlertsAccess) analyticsItems.push({ label: "Alerts", path: "/alerts", icon: <Bell /> });
@@ -411,6 +423,7 @@ function MainSideBar(): React.JSX.Element {
                         {group.items.map((item, index) => (
                           <SidebarMenuItem key={item.path}>
                             <SidebarMenuButton
+                              id={getTourId(item.label)}
                               onClick={() => handleChangeURL(item.path, (item as any).isComingSoon)}
                               className={`group text-[13px] [&_svg]:w-[18px] [&_svg]:h-[18px] rounded-[0.375rem] font-normal h-9 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:text-zinc-100 ${
                                 (item as any).isComingSoon ? "opacity-50 cursor-not-allowed grayscale" : ""
@@ -455,6 +468,19 @@ function MainSideBar(): React.JSX.Element {
             
             {/* Footer */}
             <SidebarFooter className={`mt-auto border-t border-zinc-800 pt-4 pb-4 ${collabsState ? "px-0" : "px-4"}`}>
+              <div
+                onClick={startTour}
+                className="flex items-center gap-3 rounded-md px-2 py-3 mb-2 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800/50 cursor-pointer"
+              >
+                <div className="relative flex-shrink-0 flex items-center justify-center w-9 h-9 text-zinc-400">
+                  <HelpCircle className="w-5 h-5" />
+                </div>
+                {!collabsState && (
+                  <div className="text-sm font-medium leading-tight text-zinc-300 transition-colors duration-300">
+                    Quick Tour
+                  </div>
+                )}
+              </div>
               <div
                 onClick={() => handleChangeURL("/account-setup")}
                 className="flex items-center gap-3 rounded-md px-2 py-3 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800/50 cursor-pointer"
@@ -607,7 +633,19 @@ function MainSideBar(): React.JSX.Element {
               </nav>
 
               {/* Footer */}
-              <div className="mt-auto pt-6 border-t border-zinc-700">
+              <div className="mt-auto pt-6 border-t border-zinc-700 flex flex-col space-y-4">
+                {/* Quick Tour Button for Mobile */}
+                <div
+                  onClick={() => startTour()}
+                  className="flex items-center gap-3 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:opacity-80 cursor-pointer"
+                >
+                  <div className="flex items-center justify-center h-9 w-9 rounded-full bg-zinc-800 border border-zinc-700/50 shadow-sm transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-110 active:scale-95 text-zinc-400">
+                    <HelpCircle size={18} />
+                  </div>
+                  <div className="text-sm font-medium leading-tight text-zinc-300 transition-colors duration-300">
+                    Quick Tour
+                  </div>
+                </div>
                 <div
                   onClick={() => handleChangeURL("/account-setup")}
                   className="flex items-center gap-3 mt-4 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:opacity-80 cursor-pointer"

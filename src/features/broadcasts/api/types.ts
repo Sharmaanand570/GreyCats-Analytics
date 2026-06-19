@@ -53,6 +53,10 @@ export interface BroadcastIntegration {
   clientId?: number | null;
   config: Record<string, any>;
   createdAt: string;
+  /** ISO timestamp — if in the future, the gateway is temporarily paused (v2.0) */
+  coolDownUntil?: string | null;
+  /** Human-readable error message from the last gateway failure (v2.0) */
+  lastErrorMsg?: string | null;
   user?: BroadcastOwner; // Only present on admin endpoints
 }
 
@@ -106,4 +110,27 @@ export interface BroadcastsListResponse {
 export interface BroadcastResponse {
   success: boolean;
   broadcast: Broadcast;
+}
+
+/** GET /broadcasts/stats — engagement metrics (v2.0) */
+export interface BroadcastStats {
+  total: number;
+  sent: number;
+  failed: number;
+  delivered: number;
+  opened: number;
+  clicked: number;
+  bounced: number;
+  byChannel?: Record<string, number>;
+  byDay?: Array<{ date: string; sent: number }>;
+}
+
+/** POST /broadcasts/test — request/response (v2.0) */
+export interface SendTestPayload {
+  campaignId: number;
+  testTo: string;
+}
+
+export interface SendTestResponse {
+  message: string;
 }

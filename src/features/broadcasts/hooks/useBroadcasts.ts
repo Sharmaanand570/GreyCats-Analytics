@@ -16,12 +16,15 @@ import {
   createIntegration,
   deleteIntegration,
   deleteAdminIntegration,
-  syncTemplates
+  syncTemplates,
+  getBroadcastStats,
+  sendTestMessage
 } from '../api/broadcastApi';
 import type { 
   CreateBroadcastPayload, 
   CreateTemplateRequest, 
-  CreateIntegrationRequest
+  CreateIntegrationRequest,
+  SendTestPayload
 } from '../api/types';
 import { toast } from 'sonner';
 
@@ -96,10 +99,15 @@ export const useCreateBroadcastCsv = () => {
       data.clientId,
       data.variableMapping
     ),
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['broadcasts'] });
       queryClient.invalidateQueries({ queryKey: ['broadcasts-admin'] });
-      toast.success('CSV Broadcast campaign created');
+      // Check if the backend silently truncated the CSV at 5,000 recipients
+      if (result.serverMessage?.toLowerCase().includes('truncated')) {
+        toast.warning('Your CSV had more than 5,000 valid recipients. Only the first 5,000 were imported.');
+      } else {
+        toast.success('CSV Broadcast campaign created');
+      }
     },
     onError: (error: any) => {
       toast.error(extractError(error, 'CSV upload failed'));
@@ -272,6 +280,33 @@ export const useAdminDeleteIntegration = () => {
     },
     onError: (error: any) => {
       toast.error(extractError(error, 'Failed to delete provider as admin'));
+    }
+  });
+};
+
+/**
+ * Fetch engagement stats (delivered, opened, clicked, bounced) for the current workspace.
+ * GET /broadcasts/stats
+ */
+export const useBroadcastStats = (clientId?: number) => {
+  return useQuery({
+    queryKey: ['broadcast-stats', clientId],
+    queryFn: () => getBroadcastStats(clientId),
+    // Refresh every 5 minutes — stats are updated by webhooks, not real-time
+    refetchInterval: 5 * 60 * 1000,
+  });
+};
+
+/**
+ * Send a single test message for a campaign.
+ * POST /broadcasts/test
+ */
+export const useSendTestMessage = () => {
+  return useMutation({
+    mutationFn: (payload: SendTestPayload) => sendTestMessage(payload),
+    onError: (error: any) => {
+      // Let the caller handle the toast so it can include the testTo address
+      console.error('Send test failed:', extractError(error, 'Failed to send test message'));
     }
   });
 };

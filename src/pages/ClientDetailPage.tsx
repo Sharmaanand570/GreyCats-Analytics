@@ -125,6 +125,13 @@ const ClientDetailPage: React.FC = () => {
         }
     }, [activeTab, isReportAccessLocked]);
 
+    React.useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab && tab !== activeTab) {
+            setActiveTab(tab);
+        }
+    }, [searchParams]);
+
     const handleAccountConnected = () => {
         if (!parsedClientId) return;
         // Refresh client details to update integrations list
@@ -225,15 +232,15 @@ const ClientDetailPage: React.FC = () => {
                             className="space-y-6"
                         >
                             <TabsList className="bg-zinc-100/50 p-1 border border-zinc-200/50">
-                                <TabsTrigger value="overview" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                                <TabsTrigger id="tour-tab-overview" value="overview" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
                                     <LayoutDashboard className="w-4 h-4 mr-2" />
                                     Overview
                                 </TabsTrigger>
-                                <TabsTrigger value="reports" disabled={isReportAccessLocked} className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                                <TabsTrigger id="tour-tab-reports" value="reports" disabled={isReportAccessLocked} className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
                                     <FileBarChart className="w-4 h-4 mr-2" />
                                     Reports
                                 </TabsTrigger>
-                                <TabsTrigger value="schedules" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                                <TabsTrigger id="tour-tab-schedules" value="schedules" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
                                     <CalendarDays className="w-4 h-4 mr-2" />
                                     Schedules
                                 </TabsTrigger>
@@ -241,12 +248,12 @@ const ClientDetailPage: React.FC = () => {
                                     <Database className="w-4 h-4 mr-2" />
                                     Platforms
                                 </TabsTrigger>
-                                <TabsTrigger value="ai-studio" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                                <TabsTrigger id="tour-tab-ai-studio" value="ai-studio" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
                                     <Sparkles className="w-4 h-4 mr-2" />
                                     AI Studio
                                 </TabsTrigger>
                                 {(!client?._isShared || client?.sharedAccess?.role === 'ADMIN') && (
-                                    <TabsTrigger value="team-access" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                                    <TabsTrigger id="tour-tab-team-access" value="team-access" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
                                         <Users className="w-4 h-4 mr-2" />
                                         Team Access
                                     </TabsTrigger>

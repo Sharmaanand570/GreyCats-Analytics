@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import SettingSideBar from "@/components/SettingSideBar";
 
 // Components
@@ -11,7 +12,14 @@ import AISettings from "@/components/settings/AISettings";
 
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState("personal-info");
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab") || "personal-info";
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab) setActiveTab(tab);
+  }, [searchParams]);
 
   // Render the active component
   const renderContent = () => {
