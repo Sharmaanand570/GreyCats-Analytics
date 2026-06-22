@@ -681,9 +681,6 @@ export function CreateBroadcastModal({ isOpen, onClose, clientId, fixedChannel }
                           </>
                         )}
                      </div>
-                     <p className="text-[11px] text-zinc-400 font-medium text-center -mt-1">
-                       Maximum 5,000 recipients per campaign.
-                     </p>
                      <div className="flex flex-col sm:flex-row gap-4 bg-white p-4 rounded-xl border border-zinc-200 shadow-sm">
                         <div className="flex-1 space-y-1.5">
                           <label className="text-xs font-semibold text-zinc-600 px-1">Target Column (Optional)</label>

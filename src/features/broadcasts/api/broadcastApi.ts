@@ -5,10 +5,7 @@ import type {
   BroadcastTemplate,
   BroadcastIntegration,
   CreateTemplateRequest,
-  CreateIntegrationRequest,
-  BroadcastStats,
-  SendTestPayload,
-  SendTestResponse
+  CreateIntegrationRequest
 } from './types';
 
 // Tolerate both wrapped ({ success, x }) and unwrapped (x) backend response shapes.
@@ -35,7 +32,6 @@ export const createBroadcast = async (payload: CreateBroadcastPayload): Promise<
 /**
  * Create a broadcast campaign via CSV upload.
  * POST /broadcasts/csv
- * Returns the Broadcast object AND the raw server message (for truncation detection).
  */
 export const createBroadcastCsv = async (
   file: File,
@@ -47,7 +43,7 @@ export const createBroadcastCsv = async (
   subject?: string,
   clientId?: number,
   variableMapping?: Record<string, string>
-): Promise<{ broadcast: Broadcast; serverMessage?: string }> => {
+): Promise<Broadcast> => {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('name', name);
@@ -62,10 +58,7 @@ export const createBroadcastCsv = async (
   const response = await api.post('/broadcasts/csv', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
-  return {
-    broadcast: pickOne<Broadcast>(response.data, 'broadcast'),
-    serverMessage: response.data?.message as string | undefined,
-  };
+  return pickOne<Broadcast>(response.data, 'broadcast');
 };
 
 /**
@@ -212,22 +205,25 @@ export const deleteAdminIntegration = async (id: number): Promise<void> => {
 };
 
 /**
- * Get engagement stats for the current user's broadcasts.
- * GET /broadcasts/stats
+ * Register Two-Step Verification PIN for WhatsApp
+ * POST /broadcasts/integrations/:id/whatsapp/register-pin
  */
-export const getBroadcastStats = async (clientId?: number): Promise<BroadcastStats> => {
-  const response = await api.get('/broadcasts/stats', {
-    params: clientId ? { clientId } : undefined,
-  });
-  // Tolerate wrapped or unwrapped response
-  return (response.data?.stats ?? response.data?.data ?? response.data) as BroadcastStats;
+export const registerWhatsAppPin = async (id: number, pin: string): Promise<void> => {
+  await api.post(`/broadcasts/integrations/${id}/whatsapp/register-pin`, { pin });
 };
 
 /**
- * Send a single test message for a campaign.
- * POST /broadcasts/test
+ * Request SMS Code for WhatsApp Verification
+ * POST /broadcasts/integrations/:id/whatsapp/request-code
  */
-export const sendTestMessage = async (payload: SendTestPayload): Promise<SendTestResponse> => {
-  const response = await api.post('/broadcasts/test', payload);
-  return response.data as SendTestResponse;
+export const requestWhatsAppCode = async (id: number, code_method: 'SMS' | 'VOICE' = 'SMS'): Promise<void> => {
+  await api.post(`/broadcasts/integrations/${id}/whatsapp/request-code`, { code_method });
+};
+
+/**
+ * Submit Verification Code for WhatsApp
+ * POST /broadcasts/integrations/:id/whatsapp/verify-code
+ */
+export const verifyWhatsAppCode = async (id: number, code: string): Promise<void> => {
+  await api.post(`/broadcasts/integrations/${id}/whatsapp/verify-code`, { code });
 };

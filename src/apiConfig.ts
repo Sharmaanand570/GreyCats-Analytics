@@ -45,13 +45,30 @@ api.interceptors.request.use(
 // RESPONSE INTERCEPTOR
 // ---------------------
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // ── Global Quota Invalidation ───────────────────────────────────────────
+    // If we get a successful response from an endpoint that likely uses AI quota
+    // we invalidate the quota cache to force UI updates.
+    const url = response.config.url || "";
+    const method = response.config.method?.toLowerCase() || "";
+    
+    if (
+      method !== "get" && 
+      url.includes("/ai/")
+    ) {
+      import("@/main").then(({ queryClient }) => {
+        queryClient.invalidateQueries({ queryKey: ["aiConfigEffective"] });
+      });
+    }
+
+    return response;
+  },
   (error: AxiosError) => {
     const status = error.response?.status;
     const data = error.response?.data as any;
 
-    // ── 403 upgradeRequired ─────────────────────────────────────────────────
-    if (status === 403 && data?.upgradeRequired === true) {
+    // ── 403 upgradeRequired or QUOTA_EXCEEDED ───────────────────────────────
+    if (status === 403 && (data?.upgradeRequired === true || data?.code === "QUOTA_EXCEEDED")) {
       // Lazy import to avoid circular dependency at module load time
       import("@/store/useUpgradeModalStore").then(({ useUpgradeModalStore }) => {
         useUpgradeModalStore.getState().open(

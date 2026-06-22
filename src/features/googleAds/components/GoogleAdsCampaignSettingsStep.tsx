@@ -300,7 +300,6 @@ export default function GoogleAdsCampaignSettingsStep({ onNext, activeSubStep, o
           </div>
         </div>
         )}
-
         {/* Audience segments Panel - Hidden for PMax */}
         {!isPMax && (
           <div 

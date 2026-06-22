@@ -18,6 +18,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { isAuthenticated, StorageKey } from "@/utils/storage";
+import Footer from "@/components/Footer";
 
 export default function PricingPage() {
   const { data: plans, isLoading: plansLoading } = usePlansQuery();
@@ -199,7 +200,7 @@ export default function PricingPage() {
             <span className="text-[#4285F4]">your growth</span>
           </h1>
           <p className="text-lg md:text-xl text-[#666] max-w-xl mx-auto font-light leading-relaxed">
-            Start free with a 15-day trial. No credit card required. Upgrade
+            Start free with a 7-day trial. No credit card required. Upgrade
             anytime as your agency scales.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-6 pt-2">
@@ -289,38 +290,7 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* ── Footer ── */}
-      <footer className="py-16 px-6 text-sm border-t border-[#e5e5e5]">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-12 mb-16">
-            <div className="col-span-2">
-              <Link to="/" className="flex items-center gap-3 mb-6">
-                <img src={logoBlack} alt="GreyCats Analytics" className="h-8 w-auto" />
-              </Link>
-              <p className="text-[#666] mb-2 font-medium">Operated by Greycats Tech LLP</p>
-              <a href="mailto:info@greycats.tech" className="text-[#4285F4] font-semibold hover:underline">
-                info@greycats.tech
-              </a>
-            </div>
-            <div>
-              <h4 className="font-bold text-[#111] mb-6 uppercase tracking-widest text-xs">Legal & Support</h4>
-              <ul className="space-y-4 text-[#666] font-medium">
-                <li><Link to="/pricing" className="text-[#111] font-semibold">Plans & Pricing</Link></li>
-                <li><Link to="/privacy-policy" className="hover:text-[#111] transition-colors">Privacy Policy</Link></li>
-                <li><Link to="/terms-of-service" className="hover:text-[#111] transition-colors">Terms of Service</Link></li>
-                <li><Link to="/contact" className="hover:text-[#111] transition-colors">Support</Link></li>
-              </ul>
-            </div>
-          </div>
-          <div className="pt-8 border-t border-[#e5e5e5] flex flex-col md:flex-row items-center justify-between gap-6 text-[#666] font-medium">
-            <p>© 2026 Greycats Tech LLP. All rights reserved.</p>
-            <div className="flex items-center gap-6">
-              <span className="flex items-center gap-2"><Lock className="w-4 h-4" /> Secure Data</span>
-              <span className="flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Data Security</span>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

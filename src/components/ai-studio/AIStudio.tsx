@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { Sparkles, Palette, Type, Image as ImageIcon, Target, Shield, BookOpen, MessageSquare } from "lucide-react";
 import { BrandProfileView } from "./BrandProfileView";
 import { CreativeSuiteView } from "./CreativeSuiteView";
+import { AIBadge } from "./AIBadge";
 
 interface Props {
   clientId: number;
@@ -40,8 +41,11 @@ export default function AIStudio({ clientId }: Props) {
             <Sparkles className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-zinc-900 tracking-tight">AI Studio</h2>
-            <p className="text-[11px] font-medium text-zinc-500">Train & Generate</p>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold text-zinc-900 tracking-tight">AI Studio</h2>
+            </div>
+            <p className="text-[11px] font-medium text-zinc-500 mt-0.5 mb-2">Train & Generate</p>
+            <AIBadge />
           </div>
         </div>
 

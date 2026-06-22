@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Eye, EyeOff, Zap, Trash2, CheckCircle, XCircle, Loader2, Info } from "lucide-react";
 import { toast } from "sonner";
+import { AIBadge } from "@/components/ai-studio/AIBadge";
 
 // ─────────────────────────────────────────────
 // Provider & Model Presets
@@ -243,6 +244,13 @@ export default function AISettings() {
 
   return (
     <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">AI Settings</h2>
+          <p className="text-sm text-muted-foreground">Manage your AI configurations.</p>
+        </div>
+        <AIBadge />
+      </div>
 
       {/* System Default Banner */}
       {config?.usingSystemDefault && (
@@ -324,6 +332,8 @@ export default function AISettings() {
                   id="textModel"
                   list="text-model-list"
                   placeholder={currentPreset ? currentPreset.models[0] : "e.g. claude-sonnet-4-6"}
+                  autoComplete="off"
+                  data-lpignore="true"
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   {...register("textModel")}
                 />
@@ -347,6 +357,8 @@ export default function AISettings() {
                     id="textApiKey"
                     type={showTextKey ? "text" : "password"}
                     placeholder={currentPreset?.placeholder || config?.textApiKey || "Paste your API key"}
+                    autoComplete="new-password"
+                    data-lpignore="true"
                     className="pr-10 font-mono text-sm"
                     {...register("textApiKey")}
                   />
@@ -372,6 +384,8 @@ export default function AISettings() {
                   <Input
                     id="textBaseUrl"
                     placeholder={currentPreset?.defaultBaseUrl || "https://api.provider.com/v1"}
+                    autoComplete="off"
+                    data-lpignore="true"
                     className="font-mono text-sm"
                     {...register("textBaseUrl")}
                   />
@@ -391,6 +405,8 @@ export default function AISettings() {
                   <Input
                     id="textOrgId"
                     placeholder="org-..."
+                    autoComplete="off"
+                    data-lpignore="true"
                     className="font-mono text-sm"
                     {...register("textOrgId")}
                   />
@@ -477,6 +493,8 @@ export default function AISettings() {
                   id="imageModel"
                   list="image-model-list"
                   placeholder={imageProviderModels[0] || "e.g. gpt-image-1"}
+                  autoComplete="off"
+                  data-lpignore="true"
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   {...register("imageModel")}
                 />
@@ -495,6 +513,8 @@ export default function AISettings() {
                     id="imageApiKey"
                     type={showImageKey ? "text" : "password"}
                     placeholder={config?.imageApiKey || "Paste your API key"}
+                    autoComplete="new-password"
+                    data-lpignore="true"
                     className="pr-10 font-mono text-sm"
                     {...register("imageApiKey")}
                   />

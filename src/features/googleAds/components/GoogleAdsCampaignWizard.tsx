@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { HelpCircle, CheckCircle2, Search, ChevronRight } from "lucide-react";
+import { HelpCircle, CheckCircle2, Search, ChevronRight, LineChart } from "lucide-react";
 import GoogleAdsBiddingStep from "./GoogleAdsBiddingStep";
 import GoogleAdsCampaignSettingsStep from "./GoogleAdsCampaignSettingsStep";
 import GoogleAdsAssetGroupStep from "./GoogleAdsAssetGroupStep";
@@ -18,6 +18,7 @@ interface WizardProps {
 export default function GoogleAdsCampaignWizard({ campaignType }: WizardProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [activeSubStep, setActiveSubStep] = useState("bidding");
+  const [budgetType] = useState<'daily' | 'campaign'>('daily');
   
   const steps = campaignType === "Search" ? [
     { id: 1, name: "Bidding", component: GoogleAdsBiddingStep },
@@ -316,71 +317,91 @@ export default function GoogleAdsCampaignWizard({ campaignType }: WizardProps) {
            )}
         </div>
 
-        {/* Right Sidebar */}
-        <div className="w-[320px] bg-white border-l border-slate-200 shrink-0 flex flex-col pt-6 relative">
-           <div className="px-6 flex flex-col gap-6">
-             {/* Optimization Score */}
-             <div>
-                <div className="flex items-end justify-between mb-2">
-                   <div className="text-[28px] leading-none text-blue-600">
-                     {currentStep === 1 ? "--.-%" : "95.7%"}
+         {/* Right Sidebar */}
+         <div className="w-[320px] bg-white border-l border-slate-200 shrink-0 flex flex-col pt-6 relative">
+            <div className="px-6 flex flex-col gap-6">
+              
+              {/* If step 6 (Budget) for Search, show specific estimates box */}
+              {currentStep === 6 && campaignType === "Search" ? (
+                <div className="border border-slate-200 rounded-md p-6 bg-white flex flex-col gap-4 shadow-sm items-center mt-4">
+                   <div className="w-16 h-12 border border-slate-200 bg-white shadow-sm flex items-end justify-between px-1.5 pb-1 relative">
+                     {/* Mini chart graphic */}
+                     <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                     <LineChart className="w-full h-full text-slate-400 stroke-[1.5px]" />
                    </div>
-                   <HelpCircle className="w-4 h-4 text-slate-400 mb-1" />
+                   <div className="text-[12px] text-slate-600 leading-relaxed text-center">
+                     Traffic estimates are not yet available for AI Max in Search campaigns.
+                     {budgetType === 'campaign' && (
+                       <span> Traffic estimates are not yet available for campaigns using a total budget or with promotion mode turned on.</span>
+                     )}
+                   </div>
                 </div>
-                {currentStep === 2 && (
-                  <div className="w-full h-1 bg-slate-100 rounded-full mb-3 overflow-hidden">
-                    <div className="h-full bg-blue-600 rounded-full w-[95.7%]"></div>
+              ) : (
+                <>
+                  {/* Optimization Score */}
+                  <div>
+                     <div className="flex items-end justify-between mb-2">
+                        <div className="text-[28px] leading-none text-blue-600">
+                          {currentStep === 1 ? "--.-%" : "95.7%"}
+                        </div>
+                        <HelpCircle className="w-4 h-4 text-slate-400 mb-1" />
+                     </div>
+                     {currentStep === 2 && (
+                       <div className="w-full h-1 bg-slate-100 rounded-full mb-3 overflow-hidden">
+                         <div className="h-full bg-blue-600 rounded-full w-[95.7%]"></div>
+                       </div>
+                     )}
+                     <div className="text-[13px] font-medium text-slate-800 flex items-center justify-between mb-1">
+                        Campaign optimization score
+                     </div>
+                     <div className="text-[12px] text-slate-500 leading-relaxed">
+                        Your score will be shown after you've made updates to your campaign needed to run ads.
+                     </div>
                   </div>
-                )}
-                <div className="text-[13px] font-medium text-slate-800 flex items-center justify-between mb-1">
-                   Campaign optimization score
-                </div>
-                <div className="text-[12px] text-slate-500 leading-relaxed">
-                   Your score will be shown after you've made updates to your campaign needed to run ads.
-                </div>
-             </div>
 
-             <div className="h-px bg-slate-200 w-full"></div>
+                  <div className="h-px bg-slate-200 w-full"></div>
 
-             {/* Estimates */}
-             <div>
-                <div className="flex items-center gap-2 mb-4">
-                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5 text-slate-500"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                   <span className="text-[14px] text-slate-800 font-medium">Weekly estimates</span>
-                </div>
-                
-                {currentStep === 1 ? (
-                  <div className="text-[13px] text-slate-500">
-                     Estimates aren't currently available
+                  {/* Estimates */}
+                  <div>
+                     <div className="flex items-center gap-2 mb-4">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5 text-slate-500"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                        <span className="text-[14px] text-slate-800 font-medium">Weekly estimates</span>
+                     </div>
+                     
+                     {currentStep === 1 ? (
+                       <div className="text-[13px] text-slate-500">
+                          Estimates aren't currently available
+                       </div>
+                     ) : (
+                       <div className="flex flex-col gap-4">
+                         <div className="text-[11px] text-slate-500">
+                           Based on your daily budget and bid settings
+                         </div>
+                         
+                         <div className="grid grid-cols-2 gap-4">
+                           <div className="flex flex-col gap-1">
+                             <div className="text-[11px] text-slate-500">Weekly conv.</div>
+                             <div className="text-[13px] text-slate-900 font-medium">9</div>
+                           </div>
+                           <div className="flex flex-col gap-1">
+                             <div className="text-[11px] text-slate-500">Weekly conversion value</div>
+                             <div className="text-[13px] text-slate-900 font-medium">{currentStep >= 4 ? '₹13,586.26' : '₹20,280.95'}</div>
+                           </div>
+                           <div className="flex flex-col gap-1 mt-2">
+                             <div className="text-[11px] text-slate-500 leading-tight">Avg. conversion value/cost</div>
+                             <div className="text-[13px] text-slate-900 font-medium">{currentStep >= 4 ? '146.35%' : '146.57%'}</div>
+                           </div>
+                           <div className="flex flex-col gap-1 mt-2">
+                             <div className="text-[11px] text-slate-500">Weekly cost</div>
+                             <div className="text-[13px] text-slate-900 font-medium">{currentStep >= 4 ? '₹9,283.61' : '₹13,603.25'}</div>
+                           </div>
+                         </div>
+                       </div>
+                     )}
                   </div>
-                ) : (
-                  <div className="flex flex-col gap-4">
-                    <div className="text-[11px] text-slate-500">
-                      Based on your daily budget and bid settings
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-1">
-                        <div className="text-[11px] text-slate-500">Weekly conv.</div>
-                        <div className="text-[13px] text-slate-900 font-medium">9</div>
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <div className="text-[11px] text-slate-500">Weekly conversion value</div>
-                        <div className="text-[13px] text-slate-900 font-medium">{currentStep >= 4 ? '₹13,586.26' : '₹20,280.95'}</div>
-                      </div>
-                      <div className="flex flex-col gap-1 mt-2">
-                        <div className="text-[11px] text-slate-500 leading-tight">Avg. conversion value/cost</div>
-                        <div className="text-[13px] text-slate-900 font-medium">{currentStep >= 4 ? '146.35%' : '146.57%'}</div>
-                      </div>
-                      <div className="flex flex-col gap-1 mt-2">
-                        <div className="text-[11px] text-slate-500">Weekly cost</div>
-                        <div className="text-[13px] text-slate-900 font-medium">{currentStep >= 4 ? '₹9,283.61' : '₹13,603.25'}</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-             </div>
-           </div>
+                </>
+              )}
+            </div>
 
            <div className="mt-auto border-t border-slate-200 p-2 flex justify-end">
               <ChevronRight className="w-5 h-5 text-slate-400 cursor-pointer hover:text-slate-600" />

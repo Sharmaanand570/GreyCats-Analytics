@@ -28,7 +28,7 @@ export default function GoogleAdsKeywordAssetGenStep({ onNext }: KeywordAssetGen
         <div className="p-6">
            <div className="flex items-center gap-2 mb-3">
              <h3 className="text-[15px] font-medium text-slate-800">Get help creating your ad</h3>
-             <span className="bg-green-100 text-green-800 text-[10px] font-bold px-1.5 py-0.5 rounded-sm tracking-wide">NEW</span>
+             <span className="bg-green-100 text-green-800 text-[10px] font-bold px-1.5 py-0.5 rounded-sm tracking-wide">BETA</span>
            </div>
            
            <div className="text-[12px] text-slate-600 leading-relaxed mb-4 max-w-[700px]">

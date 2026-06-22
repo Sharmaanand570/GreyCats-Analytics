@@ -8,6 +8,7 @@ import {
   PieChart, Send, Lock, ShieldCheck, BarChart2, 
   MessageCircle, Menu, X, ArrowRight, Search 
 } from 'lucide-react';
+import Footer from '@/components/Footer';
 
 // --- Shared Components ---
 
@@ -1227,7 +1228,7 @@ export default function LandingPage() {
             ))}
           </div>
           <div className="mt-4 text-left px-4">
-            <Link to="/integrations" className="text-[13px] font-bold text-[#666] hover:text-[#111] transition-colors inline-flex items-center gap-2 group tracking-wide">Browse thousands more <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></Link>
+            <Link to="/integrations-info" className="text-[13px] font-bold text-[#666] hover:text-[#111] transition-colors inline-flex items-center gap-2 group tracking-wide">Browse thousands more <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></Link>
           </div>
         </div>
       </section>
@@ -1461,36 +1462,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-20 px-6 bg-transparent text-sm relative z-10">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-12 mb-20">
-            <div className="col-span-2">
-              <div className="flex items-center gap-3 mb-6">
-                <img src={logo} alt="GreyCats Logo" className="h-8" />
-              </div>
-              <p className="text-[#666] mb-2 font-medium">Operated by Greycats Tech LLP</p>
-              <a href="mailto:info@greycats.tech" className="text-[#4285F4] font-semibold hover:underline">info@greycats.tech</a>
-            </div>
-            <div>
-              <h4 className="font-bold text-[#111] mb-6 uppercase tracking-widest text-xs">Legal & Support</h4>
-              <ul className="space-y-4 text-[#666] font-medium">
-                <li><Link to="/pricing" className="hover:text-[#111] transition-colors">Plans & Pricing</Link></li>
-                <li><Link to="/privacy-policy" className="hover:text-[#111] transition-colors">Privacy Policy</Link></li>
-                <li><Link to="/terms-of-service" className="hover:text-[#111] transition-colors">Terms of Service</Link></li>
-                <li><Link to="/contact" className="hover:text-[#111] transition-colors">Support</Link></li>
-              </ul>
-            </div>
-          </div>
-          <div className="pt-8 border-t border-[#e5e5e5] flex flex-col md:flex-row items-center justify-between gap-6 text-[#666] font-medium">
-            <p>© 2026 Greycats Tech LLP. All rights reserved.</p>
-            <div className="flex items-center gap-6">
-              <span className="flex items-center gap-2"><Lock className="w-4 h-4" /> Secure Data</span>
-              <span className="flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Data Security</span>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

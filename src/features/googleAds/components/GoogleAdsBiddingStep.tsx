@@ -122,13 +122,16 @@ export default function GoogleAdsBiddingStep({ onNext, onSubStepChange, campaign
                 </div>
               )}
 
-              {/* Conversion value tabs — shown when "Conversion value" selected */}
-              {!isSearch && !setTargetCPA && biddingFocus === "Conversion value" && (
-                <div className="pl-0">
-                  <div className="flex border-b border-slate-200 mb-3">
-                    <div className="px-4 py-2 text-[13px] font-medium text-blue-600 border-b-2 border-blue-600 cursor-pointer">Conversions</div>
-                    <div className="px-4 py-2 text-[13px] text-slate-600 cursor-pointer hover:bg-slate-50">Conversion value</div>
-                    <div className="px-4 py-2 text-[13px] text-slate-600 cursor-pointer hover:bg-slate-50 text-blue-600">per action (optional)</div>
+              {/* Target ROAS input */}
+              {setTargetCPA && biddingFocus === "Conversion value" && (
+                <div className="pl-7">
+                  <div className="flex items-center gap-1 mb-2">
+                    <span className="text-[13px] text-slate-800">Target ROAS</span>
+                    <HelpCircle className="w-3.5 h-3.5 text-slate-500" />
+                  </div>
+                  <div className="border border-slate-300 rounded-sm flex items-center w-[120px] mb-3 bg-white focus-within:ring-2 focus-within:ring-blue-500">
+                    <input type="text" className="w-full outline-none text-[13px] px-3 py-1.5 text-right" />
+                    <span className="pr-3 text-[13px] text-slate-600">%</span>
                   </div>
                 </div>
               )}
@@ -161,73 +164,67 @@ export default function GoogleAdsBiddingStep({ onNext, onSubStepChange, campaign
           </div>
         </div>
 
-        {/* ── Customer Acquisition Panel ── */}
-        <div
-          id="panel-acquisition"
-          onClick={() => onSubStepChange?.('acquisition')}
-          className="bidding-panel-section bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden"
-        >
-          <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-50">
-            <h2 className="text-[14px] font-medium text-slate-800">Customer acquisition</h2>
-            <ChevronUp className="w-5 h-5 text-slate-500" />
-          </div>
-          <div className="p-6 flex gap-6">
-            {/* Left side */}
-            <div className="flex-1 flex flex-col gap-3">
-              <label className="flex items-start gap-3 cursor-pointer" onClick={e => e.stopPropagation()}>
-                <input
-                  type="checkbox"
-                  checked={onlyNewCustomers}
-                  onChange={() => setOnlyNewCustomers(!onlyNewCustomers)}
-                  className="w-4 h-4 mt-0.5 rounded border-slate-300 text-blue-600 accent-blue-600"
-                />
-                <span className="text-[13px] text-slate-800">Only bid for new customers</span>
-              </label>
-              <div className="pl-7 text-[12px] text-slate-500 leading-relaxed">
-                Your campaign will be limited to only new customers, regardless of your bid strategy.
-              </div>
 
-              {/* Warning when checked */}
-              {onlyNewCustomers && (
-                <div className="pl-7 mt-2">
-                  <div className="bg-red-50 border border-red-200 rounded-md p-4 flex gap-3 max-w-[460px]">
-                    <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-                    <div className="text-[13px] text-slate-800 leading-relaxed">
-                      <div className="font-medium text-red-700 mb-1">This campaign will not run.</div>
-                      To fix this campaign, you can either include an audience segment with at least 1,000 active members in at least one network, or turn off this setting until you have added an eligible audience segment.
-                      <div className="mt-2">
-                        <a href="#" className="text-blue-600 hover:underline font-medium text-[13px]" onClick={e => e.preventDefault()}>
-                          Define existing customer list
-                        </a>
+        {!isSearch && (
+          <div
+            id="panel-customer-acquisition"
+            onClick={() => onSubStepChange?.('customer-acquisition')}
+            className="bidding-panel-section bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden"
+          >
+            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-50">
+              <h2 className="text-[14px] font-medium text-slate-800">Customer acquisition</h2>
+              <ChevronUp className="w-5 h-5 text-slate-500" />
+            </div>
+            <div className="p-6 flex flex-col gap-4">
+              <div className="flex gap-8">
+                <div className="flex-1">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={onlyNewCustomers}
+                      onChange={() => setOnlyNewCustomers(!onlyNewCustomers)}
+                      className="mt-1 w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600"
+                    />
+                    <div>
+                      <div className="text-[13px] font-medium text-slate-800">Only bid for new customers</div>
+                      <div className="text-[12px] text-slate-500 mt-0.5">Your campaign will be limited to only new customers, regardless of your bid strategy</div>
+                    </div>
+                  </label>
+
+                  {onlyNewCustomers && (
+                    <div className="mt-4 bg-[#fce8e6] border border-[#f8dedc] rounded p-4 flex gap-3 ml-7">
+                      <AlertCircle className="w-5 h-5 text-[#c5221f] shrink-0 mt-0.5" />
+                      <div>
+                        <div className="text-[13px] font-medium text-[#c5221f] mb-2">This campaign will not run</div>
+                        <div className="text-[12px] text-[#c5221f] leading-relaxed mb-3">
+                          To fix this campaign, you can either include an audience segment with at least 1,000 active members in at least one network, or turn off this setting until you have added an eligible audience segment.
+                        </div>
+                        <button className="text-[13px] font-medium text-[#c5221f] hover:underline">Define existing customer list</button>
                       </div>
                     </div>
+                  )}
+                </div>
+                <div className="w-[280px] shrink-0 border-l border-slate-200 pl-6 flex flex-col gap-4 text-[12px] text-slate-600 leading-relaxed">
+                  <div>
+                    By default, your campaign bids equally for new and existing customers. However, you can configure your customer acquisition settings to optimize for acquiring new customers. <a href="#" className="text-blue-600 hover:underline">Learn more about customer acquisition</a>
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-800">Smart bidding</span> will be optimized for delivering your ads only to new customers.
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-800">Note:</span> Your ads may sometimes be shown to existing customers due to technology limitations and privacy measures. <a href="#" className="text-blue-600 hover:underline">Learn more about customer acquisition</a>
                   </div>
                 </div>
-              )}
-            </div>
-
-            {/* Right description */}
-            <div className="w-[280px] shrink-0 border-l border-slate-200 pl-5 text-[12px] text-slate-600 leading-relaxed">
-              {!onlyNewCustomers ? (
-                <>
-                  By default, your campaign bids equally for new and existing customers. However, you can configure your customer acquisition settings to optimize for acquiring new customers.{" "}
-                  <a href="#" className="text-blue-600 hover:underline" onClick={e => e.preventDefault()}>Learn more about customer acquisition</a>
-                </>
-              ) : (
-                <>
-                  Smart bidding will be optimized for delivering your ads only to new customers. Due to privacy restrictions, it's not possible to show ads to existing customers due to technology limitations and privacy measures.{" "}
-                  <a href="#" className="text-blue-600 hover:underline" onClick={e => e.preventDefault()}>Learn more about customer acquisition</a>
-                </>
-              )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* ── Customer Retention Panel (Performance Max only) ── */}
-        {campaignType === "Performance Max" && (
+        {/* ── Customer Retention Panel ── */}
+        {!isSearch && (
           <div
-            id="panel-retention"
-            onClick={() => onSubStepChange?.('retention')}
+            id="panel-customer-retention"
+            onClick={() => onSubStepChange?.('customer-retention')}
             className="bidding-panel-section bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden"
           >
             <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-50">
@@ -250,7 +247,7 @@ export default function GoogleAdsBiddingStep({ onNext, onSubStepChange, campaign
 
                 {/* Info: no purchase goal */}
                 <div className="pl-7">
-                  <div className="bg-blue-50 border border-blue-100 rounded-md p-4 flex gap-3 max-w-[460px]">
+                  <div className="bg-[#e8f0fe] border border-blue-100 rounded-md p-4 flex gap-3 max-w-[460px]">
                     <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                     <div className="text-[13px] text-slate-700 leading-relaxed">
                       You can't bid higher for lapsed customers because you don't have a purchase goal in your account. Add a purchase goal to run campaigns that bid higher for specific customer types.
@@ -260,11 +257,11 @@ export default function GoogleAdsBiddingStep({ onNext, onSubStepChange, campaign
 
                 {/* Additional warning when onlyNewCustomers is checked */}
                 {onlyNewCustomers && (
-                  <div className="pl-7">
-                    <div className="bg-blue-50 border border-blue-100 rounded-md p-4 flex gap-3 max-w-[460px]">
+                  <div className="pl-7 mt-2">
+                    <div className="bg-[#e8f0fe] border border-blue-100 rounded-md p-4 flex gap-3 max-w-[460px]">
                       <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                       <div className="text-[13px] text-slate-700 leading-relaxed">
-                        Customer retention option is not available because your customer acquisition is set to only bid for new customers. To use customer retention, set customer acquisition to bid higher for new customers than existing customers.
+                        Customer retention optimization is not available because your customer acquisition is set to only bid for new customers. To use customer retention, set customer acquisition to bid higher for new customers than existing customers.
                       </div>
                     </div>
                   </div>
@@ -273,7 +270,7 @@ export default function GoogleAdsBiddingStep({ onNext, onSubStepChange, campaign
 
               {/* Right description */}
               <div className="w-[280px] shrink-0 border-l border-slate-200 pl-5 text-[12px] text-slate-600 leading-relaxed">
-                By default, your campaign does not adjust bidding to re-engage lapsed customers. However, you can configure your customer acquisition settings in Google to optimize for winning back lapsed customers.
+                By default, your campaign does not adjust bidding to re-engage lapsed customers. However, you can configure your customer acquisition settings to optimize for winning back lapsed customers.
                 <div className="mt-1">
                   <a href="#" className="text-blue-600 hover:underline" onClick={e => e.preventDefault()}>Learn more about how to re-engage lapsed customers</a>
                 </div>

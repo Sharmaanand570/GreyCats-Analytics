@@ -27,6 +27,16 @@ const featureRows: FeatureRow[] = [
     getValue: (p) =>
       p.limits.maxReports === -1 ? "Unlimited" : p.limits.maxReports.toString(),
   },
+  {
+    label: "AI Prompts",
+    getValue: (p) =>
+      p.limits.maxAIPrompts === 0 ? false : p.limits.maxAIPrompts === -1 ? "Unlimited" : `${p.limits.maxAIPrompts}/mo`,
+  },
+  {
+    label: "AI Images",
+    getValue: (p) =>
+      p.limits.maxAIImages === 0 ? false : p.limits.maxAIImages === -1 ? "Unlimited" : `${p.limits.maxAIImages}/mo`,
+  },
   { label: "PDF Export", getValue: (p) => p.features.pdfExport },
   { label: "Alerts", getValue: (p) => p.features.alerts },
   { label: "Scheduled Reports", getValue: (p) => p.features.scheduledReports },

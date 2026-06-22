@@ -19,13 +19,7 @@ import {
   Trash2,
   Users,
   UserPlus,
-  RefreshCcw,
-  FlaskConical,
-  MousePointerClick,
-  PackageCheck,
-  TrendingUp,
-  AlertTriangle,
-  X as XIcon
+  RefreshCcw
 } from 'lucide-react';
 import { SiTelegram, SiWhatsapp } from 'react-icons/si';
 import { Button } from '@/components/ui/button';
@@ -35,11 +29,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-import { useBroadcasts, useBroadcastStats } from '@/features/broadcasts/hooks/useBroadcasts';
+import { useBroadcasts } from '@/features/broadcasts/hooks/useBroadcasts';
 import { CreateBroadcastModal } from '@/features/broadcasts/components/CreateBroadcastModal';
 import { TemplateManager } from '@/features/broadcasts/components/TemplateManager';
 import { ProviderManager } from '@/features/broadcasts/components/ProviderManager';
-import { SendTestModal } from '@/features/broadcasts/components/SendTestModal';
 import { useIntegrations, useTemplates } from '@/features/broadcasts/hooks/useBroadcasts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
@@ -49,7 +42,6 @@ import { useTelegramTargets } from '@/features/blog/hooks/useBlogPosts';
 import { useCreateClient, useDeleteClient, useClient, useAllClients } from '../hooks/useClients';
 import { getProfileImageUrl } from '@/utils/imageUtils';
 import type { ClientWithIntegrations } from '@/types/client.types';
-import type { BroadcastChannel } from '@/features/broadcasts/api/types';
 
 const statusConfig = {
   PENDING: {
@@ -424,13 +416,10 @@ function StepWorkspace({
   const { data: integrations } = useIntegrations(client.id);
   const { data: templates } = useTemplates();
   const { data: telegramTargets = [] } = useTelegramTargets(client.id);
-  const { data: broadcastStats } = useBroadcastStats(client.id);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  // Send Test modal state
-  const [testModal, setTestModal] = useState<{ campaignId: number; campaignName: string; channel: BroadcastChannel } | null>(null);
-  // Cool-down banner: dismissed per-session per integration id
-  const [dismissedCooldowns, setDismissedCooldowns] = useState<Set<number>>(new Set());
+
+
 
   const [activeTab, setActiveTab] = useState('campaigns');
 
@@ -580,142 +569,38 @@ function StepWorkspace({
             </TabsList>
 
             <TabsContent value="campaigns" className="space-y-8 focus-visible:outline-none">
-              {/* ── Gateway Cool-Down Warning Banners ── */}
-              {integrations
-                ?.filter(i =>
-                  i.type.toUpperCase() === channel.toUpperCase() &&
-                  i.coolDownUntil &&
-                  new Date(i.coolDownUntil) > new Date() &&
-                  !dismissedCooldowns.has(i.id)
-                )
-                .map(i => (
-                  <div
-                    key={i.id}
-                    className="flex items-start gap-3 p-4 rounded-xl border border-amber-200 bg-amber-50 animate-in slide-in-from-top-2 duration-300"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
-                      <AlertTriangle className="w-4 h-4 text-amber-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-amber-900">
-                        ⚠️ Gateway Paused — {i.name}
-                      </p>
-                      {i.lastErrorMsg && (
-                        <p className="text-xs font-medium text-amber-700 mt-0.5">
-                          "{i.lastErrorMsg}"
-                        </p>
-                      )}
-                      <p className="text-xs text-amber-600 mt-1 font-medium">
-                        Sending will automatically resume at:{' '}
-                        <span className="font-bold">
-                          {new Date(i.coolDownUntil!).toLocaleString()}
-                        </span>
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setDismissedCooldowns(prev => new Set([...prev, i.id]))}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-amber-500 hover:bg-amber-100 hover:text-amber-700 transition-colors shrink-0"
-                      aria-label="Dismiss"
-                    >
-                      <XIcon className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))
-              }
-
               {(totalCampaigns > 0 || isLoading) && (
                 <>
-                  {/* ── Existing 3 stat cards ── */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4 mb-2">
-                <div className={cn("bg-white p-5 rounded-[28px] border shadow-sm transition-all duration-500 hover:shadow-xl col-span-1", theme.borderColor, theme.glowShadow)}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center", theme.lightBg)}>
-                      <BarChart3 className={cn("w-4 h-4", theme.iconColor)} />
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                <div className={cn("bg-white p-6 rounded-[28px] border shadow-sm transition-all duration-500 hover:shadow-xl", theme.borderColor, theme.glowShadow)}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center", theme.lightBg)}>
+                      <BarChart3 className={cn("w-5 h-5", theme.iconColor)} />
                     </div>
-                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Total</p>
+                    <p className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Total Campaigns</p>
                   </div>
-                  <p className="text-3xl font-extrabold text-zinc-900 tracking-tight">{filteredBroadcasts?.length || 0}</p>
+                  <p className="text-4xl font-extrabold text-zinc-900 tracking-tight">{filteredBroadcasts?.length || 0}</p>
                 </div>
-                <div className={cn("bg-white p-5 rounded-[28px] border shadow-sm transition-all duration-500 hover:shadow-xl col-span-1", theme.borderColor, theme.glowShadow)}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center", theme.lightBg)}>
-                      <CheckCircle2 className={cn("w-4 h-4", theme.iconColor)} />
+                <div className={cn("bg-white p-6 rounded-[28px] border shadow-sm transition-all duration-500 hover:shadow-xl", theme.borderColor, theme.glowShadow)}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center", theme.lightBg)}>
+                      <CheckCircle2 className={cn("w-5 h-5", theme.iconColor)} />
                     </div>
-                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Sent</p>
+                    <p className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Messages Sent</p>
                   </div>
-                  <p className="text-3xl font-extrabold text-zinc-900 tracking-tight">
+                  <p className="text-4xl font-extrabold text-zinc-900 tracking-tight">
                     {filteredBroadcasts?.reduce((acc, b) => acc + b.sentCount, 0).toLocaleString() || 0}
                   </p>
                 </div>
-                <div className={cn("bg-white p-5 rounded-[28px] border shadow-sm transition-all duration-500 hover:shadow-xl col-span-1", theme.borderColor, theme.glowShadow)}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center", theme.lightBg)}>
-                      <AlertCircle className={cn("w-4 h-4", theme.iconColor)} />
+                <div className={cn("bg-white p-6 rounded-[28px] border shadow-sm transition-all duration-500 hover:shadow-xl", theme.borderColor, theme.glowShadow)}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center", theme.lightBg)}>
+                      <AlertCircle className={cn("w-5 h-5", theme.iconColor)} />
                     </div>
-                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Failed</p>
+                    <p className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Failures</p>
                   </div>
-                  <p className="text-3xl font-extrabold text-zinc-900 tracking-tight">
+                  <p className="text-4xl font-extrabold text-zinc-900 tracking-tight">
                     {filteredBroadcasts?.reduce((acc, b) => acc + b.failedCount, 0).toLocaleString() || 0}
-                  </p>
-                </div>
-
-                {/* ── 4 NEW engagement stat cards (v2.0) ── */}
-                <div className="bg-white p-5 rounded-[28px] border border-emerald-200 shadow-sm transition-all duration-500 hover:shadow-xl hover:shadow-emerald-100/50 col-span-1">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-emerald-50">
-                      <PackageCheck className="w-4 h-4 text-emerald-600" />
-                    </div>
-                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Delivered</p>
-                  </div>
-                  <p className="text-3xl font-extrabold text-zinc-900 tracking-tight">
-                    {(broadcastStats?.delivered ?? 0).toLocaleString()}
-                  </p>
-                </div>
-                <div className="bg-white p-5 rounded-[28px] border border-blue-200 shadow-sm transition-all duration-500 hover:shadow-xl hover:shadow-blue-100/50 col-span-1">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-blue-50">
-                      <TrendingUp className="w-4 h-4 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Opened</p>
-                    </div>
-                  </div>
-                  <p className="text-3xl font-extrabold text-zinc-900 tracking-tight">
-                    {(broadcastStats?.opened ?? 0).toLocaleString()}
-                  </p>
-                  {(broadcastStats?.sent ?? 0) > 0 && (
-                    <p className="text-[10px] font-bold text-blue-500 mt-1">
-                      {(((broadcastStats!.opened) / broadcastStats!.sent) * 100).toFixed(1)}% open rate
-                    </p>
-                  )}
-                </div>
-                <div className="bg-white p-5 rounded-[28px] border border-violet-200 shadow-sm transition-all duration-500 hover:shadow-xl hover:shadow-violet-100/50 col-span-1">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-violet-50">
-                      <MousePointerClick className="w-4 h-4 text-violet-600" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Clicked</p>
-                    </div>
-                  </div>
-                  <p className="text-3xl font-extrabold text-zinc-900 tracking-tight">
-                    {(broadcastStats?.clicked ?? 0).toLocaleString()}
-                  </p>
-                  {(broadcastStats?.opened ?? 0) > 0 && (
-                    <p className="text-[10px] font-bold text-violet-500 mt-1">
-                      {(((broadcastStats!.clicked) / broadcastStats!.opened) * 100).toFixed(1)}% CTR
-                    </p>
-                  )}
-                </div>
-                <div className="bg-white p-5 rounded-[28px] border border-red-200 shadow-sm transition-all duration-500 hover:shadow-xl hover:shadow-red-100/50 col-span-1">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-red-50">
-                      <AlertCircle className="w-4 h-4 text-red-500" />
-                    </div>
-                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Bounced</p>
-                  </div>
-                  <p className="text-3xl font-extrabold text-zinc-900 tracking-tight">
-                    {(broadcastStats?.bounced ?? 0).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -767,7 +652,6 @@ function StepWorkspace({
                           <th className="px-6 py-3 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Status</th>
                           <th className="px-6 py-3 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Progress</th>
                           <th className="px-6 py-3 text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-right">Date Created</th>
-                          <th className="px-6 py-3 text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-right">Test</th>
                         </tr>
                       </thead>
                     )}
@@ -953,17 +837,6 @@ function StepWorkspace({
                                   {format(new Date(b.createdAt), 'hh:mm a')}
                                 </div>
                               </td>
-                              {/* Send Test button */}
-                              <td className="px-4 py-4 text-right">
-                                <button
-                                  onClick={() => setTestModal({ campaignId: b.id, campaignName: b.name, channel: b.channel as BroadcastChannel })}
-                                  title="Send a test message"
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-zinc-500 hover:text-violet-700 hover:bg-violet-50 border border-zinc-200 hover:border-violet-200 rounded-lg transition-all"
-                                >
-                                  <FlaskConical className="w-3.5 h-3.5" />
-                                  Test
-                                </button>
-                              </td>
                             </tr>
                           );
                         })
@@ -991,17 +864,6 @@ function StepWorkspace({
         clientId={client.id}
         fixedChannel={channel.toUpperCase() as any}
       />
-
-      {/* Send Test Message modal */}
-      {testModal && (
-        <SendTestModal
-          isOpen={!!testModal}
-          onClose={() => setTestModal(null)}
-          campaignId={testModal.campaignId}
-          campaignName={testModal.campaignName}
-          channel={testModal.channel}
-        />
-      )}
     </div>
   );
 }

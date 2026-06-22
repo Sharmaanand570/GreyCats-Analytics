@@ -17,14 +17,14 @@ import {
   deleteIntegration,
   deleteAdminIntegration,
   syncTemplates,
-  getBroadcastStats,
-  sendTestMessage
+  registerWhatsAppPin,
+  requestWhatsAppCode,
+  verifyWhatsAppCode
 } from '../api/broadcastApi';
 import type { 
   CreateBroadcastPayload, 
   CreateTemplateRequest, 
-  CreateIntegrationRequest,
-  SendTestPayload
+  CreateIntegrationRequest
 } from '../api/types';
 import { toast } from 'sonner';
 
@@ -99,15 +99,10 @@ export const useCreateBroadcastCsv = () => {
       data.clientId,
       data.variableMapping
     ),
-    onSuccess: (result) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['broadcasts'] });
       queryClient.invalidateQueries({ queryKey: ['broadcasts-admin'] });
-      // Check if the backend silently truncated the CSV at 5,000 recipients
-      if (result.serverMessage?.toLowerCase().includes('truncated')) {
-        toast.warning('Your CSV had more than 5,000 valid recipients. Only the first 5,000 were imported.');
-      } else {
-        toast.success('CSV Broadcast campaign created');
-      }
+      toast.success('CSV Broadcast campaign created');
     },
     onError: (error: any) => {
       toast.error(extractError(error, 'CSV upload failed'));
@@ -284,29 +279,44 @@ export const useAdminDeleteIntegration = () => {
   });
 };
 
-/**
- * Fetch engagement stats (delivered, opened, clicked, bounced) for the current workspace.
- * GET /broadcasts/stats
- */
-export const useBroadcastStats = (clientId?: number) => {
-  return useQuery({
-    queryKey: ['broadcast-stats', clientId],
-    queryFn: () => getBroadcastStats(clientId),
-    // Refresh every 5 minutes — stats are updated by webhooks, not real-time
-    refetchInterval: 5 * 60 * 1000,
+export const useRegisterWhatsAppPin = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, pin }: { id: number; pin: string }) => registerWhatsAppPin(id, pin),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['broadcast-integrations'] });
+      queryClient.invalidateQueries({ queryKey: ['broadcast-integrations-admin'] });
+      toast.success('Two-Step Verification PIN registered successfully');
+    },
+    onError: (error: any) => {
+      toast.error(extractError(error, 'Failed to register PIN'));
+    }
   });
 };
 
-/**
- * Send a single test message for a campaign.
- * POST /broadcasts/test
- */
-export const useSendTestMessage = () => {
+export const useRequestWhatsAppCode = () => {
   return useMutation({
-    mutationFn: (payload: SendTestPayload) => sendTestMessage(payload),
+    mutationFn: ({ id, method }: { id: number; method?: 'SMS' | 'VOICE' }) => requestWhatsAppCode(id, method),
+    onSuccess: () => {
+      toast.success('Verification code requested successfully');
+    },
     onError: (error: any) => {
-      // Let the caller handle the toast so it can include the testTo address
-      console.error('Send test failed:', extractError(error, 'Failed to send test message'));
+      toast.error(extractError(error, 'Failed to request verification code'));
+    }
+  });
+};
+
+export const useVerifyWhatsAppCode = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, code }: { id: number; code: string }) => verifyWhatsAppCode(id, code),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['broadcast-integrations'] });
+      queryClient.invalidateQueries({ queryKey: ['broadcast-integrations-admin'] });
+      toast.success('Phone number verified successfully');
+    },
+    onError: (error: any) => {
+      toast.error(extractError(error, 'Failed to verify code'));
     }
   });
 };

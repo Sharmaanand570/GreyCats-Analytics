@@ -99,6 +99,8 @@ const TermsOfServicePage = lazy(() => import("./pages/TermsOfServicePage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));
 const CookiePolicyPage = lazy(() => import("./pages/CookiePolicyPage"));
 const LandingPage = lazy(() => import("./pages/LandingPage"));
+const FeaturesPage = lazy(() => import("./pages/FeaturesPage"));
+const IntegrationsLandingPage = lazy(() => import("./pages/IntegrationsLandingPage"));
 const PricingPage = lazy(() => import("./pages/pricing/PricingPage"));
 const BillingPage = lazy(() => import("./pages/billing/BillingPage"));
 const CheckoutPage = lazy(() => import("./pages/pricing/CheckoutPage"));
@@ -144,6 +146,8 @@ function App() {
         <Routes>
           <Route path="/" element={<AuthParentComp />}>
             <Route index element={<LandingPage />} />
+            <Route path="features" element={<FeaturesPage />} />
+            <Route path="integrations-info" element={<IntegrationsLandingPage />} />
             {/* Public auth routes */}
             {/* Public auth routes */}
             <Route path="auth">

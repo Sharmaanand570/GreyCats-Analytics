@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useTemplates, useAdminTemplates, useCreateTemplate, useCreateSystemTemplate, useDeleteTemplate, useApproveTemplate, useSyncTemplates } from '../hooks/useBroadcasts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -55,10 +55,6 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
   const [searchQuery, setSearchQuery] = useState('');
   const [editingExternalIds, setEditingExternalIds] = useState<Record<number, string>>({});
   const [error, setError] = useState<string | null>(null);
-  // Preview toggle for email iframe
-  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
-  // Ref to the content textarea for cursor-position variable insertion
-  const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const max = channel === 'SMS' ? 160 : channel === 'WHATSAPP' ? 1024 : channel === 'TELEGRAM' ? 4096 : 10000;
 
@@ -257,7 +253,6 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
               <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-1">Message Content</label>
               <div className="relative">
                 <textarea
-                  ref={contentTextareaRef}
                   value={content} onChange={(e) => setContent(e.target.value)}
                   placeholder="Craft your message here. Use {{name}} for dynamic tags..." rows={5}
                   className="w-full px-5 py-4 pr-12 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none leading-relaxed outline-none"
@@ -336,51 +331,6 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
               </div>
             </div>
 
-            {/* ── Variable Helper Chips (Email & SMS only — v2.0) ── */}
-            {(channel === 'EMAIL' || channel === 'SMS') && (
-              <details className="group" open={channel === 'EMAIL'}>
-                <summary className="flex items-center gap-2 text-[11px] font-bold text-blue-600 cursor-pointer list-none select-none hover:text-blue-700 transition-colors mb-2 ml-1">
-                  <span className="w-4 h-4 rounded bg-blue-500/10 flex items-center justify-center text-blue-500 group-open:rotate-90 transition-transform">
-                    <Info className="w-2.5 h-2.5" />
-                  </span>
-                  <span>💡 Available Variables — click to insert at cursor</span>
-                </summary>
-                <div className="flex flex-wrap gap-2 p-3 bg-blue-50/50 border border-blue-100 rounded-xl mt-1">
-                  {[
-                    { variable: '{{name}}', desc: "Recipient's name (part before @)" },
-                    { variable: '{{email}}', desc: "Recipient's email address" },
-                  ].map(({ variable, desc }) => (
-                    <button
-                      key={variable}
-                      type="button"
-                      title={`Insert ${variable}: ${desc}`}
-                      onClick={() => {
-                        const ta = contentTextareaRef.current;
-                        if (!ta) {
-                          setContent(prev => prev + variable);
-                          return;
-                        }
-                        const start = ta.selectionStart ?? content.length;
-                        const end = ta.selectionEnd ?? content.length;
-                        const next = content.slice(0, start) + variable + content.slice(end);
-                        setContent(next);
-                        // Restore cursor after the inserted variable
-                        requestAnimationFrame(() => {
-                          ta.focus();
-                          const pos = start + variable.length;
-                          ta.setSelectionRange(pos, pos);
-                        });
-                      }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-blue-200 text-blue-700 text-[11px] font-bold hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all shadow-sm"
-                    >
-                      <span className="font-mono">{variable}</span>
-                      <span className="text-[10px] font-normal opacity-70">{desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </details>
-            )}
-
             {error && (
               <div className="flex items-center gap-2 p-3 bg-red-500/5 rounded-xl border border-red-500/10 mb-6 animate-in fade-in slide-in-from-top-1">
                 <AlertCircle className="w-3.5 h-3.5 text-red-500" />
@@ -438,69 +388,6 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
               >
                 {createTemplate.isPending || createSystemTemplate.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Deploy Template'}
               </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ── Email HTML Live Preview (v2.0) ── */}
-      {isCreating && channel === 'EMAIL' && content.includes('<') && (
-        <Card className="border-blue-200/60 shadow-sm overflow-hidden bg-white animate-in fade-in duration-500">
-          <CardContent className="p-0">
-            {/* Preview toolbar */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-blue-100 bg-blue-50/40">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                  <MailIcon className="w-3.5 h-3.5 text-blue-600" />
-                </div>
-                <span className="text-xs font-bold text-blue-800">Live Email Preview</span>
-                <span className="text-[10px] text-blue-500 font-medium">(sandboxed — JS blocked)</span>
-              </div>
-              <div className="flex items-center gap-1 p-1 bg-white border border-blue-100 rounded-lg">
-                <button
-                  type="button"
-                  onClick={() => setPreviewMode('desktop')}
-                  className={cn(
-                    'px-3 py-1 rounded-md text-[11px] font-bold transition-all',
-                    previewMode === 'desktop'
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-zinc-500 hover:text-zinc-800'
-                  )}
-                >
-                  🖥 Desktop
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPreviewMode('mobile')}
-                  className={cn(
-                    'px-3 py-1 rounded-md text-[11px] font-bold transition-all',
-                    previewMode === 'mobile'
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-zinc-500 hover:text-zinc-800'
-                  )}
-                >
-                  📱 Mobile
-                </button>
-              </div>
-            </div>
-            {/* Sandboxed iframe */}
-            <div className="p-4 bg-gray-50/50 overflow-x-auto">
-              <iframe
-                id="emailPreview"
-                sandbox="allow-same-origin"
-                srcDoc={content}
-                style={{
-                  width: previewMode === 'mobile' ? '375px' : '100%',
-                  minHeight: '400px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  display: 'block',
-                  margin: previewMode === 'mobile' ? '0 auto' : '0',
-                  background: '#fff',
-                  transition: 'width 0.3s ease',
-                }}
-                title="Email HTML Preview"
-              />
             </div>
           </CardContent>
         </Card>

@@ -665,7 +665,7 @@ function Integrations({ clientId: propClientId, withLayout = true, hideHeader = 
             </div>
 
             <ConnectDataSource clientId={clientId}>
-              <Button className="rounded-2xl h-14 px-10 bg-zinc-900 hover:bg-zinc-800 text-white font-bold shadow-xl shadow-zinc-200/50 transition-all active:scale-[0.98] text-base">
+              <Button id="tour-connect-platform-primary" className="rounded-2xl h-14 px-10 bg-zinc-900 hover:bg-zinc-800 text-white font-bold shadow-xl shadow-zinc-200/50 transition-all active:scale-[0.98] text-base">
                 Get Started
               </Button>
             </ConnectDataSource>

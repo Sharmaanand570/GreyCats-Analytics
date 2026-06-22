@@ -53,6 +53,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useClientContext } from "@/context/ClientContext";
 import { useProductTour } from "./ProductTour";
 import { HelpCircle } from "lucide-react";
+import { AIQuotaSidebarWidget } from "@/components/ai-studio/AIQuotaSidebarWidget";
+
 function MainSideBar(): React.JSX.Element {
   const location = useLocation();
   const [activeTab, setActive] = useState(location.pathname);
@@ -71,6 +73,16 @@ function MainSideBar(): React.JSX.Element {
       fetchProfile();
     }
   }, [user, fetchProfile]);
+
+  useEffect(() => {
+    if (user && !user.hasSeenQuickTour) {
+      const timer = setTimeout(() => {
+        startTour();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.hasSeenQuickTour]);
 
   const userInitials = user?.fullName
     ? user.fullName
@@ -113,6 +125,15 @@ function MainSideBar(): React.JSX.Element {
   const [collabsState, setcollabsState] = useState<boolean>(
     getInitialCollapseState()
   );
+
+  useEffect(() => {
+    const handleOpenGroup = (e: CustomEvent<{ group: string }>) => {
+      setOpenGroups((prev) => ({ ...prev, [e.detail.group]: true }));
+      setcollabsState(false);
+    };
+    window.addEventListener("openSidebarGroup", handleOpenGroup as EventListener);
+    return () => window.removeEventListener("openSidebarGroup", handleOpenGroup as EventListener);
+  }, []);
 
   const getInitialOpenGroup = (): Record<string, boolean> => {
     const path = location.pathname;
@@ -307,8 +328,8 @@ function MainSideBar(): React.JSX.Element {
       badge: "Soon",
       isCollapsible: true,
       items: [
-        { label: "Meta Ads", path: "/data-sources/meta-ads", icon: <Megaphone />, isComingSoon: true },
-        { label: "Google Ads", path: "/data-sources/google-ads", icon: <SiGoogleads className="w-[18px] h-[18px]" />, isComingSoon: true },
+        { label: "Meta Ads", path: "/data-sources/meta-ads", icon: <Megaphone />, isComingSoon: true},
+        { label: "Google Ads", path: "/data-sources/google-ads", icon: <SiGoogleads className="w-[18px] h-[18px]" />, isComingSoon: false },
       ],
     }] : []),
     {
@@ -468,6 +489,7 @@ function MainSideBar(): React.JSX.Element {
             
             {/* Footer */}
             <SidebarFooter className={`mt-auto border-t border-zinc-800 pt-4 pb-4 ${collabsState ? "px-0" : "px-4"}`}>
+              <AIQuotaSidebarWidget isCollapsed={collabsState} />
               <div
                 onClick={startTour}
                 className="flex items-center gap-3 rounded-md px-2 py-3 mb-2 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800/50 cursor-pointer"
@@ -634,6 +656,7 @@ function MainSideBar(): React.JSX.Element {
 
               {/* Footer */}
               <div className="mt-auto pt-6 border-t border-zinc-700 flex flex-col space-y-4">
+                <AIQuotaSidebarWidget isCollapsed={false} />
                 {/* Quick Tour Button for Mobile */}
                 <div
                   onClick={() => startTour()}

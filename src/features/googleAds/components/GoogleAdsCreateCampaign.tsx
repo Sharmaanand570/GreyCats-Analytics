@@ -5,10 +5,14 @@ import {
   ShoppingCart, CreditCard, Target, Eye, 
   MoreVertical, TriangleAlert, Info, Play, Trash2, ChevronUp,
   Mail, Sparkles, Layout, MonitorPlay, Search,
-  Building2, CornerUpRight, ChevronDown, Package, FileClock, Link2, X
+  Building2, CornerUpRight, ChevronDown, Package, FileClock, Link2, X, AlertCircle
 } from "lucide-react";
 import { SiGoogleads } from "react-icons/si";
 import GoogleAdsCampaignWizard from "./GoogleAdsCampaignWizard";
+import GoogleAdsDemandGenWizard from "./GoogleAdsDemandGenWizard";
+import GoogleAdsDisplayWizard from "./GoogleAdsDisplayWizard";
+import GoogleAdsShoppingWizard from "./GoogleAdsShoppingWizard";
+import GoogleAdsAppWizard from "./GoogleAdsAppWizard";
 interface CreateCampaignProps {
   onCancel: () => void;
 }
@@ -16,6 +20,8 @@ interface CreateCampaignProps {
 export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProps) {
   const [selectedObjective, setSelectedObjective] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [merchantCenterStatus, setMerchantCenterStatus] = useState<"no_account" | "linked">("no_account");
+  const [isMerchantModalOpen, setIsMerchantModalOpen] = useState(false);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [youtubeGoal, setYoutubeGoal] = useState<"views" | "reach" | "subs">("views");
@@ -78,7 +84,9 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
       customCampaignType === "shopping" ? "Shopping" : 
       customCampaignType === "video" ? "Video" : 
       customCampaignType === "display" ? "Display" :
-      customCampaignType === "demand" ? "Demand Gen" :
+      customCampaignType === "demandgen" ? "Demand Gen" :
+      customCampaignType === "app" ? "App" :
+      selectedObjective === "app" ? "App" :
       "Campaign";
       
     if (selectedObjective === "youtube") {
@@ -86,6 +94,19 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
         youtubeGoal === "subs" ? "Demand Gen" :
         youtubeGoal === "reach" && customCampaignType === "display" ? "Display" : 
         "Video";
+    }
+
+    if (displayType === "Demand Gen") {
+      return <GoogleAdsDemandGenWizard onCancel={onCancel} campaignType={displayType} />;
+    }
+    if (displayType === "Display") {
+      return <GoogleAdsDisplayWizard onCancel={onCancel} campaignType={displayType} />;
+    }
+    if (displayType === "Shopping") {
+      return <GoogleAdsShoppingWizard onCancel={onCancel} campaignType={displayType} />;
+    }
+    if (displayType === "App") {
+      return <GoogleAdsAppWizard onClose={onCancel} />;
     }
 
     return <GoogleAdsCampaignWizard onCancel={onCancel} campaignType={displayType} />;
@@ -216,6 +237,15 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
         </div>
       )}
 
+      {/* Demand Gen Info Box */}
+      {selectedObjective === "custom" && customCampaignType === "demandgen" && (
+        <div className="bg-white border border-slate-200 shadow-sm rounded-md mb-6 order-5 p-4">
+          <div className="text-[12px] text-slate-600 leading-relaxed">
+            Capturing engagement and action across YouTube, including Shorts, Discover, and Gmail, Demand Gen campaigns are ideal for social advertisers who want to serve visually-appealing, multi-format ads on Google's most impactful surfaces available to any advertiser. <a href="#" className="text-blue-600 hover:underline">See how it works</a>
+          </div>
+        </div>
+      )}
+
       {/* Dynamic Panel: App Promotion */}
       {selectedObjective === "app" && (
         <div className="flex flex-col gap-4 mb-6 order-3">
@@ -245,21 +275,39 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
             </div>
             <div className="p-6 flex flex-col gap-4">
               <label className="flex items-start gap-3 cursor-pointer">
-                <input type="radio" name="subtype" defaultChecked className="mt-1 text-blue-600 w-4 h-4" />
+                <input 
+                  type="radio" 
+                  name="subtype" 
+                  checked={appSubtype === "installs"} 
+                  onChange={() => setAppSubtype("installs")}
+                  className="mt-1 text-blue-600 w-4 h-4" 
+                />
                 <div>
                   <div className="text-[13px] font-medium text-slate-800">App installs</div>
                   <div className="text-[12px] text-slate-500">Get new people to install your app</div>
                 </div>
               </label>
               <label className="flex items-start gap-3 cursor-pointer">
-                <input type="radio" name="subtype" className="mt-1 text-blue-600 w-4 h-4" />
+                <input 
+                  type="radio" 
+                  name="subtype" 
+                  checked={appSubtype === "engagement"} 
+                  onChange={() => setAppSubtype("engagement")}
+                  className="mt-1 text-blue-600 w-4 h-4" 
+                />
                 <div>
                   <div className="text-[13px] font-medium text-slate-800">App engagement</div>
                   <div className="text-[12px] text-slate-500">Get existing users to take actions in your app (Minimum 50K installs required)</div>
                 </div>
               </label>
               <label className="flex items-start gap-3 cursor-pointer">
-                <input type="radio" name="subtype" className="mt-1 text-blue-600 w-4 h-4" />
+                <input 
+                  type="radio" 
+                  name="subtype" 
+                  checked={appSubtype === "prereg"} 
+                  onChange={() => setAppSubtype("prereg")}
+                  className="mt-1 text-blue-600 w-4 h-4" 
+                />
                 <div>
                   <div className="text-[13px] font-medium text-slate-800">App pre-registration (Android only)</div>
                   <div className="text-[12px] text-slate-500">Get new users to pre-register for your app before launch</div>
@@ -268,35 +316,154 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
             </div>
           </div>
 
-          <div className="bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden">
-            <div className="bg-white px-6 py-4 border-b border-slate-200">
-              <h2 className="text-sm font-semibold text-slate-800">Select your mobile app's platform</h2>
-            </div>
-            <div className="p-6 flex flex-col gap-6">
-              <div className="flex flex-col gap-3">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input type="radio" name="platform" defaultChecked className="text-blue-600 w-4 h-4" />
-                  <span className="text-[13px] text-slate-800">Android</span>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input type="radio" name="platform" className="text-blue-600 w-4 h-4" />
-                  <span className="text-[13px] text-slate-800">iOS</span>
-                </label>
+          {appSubtype === "installs" && (
+            <div className="bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden">
+              <div className="bg-white px-6 py-4 border-b border-slate-200">
+                <h2 className="text-sm font-semibold text-slate-800">Select your mobile app's platform</h2>
               </div>
-              
-              <div className="flex flex-col gap-2 w-full max-w-lg">
-                <label className="text-[13px] font-medium text-slate-800">Look up your app</label>
-                <input 
-                  type="text" 
-                  placeholder="Enter the app name, package name, publisher, or Play Store URL"
-                  className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                />
-                <p className="text-[12px] text-slate-500">
-                  If you cannot find your app, please see <a href="#" className="text-blue-600 hover:underline">these steps</a>
-                </p>
+              <div className="p-6 flex flex-col gap-6">
+                <div className="flex flex-col gap-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="radio" name="platform" defaultChecked className="text-blue-600 w-4 h-4" />
+                    <span className="text-[13px] text-slate-800">Android</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="radio" name="platform" className="text-blue-600 w-4 h-4" />
+                    <span className="text-[13px] text-slate-800">iOS</span>
+                  </label>
+                </div>
+                
+                <div className="flex flex-col gap-2 w-full max-w-lg">
+                  <label className="text-[13px] font-medium text-slate-800">Look up your app</label>
+                  <input 
+                    type="text" 
+                    placeholder="Enter the app name, package name, publisher, or Play Store URL"
+                    className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  />
+                  <p className="text-[12px] text-slate-500">
+                    If you cannot find your app, please see <a href="#" className="text-blue-600 hover:underline">these steps</a>
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {(appSubtype === "engagement" || appSubtype === "prereg") && (
+            <div className="bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden">
+              <div className="p-6 flex flex-col gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-slate-900 rounded flex items-center justify-center">
+                    <span className="text-white font-bold text-[14px]">Y</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] font-medium text-slate-800">Yorder</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[12px]">
+                      <a href="#" className="text-blue-600 hover:underline">com.yorder.app</a>
+                      <span className="text-slate-500">- Yorder Web Services</span>
+                    </div>
+                  </div>
+                  <button className="w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+
+                {appSubtype === "engagement" && (
+                  <div className="bg-[#fce8e6] border border-red-100 rounded p-4 flex gap-3 mt-2">
+                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-[12px] text-slate-800 leading-relaxed">
+                        For this campaign to run, your app needs to have a minimum number of installs and have conversion tracking set up. <a href="#" className="text-blue-600 hover:underline">Learn more</a>
+                      </div>
+                      <button className="text-red-600 text-[12px] font-medium mt-1 hover:underline">Set up conversion tracking</button>
+                    </div>
+                  </div>
+                )}
+
+                {appSubtype === "prereg" && (
+                  <div className="bg-[#fce8e6] border border-red-100 rounded p-4 flex gap-3 mt-2">
+                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-[12px] text-slate-800 leading-relaxed">
+                        The app you selected is not eligible for pre-registration. Eligibility for pre-registration requires that the app turns on preregistration for at least one country on Play Console. <a href="#" className="text-blue-600 hover:underline">Learn more</a>
+                      </div>
+                      <button className="text-red-600 text-[12px] font-medium mt-3 hover:underline block">Go to play console</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {appSubtype === "engagement" && (
+            <div className="bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden">
+              <div className="bg-white px-6 py-4 border-b border-slate-200">
+                <h2 className="text-sm font-semibold text-slate-800">Select a marketing objective for your app engagement campaign</h2>
+              </div>
+              <div className="flex">
+                <div className="p-6 flex-1 pr-4">
+                  <p className="text-[12px] text-slate-800 mb-6 leading-relaxed">
+                    When you select a marketing objective, this campaign will use selections for bidding strategy, audiences, and assets based on insights from past performance to help you reach it. You can edit any of these selections during campaign creation.
+                  </p>
+                  
+                  <div className="flex flex-col gap-4">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input type="radio" name="engagement_obj" className="mt-1 text-blue-600 w-4 h-4" />
+                      <div>
+                        <div className="text-[13px] text-slate-800">Re-engage lapsed users</div>
+                        <div className="text-[12px] text-slate-500">Reach people who have installed your app but aren't using it, and get them to take action</div>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input type="radio" name="engagement_obj" className="mt-1 text-blue-600 w-4 h-4" />
+                      <div>
+                        <div className="text-[13px] text-slate-800">Re-engage lapsed purchasers</div>
+                        <div className="text-[12px] text-slate-500">Reach people who previously made a purchase and get them to become return customers</div>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input type="radio" name="engagement_obj" className="mt-1 text-blue-600 w-4 h-4" />
+                      <div>
+                        <div className="text-[13px] text-slate-800">Re-engage non-purchasers</div>
+                        <div className="text-[12px] text-slate-500">Reach people who haven't made a purchase and get them to become customers</div>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input type="radio" name="engagement_obj" className="mt-1 text-blue-600 w-4 h-4" />
+                      <div>
+                        <div className="text-[13px] text-slate-800">Re-engage unnotified users (Firebase SDK and FCM setup recommended)</div>
+                        <div className="text-[12px] text-slate-500">Reach people who haven't received push notifications and get them to take action</div>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input type="radio" name="engagement_obj" className="mt-1 text-blue-600 w-4 h-4" />
+                      <div>
+                        <div className="text-[13px] text-slate-800">Re-engage all users</div>
+                        <div className="text-[12px] text-slate-500">Reach all people who have downloaded your app</div>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input type="radio" name="engagement_obj" className="mt-1 text-blue-600 w-4 h-4" />
+                      <div>
+                        <div className="text-[13px] text-slate-800">Re-engage users who uninstalled your app</div>
+                        <div className="text-[12px] text-slate-500">Reach people who uninstalled your app and get them to reinstall it</div>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-3 cursor-pointer mt-2">
+                      <input type="radio" name="engagement_obj" className="mt-0.5 text-blue-600 w-4 h-4" />
+                      <div className="text-[13px] text-slate-800">Create a campaign with a different marketing objective without using automated selections</div>
+                    </label>
+                  </div>
+                </div>
+                <div className="w-[280px] p-6 border-l border-slate-200 shrink-0">
+                  <p className="text-[12px] text-slate-500 italic">
+                    A preview of the suggested campaign selections will appear here when you pick a marketing objective.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden">
             <div className="bg-white px-6 py-4 border-b border-slate-200">
@@ -739,17 +906,59 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
               </label>
             )}
 
-            {(customCampaignType === "shopping" || (customCampaignType === "pmax" && advertiseProducts)) && (
+            {(customCampaignType === "shopping" || (customCampaignType === "pmax" && advertiseProducts)) && merchantCenterStatus === "no_account" && (
               <div className={customCampaignType === "pmax" ? "ml-7" : ""}>
-                <div className="flex items-center gap-1 text-[12px] text-slate-600 mb-2">
-                  Select a Merchant Center account <Info className="w-3.5 h-3.5" />
+                <div className="bg-[#e8f0fe] rounded p-4 flex items-center justify-between gap-4">
+                  <div className="flex gap-3 items-start">
+                    <Info className="w-5 h-5 text-blue-600 shrink-0" />
+                    <div className="text-[13px] text-slate-700 leading-relaxed">
+                      To run a Shopping campaign, create a Merchant Center account with the products you want to advertise. You can create the account now and finish setting it up after you've published this campaign.
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setIsMerchantModalOpen(true)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-medium px-4 py-2 rounded shrink-0"
+                  >
+                    Create Merchant Center account
+                  </button>
                 </div>
-                <div className="flex items-center gap-2 border border-slate-300 rounded px-3 py-2 w-max bg-white mb-3">
-                  <Package className="w-4 h-4 text-blue-600 fill-blue-100" />
-                  <span className="text-[13px] text-slate-800">5513827312 - kashmirorganicnuts</span>
-                  <button className="text-slate-400 hover:text-slate-600"><Trash2 className="w-4 h-4"/></button>
+                {hasContinued && (
+                  <div className="text-[12px] text-[#c5221f] mt-2">
+                    Create a Merchant Center account to run a Shopping campaign
+                  </div>
+                )}
+              </div>
+            )}
+
+            {(customCampaignType === "shopping" || (customCampaignType === "pmax" && advertiseProducts)) && merchantCenterStatus === "linked" && (
+              <div className={customCampaignType === "pmax" ? "ml-7" : ""}>
+                <div className="flex flex-col gap-2">
+                  <div className="text-[12px] text-slate-600 flex items-center gap-1">
+                    Select a Merchant Center account <Info className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="flex items-center gap-3 border border-slate-300 rounded px-3 py-2 w-max bg-white hover:border-slate-400 cursor-pointer">
+                    <Package className="w-4 h-4 text-blue-600 fill-blue-100" />
+                    <span className="text-[13px] text-slate-800">5813121778 - Shobha Shringar</span>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMerchantCenterStatus("no_account");
+                      }} 
+                      className="text-slate-400 hover:text-slate-600 ml-2 border border-slate-200 rounded-full p-0.5"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
-                <div className="text-[12px] text-slate-600">
+
+                <div className="bg-[#e8f0fe] rounded p-4 flex items-start gap-3 mt-4">
+                  <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                  <div className="text-[13px] text-slate-700 leading-relaxed">
+                    This Merchant Center account isn't set up to show products in ads yet. You can finish setting up the account after you've published this campaign.
+                  </div>
+                </div>
+
+                <div className="text-[13px] text-slate-600 mt-4">
                   All products from the selected account will be available to advertise in this campaign. <a href="#" className="text-blue-600 hover:underline">Select a feed label</a>
                 </div>
               </div>
@@ -1543,12 +1752,12 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
             </div>
           )}
 
-          {/* Shared Panel: Ways to reach goal (Search) */}
+          {/* Shared Panel: Results to get from campaign (Search) */}
           {customCampaignType === "search" && (
             <div className="bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden mb-6 order-6">
               <div className="p-6 pb-5">
                 <div className="text-[13px] font-medium text-slate-800 flex items-center gap-1 mb-4">
-                  Select the ways you'd like to reach your goal <Info className="w-3.5 h-3.5 text-slate-500" />
+                  Select the results you want to get from this campaign <Info className="w-3.5 h-3.5 text-slate-500" />
                 </div>
                 <div className="flex flex-col gap-5">
                   <div className="flex flex-col gap-2">
@@ -1675,27 +1884,42 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
 
           {/* Shared Panel: Display Website */}
           {customCampaignType === "display" && (
-            <div className="bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden mb-6 order-6">
-              <div className="p-6">
-                <div className="text-[13px] font-medium text-slate-800 flex items-center gap-1 mb-4">
-                  This is the web page people will go to after clicking your ad <Info className="w-3.5 h-3.5 text-slate-500" />
+            <>
+              <div className="bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden mb-6 order-6">
+                <div className="p-6">
+                  <div className="text-[13px] font-medium text-slate-800 flex items-center gap-1 mb-4">
+                    This is the web page people will go to after clicking your ad <Info className="w-3.5 h-3.5 text-slate-500" />
+                  </div>
+                  <div className="relative w-full max-w-[400px]">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Link2 className="w-4 h-4 text-slate-500" />
+                    </div>
+                    <input 
+                      type="text" 
+                      placeholder="Your business's website"
+                      className="w-full border border-slate-300 rounded px-3 py-2 pl-9 text-[13px] text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    />
+                  </div>
                 </div>
-                <div className="relative w-full max-w-[400px]">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Link2 className="w-4 h-4 text-slate-500" />
+              </div>
+
+              <div className="bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden mb-6 order-7">
+                <div className="p-6">
+                  <div className="text-[13px] font-medium text-slate-800 mb-4">
+                    Campaign name
                   </div>
                   <input 
                     type="text" 
-                    placeholder="Your business's website"
-                    className="w-full border border-slate-300 rounded px-3 py-2 pl-9 text-[13px] text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    defaultValue="Display 10"
+                    className="w-full max-w-[400px] border border-slate-300 rounded px-3 py-2 text-[13px] text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                   />
                 </div>
               </div>
-            </div>
+            </>
           )}
 
-          {/* Shared Panel: Draft / Campaign Name (PMax, Search, Display) */}
-          {["pmax", "search", "display"].includes(customCampaignType) && (
+          {/* Shared Panel: Draft / Campaign Name (PMax, Search) */}
+          {["pmax", "search"].includes(customCampaignType) && (
             <div className="bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden mb-6 order-7">
               <div className="bg-white px-6 py-4 border-b border-slate-200">
                 <h2 className="text-sm font-semibold text-slate-800">Would you like to resume from an existing campaign draft?</h2>
@@ -1938,6 +2162,113 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
                 className="text-blue-600 text-sm font-medium hover:bg-blue-50 px-4 py-2 rounded transition-colors"
               >
                 Go to conversions
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Merchant Center Link Modal */}
+      {isMerchantModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded shadow-xl w-full max-w-[800px] overflow-hidden flex flex-col h-[600px]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <button onClick={() => setIsMerchantModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                  <X className="w-5 h-5 text-slate-500" />
+                </button>
+                <h2 className="text-[20px] font-normal text-slate-800">Create and link Merchant Center account</h2>
+              </div>
+            </div>
+            
+            <div className="p-6 flex-1 overflow-y-auto">
+              <h3 className="text-[15px] font-medium text-slate-800 mb-6">Enter your business info</h3>
+              
+              <div className="flex gap-8">
+                <div className="flex-1 flex flex-col gap-6">
+                  <div className="relative border border-slate-300 rounded px-3 pt-4 pb-2">
+                    <label className="absolute -top-2 left-2 bg-white px-1 text-[11px] text-slate-600">Business name*</label>
+                    <input type="text" defaultValue="Shobha Shringar" className="w-full text-[13px] text-slate-800 outline-none" />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <div className="relative border border-slate-300 rounded px-3 pt-4 pb-2">
+                      <label className="absolute -top-2 left-2 bg-white px-1 text-[11px] text-slate-600">Business website*</label>
+                      <input type="text" defaultValue="goo.gl/untrusted" className="w-full text-[13px] text-slate-800 outline-none" />
+                    </div>
+                    <span className="text-[11px] text-slate-500">Google will search this website for products to add to Merchant Center</span>
+                  </div>
+
+                  <div className="relative border border-slate-300 rounded px-3 py-2.5">
+                    <label className="absolute -top-2 left-2 bg-white px-1 text-[11px] text-slate-600">Registered country</label>
+                    <select className="w-full text-[13px] text-slate-800 outline-none appearance-none bg-white">
+                      <option>India</option>
+                    </select>
+                    <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-slate-500 pointer-events-none" />
+                  </div>
+
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" defaultChecked className="w-4 h-4 text-blue-600 rounded-sm" />
+                    <span className="text-[13px] text-slate-800">Get personalized email notifications on news and tips</span>
+                  </label>
+
+                  <div className="text-[11px] text-slate-500 leading-relaxed flex flex-col gap-3">
+                    <p>By continuing, you're agreeing to the <a href="#" className="text-blue-600 hover:underline">Google Merchant Center Terms of Service</a>. Depending on your setup, your apps data may be shared with Business Manager. The <a href="#" className="text-blue-600 hover:underline">Google Privacy Policy</a> describes how Google handles your data.</p>
+                    <p>In the European Economic Area, the United Kingdom and Switzerland, you promote your products through one or several Comparison Shopping Services (CSSs) of your choice. If you create an account here, it will be associated with Google Shopping, Google's own CSS. If you'd like to create an account with a different CSS, reach out to them. <a href="#" className="text-blue-600 hover:underline">Find certified CSSs</a> or <a href="#" className="text-blue-600 hover:underline">learn more about advertising with CSSs</a></p>
+                    <p>When you create a Merchant Center account and link it with this Google Ads account, you also agree to share data between these accounts.</p>
+                  </div>
+
+                  <div className="flex items-center gap-2 cursor-pointer text-blue-600 hover:underline text-[13px] font-medium mt-1">
+                    <ChevronDown className="w-4 h-4" /> View details of data shared
+                  </div>
+                </div>
+
+                <div className="w-[280px] shrink-0 flex flex-col gap-4">
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-6 flex items-center justify-center h-[200px]">
+                    <div className="bg-white shadow-sm rounded border border-slate-200 p-3 w-full flex flex-col gap-2 relative">
+                      <div className="flex justify-center mb-1"><span className="text-blue-500 text-[10px] font-bold">Google</span></div>
+                      <div className="flex gap-2 justify-center">
+                          <div className="w-8 h-8 bg-slate-100 rounded border border-slate-200 flex items-center justify-center"><div className="w-5 h-3 bg-red-400 rounded-sm"></div></div>
+                          <div className="w-8 h-8 bg-slate-100 rounded border border-slate-200 flex items-center justify-center"><div className="w-5 h-3 bg-blue-400 rounded-sm"></div></div>
+                          <div className="w-8 h-8 bg-slate-100 rounded border border-slate-200 flex items-center justify-center"><div className="w-5 h-3 bg-green-400 rounded-sm"></div></div>
+                          <div className="w-8 h-8 bg-slate-100 rounded border border-slate-200 flex items-center justify-center"><div className="w-5 h-3 bg-amber-400 rounded-sm"></div></div>
+                      </div>
+                      <div className="h-1.5 bg-slate-200 rounded w-full mt-2"></div>
+                      <div className="h-1.5 bg-slate-200 rounded w-3/4"></div>
+                      <div className="h-1.5 bg-slate-200 rounded w-full mt-2"></div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-[#e8f0fe] rounded p-4 flex flex-col gap-2">
+                    <div className="flex gap-2">
+                      <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <div className="text-[13px] font-medium text-slate-800 leading-snug">
+                        Your products can't be automatically added to Merchant Center
+                      </div>
+                    </div>
+                    <div className="text-[12px] text-slate-700 leading-relaxed ml-6">
+                      You can add products another way when your account is created. <a href="#" className="text-blue-600 hover:underline">Learn more about adding products to Merchant Center</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-slate-200 flex items-center gap-4 bg-white">
+              <button 
+                onClick={() => {
+                  setMerchantCenterStatus("linked");
+                  setIsMerchantModalOpen(false);
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white text-[14px] font-medium px-6 py-2 rounded"
+              >
+                Create and link account
+              </button>
+              <button 
+                onClick={() => setIsMerchantModalOpen(false)}
+                className="text-blue-600 hover:underline text-[14px] font-medium"
+              >
+                Cancel
               </button>
             </div>
           </div>

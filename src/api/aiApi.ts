@@ -2,6 +2,8 @@ import api from "@/apiConfig";
 
 export interface AIConfigData {
   usingSystemDefault: boolean;
+  usingSystemTextKey: boolean;
+  usingSystemImageKey: boolean;
   systemTextProvider: string;
   systemTextModel: string;
   systemImageProvider: string;
@@ -17,6 +19,18 @@ export interface AIConfigData {
   imageBaseUrl: string | null;
   isActive: boolean;
   updatedAt?: string;
+  usage?: {
+    prompt: {
+      used: number;
+      limit: number;
+      remaining: number;
+    };
+    image: {
+      used: number;
+      limit: number;
+      remaining: number;
+    };
+  };
 }
 
 export interface SaveAIConfigPayload {
@@ -68,7 +82,7 @@ export const aiApi = {
   },
 
   getEffectiveConfig: async () => {
-    const res = await api.get("/ai/config/effective");
+    const res = await api.get(`/ai/config/effective?t=${Date.now()}`);
     return res.data;
   },
 };
