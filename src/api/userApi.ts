@@ -29,6 +29,7 @@ export const userApi = {
             companyCountry: profileData.companyCountry,
             companyPIN: profileData.companyPIN,
             companyPhone: profileData.companyPhone,
+            hasSeenQuickTour: profileData.hasSeenQuickTour,
         });
         return response.data;
     },

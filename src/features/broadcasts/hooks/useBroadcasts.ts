@@ -16,7 +16,10 @@ import {
   createIntegration,
   deleteIntegration,
   deleteAdminIntegration,
-  syncTemplates
+  syncTemplates,
+  registerWhatsAppPin,
+  requestWhatsAppCode,
+  verifyWhatsAppCode
 } from '../api/broadcastApi';
 import type { 
   CreateBroadcastPayload, 
@@ -272,6 +275,48 @@ export const useAdminDeleteIntegration = () => {
     },
     onError: (error: any) => {
       toast.error(extractError(error, 'Failed to delete provider as admin'));
+    }
+  });
+};
+
+export const useRegisterWhatsAppPin = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, pin }: { id: number; pin: string }) => registerWhatsAppPin(id, pin),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['broadcast-integrations'] });
+      queryClient.invalidateQueries({ queryKey: ['broadcast-integrations-admin'] });
+      toast.success('Two-Step Verification PIN registered successfully');
+    },
+    onError: (error: any) => {
+      toast.error(extractError(error, 'Failed to register PIN'));
+    }
+  });
+};
+
+export const useRequestWhatsAppCode = () => {
+  return useMutation({
+    mutationFn: ({ id, method }: { id: number; method?: 'SMS' | 'VOICE' }) => requestWhatsAppCode(id, method),
+    onSuccess: () => {
+      toast.success('Verification code requested successfully');
+    },
+    onError: (error: any) => {
+      toast.error(extractError(error, 'Failed to request verification code'));
+    }
+  });
+};
+
+export const useVerifyWhatsAppCode = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, code }: { id: number; code: string }) => verifyWhatsAppCode(id, code),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['broadcast-integrations'] });
+      queryClient.invalidateQueries({ queryKey: ['broadcast-integrations-admin'] });
+      toast.success('Phone number verified successfully');
+    },
+    onError: (error: any) => {
+      toast.error(extractError(error, 'Failed to verify code'));
     }
   });
 };

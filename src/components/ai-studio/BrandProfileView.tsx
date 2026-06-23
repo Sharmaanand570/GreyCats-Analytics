@@ -1,12 +1,19 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   brandApi,
   type BrandVoice,
   type BrandKnowledge,
+  type BrandSuggestion,
   type UpsertBrandProfilePayload,
 } from "@/api/brandApi";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { formatDistanceToNow } from "date-fns";
 import {
   Loader2,
   Upload,
@@ -34,6 +43,8 @@ import {
   MessageSquare,
   Shield,
   BookOpen,
+  Check,
+  XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +66,25 @@ const KNOWLEDGE_TYPES = [
   { value: "successful_content", label: "Successful Content" },
   { value: "reference", label: "Reference Material" },
 ];
+
+const FIELD_LABELS: Record<string, string> = {
+  brandName: "Brand Name", tagline: "Tagline", industry: "Industry", brandVoice: "Brand Voice",
+  targetAudience: "Target Audience", valueProposition: "Value Proposition", missionStatement: "Mission Statement",
+  brandStory: "Brand Story", colorPalette: "Color Palette", competitors: "Competitors", keyProducts: "Key Products",
+  doList: "Do's", dontList: "Don'ts", additionalContext: "Additional Context", knowledgeBase: "Knowledge Base",
+};
+
+const TYPE_LABELS: Record<string, { label: string; color: string }> = {
+  missing: { label: "Missing", color: "text-amber-600 bg-amber-50 border-amber-200" },
+  improve: { label: "Improve", color: "text-blue-600 bg-blue-50 border-blue-200" },
+  inconsistency: { label: "Inconsistency", color: "text-red-600 bg-red-50 border-red-200" },
+};
+
+const PRIORITY_COLORS: Record<string, string> = {
+  high: "border-l-red-500",
+  medium: "border-l-amber-500",
+  low: "border-l-blue-400",
+};
 
 function formatFileSize(bytes: number | null): string {
   if (!bytes) return "";
@@ -155,9 +185,10 @@ function ColorPaletteInput({ colors, onChange }: { colors: string[]; onChange: (
 interface Props {
   clientId: number;
   activeSubTab: string;
+  onNavigate?: (tab: string) => void;
 }
 
-export function BrandProfileView({ clientId, activeSubTab }: Props) {
+export function BrandProfileView({ clientId, activeSubTab, onNavigate }: Props) {
   const queryClient = useQueryClient();
 
   // Form state
@@ -179,6 +210,16 @@ export function BrandProfileView({ clientId, activeSubTab }: Props) {
   const [additionalContext, setAdditionalContext] = useState("");
   const [uploadType, setUploadType] = useState("guideline");
   const [populated, setPopulated] = useState(false);
+
+  // Optimization state
+  const [optimizeOpen, setOptimizeOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<BrandSuggestion[]>([]);
+  const [appliedFields, setAppliedFields] = useState<string[]>([]);
+  const [dismissedFields, setDismissedFields] = useState<string[]>([]);
+  const [completionPct, setCompletionPct] = useState<number>(0);
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
+  const pendingSaveRef = useRef(false);
+
 
   // Queries
   const profileQuery = useQuery({
@@ -288,6 +329,89 @@ export function BrandProfileView({ clientId, activeSubTab }: Props) {
     onSuccess: () => { toast.success("File deleted"); queryClient.invalidateQueries({ queryKey: ["brand-knowledge", clientId] }); },
   });
 
+  // Optimize mutation
+  const optimizeMutation = useMutation({
+    mutationFn: () => {
+      const currentProfile = {
+        brandName, tagline, industry, brandVoice, targetAudience, valueProposition,
+        missionStatement, brandStory, colorPalette, competitors, keyProducts,
+        doList, dontList, additionalContext,
+        _appliedFields: appliedFields,
+        _dismissedFields: dismissedFields,
+      };
+      return brandApi.optimizeProfile(clientId, currentProfile);
+    },
+    onSuccess: (res) => {
+      const data = res.data.data;
+      setSuggestions(data.suggestions || []);
+      setAppliedFields(data.appliedFields || []);
+      setDismissedFields(data.dismissedFields || []);
+      setCompletionPct(data.completionPct || 0);
+      setGeneratedAt((data as any).generatedAt || new Date().toISOString());
+      setOptimizeOpen(true);
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.message || "Optimization failed"),
+  });
+
+  // Close panel when switching tabs
+  useEffect(() => { setOptimizeOpen(false); }, [activeSubTab]);
+
+  useEffect(() => {
+    if (profileQuery.data?.optimizationData) {
+      const d = profileQuery.data.optimizationData as any;
+      if (d.suggestions?.length) setSuggestions(d.suggestions);
+      if (d.appliedFields) setAppliedFields(d.appliedFields);
+      if (d.dismissedFields) setDismissedFields(d.dismissedFields);
+      if (d.completionPct !== undefined) setCompletionPct(d.completionPct);
+      if (d.generatedAt) setGeneratedAt(d.generatedAt);
+    }
+  }, [profileQuery.data]);
+
+  // Auto-save after apply
+  useEffect(() => {
+    if (!pendingSaveRef.current) return;
+    pendingSaveRef.current = false;
+    saveMutation.mutate();
+  }, [brandStory, tagline, valueProposition, missionStatement, targetAudience, doList, dontList, additionalContext]);
+
+  const handleApplySuggestion = (s: BrandSuggestion) => {
+    const setters: Record<string, (v: any) => void> = {
+      tagline: setTagline, industry: setIndustry, targetAudience: setTargetAudience,
+      valueProposition: setValueProposition, missionStatement: setMissionStatement,
+      brandStory: setBrandStory, additionalContext: setAdditionalContext,
+    };
+    const textToApply = (s as any).suggestedValue || s.suggestion || "";
+    if (s.field === "brandVoice" && ["PROFESSIONAL","FRIENDLY","BOLD","LUXURY","QUIRKY","MINIMALIST"].includes(textToApply)) {
+      setBrandVoice(textToApply as BrandVoice);
+    } else if (s.field === "doList") {
+      setDoList(prev => [...new Set([...prev, ...textToApply.split(/[;,]/).map((x: string) => x.trim()).filter(Boolean)])]);
+    } else if (s.field === "dontList") {
+      setDontList(prev => [...new Set([...prev, ...textToApply.split(/[;,]/).map((x: string) => x.trim()).filter(Boolean)])]);
+    } else if (setters[s.field]) {
+      setters[s.field](textToApply);
+    }
+    const newApplied = [...new Set([...appliedFields, s.field])];
+    setAppliedFields(newApplied);
+    pendingSaveRef.current = true;
+    // Persist optimization state
+    brandApi.saveOptimizationData(clientId, {
+      suggestions,
+      appliedFields: newApplied, dismissedFields,
+      completionPct, generatedAt
+    }).catch(() => {});
+    toast.success(`Applied suggestion for ${FIELD_LABELS[s.field] || s.field}`);
+  };
+
+  const handleDismissSuggestion = (s: BrandSuggestion) => {
+    const newDismissed = [...new Set([...dismissedFields, s.field])];
+    setDismissedFields(newDismissed);
+    brandApi.saveOptimizationData(clientId, {
+      suggestions,
+      appliedFields, dismissedFields: newDismissed,
+      completionPct, generatedAt
+    }).catch(() => {});
+  };
+
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) uploadMutation.mutate(file);
@@ -324,7 +448,119 @@ export function BrandProfileView({ clientId, activeSubTab }: Props) {
 
   return (
     <div className="max-w-4xl pb-24 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      
+
+      {/* ── Optimize Bar ── */}
+      {activeSubTab !== "knowledge" && <div className="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3 w-full sm:w-1/2">
+          <div className="text-sm font-bold text-zinc-700 min-w-[40px] text-right">{completionPct}%</div>
+          <Progress 
+            value={completionPct} 
+            className="flex-1"
+            indicatorClassName={
+              completionPct < 40 ? "bg-red-500" :
+              completionPct < 75 ? "bg-amber-500" :
+              "bg-green-500"
+            }
+          />
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-3 w-full sm:w-auto">
+          {generatedAt && (
+            <span className="text-xs font-medium text-zinc-500">
+              Last analyzed: {formatDistanceToNow(new Date(generatedAt))} ago
+            </span>
+          )}
+          {suggestions.length > 0 && (
+            <button onClick={() => setOptimizeOpen(true)} className="flex items-center gap-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 px-3 py-1.5 rounded-full transition-all">
+              <Sparkles className="h-3.5 w-3.5" />
+              {suggestions.length} suggestion{suggestions.length !== 1 ? "s" : ""}
+            </button>
+          )}
+          <Button
+            onClick={() => {
+              if (!hasProfile) { toast.error("Save your brand profile first"); return; }
+              if (appliedFields.length > 0 && !window.confirm("Re-analyzing will overwrite your current suggestions and clear pending items. Continue?")) return;
+              optimizeMutation.mutate();
+            }}
+            disabled={optimizeMutation.isPending}
+            className="gap-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-semibold shadow-md"
+          >
+            {optimizeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            Optimize with AI
+          </Button>
+        </div>
+      </div>}
+
+      {/* ── Optimization Side Panel ── */}
+      <Sheet open={optimizeOpen} onOpenChange={setOptimizeOpen}>
+        <SheetContent className="w-[440px] sm:max-w-[440px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" /> AI Suggestions
+            </SheetTitle>
+          </SheetHeader>
+          <div className="mt-6 space-y-4">
+            {suggestions.length === 0 ? (
+              <div className="text-center py-12">
+                <Check className="h-10 w-10 text-green-500 mx-auto mb-3" />
+                <p className="font-semibold text-zinc-800">Looking good!</p>
+                <p className="text-sm text-zinc-500 mt-1">No more suggestions. Your brand profile is well optimized.</p>
+              </div>
+            ) : (
+              suggestions.map((s, i) => {
+                const typeInfo = TYPE_LABELS[s.type] || TYPE_LABELS.improve;
+                const isApplied = appliedFields.includes(s.field);
+                const isDismissed = dismissedFields.includes(s.field);
+                const suggestionText = (s as any).suggestedValue || s.suggestion || "";
+                const messageText = (s as any).reason || s.message || "";
+                
+                if (isDismissed) {
+                  return (
+                    <div key={`${s.field}-${i}`} className="border rounded-xl p-4 bg-zinc-50 border-l-4 border-l-zinc-300 opacity-60">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-bold text-zinc-500 line-through">{FIELD_LABELS[s.field] || s.field}</span>
+                        <Badge variant="secondary" className="bg-zinc-200 text-zinc-600">Dismissed</Badge>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={`${s.field}-${i}`} className={cn("border rounded-xl p-4 bg-white border-l-4", PRIORITY_COLORS[s.priority] || "border-l-zinc-300")}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-bold text-zinc-900">{FIELD_LABELS[s.field] || s.field}</span>
+                      <div className="flex items-center gap-2">
+                        {isApplied && <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none"><Check className="w-3 h-3 mr-1"/> Applied</Badge>}
+                        <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", typeInfo.color)}>{typeInfo.label}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-zinc-500 mb-2">{messageText}</p>
+                    {s.field !== "knowledgeBase" && suggestionText && (
+                      <div className="bg-zinc-50 rounded-lg p-3 text-sm text-zinc-700 mb-3 border border-zinc-100">
+                        {suggestionText.length > 200 ? suggestionText.slice(0, 200) + "..." : suggestionText}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      {s.field === "knowledgeBase" ? (
+                        <Button size="sm" variant="outline" className="text-xs rounded-lg gap-1" onClick={() => { setOptimizeOpen(false); onNavigate?.("brand-knowledge"); }}>
+                          <Upload className="h-3 w-3" /> Go to Knowledge
+                        </Button>
+                      ) : (
+                        <Button size="sm" disabled={isApplied} className="text-xs rounded-lg gap-1 bg-zinc-900 hover:bg-zinc-800" onClick={() => handleApplySuggestion(s)}>
+                          <Check className="h-3 w-3" /> Apply
+                        </Button>
+                      )}
+                      <Button size="sm" disabled={isApplied} variant="ghost" className="text-xs rounded-lg text-zinc-400 hover:text-red-500" onClick={() => handleDismissSuggestion(s)}>
+                        <XCircle className="h-3 w-3" /> Dismiss
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
       {/* ── Scraper ── */}
       {activeSubTab === "identity" && (
         <div className="mb-10 bg-zinc-100 rounded-3xl p-1 border border-zinc-200">
@@ -630,6 +866,3 @@ export function BrandProfileView({ clientId, activeSubTab }: Props) {
     </div>
   );
 }
-
-// Ensure Check is imported above
-import { Check } from "lucide-react";

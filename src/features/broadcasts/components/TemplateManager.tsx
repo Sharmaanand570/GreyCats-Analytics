@@ -90,6 +90,10 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
       setError('Name and content are required');
       return;
     }
+    if (channel === 'SMS' && !externalId) {
+      setError('DLT ID is required for SMS templates');
+      return;
+    }
     
     if (isAdmin && isSystemTemplate) {
       await createSystemTemplate.mutateAsync({ name, channel, content, externalId });
@@ -352,7 +356,7 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
               <div className="flex items-center gap-6">
                 {channel === 'SMS' && (
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block ml-1">DLT ID (Optional)</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block ml-1">DLT ID *</label>
                     <input 
                       type="text" value={externalId} onChange={(e) => setExternalId(e.target.value)}
                       placeholder="DLT External ID"
@@ -379,7 +383,7 @@ export function TemplateManager({ fixedChannel, clientId }: { fixedChannel?: Bro
 
               <Button 
                 onClick={handleSubmit} 
-                disabled={!name || !content || createTemplate.isPending || createSystemTemplate.isPending}
+                disabled={!name || !content || (channel === 'SMS' && !externalId) || createTemplate.isPending || createSystemTemplate.isPending}
                 className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-10 h-12 font-bold shadow-lg shadow-blue-500/20 min-w-[180px]"
               >
                 {createTemplate.isPending || createSystemTemplate.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Deploy Template'}

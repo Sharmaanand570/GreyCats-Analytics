@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { Sparkles, Palette, Type, Image as ImageIcon, Target, Shield, BookOpen, MessageSquare } from "lucide-react";
 import { BrandProfileView } from "./BrandProfileView";
 import { CreativeSuiteView } from "./CreativeSuiteView";
+import { AIBadge } from "./AIBadge";
 
 interface Props {
   clientId: number;
@@ -40,8 +41,11 @@ export default function AIStudio({ clientId }: Props) {
             <Sparkles className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-zinc-900 tracking-tight">AI Studio</h2>
-            <p className="text-[11px] font-medium text-zinc-500">Train & Generate</p>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold text-zinc-900 tracking-tight">AI Studio</h2>
+            </div>
+            <p className="text-[11px] font-medium text-zinc-500 mt-0.5 mb-2">Train & Generate</p>
+            <AIBadge />
           </div>
         </div>
 
@@ -77,7 +81,7 @@ export default function AIStudio({ clientId }: Props) {
       <div className="flex-1 bg-white relative flex flex-col min-h-0 overflow-hidden">
         <div className="flex-1 overflow-y-auto p-8 relative z-10">
           <div className={cn(activeTab.startsWith("brand-") ? "block" : "hidden")}>
-            <BrandProfileView clientId={clientId} activeSubTab={activeTab.startsWith("brand-") ? activeTab.replace("brand-", "") : "identity"} />
+            <BrandProfileView clientId={clientId} activeSubTab={activeTab.startsWith("brand-") ? activeTab.replace("brand-", "") : "identity"} onNavigate={setActiveTab} />
           </div>
           <div className={cn(activeTab.startsWith("creative-") ? "block" : "hidden")}>
             <CreativeSuiteView clientId={clientId} activeSubTab={activeTab.startsWith("creative-") ? activeTab.replace("creative-", "") : "captions"} />

@@ -31,6 +31,22 @@ export interface Broadcast {
 
 export type WhatsAppTemplateCategory = 'UTILITY' | 'MARKETING';
 
+export interface WhatsAppTemplateComponent {
+  type: 'HEADER' | 'BODY' | 'FOOTER' | 'BUTTONS';
+  format?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT';
+  text?: string;
+  buttons?: Array<{
+    type: 'URL' | 'PHONE_NUMBER' | 'QUICK_REPLY';
+    text: string;
+    url?: string;
+    example?: string[];
+  }>;
+  example?: {
+    header_handle?: string[];
+    body_text?: string[][];
+  };
+}
+
 export interface BroadcastTemplate {
   id: number;
   name: string;
@@ -40,6 +56,7 @@ export interface BroadcastTemplate {
   status: TemplateStatus;
   category?: WhatsAppTemplateCategory; // WhatsApp only
   language?: string; // WhatsApp Meta language code e.g. en_US
+  components?: WhatsAppTemplateComponent[]; // Meta's raw component blueprint
   createdAt: string;
   userId?: number | null; // null = system template (visible to everyone)
 }
@@ -51,9 +68,24 @@ export interface BroadcastIntegration {
   name: string;
   isDefault: boolean;
   clientId?: number | null;
-  config: Record<string, any>;
+  config: Record<string, any> & {
+    verificationStatus?: string;
+    requiresTwoStepPin?: boolean;
+  };
   createdAt: string;
   user?: BroadcastOwner; // Only present on admin endpoints
+}
+
+export interface TemplateParamComponent {
+  type: 'header' | 'body' | 'button';
+  parameters: Array<
+    | { type: 'text'; text: string }
+    | { type: 'image'; image: { link: string } }
+    | { type: 'video'; video: { link: string } }
+    | { type: 'document'; document: { link: string; filename?: string } }
+  >;
+  sub_type?: 'url';
+  index?: string;
 }
 
 export interface CreateBroadcastPayload {
@@ -67,6 +99,8 @@ export interface CreateBroadcastPayload {
   /** Plain-text body used by Telegram broadcasts (no template). */
   message?: string;
   recipients: string[];
+  /** WhatsApp advanced: Dynamic header/body/button params for Meta API */
+  templateParams?: TemplateParamComponent[];
 }
 
 export interface CreateBroadcastCsvPayload {

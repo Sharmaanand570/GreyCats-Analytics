@@ -547,16 +547,14 @@ function StepWorkspace({
                 <ArrowLeft className="w-3 h-3" />
                 Switch Workspace
               </Button>
-              {(totalCampaigns > 0 || activeTab !== 'campaigns') && (
-                <Button 
-                  size="sm"
-                  onClick={() => setIsCreateModalOpen(true)}
-                  className="bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg px-4 h-8 flex items-center gap-2 font-bold transition-all text-[11px]"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  New Campaign
-                </Button>
-              )}
+              <Button 
+                size="sm"
+                onClick={() => setIsCreateModalOpen(true)}
+                className="bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg px-4 h-8 flex items-center gap-2 font-bold transition-all text-[11px]"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                New Campaign
+              </Button>
             </div>
         </div>
       </div>
@@ -564,13 +562,11 @@ function StepWorkspace({
       <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
         <div className="max-w-[1400px] mx-auto w-full">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            {(totalCampaigns > 0 || activeTab !== 'campaigns') && (
-              <TabsList className="bg-zinc-100/50 p-1 border border-zinc-200/50 rounded-xl mb-8">
-                <TabsTrigger value="campaigns" className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Campaigns</TabsTrigger>
-                <TabsTrigger value="templates" className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Templates</TabsTrigger>
-                <TabsTrigger value="providers" className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Gateways</TabsTrigger>
-              </TabsList>
-            )}
+            <TabsList className="bg-zinc-100/50 p-1 border border-zinc-200/50 rounded-xl mb-8">
+              <TabsTrigger value="campaigns" className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Campaigns</TabsTrigger>
+              <TabsTrigger value="templates" className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Templates</TabsTrigger>
+              <TabsTrigger value="providers" className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Gateways</TabsTrigger>
+            </TabsList>
 
             <TabsContent value="campaigns" className="space-y-8 focus-visible:outline-none">
               {(totalCampaigns > 0 || isLoading) && (

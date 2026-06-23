@@ -17,6 +17,8 @@ export interface UserProfile {
 
     role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
 
+    hasSeenQuickTour?: boolean;
+
     createdAt: string;
 }
 

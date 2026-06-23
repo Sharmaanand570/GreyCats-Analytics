@@ -1849,9 +1849,14 @@ function AIGeneratePanel({
           aspectRatio: '1:1',
           mode: 'sync',
         });
-        const url = res.data.data.imageUrl;
-        if (url) {
-          setGeneratedImageUrl(url);
+        const rawUrl = res.data.data.imageUrl;
+        if (rawUrl) {
+          // Static files are served at server root (not under /api),
+          // so extract only the origin from VITE_API_BASE_URL
+          const apiBase = import.meta.env.VITE_API_BASE_URL ?? '';
+          const serverRoot = apiBase ? new URL(apiBase).origin : '';
+          const fullUrl = rawUrl.startsWith('http') ? rawUrl : `${serverRoot}${rawUrl}`;
+          setGeneratedImageUrl(fullUrl);
           toast.success('Image generated!');
         } else {
           toast.error('Image generation returned no image');

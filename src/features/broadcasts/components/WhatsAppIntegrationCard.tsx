@@ -23,7 +23,6 @@ declare global {
 
 export function WhatsAppIntegrationCard({ clientId, onConnected, hasExisting, variant = 'card' }: WhatsAppIntegrationCardProps) {
   const [isConnecting, setIsConnecting] = useState(false);
-  const [pin, setPin] = useState('');
   const createIntegration = useCreateIntegration();
   
   const loadSdkAsynchronously = () => {
@@ -100,17 +99,17 @@ export function WhatsAppIntegrationCard({ clientId, onConnected, hasExisting, va
       window.FB.login((response: any) => {
         if (response.authResponse) {
           const accessToken = response.authResponse.accessToken;
+          const code = response.authResponse.code;
           
           createIntegration.mutateAsync({
             name: 'WhatsApp Business',
             type: 'WHATSAPP',
             provider: 'META',
-            config: { accessToken, pin: pin.trim() || '123456' },
+            config: { accessToken, code, redirectUri: 'https://analytics.greycats.tech/' },
             isDefault: true,
             clientId
           }).then(() => {
             toast.success('WhatsApp Business connected successfully!');
-            setPin('');
             if (onConnected) onConnected();
           }).catch((err) => {
             if (err?.response?.status === 400 || err?.message?.includes('400')) {
@@ -126,8 +125,9 @@ export function WhatsAppIntegrationCard({ clientId, onConnected, hasExisting, va
           setIsConnecting(false);
         }
       }, {
-        scope: 'whatsapp_business_management,whatsapp_business_messaging',
-        return_scopes: true
+        config_id: '1700127654344936',
+        response_type: 'code',
+        override_default_response_type: true
       });
     } catch (err: any) {
       toast.error(err.message || 'Could not load Meta SDK');
@@ -138,14 +138,6 @@ export function WhatsAppIntegrationCard({ clientId, onConnected, hasExisting, va
   if (variant === 'button') {
     return (
       <div className="flex flex-col gap-3 w-full">
-        <input
-          type="text"
-          maxLength={6}
-          placeholder="6-digit PIN (Optional)"
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-          className="h-11 w-full px-4 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-black text-sm font-medium focus:ring-2 focus:ring-[#25D366]/20 focus:border-[#25D366] transition-all outline-none"
-        />
         <Button
           onClick={launchWhatsAppSignup}
           disabled={isConnecting}
@@ -177,14 +169,6 @@ export function WhatsAppIntegrationCard({ clientId, onConnected, hasExisting, va
         <p className="text-sm font-bold text-gray-600 dark:text-gray-300">
           {hasExisting ? 'Connect Another Account' : 'No WhatsApp Gateway Connected'}
         </p>
-        <input
-          type="text"
-          maxLength={6}
-          placeholder="6-digit PIN (Optional)"
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-          className="h-10 w-full px-3 text-center rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111] text-xs font-medium focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none"
-        />
         <Button
           onClick={launchWhatsAppSignup}
           disabled={isConnecting}

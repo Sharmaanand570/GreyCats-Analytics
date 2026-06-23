@@ -4,6 +4,8 @@ export interface PlanLimits {
   maxClients: number;        // -1 = unlimited
   maxIntegrations: number;   // -1 = unlimited
   maxReports: number;        // -1 = unlimited
+  maxAIPrompts: number;      // -1 = unlimited
+  maxAIImages: number;       // -1 = unlimited
   trialDays?: number;
 }
 

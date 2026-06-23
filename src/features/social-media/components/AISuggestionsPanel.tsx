@@ -155,8 +155,14 @@ export function AISuggestionsPanel({ clientId, isOpen, onClose, onPostCreated }:
       });
 
       if (res.data.data.imageUrl) {
-        setGeneratedImages((prev) => ({ ...prev, [entry.id]: res.data.data.imageUrl! }));
-        calendarApi.updateEntry(entry.id, { imageUrl: res.data.data.imageUrl } as Partial<CalendarEntry>).catch(() => {});
+        // Static files are served at server root (not under /api),
+        // so extract only the origin from VITE_API_BASE_URL
+        const apiBase = import.meta.env.VITE_API_BASE_URL ?? '';
+        const serverRoot = apiBase ? new URL(apiBase).origin : '';
+        const rawUrl = res.data.data.imageUrl!;
+        const fullUrl = rawUrl.startsWith('http') ? rawUrl : `${serverRoot}${rawUrl}`;
+        setGeneratedImages((prev) => ({ ...prev, [entry.id]: fullUrl }));
+        calendarApi.updateEntry(entry.id, { imageUrl: fullUrl } as Partial<CalendarEntry>).catch(() => {});
         setGeneratingImage(null);
         toast.success("Image ready!");
       } else {

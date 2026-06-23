@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SiTelegram, SiWhatsapp } from 'react-icons/si';
 import { WhatsAppIntegrationCard } from './WhatsAppIntegrationCard';
+import { WhatsAppVerificationModal } from './WhatsAppVerificationModal';
 import {
   Plus,
   Loader2,
@@ -81,6 +82,7 @@ export function ProviderManager({ admin = false, clientId, fixedChannel }: Provi
   const [tgChatId, setTgChatId] = useState('');
   const [tgDisplayName, setTgDisplayName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [verificationModal, setVerificationModal] = useState<{ id: number; mode: 'SMS' | 'PIN' } | null>(null);
   const smtpFieldsRef = useRef<HTMLDivElement | null>(null);
 
 
@@ -293,20 +295,44 @@ export function ProviderManager({ admin = false, clientId, fixedChannel }: Provi
             </div>
           )}
 
-          <div className="flex items-center justify-between pt-6 border-t border-gray-100 dark:border-white/5 mt-auto">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">Operational</span>
+          {i.type === 'WHATSAPP' && i.config?.requiresTwoStepPin ? (
+            <div className="flex items-center justify-between pt-6 border-t border-gray-100 dark:border-white/5 mt-auto">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="w-full text-amber-600 border-amber-200 hover:bg-amber-50 font-bold"
+                onClick={() => setVerificationModal({ id: i.id, mode: 'PIN' })}
+              >
+                Enter PIN
+              </Button>
             </div>
-            {i.isDefault && (
-              <div className={cn(
-                "flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg",
-                chanCfg.style
-              )}>
-                <ShieldCheck className="w-3.5 h-3.5" />
-                System Default
+          ) : i.type === 'WHATSAPP' && i.config?.verificationStatus === 'EXPIRED' ? (
+            <div className="flex items-center justify-between pt-6 border-t border-gray-100 dark:border-white/5 mt-auto">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="w-full text-red-600 border-red-200 hover:bg-red-50 font-bold"
+                onClick={() => setVerificationModal({ id: i.id, mode: 'SMS' })}
+              >
+                Verify Phone Number
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between pt-6 border-t border-gray-100 dark:border-white/5 mt-auto">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">Operational</span>
               </div>
-            )}
-          </div>
+              {i.isDefault && (
+                <div className={cn(
+                  "flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg",
+                  chanCfg.style
+                )}>
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  System Default
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     );
@@ -934,6 +960,15 @@ export function ProviderManager({ admin = false, clientId, fixedChannel }: Provi
           </div>
         )}
       </div>
+
+      {verificationModal && (
+        <WhatsAppVerificationModal
+          isOpen={!!verificationModal}
+          onClose={() => setVerificationModal(null)}
+          integrationId={verificationModal.id}
+          mode={verificationModal.mode}
+        />
+      )}
     </div>
   );
 }

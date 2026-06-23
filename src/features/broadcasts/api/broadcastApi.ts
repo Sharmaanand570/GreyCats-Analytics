@@ -203,3 +203,27 @@ export const deleteIntegration = async (id: number): Promise<void> => {
 export const deleteAdminIntegration = async (id: number): Promise<void> => {
   await api.delete(`/broadcasts/admin/integrations/${id}`);
 };
+
+/**
+ * Register Two-Step Verification PIN for WhatsApp
+ * POST /broadcasts/integrations/:id/whatsapp/register-pin
+ */
+export const registerWhatsAppPin = async (id: number, pin: string): Promise<void> => {
+  await api.post(`/broadcasts/integrations/${id}/whatsapp/register-pin`, { pin });
+};
+
+/**
+ * Request SMS Code for WhatsApp Verification
+ * POST /broadcasts/integrations/:id/whatsapp/request-code
+ */
+export const requestWhatsAppCode = async (id: number, code_method: 'SMS' | 'VOICE' = 'SMS'): Promise<void> => {
+  await api.post(`/broadcasts/integrations/${id}/whatsapp/request-code`, { code_method });
+};
+
+/**
+ * Submit Verification Code for WhatsApp
+ * POST /broadcasts/integrations/:id/whatsapp/verify-code
+ */
+export const verifyWhatsAppCode = async (id: number, code: string): Promise<void> => {
+  await api.post(`/broadcasts/integrations/${id}/whatsapp/verify-code`, { code });
+};

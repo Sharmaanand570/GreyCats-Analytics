@@ -39,7 +39,7 @@ export const PricingCard: React.FC<PricingCardProps> = ({
   const priceFormatted = formatPrice(plan.price);
   const intervalLabel =
     plan.interval === "trial"
-      ? `${plan.limits.trialDays ?? 15}-day trial`
+      ? `7-day trial`
       : plan.interval === "monthly"
       ? "/ month"
       : plan.interval;
@@ -60,6 +60,14 @@ export const PricingCard: React.FC<PricingCardProps> = ({
     {
       label: `${formatLimit(plan.limits.maxReports)} Reports`,
       enabled: true,
+    },
+    {
+      label: `${formatLimit(plan.limits.maxAIPrompts)} AI Prompts/mo`,
+      enabled: plan.limits.maxAIPrompts !== 0,
+    },
+    {
+      label: `${formatLimit(plan.limits.maxAIImages)} AI Images/mo`,
+      enabled: plan.limits.maxAIImages !== 0,
     },
     { label: "PDF Export", enabled: plan.features.pdfExport },
     { label: "Alerts", enabled: plan.features.alerts },
@@ -98,7 +106,7 @@ export const PricingCard: React.FC<PricingCardProps> = ({
             isMostPopular ? "text-white/60" : "text-[#666]"
           }`}
         >
-          {plan.description}
+          {plan.description?.replace(/15-day/g, "7-day")}
         </p>
       </div>
 

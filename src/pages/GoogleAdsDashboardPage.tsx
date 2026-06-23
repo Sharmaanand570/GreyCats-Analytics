@@ -1,19 +1,51 @@
 import { useState } from "react";
+  // @ts-expect-error unused variable
+import { useParams, Routes, Route, useNavigate } from "react-router-dom";
 import { SiGoogleads } from "react-icons/si";
 import { 
   Search, Palette, RefreshCw, HelpCircle, Bell, MessageSquare, 
-  Plus, Megaphone, Target, Wrench, CreditCard, Settings, 
+  Plus, Megaphone, Target, Wrench, CreditCard, Settings, Activity,
+  // @ts-expect-error unused variable
   ChevronDown, AlertCircle, ChevronLeft, ChevronRight, X
 } from "lucide-react";
 import GoogleAdsOverview from "../features/googleAds/components/GoogleAdsOverview";
-import GoogleAdsCampaignsTable from "../features/googleAds/components/GoogleAdsCampaignsTable";
+import { LiveCampaignsTable } from "../features/googleAds/components/campaigns/LiveCampaignsTable";
+import { GoogleAdsCampaignDetailPage } from "../features/googleAds/components/campaigns/GoogleAdsCampaignDetailPage";
 import GoogleAdsCreateCampaign from "../features/googleAds/components/GoogleAdsCreateCampaign";
+import { GoogleAdsDateRangePicker } from "../features/googleAds/components/GoogleAdsDateRangePicker";
+import { AudiencesTab } from "../features/googleAds/components/audiences/AudiencesTab";
+import { AssetsLibraryPage } from "../features/googleAds/components/assets/AssetsLibraryPage";
+import { AssetGroupsPage } from "../features/googleAds/components/pmax/AssetGroupsPage";
+import { RecommendationsPage } from "../features/googleAds/components/recommendations/RecommendationsPage";
+import { ConversionsPage } from "../features/googleAds/components/conversions/ConversionsPage";
+import { GoogleAdsReportsPage } from "../features/googleAds/components/reports/GoogleAdsReportsPage";
+import { AccountSwitcher } from "../features/googleAds/components/mcc/AccountSwitcher";
+import { MCCHierarchyPage } from "../features/googleAds/components/mcc/MCCHierarchyPage";
+import { SharedNegativeListsPage } from "../features/googleAds/components/sharedLibrary/SharedNegativeListsPage";
+import { BillingOverviewPage } from "../features/googleAds/components/billing/BillingOverviewPage";
+import { LabelsPage } from "../features/googleAds/components/sharedLibrary/labels/LabelsPage";
+import { PortfolioBidStrategiesPage } from "../features/googleAds/components/sharedLibrary/bidding/PortfolioBidStrategiesPage";
+import { SharedBudgetsPage } from "../features/googleAds/components/sharedLibrary/budget/SharedBudgetsPage";
+import { PlacementExclusionListsPage } from "../features/googleAds/components/sharedLibrary/PlacementExclusionListsPage";
+import { ChangeHistoryPage } from "../features/googleAds/components/changeHistory/ChangeHistoryPage";
 
 export default function GoogleAdsDashboardPage() {
-  const [activeTab, setActiveTab] = useState<"overview" | "campaigns">("overview");
+  const { clientId, "*": splat } = useParams<{ clientId?: string; "*": string }>();
+  const navigate = useNavigate();
+  const numericClientId = clientId ? parseInt(clientId, 10) : 1; // Fallback to 1 if not provided
+  
+  const [activeTab, setActiveTab] = useState<"overview" | "campaigns" | "audiences" | "assets" | "asset-groups" | "recommendations" | "conversions" | "reports" | "accounts" | "shared-library" | "shared-library-bid-strategies" | "shared-library-budgets" | "shared-library-placement-exclusions" | "billing" | "labels" | "change-history">("overview");
   const [currentView, setCurrentView] = useState<"dashboard" | "create">("dashboard");
 
-  // This function is passed to GoogleAdsOverview to switch the view
+  // If splat contains 'campaigns/', we should just render the detail page without the dashboard sidebar
+  if (splat && splat.startsWith("campaigns/")) {
+    return (
+      <div className="w-full h-full bg-slate-50 overflow-hidden flex flex-col font-['Inter']">
+        <GoogleAdsCampaignDetailPage clientId={numericClientId} baseRoute={`/data-sources/google-ads/${numericClientId}`} />
+      </div>
+    );
+  }
+
   const handleCreateCampaign = () => {
     setCurrentView("create");
   };
@@ -63,8 +95,10 @@ export default function GoogleAdsDashboardPage() {
           </div>
           
           <div className="flex flex-col items-end leading-tight border-l border-slate-200 pl-5 ml-2">
-            <span className="text-slate-900">781-522-1497 kashmir Organ...</span>
-            <span className="text-slate-500 font-normal">Team@antagonmedia.com</span>
+            <AccountSwitcher 
+              selectedClientId={numericClientId} 
+              onSelectClient={(id) => navigate(`/data-sources/google-ads/${id}`)}
+            />
           </div>
           <div className="w-8 h-8 rounded-full bg-amber-800 text-white flex items-center justify-center text-sm font-semibold cursor-pointer">
             T
@@ -113,29 +147,105 @@ export default function GoogleAdsDashboardPage() {
                 >
                   Overview
                 </button>
-                <button className="text-left text-sm px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-r-full mr-4">Recommendations</button>
-                <button className="text-left text-sm px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-r-full mr-4">Insights and reports</button>
+                <button 
+                  onClick={() => setActiveTab("recommendations")}
+                  className={`text-left text-sm px-3 py-1.5 rounded-r-full mr-4 ${activeTab === "recommendations" ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-600 hover:bg-slate-100"}`}
+                >
+                  Recommendations
+                </button>
+                <button 
+                  onClick={() => setActiveTab("reports")}
+                  className={`text-left text-sm px-3 py-1.5 rounded-r-full mr-4 ${activeTab === "reports" ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-600 hover:bg-slate-100"}`}
+                >
+                  Insights and reports
+                </button>
                 <button 
                   onClick={() => setActiveTab("campaigns")}
                   className={`text-left text-sm px-3 py-1.5 rounded-r-full mr-4 ${activeTab === "campaigns" ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-600 hover:bg-slate-100"}`}
                 >
                   Campaigns
                 </button>
-                <button className="text-left text-sm px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-r-full mr-4">Assets</button>
+                <button 
+                  onClick={() => setActiveTab("accounts")}
+                  className={`text-left text-sm px-3 py-1.5 rounded-r-full mr-4 ${activeTab === "accounts" ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-600 hover:bg-slate-100"}`}
+                >
+                  Accounts (MCC)
+                </button>
+                <button 
+                  onClick={() => setActiveTab("assets")}
+                  className={`text-left text-sm px-3 py-1.5 rounded-r-full mr-4 ${activeTab === "assets" ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-600 hover:bg-slate-100"}`}
+                >
+                  Assets
+                </button>
+                <button 
+                  onClick={() => setActiveTab("asset-groups")}
+                  className={`text-left text-sm px-3 py-1.5 rounded-r-full mr-4 ${activeTab === "asset-groups" ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-600 hover:bg-slate-100"}`}
+                >
+                  Asset Groups (PMax)
+                </button>
+                <button 
+                  onClick={() => setActiveTab("audiences")}
+                  className={`text-left text-sm px-3 py-1.5 rounded-r-full mr-4 ${activeTab === "audiences" ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-600 hover:bg-slate-100"}`}
+                >
+                  Audiences
+                </button>
                 <button className="text-left text-sm px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-r-full mr-4">Products</button>
               </div>
               
-              <button className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-100 rounded-r-full mr-4">
-                <Target className="w-5 h-5" /> Goals
-                <ChevronDown className="w-4 h-4 ml-auto" />
+              <button 
+                onClick={() => setActiveTab("conversions")}
+                className={`flex items-center gap-3 px-4 py-2.5 text-sm rounded-r-full mr-4 ${activeTab === "conversions" ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-600 hover:bg-slate-100"}`}
+              >
+                <Target className="w-5 h-5" /> Goals (Conversions)
               </button>
-              <button className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-100 rounded-r-full mr-4">
-                <Wrench className="w-5 h-5" /> Tools
-                <ChevronDown className="w-4 h-4 ml-auto" />
-              </button>
-              <button className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-100 rounded-r-full mr-4">
-                <CreditCard className="w-5 h-5" /> Billing
-              </button>
+                <button className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-100 rounded-r-full mr-4">
+                  <Wrench className="w-5 h-5" /> Tools
+                </button>
+                <div className="ml-[48px] flex flex-col gap-1 border-l border-slate-200 pl-2 my-1">
+                  <button 
+                    onClick={() => setActiveTab("shared-library")}
+                    className={`text-left text-sm px-3 py-1.5 rounded-r-full mr-4 ${activeTab === "shared-library" ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-600 hover:bg-slate-100"}`}
+                  >
+                    Negative lists
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab("shared-library-bid-strategies")}
+                    className={`text-left text-sm px-3 py-1.5 rounded-r-full mr-4 ${activeTab === "shared-library-bid-strategies" ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-600 hover:bg-slate-100"}`}
+                  >
+                    Bid strategies
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab("shared-library-budgets")}
+                    className={`text-left text-sm px-3 py-1.5 rounded-r-full mr-4 ${activeTab === "shared-library-budgets" ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-600 hover:bg-slate-100"}`}
+                  >
+                    Shared budgets
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab("shared-library-placement-exclusions")}
+                    className={`text-left text-sm px-3 py-1.5 rounded-r-full mr-4 ${activeTab === "shared-library-placement-exclusions" ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-600 hover:bg-slate-100"}`}
+                  >
+                    Placement exclusions
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab("labels")}
+                    className={`text-left text-sm px-3 py-1.5 rounded-r-full mr-4 ${activeTab === "labels" ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-600 hover:bg-slate-100"}`}
+                  >
+                    Labels
+                  </button>
+                </div>
+                
+                <button 
+                  onClick={() => setActiveTab("billing")}
+                  className={`flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-100 rounded-r-full mr-4 ${activeTab === "billing" ? "bg-blue-50 text-blue-700 font-medium" : ""}`}
+                >
+                  <CreditCard className="w-5 h-5" /> Billing
+                </button>
+                <button 
+                  onClick={() => setActiveTab("change-history")}
+                  className={`flex items-center gap-3 px-4 py-2.5 text-sm rounded-r-full mr-4 ${activeTab === "change-history" ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-600 hover:bg-slate-100"}`}
+                >
+                  <Activity className="w-5 h-5" /> Change history
+                </button>
               <button className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-100 rounded-r-full mr-4">
                 <Settings className="w-5 h-5" /> Admin
               </button>
@@ -144,37 +254,107 @@ export default function GoogleAdsDashboardPage() {
         )}
 
         {/* ── Main Content Area ── */}
-        <main className="flex-1 overflow-y-auto bg-slate-50 flex flex-col relative z-0">
+        <main className={`flex-1 flex flex-col relative z-0 overflow-hidden ${currentView === "create" ? "bg-[#f1f3f4]" : "bg-slate-50 overflow-y-auto"}`}>
           
           {currentView === "dashboard" ? (
             <>
               {/* Page Title & Controls */}
-              <div className="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-end shrink-0 sticky top-0 z-10">
+              <div className="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center shrink-0 sticky top-0 z-10">
                 <h1 className="text-2xl font-normal text-slate-800">
                   {activeTab === "overview" ? "Overview" : "Campaigns"}
                 </h1>
                 
                 <div className="flex items-center gap-4 text-sm">
-                  <span className="text-slate-500">Custom</span>
-                  <div className="flex items-center gap-2 border border-slate-300 rounded px-3 py-1.5 hover:bg-slate-50 cursor-pointer bg-white">
-                    Jun 1 - 3, 2026
-                    <ChevronDown className="w-4 h-4 text-slate-500" />
-                  </div>
-                  <div className="flex items-center bg-white border border-slate-300 rounded overflow-hidden">
-                    <button className="p-1.5 hover:bg-slate-100 border-r border-slate-300 text-slate-500"><ChevronLeft className="w-4 h-4"/></button>
-                    <button className="p-1.5 hover:bg-slate-100 text-slate-500"><ChevronRight className="w-4 h-4"/></button>
-                  </div>
-                  <a href="#" className="text-blue-600 hover:underline">Show last 30 days</a>
+                  <GoogleAdsDateRangePicker />
                 </div>
               </div>
 
-              <div className="flex-1 p-8 max-w-[1600px] w-full mx-auto">
+              <div className="flex-1 p-8 w-full mx-auto min-w-0 overflow-auto">
                 {activeTab === "overview" && <GoogleAdsOverview onCreateCampaign={handleCreateCampaign} />}
-                {activeTab === "campaigns" && <GoogleAdsCampaignsTable />}
+                {activeTab === "campaigns" && (
+                   <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden h-[800px]">
+                     <LiveCampaignsTable clientId={numericClientId} baseRoute={`/data-sources/google-ads/${numericClientId}`} />
+                   </div>
+                )}
+                {activeTab === "audiences" && (
+                   <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden h-[800px]">
+                     <AudiencesTab clientId={numericClientId} />
+                   </div>
+                )}
+                {activeTab === "assets" && (
+                   <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden h-[800px]">
+                     <AssetsLibraryPage clientId={numericClientId} />
+                   </div>
+                )}
+                {activeTab === "asset-groups" && (
+                   <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden h-[800px]">
+                     <AssetGroupsPage clientId={numericClientId} />
+                   </div>
+                )}
+                {activeTab === "recommendations" && (
+                   <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden h-[800px]">
+                     <RecommendationsPage clientId={numericClientId} />
+                   </div>
+                )}
+                {activeTab === "conversions" && (
+                   <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden h-[800px]">
+                     <ConversionsPage clientId={numericClientId} />
+                   </div>
+                )}
+                {activeTab === "reports" && (
+                   <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden h-[800px]">
+                     <GoogleAdsReportsPage clientId={numericClientId} />
+                   </div>
+                )}
+                {activeTab === "accounts" && (
+                   <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden h-[800px]">
+                     <MCCHierarchyPage 
+                       clientId={numericClientId} 
+                       onSelectClient={(id) => {
+                         navigate(`/data-sources/google-ads/${id}`);
+                       }}
+                     />
+                   </div>
+                )}
+                {activeTab === "shared-library" && (
+                   <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden h-[800px]">
+                     <SharedNegativeListsPage clientId={numericClientId} />
+                   </div>
+                )}
+                {activeTab === "shared-library-bid-strategies" && (
+                  <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden h-[800px]">
+                    <PortfolioBidStrategiesPage clientId={numericClientId} />
+                  </div>
+                )}
+                {activeTab === "shared-library-budgets" && (
+                  <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden h-[800px]">
+                    <SharedBudgetsPage clientId={numericClientId} />
+                  </div>
+                )}
+                {activeTab === "shared-library-placement-exclusions" && (
+                  <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden h-[800px]">
+                    <PlacementExclusionListsPage clientId={numericClientId} />
+                  </div>
+                )}
+                {activeTab === "billing" && (
+                   <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden h-[800px]">
+                     <BillingOverviewPage clientId={numericClientId} />
+                   </div>
+                )}
+                {activeTab === "labels" && (
+                   <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden h-[800px]">
+                     <LabelsPage clientId={numericClientId} />
+                   </div>
+                )}
+                {activeTab === "change-history" && (
+                   <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden h-[800px]">
+                     <ChangeHistoryPage clientId={numericClientId} />
+                   </div>
+                )}
               </div>
             </>
           ) : (
-            <div className="flex-1 flex flex-col h-full w-full">
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
               <GoogleAdsCreateCampaign onCancel={() => setCurrentView("dashboard")} />
             </div>
           )}

@@ -51,13 +51,16 @@ import { PlanBadge } from "@/components/subscription/PlanBadge";
 import { useSubscriptionQuery } from "@/hooks/subscription/useSubscriptionQuery";
 import { useQueryClient } from "@tanstack/react-query";
 import { useClientContext } from "@/context/ClientContext";
-
+import { useProductTour } from "./ProductTour";
+import { HelpCircle } from "lucide-react";
+import { AIQuotaSidebarWidget } from "@/components/ai-studio/AIQuotaSidebarWidget";
 
 function MainSideBar(): React.JSX.Element {
   const location = useLocation();
   const [activeTab, setActive] = useState(location.pathname);
   const is404Page = location.pathname.startsWith("/404");
   const { user, fetchProfile, logout } = useUserStore();
+  const { startTour } = useProductTour();
   const queryClient = useQueryClient();
   const { setClients, setCurrentClient, currentClient } = useClientContext();
   const { data: subscriptionData } = useSubscriptionQuery();
@@ -70,6 +73,16 @@ function MainSideBar(): React.JSX.Element {
       fetchProfile();
     }
   }, [user, fetchProfile]);
+
+  useEffect(() => {
+    if (user && !user.hasSeenQuickTour) {
+      const timer = setTimeout(() => {
+        startTour();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.hasSeenQuickTour]);
 
   const userInitials = user?.fullName
     ? user.fullName
@@ -112,6 +125,15 @@ function MainSideBar(): React.JSX.Element {
   const [collabsState, setcollabsState] = useState<boolean>(
     getInitialCollapseState()
   );
+
+  useEffect(() => {
+    const handleOpenGroup = (e: CustomEvent<{ group: string }>) => {
+      setOpenGroups((prev) => ({ ...prev, [e.detail.group]: true }));
+      setcollabsState(false);
+    };
+    window.addEventListener("openSidebarGroup", handleOpenGroup as EventListener);
+    return () => window.removeEventListener("openSidebarGroup", handleOpenGroup as EventListener);
+  }, []);
 
   const getInitialOpenGroup = (): Record<string, boolean> => {
     const path = location.pathname;
@@ -253,6 +275,17 @@ function MainSideBar(): React.JSX.Element {
   const hasSchedulerAccess = !isShared || access?.accessScheduler !== false;
   const hasAdsAccess = !isShared || access?.accessAds !== false;
 
+  const getTourId = (label: string) => {
+    switch (label) {
+      case "Clients": return "tour-sidebar-clients";
+      case "Integrations": return "tour-sidebar-integrations";
+      case "Settings": return "tour-sidebar-settings";
+      case "Account Setup": return "tour-sidebar-settings";
+      case "Alerts": return "tour-sidebar-alerts";
+      default: return undefined;
+    }
+  };
+
   const analyticsItems = [];
   if (hasAnalyticsAccess) analyticsItems.push({ label: "Clients", path: "/clients", icon: <Layers /> });
   if (hasAlertsAccess) analyticsItems.push({ label: "Alerts", path: "/alerts", icon: <Bell /> });
@@ -266,6 +299,7 @@ function MainSideBar(): React.JSX.Element {
     }] : []),
     {
       label: "SEO Tools",
+      badge: "Beta",
       isCollapsible: true,
       items: [
         { label: "SEO Reporter", path: "/seo-report", icon: <Search /> }
@@ -291,10 +325,11 @@ function MainSideBar(): React.JSX.Element {
     }] : []),
     ...(hasAdsAccess ? [{
       label: "Ads Manager",
+      badge: "Soon",
       isCollapsible: true,
       items: [
-        { label: "Meta Ads", path: "/data-sources/meta-ads", icon: <Megaphone /> },
-        { label: "Google Ads", path: "/data-sources/google-ads", icon: <SiGoogleads className="w-[18px] h-[18px]" /> },
+        { label: "Meta Ads", path: "/data-sources/meta-ads", icon: <Megaphone />, isComingSoon: true},
+        { label: "Google Ads", path: "/data-sources/google-ads", icon: <SiGoogleads className="w-[18px] h-[18px]" />, isComingSoon: true },
       ],
     }] : []),
     {
@@ -379,9 +414,16 @@ function MainSideBar(): React.JSX.Element {
                       }`}
                     >
                       {group.isCollapsible ? (
-                        <span className="text-[13px] font-medium tracking-wide">
-                          {group.label}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[13px] font-medium tracking-wide">
+                            {group.label}
+                          </span>
+                          {group.badge && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-400 px-1.5 py-px rounded shadow-sm border border-blue-500/30">
+                              {group.badge}
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-[11px] tracking-wider uppercase">
                           {group.label}
@@ -402,6 +444,7 @@ function MainSideBar(): React.JSX.Element {
                         {group.items.map((item, index) => (
                           <SidebarMenuItem key={item.path}>
                             <SidebarMenuButton
+                              id={getTourId(item.label)}
                               onClick={() => handleChangeURL(item.path, (item as any).isComingSoon)}
                               className={`group text-[13px] [&_svg]:w-[18px] [&_svg]:h-[18px] rounded-[0.375rem] font-normal h-9 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800 hover:text-zinc-100 ${
                                 (item as any).isComingSoon ? "opacity-50 cursor-not-allowed grayscale" : ""
@@ -446,6 +489,20 @@ function MainSideBar(): React.JSX.Element {
             
             {/* Footer */}
             <SidebarFooter className={`mt-auto border-t border-zinc-800 pt-4 pb-4 ${collabsState ? "px-0" : "px-4"}`}>
+              <AIQuotaSidebarWidget isCollapsed={collabsState} />
+              <div
+                onClick={startTour}
+                className="flex items-center gap-3 rounded-md px-2 py-3 mb-2 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800/50 cursor-pointer"
+              >
+                <div className="relative flex-shrink-0 flex items-center justify-center w-9 h-9 text-zinc-400">
+                  <HelpCircle className="w-5 h-5" />
+                </div>
+                {!collabsState && (
+                  <div className="text-sm font-medium leading-tight text-zinc-300 transition-colors duration-300">
+                    Quick Tour
+                  </div>
+                )}
+              </div>
               <div
                 onClick={() => handleChangeURL("/account-setup")}
                 className="flex items-center gap-3 rounded-md px-2 py-3 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-zinc-800/50 cursor-pointer"
@@ -598,7 +655,20 @@ function MainSideBar(): React.JSX.Element {
               </nav>
 
               {/* Footer */}
-              <div className="mt-auto pt-6 border-t border-zinc-700">
+              <div className="mt-auto pt-6 border-t border-zinc-700 flex flex-col space-y-4">
+                <AIQuotaSidebarWidget isCollapsed={false} />
+                {/* Quick Tour Button for Mobile */}
+                <div
+                  onClick={() => startTour()}
+                  className="flex items-center gap-3 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:opacity-80 cursor-pointer"
+                >
+                  <div className="flex items-center justify-center h-9 w-9 rounded-full bg-zinc-800 border border-zinc-700/50 shadow-sm transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-110 active:scale-95 text-zinc-400">
+                    <HelpCircle size={18} />
+                  </div>
+                  <div className="text-sm font-medium leading-tight text-zinc-300 transition-colors duration-300">
+                    Quick Tour
+                  </div>
+                </div>
                 <div
                   onClick={() => handleChangeURL("/account-setup")}
                   className="flex items-center gap-3 mt-4 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:opacity-80 cursor-pointer"
@@ -629,7 +699,7 @@ function MainSideBar(): React.JSX.Element {
           the page content appears as a floating rounded panel lifted off the
           sidebar. Each page's own bg class then fills the inner panel. */}
       <div className="flex-1 flex flex-col bg-gradient-to-bl from-black via-zinc-950 to-zinc-800 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] py-4">
-        <main className="flex-1 rounded-l-2xl overflow-y-auto custom-scrollbar bg-[#F9FAFB]">
+        <main className="flex-1 rounded-l-2xl overflow-y-auto custom-scrollbar bg-[#F9FAFB] flex flex-col">
           <TrialExpiryBanner />
           <ImpersonationBanner />
           <GlobalOAuthHandler />
