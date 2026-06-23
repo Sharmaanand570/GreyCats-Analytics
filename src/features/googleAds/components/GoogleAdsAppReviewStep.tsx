@@ -2,6 +2,7 @@ import { AlertCircle, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-re
 
 interface Props { onPublish: () => void; }
 
+  // @ts-expect-error unused variable
 export default function GoogleAdsAppReviewStep(props: Props) {
   return (
     <div className="flex flex-col max-w-[800px] w-full pb-20">

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { ChevronUp, ChevronDown, HelpCircle, Search, X, Settings, Info } from "lucide-react";
+import { useCampaignWizardContext } from "../context/CampaignWizardContext";
 
 interface CampaignSettingsStepProps {
   onNext: () => void;
@@ -9,12 +10,27 @@ interface CampaignSettingsStepProps {
 }
 
 export default function GoogleAdsCampaignSettingsStep({ onNext, activeSubStep, onSubStepChange, campaignType = "Search" }: CampaignSettingsStepProps) {
-  const [location, setLocation] = useState("all");
-  const [euPolitical, setEuPolitical] = useState("yes"); // Defaults to yes based on screenshot? Wait, first screenshot had nothing, second has Yes, third has No. Let's do 'no' by default.
-  
-  // Actually, second screenshot shows "Yes, this campaign has EU political ads" selected. Third screenshot shows "No, this campaign doesn't have EU political ads" selected. Let's make "no" default.
-  
+  const { payload, updatePayload } = useCampaignWizardContext();
+
+  const [location, setLocation] = useState(payload.locations?.type?.toLowerCase() || "all");
+  const [euPolitical, setEuPolitical] = useState(payload.euPolitical ? "yes" : "no"); 
+  const [searchPartners, setSearchPartners] = useState(payload.networks?.searchPartners ?? true);
+  const [displayNetwork, setDisplayNetwork] = useState(payload.networks?.displayNetwork ?? true);
   const [isLanguagesOpen, setIsLanguagesOpen] = useState(false);
+  const [languages] = useState<string[]>(payload.languages || ["English"]);
+  const [startDate, setStartDate] = useState<string | undefined>(payload.startDate);
+  const [endDate, setEndDate] = useState<string | undefined>(payload.endDate);
+
+  useEffect(() => {
+    updatePayload({
+      locations: { type: location.toUpperCase() as any },
+      euPolitical: euPolitical === "yes",
+      networks: { searchPartners, displayNetwork },
+      languages,
+      startDate,
+      endDate,
+    });
+  }, [location, euPolitical, searchPartners, displayNetwork, languages, startDate, endDate, updatePayload]);
 
   const isPMax = campaignType === "Performance Max";
 
@@ -64,7 +80,8 @@ export default function GoogleAdsCampaignSettingsStep({ onNext, activeSubStep, o
                  <label className="flex items-start gap-3 cursor-pointer">
                    <input 
                      type="checkbox" 
-                     defaultChecked
+                     checked={searchPartners}
+                     onChange={(e) => setSearchPartners(e.target.checked)}
                      className="mt-1 w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600" 
                    />
                    <div>
@@ -76,7 +93,8 @@ export default function GoogleAdsCampaignSettingsStep({ onNext, activeSubStep, o
                  <label className="flex items-start gap-3 cursor-pointer">
                    <input 
                      type="checkbox" 
-                     defaultChecked
+                     checked={displayNetwork}
+                     onChange={(e) => setDisplayNetwork(e.target.checked)}
                      className="mt-1 w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600" 
                    />
                    <div>
@@ -316,6 +334,30 @@ export default function GoogleAdsCampaignSettingsStep({ onNext, activeSubStep, o
             </div>
           </div>
         )}
+
+        {/* Start and end dates */}
+        <div 
+          id="panel-dates" 
+          onClick={() => onSubStepChange?.('dates')}
+          className={`settings-panel-section bg-white border shadow-sm rounded-md overflow-hidden transition-all duration-200 ${activeSubStep === 'dates' ? 'border-blue-500 shadow-md ring-1 ring-blue-500' : 'border-slate-200'}`}
+        >
+          <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-50">
+             <h2 className={`text-[14px] ${activeSubStep === 'dates' ? 'text-blue-700 font-medium' : 'text-slate-800'}`}>Start and end dates</h2>
+             <ChevronDown className="w-5 h-5 text-slate-500" />
+          </div>
+          <div className="p-6 flex flex-col gap-4 bg-white">
+             <div className="flex gap-6 max-w-[500px]">
+                <div className="flex flex-col gap-1.5 flex-1">
+                   <label className="text-[13px] text-slate-800 font-medium">Start date</label>
+                   <input type="date" value={startDate || ""} onChange={e => setStartDate(e.target.value)} className="border border-slate-300 rounded px-3 py-2 text-[13px] w-full" />
+                </div>
+                <div className="flex flex-col gap-1.5 flex-1">
+                   <label className="text-[13px] text-slate-800 font-medium">End date (Optional)</label>
+                   <input type="date" value={endDate || ""} onChange={e => setEndDate(e.target.value)} className="border border-slate-300 rounded px-3 py-2 text-[13px] w-full" />
+                </div>
+             </div>
+          </div>
+        </div>
 
         {/* More settings */}
         {!isPMax && (

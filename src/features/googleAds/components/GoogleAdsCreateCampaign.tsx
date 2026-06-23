@@ -13,11 +13,12 @@ import GoogleAdsDemandGenWizard from "./GoogleAdsDemandGenWizard";
 import GoogleAdsDisplayWizard from "./GoogleAdsDisplayWizard";
 import GoogleAdsShoppingWizard from "./GoogleAdsShoppingWizard";
 import GoogleAdsAppWizard from "./GoogleAdsAppWizard";
+import { CampaignWizardProvider, useCampaignWizardContext } from "../context/CampaignWizardContext";
 interface CreateCampaignProps {
   onCancel: () => void;
 }
 
-export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProps) {
+function GoogleAdsCreateCampaignInner({ onCancel }: CreateCampaignProps) {
   const [selectedObjective, setSelectedObjective] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [merchantCenterStatus, setMerchantCenterStatus] = useState<"no_account" | "linked">("no_account");
@@ -43,6 +44,9 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
     leads: true,
     messages: true,
   });
+
+  const { updatePayload, loadDraft } = useCampaignWizardContext();
+  const selectedLocalDraftId = null;
 
   const conversionGoalsList = selectedObjective === "sales"
     ? [
@@ -473,6 +477,7 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
               <input 
                 type="text" 
                 defaultValue="App promotion-App-1"
+                onChange={(e) => updatePayload({ name: e.target.value })}
                 className="w-full max-w-md border border-slate-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
               />
             </div>
@@ -712,6 +717,7 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
                       <input 
                         type="text" 
                         defaultValue="Local store visits and promotions-Performance Max-10"
+                        onChange={(e) => updatePayload({ name: e.target.value })}
                         className="w-full max-w-[400px] border border-slate-300 rounded px-3 py-2.5 text-[13px] text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                       />
                     </div>
@@ -1911,6 +1917,7 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
                   <input 
                     type="text" 
                     defaultValue="Display 10"
+                    onChange={(e) => updatePayload({ name: e.target.value })}
                     className="w-full max-w-[400px] border border-slate-300 rounded px-3 py-2 text-[13px] text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                   />
                 </div>
@@ -2061,6 +2068,7 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
                         <input 
                           type="text" 
                           defaultValue={`${selectedObjective && selectedObjective !== "custom" ? selectedObjective.charAt(0).toUpperCase() + selectedObjective.slice(1) + "-" : ""}${customCampaignType === "search" ? "Search" : "Performance Max"}-10`}
+                          onChange={(e) => updatePayload({ name: e.target.value })}
                           key={customCampaignType + selectedObjective}
                           className="w-full max-w-[400px] border border-slate-300 rounded px-3 py-2.5 text-[13px] text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                         />
@@ -2082,6 +2090,7 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
                 <input 
                   type="text" 
                   defaultValue="Performance Max 3"
+                  onChange={(e) => updatePayload({ name: e.target.value })}
                   className="w-full max-w-[400px] border border-slate-300 rounded px-3 py-2 text-[13px] text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 />
               </div>
@@ -2098,6 +2107,7 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
                 <input 
                   type="text" 
                   defaultValue={customCampaignType === "app" ? "App-1" : (selectedObjective === "custom" ? "Shopping-1" : "Sales-Shopping-1")}
+                  onChange={(e) => updatePayload({ name: e.target.value })}
                   key={customCampaignType + selectedObjective}
                   className="w-full max-w-[400px] border border-slate-300 rounded px-3 py-2.5 text-[13px] text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 />
@@ -2122,8 +2132,18 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
         <button 
           onClick={() => {
             if (selectedObjective === "custom") {
+              if (resumeDraft && selectedLocalDraftId) {
+                loadDraft(selectedLocalDraftId);
+              } else {
+                updatePayload({ type: customCampaignType.toUpperCase() as any, objective: selectedObjective || undefined });
+              }
               setWizardMode(true);
             } else if (hasContinued) {
+              if (resumeDraft && selectedLocalDraftId) {
+                loadDraft(selectedLocalDraftId);
+              } else {
+                updatePayload({ type: customCampaignType.toUpperCase() as any, objective: selectedObjective || undefined });
+              }
               setWizardMode(true);
             } else {
               setHasContinued(true);
@@ -2277,5 +2297,13 @@ export default function GoogleAdsCreateCampaign({ onCancel }: CreateCampaignProp
 
     </div>
   </div>
+  );
+}
+
+export default function GoogleAdsCreateCampaign(props: CreateCampaignProps) {
+  return (
+    <CampaignWizardProvider>
+      <GoogleAdsCreateCampaignInner {...props} />
+    </CampaignWizardProvider>
   );
 }

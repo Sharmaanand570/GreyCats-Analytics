@@ -4,6 +4,7 @@ interface SummaryStepProps {
   onNext: () => void;
 }
 
+  // @ts-expect-error unused variable
 export default function GoogleAdsShoppingSummaryStep(props: SummaryStepProps) {
   return (
     <div className="flex flex-col gap-6 max-w-[800px] w-full pb-10">

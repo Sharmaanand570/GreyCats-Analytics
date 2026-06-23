@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { HelpCircle, CheckCircle2, Search, ChevronRight, LineChart } from "lucide-react";
+import { useState, useEffect } from "react";
+import { HelpCircle, CheckCircle2, Search, LineChart } from "lucide-react";
 import GoogleAdsBiddingStep from "./GoogleAdsBiddingStep";
 import GoogleAdsCampaignSettingsStep from "./GoogleAdsCampaignSettingsStep";
 import GoogleAdsAssetGroupStep from "./GoogleAdsAssetGroupStep";
@@ -9,16 +9,62 @@ import GoogleAdsAIMaxStep from "./GoogleAdsAIMaxStep";
 import GoogleAdsKeywordAssetGenStep from "./GoogleAdsKeywordAssetGenStep";
 import GoogleAdsKeywordsAndAdsStep from "./GoogleAdsKeywordsAndAdsStep";
 import GoogleAdsVideoSettingsStep from "./GoogleAdsVideoSettingsStep";
+import { useCampaignWizardContext } from "../context/CampaignWizardContext";
+import { publishCompleteCampaign } from "../API/campaignManagementApi";
+import { validateCampaignPayload } from "../utils/campaignValidation";
+import { PublishProgressModal } from "./PublishProgressModal";
+import { v4 as uuidv4 } from "uuid";
+import { toast } from "sonner";
 
 interface WizardProps {
   onCancel: () => void;
   campaignType: string;
 }
 
-export default function GoogleAdsCampaignWizard({ campaignType }: WizardProps) {
+export default function GoogleAdsCampaignWizard({ campaignType, onCancel }: WizardProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [activeSubStep, setActiveSubStep] = useState("bidding");
   const [budgetType] = useState<'daily' | 'campaign'>('daily');
+  
+  const { payload, updatePayload, isPublishing, setIsPublishing, takePublishSnapshot } = useCampaignWizardContext();
+
+  useEffect(() => {
+    const activeOp = localStorage.getItem('active_publish_operation');
+    if (activeOp) {
+      updatePayload({ publishOperationId: activeOp });
+      setIsPublishing(true);
+      takePublishSnapshot();
+    }
+  }, [setIsPublishing, takePublishSnapshot, updatePayload]);
+
+  const handlePublish = async () => {
+    // 1. Validate Payload
+    const validation = validateCampaignPayload(payload as any);
+    if (!validation.isValid) {
+      toast.error(`Validation Failed: ${validation.errors[0].message}`);
+      return;
+    }
+
+    // 2. Generate Idempotency Key
+    const operationId = uuidv4();
+    updatePayload({ publishOperationId: operationId });
+    localStorage.setItem('active_publish_operation', operationId);
+
+    // 3. Freeze UI & Take Snapshot
+    setIsPublishing(true);
+    
+    // Note: State updates are async, so we manually pass the operation ID here to ensure it's in the snapshot immediately
+    const snapshot = { ...payload, publishOperationId: operationId };
+    
+    try {
+      // 4. Send to Saga
+      await publishCompleteCampaign(1, snapshot as any);
+      // The SSE stream inside PublishProgressModal will handle completion tracking.
+    } catch (err: any) {
+      setIsPublishing(false);
+      toast.error(err.message || "Failed to start publish operation");
+    }
+  };
   
   const steps = campaignType === "Search" ? [
     { id: 1, name: "Bidding", component: GoogleAdsBiddingStep },
@@ -33,6 +79,7 @@ export default function GoogleAdsCampaignWizard({ campaignType }: WizardProps) {
     { id: 2, name: "Ad group", component: GoogleAdsAssetGroupStep },
     { id: 3, name: "Ads", component: GoogleAdsSummaryStep },
     { id: 4, name: "Bid", component: GoogleAdsSummaryStep },
+    { id: 5, name: "Review", component: GoogleAdsSummaryStep },
   ] : [
     { id: 1, name: "Bidding", component: GoogleAdsBiddingStep },
     { id: 2, name: "Campaign settings", component: GoogleAdsCampaignSettingsStep },
@@ -52,10 +99,12 @@ export default function GoogleAdsCampaignWizard({ campaignType }: WizardProps) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#f1f3f4] w-full font-sans overflow-hidden">
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar */}
-        <div className="w-[240px] shrink-0 border-r border-slate-200 bg-white flex flex-col pt-4">
+    <>
+      <PublishProgressModal clientId={1} />
+      <div className={`flex flex-col h-full bg-[#f1f3f4] w-full font-sans overflow-hidden ${isPublishing ? 'pointer-events-none opacity-60' : ''}`}>
+        <div className="flex flex-1 overflow-hidden">
+          {/* Left Sidebar */}
+          <div className="w-[240px] shrink-0 border-r border-slate-200 bg-white flex flex-col pt-4">
            <div className="px-6 mb-4 flex items-center gap-2 text-slate-600 text-[13px] font-medium">
              <div className="w-4 h-4 text-slate-400">
                {campaignType === "Search" ? <Search className="w-4 h-4 text-slate-500" /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"/></svg>}
@@ -71,10 +120,11 @@ export default function GoogleAdsCampaignWizard({ campaignType }: WizardProps) {
                     onClick={() => {
                       if (campaignType === "Video") {
                         // For Video, all content is in one scrollable page – scroll to section
-                        if (step.id === 1) { setActiveSubStep("name"); }
+                        if (step.id === 1) { setActiveSubStep("name"); setCurrentStep(1); }
                         else if (step.id === 2) { setActiveSubStep("ad-group-name"); setCurrentStep(2); }
                         else if (step.id === 3) { setActiveSubStep("ads"); setCurrentStep(3); setTimeout(() => { document.getElementById('panel-ads')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50); }
                         else if (step.id === 4) { setActiveSubStep("bid"); setCurrentStep(4); setTimeout(() => { document.getElementById('panel-bid')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50); }
+                        else if (step.id === 5) { setActiveSubStep("review"); setCurrentStep(5); }
                       } else {
                         setCurrentStep(step.id);
                         if (step.id === 1) setActiveSubStep("bidding");
@@ -266,7 +316,7 @@ export default function GoogleAdsCampaignWizard({ campaignType }: WizardProps) {
 
         {/* Main Content Area */}
         <div className="flex-1 overflow-y-auto px-10 py-6 pb-20 scroll-smooth">
-           {campaignType === "Video" ? (
+           {campaignType === "Video" && currentStep < 5 ? (
              <GoogleAdsVideoSettingsStep 
                onNext={() => {}} 
                activeSubStep={activeSubStep}
@@ -403,11 +453,34 @@ export default function GoogleAdsCampaignWizard({ campaignType }: WizardProps) {
               )}
             </div>
 
-           <div className="mt-auto border-t border-slate-200 p-2 flex justify-end">
-              <ChevronRight className="w-5 h-5 text-slate-400 cursor-pointer hover:text-slate-600" />
+           <div className="mt-auto border-t border-slate-200 p-4 flex justify-between items-center bg-white">
+              <button onClick={onCancel} className="text-[13px] text-blue-600 font-medium hover:underline px-2 py-1">Cancel</button>
+              {currentStep === steps.length ? (
+                <button 
+                  onClick={() => {
+                    // Make sure context snapshot has the right data before API call
+                    takePublishSnapshot();
+                    handlePublish();
+                  }}
+                  disabled={isPublishing}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-medium py-1.5 px-6 rounded transition-colors disabled:opacity-50"
+                >
+                  {isPublishing ? "Publishing..." : "Publish campaign"}
+                </button>
+              ) : (
+                <button 
+                  onClick={() => {
+                    setCurrentStep(prev => Math.min(prev + 1, steps.length));
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-medium py-1.5 px-6 rounded transition-colors"
+                >
+                  Next
+                </button>
+              )}
            </div>
         </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -9,7 +9,7 @@ interface WizardProps {
   campaignType: string;
 }
 
-export default function GoogleAdsDemandGenWizard(props: WizardProps) {
+export default function GoogleAdsDemandGenWizard(_props: WizardProps) {
   const [activeStep, setActiveStep] = useState("settings");
   const [campaignGoal, setCampaignGoal] = useState("conversions");
 
@@ -104,7 +104,7 @@ export default function GoogleAdsDemandGenWizard(props: WizardProps) {
               <GoogleAdsDemandGenAdStep />
             )}
             {activeStep === "review" && (
-              <GoogleAdsDemandGenReviewStep />
+              <GoogleAdsDemandGenReviewStep onNext={() => {}} />
             )}
           </div>
         </div>

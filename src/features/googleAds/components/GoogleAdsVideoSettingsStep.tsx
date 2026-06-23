@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { ChevronUp, ChevronDown, HelpCircle, Search, Plus } from "lucide-react";
-
+import { useCampaignWizardContext } from "../context/CampaignWizardContext";
 interface VideoSettingsStepProps {
   onNext: () => void;
   activeSubStep?: string;
@@ -8,10 +8,39 @@ interface VideoSettingsStepProps {
 }
 
 export default function GoogleAdsVideoSettingsStep({ onNext, activeSubStep = "name", onSubStepChange }: VideoSettingsStepProps) {
+  const { payload, updatePayload } = useCampaignWizardContext();
+
+  const initialHeadline = payload.assets?.find(a => a.type === "HEADLINE")?.text || "Video Headline";
+
   const [openContentTab, setOpenContentTab] = useState<string | null>(null);
   const [placementTab, setPlacementTab] = useState<'browse' | 'enter'>('browse');
   const [budgetType] = useState("Campaign total");
-  const [locationType, setLocationType] = useState("India");
+  const [locationType, setLocationType] = useState(payload.locations?.type || "India");
+  const [campaignName, setCampaignName] = useState(payload.name || "Video views - 2026-06-18");
+
+  const [videoId] = useState("dQw4w9WgXcQ");
+  const [videoFormat] = useState("IN_STREAM");
+  const [cta] = useState("Learn More");
+  const [finalUrl] = useState(payload.ads?.[0]?.finalUrls?.[0] || "https://example.com");
+  const [headline] = useState(initialHeadline);
+
+  useEffect(() => {
+    updatePayload({
+      campaignName,
+      ads: [
+        {
+          type: "VIDEO_AD",
+          finalUrls: [finalUrl],
+          videoAd: {
+            videoId,
+            format: videoFormat,
+            callToAction: cta,
+            headline: headline
+          }
+        }
+      ]
+    } as any);
+  }, [campaignName, videoId, videoFormat, cta, finalUrl, headline, updatePayload]);
 
   // Sync sidebar content sub-step with open accordion
   useEffect(() => {
@@ -61,7 +90,8 @@ export default function GoogleAdsVideoSettingsStep({ onNext, activeSubStep = "na
           <div className="p-6">
              <input 
                type="text" 
-               defaultValue="Video views - 2026-06-18"
+               value={campaignName}
+               onChange={(e) => setCampaignName(e.target.value)}
                className="w-full border border-slate-300 rounded px-3 py-2 text-[13px] text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
              />
              <div className="text-[11px] text-slate-400 text-right mt-1">24 / 250</div>

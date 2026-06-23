@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
-import { ChevronUp, HelpCircle, Info, AlertCircle } from "lucide-react";
+  // @ts-expect-error unused variable
+import { ChevronDown, ChevronUp, HelpCircle, AlertCircle, Info } from "lucide-react";
+import { useCampaignWizardContext } from "../context/CampaignWizardContext";
+import { UnifiedBiddingConfiguration } from "./bidding/UnifiedBiddingConfiguration";
+import type { BiddingConfigValue } from "./bidding/UnifiedBiddingConfiguration";
 
 interface BiddingStepProps {
   onNext: () => void;
@@ -8,12 +12,33 @@ interface BiddingStepProps {
   campaignType?: string;
 }
 
-export default function GoogleAdsBiddingStep({ onNext, onSubStepChange, campaignType = "Search" }: BiddingStepProps) {
-  const [biddingFocus, setBiddingFocus] = useState("Conversions");
-  const [isBiddingDropdownOpen, setIsBiddingDropdownOpen] = useState(false);
-  const [setTargetCPA, setSetTargetCPA] = useState(false);
-  const [onlyNewCustomers, setOnlyNewCustomers] = useState(false);
+  // @ts-expect-error unused variable
+export default function GoogleAdsBiddingStep({ onNext, activeSubStep, onSubStepChange, campaignType = "Search" }: BiddingStepProps) {
+  const { payload, updatePayload } = useCampaignWizardContext();
 
+  const configValue: Partial<BiddingConfigValue> = {
+    type: payload.biddingStrategyId ? "MAXIMIZE_CONVERSIONS" : 
+          (payload.targetCpa ? "TARGET_CPA" : "MAXIMIZE_CONVERSIONS"),
+    portfolioStrategyId: payload.biddingStrategyId || null,
+    targetCpa: payload.targetCpa ? payload.targetCpa * 1000000 : undefined,
+  };
+
+  const handleConfigChange = (newVal: Partial<BiddingConfigValue>) => {
+    updatePayload({
+      biddingStrategyId: newVal.portfolioStrategyId || undefined,
+      biddingFocus: (newVal.type === "TARGET_CPA" || newVal.type === "MAXIMIZE_CONVERSIONS") ? "CONVERSIONS" : "CONVERSION_VALUE",
+      targetCpa: newVal.targetCpa ? newVal.targetCpa / 1000000 : undefined,
+    });
+  };
+
+  const [onlyNewCustomers, setOnlyNewCustomers] = useState(!!payload.onlyNewCustomers);
+
+  // Sync to context when local state changes
+  useEffect(() => {
+    updatePayload({
+      onlyNewCustomers: onlyNewCustomers,
+    });
+  }, [onlyNewCustomers, updatePayload]);
 
   // Intersection Observer for scroll spy
   useEffect(() => {
@@ -53,117 +78,13 @@ export default function GoogleAdsBiddingStep({ onNext, onSubStepChange, campaign
             <ChevronUp className="w-5 h-5 text-slate-500" />
           </div>
           <div className="p-6">
-
-            {/* What do you want to focus on */}
-            {!isSearch && (
-              <div className="mb-5">
-                <div className="flex items-center gap-1 mb-2">
-                  <label className="text-[13px] text-slate-800">What do you want to focus on?</label>
-                  <HelpCircle className="w-3.5 h-3.5 text-slate-500" />
-                </div>
-                <div className="relative">
-                  <div
-                    className="border border-slate-300 rounded-sm px-3 py-2 flex items-center justify-between w-[190px] cursor-pointer hover:bg-slate-50 bg-white"
-                    onClick={(e) => { e.stopPropagation(); setIsBiddingDropdownOpen(!isBiddingDropdownOpen); }}
-                  >
-                    <span className="text-[13px] text-slate-800">{biddingFocus}</span>
-                    <svg className="w-4 h-4 text-slate-500" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  {isBiddingDropdownOpen && (
-                    <div className="absolute top-full mt-1 left-0 w-[190px] bg-white border border-slate-200 shadow-lg rounded-sm z-10 py-1">
-                      {["Conversions", "Conversion value"].map(opt => (
-                        <div
-                          key={opt}
-                          className={`px-4 py-2 text-[13px] cursor-pointer hover:bg-slate-100 ${biddingFocus === opt ? "bg-slate-50 font-medium" : ""}`}
-                          onClick={(e) => { e.stopPropagation(); setBiddingFocus(opt); setIsBiddingDropdownOpen(false); }}
-                        >
-                          {opt}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {isSearch && (
-              <div className="text-[13px] text-slate-800 mb-5 font-medium">Maximize conversions</div>
-            )}
-
-            {/* Set a target cost per action checkbox */}
-            <div className="flex flex-col gap-3">
-              <label className="flex items-center gap-3 cursor-pointer" onClick={e => e.stopPropagation()}>
-                <input
-                  type="checkbox"
-                  checked={setTargetCPA}
-                  onChange={() => setSetTargetCPA(!setTargetCPA)}
-                  className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600"
-                />
-                <span className="text-[13px] text-slate-800">
-                  {biddingFocus === "Conversions"
-                    ? "Set a target cost per action (optional)"
-                    : "Set a target return on ad spend (optional)"}
-                </span>
-              </label>
-
-              {/* Target CPA input — shown when checkbox is checked */}
-              {setTargetCPA && biddingFocus === "Conversions" && (
-                <div className="pl-7">
-                  <div className="flex items-center gap-1 mb-2">
-                    <span className="text-[13px] text-slate-800">Target CPA</span>
-                    <HelpCircle className="w-3.5 h-3.5 text-slate-500" />
-                  </div>
-                  <div className="border border-slate-300 rounded-sm flex items-center w-[120px] mb-3 bg-white focus-within:ring-2 focus-within:ring-blue-500">
-                    <span className="pl-3 text-[13px] text-slate-600">₹</span>
-                    <input type="text" className="w-full outline-none text-[13px] px-2 py-1.5" />
-                  </div>
-                </div>
-              )}
-
-              {/* Target ROAS input */}
-              {setTargetCPA && biddingFocus === "Conversion value" && (
-                <div className="pl-7">
-                  <div className="flex items-center gap-1 mb-2">
-                    <span className="text-[13px] text-slate-800">Target ROAS</span>
-                    <HelpCircle className="w-3.5 h-3.5 text-slate-500" />
-                  </div>
-                  <div className="border border-slate-300 rounded-sm flex items-center w-[120px] mb-3 bg-white focus-within:ring-2 focus-within:ring-blue-500">
-                    <input type="text" className="w-full outline-none text-[13px] px-3 py-1.5 text-right" />
-                    <span className="pr-3 text-[13px] text-slate-600">%</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Set a target CPA info banner */}
-            <div className="mt-4 bg-[#f2fdf5] border border-[#d1f4d9] rounded p-4 flex items-center justify-between max-w-[680px]">
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5">
-                  <svg className="w-4 h-4 text-[#1e8e3e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
-                </div>
-                <div className="text-[12px] text-slate-800 leading-relaxed">
-                  <strong>Set a target CPA:</strong> Get more conversions at a similar CPA by setting a target and staying unconstrained by budget{" "}
-                  <HelpCircle className="w-3 h-3 text-slate-400 inline mb-0.5 ml-0.5" />
-                </div>
-              </div>
-              <button className="text-[13px] font-medium text-blue-600 hover:text-blue-700 whitespace-nowrap ml-4 shrink-0">
-                Apply
-              </button>
-            </div>
-
-            {/* Alternative bid strategies note */}
-            {!isSearch && campaignType !== "Performance Max" && (
-              <div className="text-[12px] text-slate-500 mt-3">
-                Alternative bid strategies like Maximum CPV, Target CPM, Viewable impressions, Maximize conversion value, Target ROAS are available in this campaign.
-              </div>
-            )}
+            <UnifiedBiddingConfiguration 
+              clientId={payload.clientId || 1} 
+              value={configValue} 
+              onChange={handleConfigChange} 
+            />
           </div>
         </div>
-
 
         {!isSearch && (
           <div

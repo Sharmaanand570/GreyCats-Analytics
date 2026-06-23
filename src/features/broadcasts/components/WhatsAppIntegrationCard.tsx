@@ -99,12 +99,13 @@ export function WhatsAppIntegrationCard({ clientId, onConnected, hasExisting, va
       window.FB.login((response: any) => {
         if (response.authResponse) {
           const accessToken = response.authResponse.accessToken;
+          const code = response.authResponse.code;
           
           createIntegration.mutateAsync({
             name: 'WhatsApp Business',
             type: 'WHATSAPP',
             provider: 'META',
-            config: { accessToken },
+            config: { accessToken, code, redirectUri: 'https://analytics.greycats.tech/' },
             isDefault: true,
             clientId
           }).then(() => {
@@ -124,8 +125,9 @@ export function WhatsAppIntegrationCard({ clientId, onConnected, hasExisting, va
           setIsConnecting(false);
         }
       }, {
-        scope: 'whatsapp_business_management,whatsapp_business_messaging',
-        return_scopes: true
+        config_id: '1700127654344936',
+        response_type: 'code',
+        override_default_response_type: true
       });
     } catch (err: any) {
       toast.error(err.message || 'Could not load Meta SDK');

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp, Sparkles, Wand2, ClipboardList } from "lucide-react";
+import { useCampaignWizardContext } from "../context/CampaignWizardContext";
 
 interface AIMaxStepProps {
   onNext: () => void;
@@ -10,7 +11,13 @@ export default function GoogleAdsAIMaxStep({ onNext }: AIMaxStepProps) {
   const [assetOptOpen, setAssetOptOpen] = useState(true);
   const [brandedOpen, setBrandedOpen] = useState(false);
   const [textCustomization, setTextCustomization] = useState(true);
-  const [finalUrlExpansion, setFinalUrlExpansion] = useState(true);
+  
+  const { payload, updatePayload } = useCampaignWizardContext();
+  const [finalUrlExpansion, setFinalUrlExpansion] = useState(payload.finalUrlExpansion ?? true);
+
+  useEffect(() => {
+    updatePayload({ finalUrlExpansion });
+  }, [finalUrlExpansion, updatePayload]);
 
   return (
     <div className="flex flex-col h-full max-w-[800px]">

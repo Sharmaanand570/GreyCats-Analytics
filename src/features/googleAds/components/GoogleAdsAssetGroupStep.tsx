@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ChevronUp, ChevronDown, HelpCircle, Link as LinkIcon, PenLine, Settings, Info, Wand2, Image as ImageIcon, Video, Plus, MoreVertical, Trash2, Edit2, Sparkles } from "lucide-react";
+import { useCampaignWizardContext } from "../context/CampaignWizardContext";
+import { uploadAssetBinary } from "../API/campaignManagementApi";
 
 interface AssetGroupStepProps {
   onNext: () => void;
@@ -9,6 +11,13 @@ interface AssetGroupStepProps {
 }
 
 export default function GoogleAdsAssetGroupStep({ onNext, activeSubStep, onSubStepChange }: AssetGroupStepProps) {
+  const { payload, updatePayload } = useCampaignWizardContext();
+
+  const initialHeadlines = payload.assets?.filter(a => a.type === "HEADLINE").map(a => a.text) || [];
+  const initialLongHeadlines = payload.assets?.filter(a => a.type === "LONG_HEADLINE").map(a => a.text) || [];
+  const initialDescriptions = payload.assets?.filter(a => a.type === "DESCRIPTION").map(a => a.text) || [];
+  const initialBusinessName = payload.assets?.find(a => a.type === "BUSINESS_NAME")?.text || "Kashmir Organic Nuts";
+
   const [showListingGroupsPanel, setShowListingGroupsPanel] = useState(false);
   const [listingGroupSelection, setListingGroupSelection] = useState("all");
   const [showLogosPanel, setShowLogosPanel] = useState(false);
@@ -21,7 +30,50 @@ export default function GoogleAdsAssetGroupStep({ onNext, activeSubStep, onSubSt
   const [showSharePreviewModal, setShowSharePreviewModal] = useState(false);
   const [showFullPreviewAds, setShowFullPreviewAds] = useState(false);
   const [fullPreviewTab, setFullPreviewTab] = useState<'All' | 'Search' | 'Display' | 'YouTube' | 'Discover' | 'Gmail'>('Display');
+
+  const [assetGroupName, setAssetGroupName] = useState(payload.adGroups?.[0]?.name || "Asset Group 1");
+  const [audienceSignals] = useState<any[]>(payload.adGroups?.[0]?.audienceSignals || []);
+  const [assets, setAssets] = useState<any[]>(payload.assets || []);
+
+  // Text Assets
+  const [businessName, setBusinessName] = useState(initialBusinessName);
+  const [finalUrl, setFinalUrl] = useState(payload.ads?.[0]?.finalUrls?.[0] || "https://kashmirorganicnuts.com");
+  const [headlines, setHeadlines] = useState<string[]>(Array.from({ length: 5 }, (_, i) => initialHeadlines[i] || ""));
+  const [longHeadlines, setLongHeadlines] = useState<string[]>(Array.from({ length: 5 }, (_, i) => initialLongHeadlines[i] || ""));
+  const [descriptions, setDescriptions] = useState<string[]>(Array.from({ length: 4 }, (_, i) => initialDescriptions[i] || ""));
+
+  const handleAssetUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await uploadAssetBinary(payload.clientId || 1, formData);
+      if (res && res.success) {
+        setAssets(prev => [...prev, {
+          assetId: res.assetId,
+          assetType: type,
+          assetName: file.name,
+          previewUrl: res.assetUrl
+        }]);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
   
+  // Validation
+  const filledHeadlinesCount = headlines.filter(h => h.trim().length > 0).length;
+  const filledLongHeadlinesCount = longHeadlines.filter(h => h.trim().length > 0).length;
+  const filledDescriptionsCount = descriptions.filter(d => d.trim().length > 0).length;
+  const hasBusinessName = businessName.trim().length > 0;
+  const hasFinalUrl = finalUrl.trim().length > 0;
+
+  const adStrength = 
+    (filledHeadlinesCount >= 3 && filledDescriptionsCount >= 2 && filledLongHeadlinesCount >= 1 && hasBusinessName && hasFinalUrl)
+      ? "Good"
+      : "Poor";
+
   // Intersection Observer for scroll spy
   useEffect(() => {
     if (!onSubStepChange) return;
@@ -43,6 +95,31 @@ export default function GoogleAdsAssetGroupStep({ onNext, activeSubStep, onSubSt
     
     return () => observer.disconnect();
   }, [onSubStepChange]);
+
+  useEffect(() => {
+    const textAssets = [
+      ...headlines.filter(h => h.trim().length > 0).map(t => ({ type: "HEADLINE", text: t })),
+      ...longHeadlines.filter(h => h.trim().length > 0).map(t => ({ type: "LONG_HEADLINE", text: t })),
+      ...descriptions.filter(d => d.trim().length > 0).map(t => ({ type: "DESCRIPTION", text: t })),
+    ];
+    if (businessName.trim()) {
+      textAssets.push({ type: "BUSINESS_NAME", text: businessName });
+    }
+
+    updatePayload({
+      adGroups: [{ 
+        name: assetGroupName,
+        audienceSignals: audienceSignals
+      }] as any,
+      assets: [...assets, ...textAssets] as any,
+      ads: [
+        {
+          type: "PERFORMANCE_MAX_AD",
+          finalUrls: finalUrl ? [finalUrl] : [],
+        } as any
+      ]
+    });
+  }, [assetGroupName, audienceSignals, assets, headlines, longHeadlines, descriptions, businessName, finalUrl, updatePayload]);
 
   const getPanelClass = (id: string) => {
     return `asset-panel-section bg-white border shadow-sm rounded-md overflow-hidden transition-all duration-200 ${activeSubStep === id ? 'border-blue-500 shadow-md ring-1 ring-blue-500' : 'border-slate-200'}`;
@@ -72,7 +149,8 @@ export default function GoogleAdsAssetGroupStep({ onNext, activeSubStep, onSubSt
           <div className="p-6">
             <input 
               type="text" 
-              defaultValue="Asset Group 1"
+              value={assetGroupName}
+              onChange={(e) => setAssetGroupName(e.target.value)}
               className="border border-slate-300 rounded-md px-3 py-2 text-[13px] w-[300px] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
           </div>
@@ -113,7 +191,8 @@ export default function GoogleAdsAssetGroupStep({ onNext, activeSubStep, onSubSt
               </div>
               <input 
                 type="text" 
-                defaultValue="https://kashmirorganicnuts.com"
+                value={finalUrl}
+                onChange={(e) => setFinalUrl(e.target.value)}
                 className="block w-full pl-9 pr-3 py-2 border border-slate-300 rounded-md text-[13px] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-800"
               />
             </div>
@@ -144,11 +223,13 @@ export default function GoogleAdsAssetGroupStep({ onNext, activeSubStep, onSubSt
                 <div className="relative max-w-[500px]">
                   <input 
                     type="text"
-                    defaultValue="Kashmir Organic Nuts" 
+                    value={businessName}
+                    maxLength={25}
+                    onChange={(e) => setBusinessName(e.target.value)}
                     className="w-full border border-slate-300 rounded-md px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   />
-                  <div className="absolute -bottom-5 left-0 text-[11px] text-slate-500">Required</div>
-                  <div className="absolute -bottom-5 right-0 text-[11px] text-slate-500">20 / 25</div>
+                  <div className="absolute -bottom-5 left-0 text-[11px] text-slate-500">{businessName ? "" : "Required"}</div>
+                  <div className="absolute -bottom-5 right-0 text-[11px] text-slate-500">{businessName.length} / 25</div>
                 </div>
               </div>
 
@@ -174,11 +255,17 @@ export default function GoogleAdsAssetGroupStep({ onNext, activeSubStep, onSubSt
                   </div>
                 </div>
                 
-                <div 
-                  className="flex items-center gap-1.5 text-blue-600 cursor-pointer hover:underline text-[13px] font-medium w-fit mb-2"
-                  onClick={(e) => { e.stopPropagation(); setShowLogosPanel(true); }}
-                >
-                  <PenLine className="w-4 h-4" /> Edit
+                <div className="flex items-center gap-4 text-[13px]">
+                  <label className="flex items-center gap-1.5 text-blue-600 font-medium hover:underline cursor-pointer w-fit mb-2">
+                    <Plus className="w-4 h-4" /> Add Logo
+                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleAssetUpload(e, "LOGO")} />
+                  </label>
+                  <div 
+                    className="flex items-center gap-1.5 text-blue-600 cursor-pointer hover:underline text-[13px] font-medium w-fit mb-2"
+                    onClick={(e) => { e.stopPropagation(); setShowLogosPanel(true); }}
+                  >
+                    <PenLine className="w-4 h-4" /> Edit
+                  </div>
                 </div>
 
                 <div className="border border-slate-200 rounded-md p-4 mt-4 max-w-[600px]">
@@ -256,7 +343,7 @@ export default function GoogleAdsAssetGroupStep({ onNext, activeSubStep, onSubSt
                 </div>
                 <div>
                   <div className="text-slate-800 font-medium">Ad strength</div>
-                  <div className="text-slate-500">Poor</div>
+                  <div className={`text-[13px] font-medium ${adStrength === 'Poor' ? 'text-slate-500' : 'text-blue-600'}`}>{adStrength}</div>
                 </div>
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-slate-600 ml-4">
@@ -279,21 +366,28 @@ export default function GoogleAdsAssetGroupStep({ onNext, activeSubStep, onSubSt
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 rounded-full border-2 border-slate-400"></div>
-                      <span className="text-[13px] font-medium text-slate-800">Headline (0)</span>
+                      <span className="text-[13px] font-medium text-slate-800">Headline ({filledHeadlinesCount})</span>
                       <HelpCircle className="w-3.5 h-3.5 text-slate-500" />
                     </div>
                     <ChevronUp className="w-4 h-4 text-slate-500" />
                   </div>
-                  {[1, 2, 3].map(i => (
+                  {[0, 1, 2, 3, 4].map(i => (
                     <div key={i} className="mb-3">
                       <div className="relative">
                         <input 
                           type="text" 
                           placeholder="Headline"
+                          value={headlines[i]}
+                          maxLength={30}
+                          onChange={(e) => {
+                            const newH = [...headlines];
+                            newH[i] = e.target.value;
+                            setHeadlines(newH);
+                          }}
                           className="w-full border border-slate-300 rounded-md px-3 py-2 text-[13px] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                         />
-                        <div className="absolute -bottom-4 left-0 text-[11px] text-slate-500">Required</div>
-                        <div className="absolute -bottom-4 right-0 text-[11px] text-slate-500">0 / 30</div>
+                        <div className="absolute -bottom-4 left-0 text-[11px] text-slate-500">{i < 3 && !headlines[i] ? <span className="text-[#c5221f]">Required</span> : ""}</div>
+                        <div className={`absolute -bottom-4 right-0 text-[11px] ${headlines[i].length > 30 ? 'text-[#c5221f]' : 'text-slate-500'}`}>{headlines[i].length} / 30</div>
                       </div>
                     </div>
                   ))}
@@ -312,20 +406,29 @@ export default function GoogleAdsAssetGroupStep({ onNext, activeSubStep, onSubSt
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 rounded-full border-2 border-slate-400"></div>
-                      <span className="text-[13px] font-medium text-slate-800">Long headlines (0)</span>
+                      <span className="text-[13px] font-medium text-slate-800">Long headlines ({filledLongHeadlinesCount})</span>
                       <HelpCircle className="w-3.5 h-3.5 text-slate-500" />
                     </div>
                     <ChevronUp className="w-4 h-4 text-slate-500" />
                   </div>
-                  <div className="mb-3 relative">
-                    <input 
-                      type="text" 
-                      placeholder="Long headline"
-                      className="w-full border border-slate-300 rounded-md px-3 py-2 text-[13px] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
-                    <div className="absolute -bottom-4 left-0 text-[11px] text-slate-500">Required</div>
-                    <div className="absolute -bottom-4 right-0 text-[11px] text-slate-500">0 / 90</div>
-                  </div>
+                  {[0, 1, 2, 3, 4].map(i => (
+                    <div key={i} className="mb-3 relative">
+                      <input 
+                        type="text" 
+                        placeholder="Long headline"
+                        value={longHeadlines[i]}
+                        maxLength={90}
+                        onChange={(e) => {
+                          const newLH = [...longHeadlines];
+                          newLH[i] = e.target.value;
+                          setLongHeadlines(newLH);
+                        }}
+                        className="w-full border border-slate-300 rounded-md px-3 py-2 text-[13px] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      />
+                      <div className="absolute -bottom-4 left-0 text-[11px] text-slate-500">{i < 1 && !longHeadlines[i] ? <span className="text-[#c5221f]">Required</span> : ""}</div>
+                      <div className={`absolute -bottom-4 right-0 text-[11px] ${longHeadlines[i].length > 90 ? 'text-[#c5221f]' : 'text-slate-500'}`}>{longHeadlines[i].length} / 90</div>
+                    </div>
+                  ))}
                   <div className="flex items-center gap-4 mt-6 text-[13px]">
                     <button className="flex items-center gap-1.5 text-blue-600 font-medium hover:underline">
                       <Plus className="w-4 h-4" /> Long headline
@@ -341,20 +444,27 @@ export default function GoogleAdsAssetGroupStep({ onNext, activeSubStep, onSubSt
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 rounded-full border-2 border-slate-400"></div>
-                      <span className="text-[13px] font-medium text-slate-800">Descriptions (0)</span>
+                      <span className="text-[13px] font-medium text-slate-800">Descriptions ({filledDescriptionsCount})</span>
                       <HelpCircle className="w-3.5 h-3.5 text-slate-500" />
                     </div>
                     <ChevronUp className="w-4 h-4 text-slate-500" />
                   </div>
-                  {[1, 2].map(i => (
+                  {[0, 1, 2, 3].map(i => (
                     <div key={i} className="mb-3 relative">
                       <input 
                         type="text" 
                         placeholder="Description"
+                        value={descriptions[i]}
+                        maxLength={90}
+                        onChange={(e) => {
+                          const newD = [...descriptions];
+                          newD[i] = e.target.value;
+                          setDescriptions(newD);
+                        }}
                         className="w-full border border-slate-300 rounded-md px-3 py-2 text-[13px] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                       />
-                      <div className="absolute -bottom-4 left-0 text-[11px] text-slate-500">Required</div>
-                      <div className="absolute -bottom-4 right-0 text-[11px] text-slate-500">0 / 90</div>
+                      <div className="absolute -bottom-4 left-0 text-[11px] text-slate-500">{i < 2 && !descriptions[i] ? <span className="text-[#c5221f]">Required</span> : ""}</div>
+                      <div className={`absolute -bottom-4 right-0 text-[11px] ${descriptions[i].length > 90 ? 'text-[#c5221f]' : 'text-slate-500'}`}>{descriptions[i].length} / 90</div>
                     </div>
                   ))}
                   <div className="flex items-center gap-4 mt-6 text-[13px]">
@@ -377,13 +487,14 @@ export default function GoogleAdsAssetGroupStep({ onNext, activeSubStep, onSubSt
                     </div>
                     <ChevronUp className="w-4 h-4 text-slate-500" />
                   </div>
-                  <div className="flex items-center gap-4 text-[13px]">
-                    <button className="flex items-center gap-1.5 text-blue-600 font-medium hover:underline">
-                      <Plus className="w-4 h-4" /> Images
-                    </button>
-                    <button className="flex items-center gap-1.5 text-blue-600 font-medium hover:underline">
-                      <ImageIcon className="w-4 h-4" /> Generate images
-                    </button>
+                    <div className="flex items-center gap-4 text-[13px]">
+                      <label className="flex items-center gap-1.5 text-blue-600 font-medium hover:underline cursor-pointer">
+                        <Plus className="w-4 h-4" /> Images
+                        <input type="file" className="hidden" accept="image/*" onChange={(e) => handleAssetUpload(e, "IMAGE")} />
+                      </label>
+                      <button className="flex items-center gap-1.5 text-blue-600 font-medium hover:underline">
+                        <ImageIcon className="w-4 h-4" /> Generate images
+                      </button>
                   </div>
                 </div>
 
@@ -398,12 +509,13 @@ export default function GoogleAdsAssetGroupStep({ onNext, activeSubStep, onSubSt
                     <ChevronUp className="w-4 h-4 text-slate-500" />
                   </div>
                   <div className="flex items-center gap-4 text-[13px]">
-                    <button className="flex items-center gap-1.5 text-blue-600 font-medium hover:underline">
-                      <Plus className="w-4 h-4" /> Videos
-                    </button>
-                    <button className="flex items-center gap-1.5 text-blue-600 font-medium hover:underline">
-                      <Video className="w-4 h-4" /> Generate videos
-                    </button>
+                      <label className="flex items-center gap-1.5 text-blue-600 font-medium hover:underline cursor-pointer">
+                        <Plus className="w-4 h-4" /> Videos
+                        <input type="file" className="hidden" accept="video/*" onChange={(e) => handleAssetUpload(e, "VIDEO")} />
+                      </label>
+                      <button className="flex items-center gap-1.5 text-blue-600 font-medium hover:underline">
+                        <Video className="w-4 h-4" /> Generate videos
+                      </button>
                   </div>
                 </div>
 

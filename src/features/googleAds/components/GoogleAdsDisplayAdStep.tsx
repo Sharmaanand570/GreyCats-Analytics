@@ -1,13 +1,67 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronUp, ChevronDown, Info, HelpCircle, Image as ImageIcon, Edit2, PlaySquare, Plus, Mail, MonitorPlay, AlertTriangle, CheckSquare } from "lucide-react";
+import { useCampaignWizardContext } from "../context/CampaignWizardContext";
+import { uploadAssetBinary } from "../API/campaignManagementApi";
 
 interface AdStepProps {
   onNext: () => void;
 }
 
 export default function GoogleAdsDisplayAdStep({ onNext }: AdStepProps) {
+  const { payload, updatePayload } = useCampaignWizardContext();
+
+  const initialHeadline = payload.assets?.find(a => a.type === "HEADLINE")?.text || "";
+  const initialLongHeadline = payload.assets?.find(a => a.type === "LONG_HEADLINE")?.text || "";
+  const initialDescription = payload.assets?.find(a => a.type === "DESCRIPTION")?.text || "";
+  const initialBusinessName = payload.assets?.find(a => a.type === "BUSINESS_NAME")?.text || "Shobha Shringar";
+
   const [expandedSection, setExpandedSection] = useState<string | null>("additional_format");
   const [activePreviewTab, setActivePreviewTab] = useState("display");
+
+  const [finalUrl, setFinalUrl] = useState(payload.ads?.[0]?.finalUrls?.[0] || "https://www.example.com");
+  const [businessName, setBusinessName] = useState(initialBusinessName);
+  const [headline, setHeadline] = useState(initialHeadline);
+  const [longHeadline, setLongHeadline] = useState(initialLongHeadline);
+  const [description, setDescription] = useState(initialDescription);
+  const [assets, setAssets] = useState<any[]>(payload.assets || []);
+
+  const handleAssetUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await uploadAssetBinary(payload.clientId || 1, formData);
+      if (res && res.success) {
+        setAssets(prev => [...prev, {
+          assetId: res.assetId,
+          assetType: type,
+          assetName: file.name,
+          previewUrl: res.assetUrl
+        }]);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    updatePayload({
+      ads: [
+        {
+          type: "RESPONSIVE_DISPLAY_AD",
+          finalUrls: [finalUrl],
+          businessName: businessName,
+          responsiveDisplayAd: {
+            headlines: headline ? [headline] : [],
+            longHeadline: longHeadline,
+            descriptions: description ? [description] : []
+          }
+        }
+      ],
+      assets: assets
+    } as any);
+  }, [finalUrl, businessName, headline, longHeadline, description, assets, updatePayload]);
 
   const toggleSection = (section: string) => {
     if (expandedSection === section) setExpandedSection(null);
@@ -72,15 +126,15 @@ export default function GoogleAdsDisplayAdStep({ onNext }: AdStepProps) {
             
             {/* Final URL */}
             <div className="flex flex-col gap-1">
-              <label className="text-[13px] text-slate-800 font-medium flex items-center gap-1">Final URL <HelpCircle className="w-3.5 h-3.5 text-slate-400" /></label>
-              <input type="text" value="https://www.example.com" className="w-full border border-slate-300 rounded px-3 py-2.5 text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-blue-500" />
-              <div className="text-[11px] text-slate-500">Required</div>
-            </div>
-
-            {/* Business Name */}
-            <div className="flex flex-col gap-1">
-              <label className="text-[13px] text-slate-800 font-medium flex items-center gap-1">Business name <HelpCircle className="w-3.5 h-3.5 text-slate-400" /></label>
-              <input type="text" value="Shobha Shringar" className="w-full border border-slate-300 rounded px-3 py-2.5 text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-blue-500" />
+                <label className="text-[13px] text-slate-800 font-medium flex items-center gap-1">Final URL <HelpCircle className="w-3.5 h-3.5 text-slate-400" /></label>
+                <input type="text" value={finalUrl} onChange={(e) => setFinalUrl(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-2.5 text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <div className="flex justify-between items-center">
+                  <label className="text-[13px] text-slate-800 font-medium flex items-center gap-1">Business name <HelpCircle className="w-3.5 h-3.5 text-slate-400" /></label>
+                  <div className="text-[11px] text-slate-500">Required</div>
+                </div>
+                <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-2.5 text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-blue-500" />
               <div className="flex justify-between text-[11px] text-slate-500">
                 <span>Required</span>
                 <span>15 / 25</span>
@@ -88,16 +142,18 @@ export default function GoogleAdsDisplayAdStep({ onNext }: AdStepProps) {
             </div>
 
             {/* Images */}
-            <div className="flex flex-col gap-2">
-              <label className="text-[13px] text-slate-800 font-medium flex items-center gap-1">Images <HelpCircle className="w-3.5 h-3.5 text-slate-400" /></label>
-              <div className="text-[12px] text-slate-500 mb-1">Add up to 15 images <a href="#" className="text-blue-600 hover:underline">Learn more</a></div>
-              <div className="flex gap-4">
-                <button className="flex items-center gap-1 text-[13px] font-medium text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded -ml-2">
-                  <Plus className="w-4 h-4" /> Images
-                </button>
-                <button className="flex items-center gap-1 text-[13px] font-medium text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded">
-                  <ImageIcon className="w-4 h-4" /> Generate images
-                </button>
+              <div className="flex flex-col gap-2">
+                <label className="text-[13px] text-slate-800 font-medium flex items-center gap-1">Images <HelpCircle className="w-3.5 h-3.5 text-slate-400" /></label>
+                <div className="text-[12px] text-slate-500 mb-1">Add up to 15 images <a href="#" className="text-blue-600 hover:underline">Learn more</a></div>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-1 text-[13px] font-medium text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded -ml-2 cursor-pointer">
+                    <Plus className="w-4 h-4" /> Images
+                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleAssetUpload(e, "IMAGE")} />
+                  </label>
+                  <button className="flex items-center gap-1 text-[13px] font-medium text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded">
+                    <ImageIcon className="w-4 h-4" /> Generate images
+                  </button>
+                </div>
               </div>
               <div className="text-[12px] text-slate-500 mt-1">
                 At least 1 landscape image is required<br/>
@@ -106,13 +162,19 @@ export default function GoogleAdsDisplayAdStep({ onNext }: AdStepProps) {
             </div>
 
             {/* Logos */}
-            <div className="flex flex-col gap-2">
-              <label className="text-[13px] text-slate-800 font-medium flex items-center gap-1">Logos <HelpCircle className="w-3.5 h-3.5 text-slate-400" /></label>
-              <div className="text-[12px] text-slate-500 mb-1">Add up to 5 logos</div>
-              <div className="flex flex-col gap-2 w-max">
-                <div className="w-[50px] h-[50px] bg-slate-900 rounded flex items-center justify-center overflow-hidden border border-slate-200">
-                  <div className="text-white text-[8px] tracking-wider text-center px-1 font-serif">SHOBHA<br/>SHRINGAR<br/><span className="text-[5px]">JEWELLERS</span></div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[13px] text-slate-800 font-medium flex items-center gap-1">Logos <HelpCircle className="w-3.5 h-3.5 text-slate-400" /></label>
+                <div className="text-[12px] text-slate-500 mb-1">Add up to 5 logos</div>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-1 text-[13px] font-medium text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded -ml-2 cursor-pointer">
+                    <Plus className="w-4 h-4" /> Add Logo
+                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleAssetUpload(e, "LOGO")} />
+                  </label>
                 </div>
+                <div className="flex flex-col gap-2 w-max">
+                  <div className="w-[50px] h-[50px] bg-slate-900 rounded flex items-center justify-center overflow-hidden border border-slate-200">
+                    <div className="text-white text-[8px] tracking-wider text-center px-1 font-serif">SHOBHA<br/>SHRINGAR<br/><span className="text-[5px]">JEWELLERS</span></div>
+                  </div>
                 <button className="flex items-center gap-1 text-[12px] font-medium text-blue-600 hover:bg-blue-50 px-2 py-1 rounded -ml-2">
                   <Edit2 className="w-3 h-3" /> Edit
                 </button>
@@ -138,11 +200,13 @@ export default function GoogleAdsDisplayAdStep({ onNext }: AdStepProps) {
               <div className="flex items-center gap-1 text-[12px] text-slate-600 mb-2">
                 <Info className="w-3.5 h-3.5 text-blue-600" /> We don't have any suggestions right now.
               </div>
-              <div className="flex flex-col gap-1">
-                <input type="text" placeholder="Headline" className="w-full border border-slate-300 rounded px-3 py-2.5 text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-blue-500" />
-                <div className="flex justify-between text-[11px] text-slate-500">
-                  <span>Required</span>
-                  <span>0 / 30</span>
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <input type="text" placeholder="Headline" value={headline} onChange={(e) => setHeadline(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-2.5 text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-blue-500" />
+                  <div className="flex justify-between text-[11px] text-slate-500">
+                    <span>1 of 5</span>
+                    <span>0 / 30</span>
+                  </div>
                 </div>
               </div>
               <button className="flex items-center gap-1 text-[13px] font-medium text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded w-max -ml-2 mt-1">
@@ -151,27 +215,24 @@ export default function GoogleAdsDisplayAdStep({ onNext }: AdStepProps) {
             </div>
 
             {/* Long Headline */}
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <label className="text-[13px] text-slate-800 font-medium flex items-center gap-1">Long headline <HelpCircle className="w-3.5 h-3.5 text-slate-400" /></label>
-              <input type="text" placeholder="Long headline" className="w-full border border-slate-300 rounded px-3 py-2.5 text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-blue-500" />
+              <input type="text" placeholder="Long headline" value={longHeadline} onChange={(e) => setLongHeadline(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-2.5 text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-blue-500" />
               <div className="flex justify-between text-[11px] text-slate-500">
-                <span>Required</span>
+                <span>1 of 1</span>
                 <span>0 / 90</span>
               </div>
             </div>
 
             {/* Descriptions */}
             <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
+              <div className="flex justify-between items-center">
                 <label className="text-[13px] text-slate-800 font-medium flex items-center gap-1">Descriptions <HelpCircle className="w-3.5 h-3.5 text-slate-400" /></label>
-                <div className="text-[12px] text-blue-600 cursor-pointer">More ideas</div>
+                <div className="text-[11px] text-slate-500">Required</div>
               </div>
-              <div className="text-[12px] text-slate-500 mb-1">Add up to 5 descriptions<br/>Suggested descriptions</div>
-              <div className="flex items-center gap-1 text-[12px] text-slate-600 mb-2">
-                <Info className="w-3.5 h-3.5 text-blue-600" /> We don't have any suggestions right now.
-              </div>
-              <div className="flex flex-col gap-1">
-                <input type="text" placeholder="Description" className="w-full border border-slate-300 rounded px-3 py-2.5 text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-blue-500" />
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <input type="text" placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-2.5 text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-blue-500" />
                 <div className="flex justify-between text-[11px] text-slate-500">
                   <span>Required</span>
                   <span>0 / 90</span>

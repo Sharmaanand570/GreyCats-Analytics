@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronUp } from "lucide-react";
+import { useCampaignWizardContext } from "../context/CampaignWizardContext";
 
 interface GoogleAdsBudgetStepProps {
   onNext: () => void;
@@ -7,9 +8,20 @@ interface GoogleAdsBudgetStepProps {
 }
 
 export default function GoogleAdsBudgetStep({ onNext, onBudgetTypeChange }: GoogleAdsBudgetStepProps) {
-  const [budgetType, setBudgetType] = useState<'daily' | 'campaign'>('daily');
-  const [budgetAmount, setBudgetAmount] = useState('');
+  const { payload, updatePayload } = useCampaignWizardContext();
+
+  const [budgetType, setBudgetType] = useState<'daily' | 'campaign'>(payload.budgetType?.toLowerCase() as any || 'daily');
+  const [budgetAmount, setBudgetAmount] = useState(payload.budgetAmount?.toString() || '');
+  const [sharedBudgetId] = useState<string | undefined>(payload.sharedBudgetId);
   const [isFocused, setIsFocused] = useState(false);
+
+  useEffect(() => {
+    updatePayload({
+      budgetType: budgetType.toUpperCase() as any,
+      budgetAmount: parseFloat(budgetAmount) || 0,
+      sharedBudgetId,
+    });
+  }, [budgetType, budgetAmount, sharedBudgetId, updatePayload]);
 
   const handleBudgetTypeChange = (type: 'daily' | 'campaign') => {
     setBudgetType(type);
@@ -58,14 +70,14 @@ export default function GoogleAdsBudgetStep({ onNext, onBudgetTypeChange }: Goog
                   <div className="flex flex-col gap-3 mt-4">
                     {/* Option 1 */}
                     <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-md cursor-pointer hover:border-slate-300 transition-colors">
-                      <input type="radio" name="dailyBudget" className="w-4 h-4 text-blue-600 accent-blue-600" />
+                      <input type="radio" name="dailyBudget" onChange={() => setBudgetAmount("1169.65")} className="w-4 h-4 text-blue-600 accent-blue-600" />
                       <span className="text-[13px] text-slate-800 font-medium">₹1,169.65</span>
                     </label>
 
                     {/* Option 2 (Recommended) */}
                     <label className="flex flex-col gap-3 p-4 border border-blue-500 rounded-md cursor-pointer bg-blue-50/10">
                       <div className="flex items-center gap-3">
-                        <input type="radio" name="dailyBudget" defaultChecked className="w-4 h-4 text-blue-600 accent-blue-600" />
+                        <input type="radio" name="dailyBudget" defaultChecked onChange={() => setBudgetAmount("974.67")} className="w-4 h-4 text-blue-600 accent-blue-600" />
                         <div className="flex items-center gap-2">
                           <span className="text-[13px] text-slate-800 font-medium">₹974.67</span>
                           <span className="text-[11px] text-blue-600 font-medium px-1.5 py-0.5 bg-blue-50 rounded">Recommended</span>
@@ -99,14 +111,28 @@ export default function GoogleAdsBudgetStep({ onNext, onBudgetTypeChange }: Goog
 
                     {/* Option 3 */}
                     <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-md cursor-pointer hover:border-slate-300 transition-colors">
-                      <input type="radio" name="dailyBudget" className="w-4 h-4 text-blue-600 accent-blue-600" />
+                      <input type="radio" name="dailyBudget" onChange={() => setBudgetAmount("779.74")} className="w-4 h-4 text-blue-600 accent-blue-600" />
                       <span className="text-[13px] text-slate-800 font-medium">₹779.74</span>
                     </label>
 
                     {/* Custom */}
-                    <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-md cursor-pointer hover:border-slate-300 transition-colors">
-                      <input type="radio" name="dailyBudget" className="w-4 h-4 text-blue-600 accent-blue-600" />
-                      <span className="text-[13px] text-slate-800 font-medium">Set custom budget</span>
+                    <label className="flex flex-col gap-3 p-4 border border-slate-200 rounded-md cursor-pointer hover:border-slate-300 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <input type="radio" name="dailyBudget" onChange={() => setBudgetAmount("")} className="w-4 h-4 text-blue-600 accent-blue-600" />
+                        <span className="text-[13px] text-slate-800 font-medium">Set custom budget</span>
+                      </div>
+                      <div className="pl-7">
+                        <div className="relative w-[160px]">
+                          <span className="absolute inset-y-0 left-0 pl-2 flex items-center text-[13px] text-slate-600 pointer-events-none">₹</span>
+                          <input 
+                            type="number"
+                            min="0"
+                            className="w-full border border-slate-300 rounded-sm pl-6 pr-3 py-1.5 text-[13px] outline-none transition-colors focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                            value={budgetAmount}
+                            onChange={(e) => setBudgetAmount(e.target.value)}
+                          />
+                        </div>
+                      </div>
                     </label>
                   </div>
                 )}

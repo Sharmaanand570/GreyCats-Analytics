@@ -329,7 +329,7 @@ function MainSideBar(): React.JSX.Element {
       isCollapsible: true,
       items: [
         { label: "Meta Ads", path: "/data-sources/meta-ads", icon: <Megaphone />, isComingSoon: true},
-        { label: "Google Ads", path: "/data-sources/google-ads", icon: <SiGoogleads className="w-[18px] h-[18px]" />, isComingSoon: false },
+        { label: "Google Ads", path: "/data-sources/google-ads", icon: <SiGoogleads className="w-[18px] h-[18px]" />, isComingSoon: true },
       ],
     }] : []),
     {

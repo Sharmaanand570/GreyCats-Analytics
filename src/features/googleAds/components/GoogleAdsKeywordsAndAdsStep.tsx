@@ -1,13 +1,80 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronUp, ChevronDown, Link, List, HelpCircle, Image as ImageIcon, Plus, CheckCircle2, MessageSquareText, Search, Phone, TriangleAlert, Pencil } from "lucide-react";
+import { useCampaignWizardContext } from "../context/CampaignWizardContext";
 
 interface KeywordsAndAdsStepProps {
   onNext: () => void;
 }
 
 export default function GoogleAdsKeywordsAndAdsStep({ onNext }: KeywordsAndAdsStepProps) {
+  const { payload, updatePayload } = useCampaignWizardContext();
+
+  const rsa = payload.ads?.[0]?.responsiveSearchAd;
+  const initialHeadlines = rsa?.headlines?.map(h => h.text) || [];
+  const initialDescriptions = rsa?.descriptions?.map(d => d.text) || [];
+  const posKeywords = payload.keywords?.filter(k => !k.negative) || [];
+  const negKeywords = payload.keywords?.filter(k => k.negative) || [];
+
   const [activePanel, setActivePanel] = useState("ads");
   const [isCreatingAd, setIsCreatingAd] = useState(false);
+  const [adGroupName, setAdGroupName] = useState(payload.adGroups?.[0]?.name || "Ad Group 1");
+  const [headlines, setHeadlines] = useState<string[]>(Array.from({ length: 8 }, (_, i) => initialHeadlines[i] || ""));
+  const [descriptions, setDescriptions] = useState<string[]>(Array.from({ length: 4 }, (_, i) => initialDescriptions[i] || ""));
+  const [finalUrl, setFinalUrl] = useState(payload.ads?.[0]?.finalUrls?.[0] || "");
+  const [path1, setPath1] = useState(rsa?.path1 || "");
+  const [path2, setPath2] = useState(rsa?.path2 || "");
+  const [keywordsText, setKeywordsText] = useState(posKeywords.map(k => k.text).join("\n"));
+  const [negativeKeywordsText, setNegativeKeywordsText] = useState(negKeywords.map(k => k.text).join("\n"));
+  const [keywordMatchType, setKeywordMatchType] = useState<"BROAD" | "PHRASE" | "EXACT">(
+    (posKeywords[0]?.matchType as any) || "BROAD"
+  );
+
+  // Validation
+  const filledHeadlinesCount = headlines.filter(h => h.trim().length > 0).length;
+  const filledDescriptionsCount = descriptions.filter(d => d.trim().length > 0).length;
+  const keywordsCount = keywordsText.split(/[\n,]+/).filter(k => k.trim().length > 0).length;
+  
+  const hasMinHeadlines = filledHeadlinesCount >= 3;
+  const hasMinDescriptions = filledDescriptionsCount >= 2;
+  const hasMinKeywords = keywordsCount >= 1;
+  const hasFinalUrl = finalUrl.trim().length > 0;
+
+  const adStrength = 
+    hasMinHeadlines && hasMinDescriptions && hasMinKeywords && hasFinalUrl 
+      ? (filledHeadlinesCount >= 5 && filledDescriptionsCount >= 3 ? "Excellent" : "Good")
+      : "Incomplete";
+
+  useEffect(() => {
+    // Sync keywords
+    const keywordsList = keywordsText
+      .split(/[\n,]+/)
+      .map(k => k.trim())
+      .filter(k => k.length > 0)
+      .map(k => ({ text: k, matchType: keywordMatchType, negative: false }));
+
+    const negativeList = negativeKeywordsText
+      .split(/[\n,]+/)
+      .map(k => k.trim())
+      .filter(k => k.length > 0)
+      .map(k => ({ text: k, matchType: keywordMatchType, negative: true }));
+
+    updatePayload({
+      adGroups: [{ name: adGroupName, status: "ENABLED" }],
+      keywords: [...keywordsList, ...negativeList] as any,
+      ads: [
+        {
+          type: "RESPONSIVE_SEARCH_AD",
+          finalUrls: finalUrl ? [finalUrl] : [],
+          responsiveSearchAd: {
+            headlines: headlines.filter(h => h.trim().length > 0).map(text => ({ text, assetId: "" })) as any,
+            descriptions: descriptions.filter(d => d.trim().length > 0).map(text => ({ text, assetId: "" })) as any,
+            path1,
+            path2
+          }
+        }
+      ]
+    });
+  }, [keywordsText, negativeKeywordsText, keywordMatchType, headlines, descriptions, finalUrl, path1, path2, adGroupName, updatePayload]);
   
   return (
     <div className="flex flex-col h-full w-full max-w-[1200px]">
@@ -27,6 +94,16 @@ export default function GoogleAdsKeywordsAndAdsStep({ onNext }: KeywordsAndAdsSt
 
       <div className="text-[15px] font-medium text-slate-800 mb-4">
         Add details to match your ads to the right searches
+      </div>
+
+      <div className="mb-6">
+        <label className="text-[13px] font-medium text-slate-800 block mb-1">Ad group name</label>
+        <input 
+          type="text" 
+          value={adGroupName}
+          onChange={(e) => setAdGroupName(e.target.value)}
+          className="w-full max-w-[400px] border border-slate-300 rounded px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" 
+        />
       </div>
 
       <div className="flex gap-6 items-start pb-20">
@@ -81,8 +158,17 @@ export default function GoogleAdsKeywordsAndAdsStep({ onNext }: KeywordsAndAdsSt
                 </div>
 
                 <div>
-                  <div className="flex items-center gap-1 mb-1">
+                  <div className="flex items-center gap-1 mb-1 justify-between">
                     <span className="text-[13px] font-medium text-slate-800">Enter keywords</span>
+                    <select
+                      value={keywordMatchType}
+                      onChange={(e) => setKeywordMatchType(e.target.value as any)}
+                      className="border border-slate-300 rounded px-2 py-1 text-[12px] text-slate-800 outline-none"
+                    >
+                      <option value="BROAD">Broad match</option>
+                      <option value="PHRASE">Phrase match</option>
+                      <option value="EXACT">Exact match</option>
+                    </select>
                   </div>
                   <div className="flex items-center gap-1 mb-2">
                     <span className="text-[12px] text-slate-500">Keywords are words or phrases that are used to match your ads with the terms people are searching for</span>
@@ -90,7 +176,23 @@ export default function GoogleAdsKeywordsAndAdsStep({ onNext }: KeywordsAndAdsSt
                   </div>
                   <textarea 
                     rows={6}
+                    value={keywordsText}
+                    onChange={(e) => setKeywordsText(e.target.value)}
                     placeholder="Enter or paste keywords. You can separate each keyword by commas or enter one per line."
+                    className="block w-full p-3 border border-slate-300 rounded-md text-[13px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none mb-4"
+                  ></textarea>
+
+                  <div className="flex items-center gap-1 mb-1">
+                    <span className="text-[13px] font-medium text-slate-800">Negative keywords</span>
+                  </div>
+                  <div className="flex items-center gap-1 mb-2">
+                    <span className="text-[12px] text-slate-500">Prevent your ad from showing on searches with these terms</span>
+                  </div>
+                  <textarea 
+                    rows={4}
+                    value={negativeKeywordsText}
+                    onChange={(e) => setNegativeKeywordsText(e.target.value)}
+                    placeholder="Enter negative keywords..."
                     className="block w-full p-3 border border-slate-300 rounded-md text-[13px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none"
                   ></textarea>
                 </div>
@@ -147,12 +249,12 @@ export default function GoogleAdsKeywordsAndAdsStep({ onNext }: KeywordsAndAdsSt
                         <div className="w-10 h-10 rounded-full border-2 border-slate-300 flex items-center justify-center">
                           <div className="w-8 h-8 rounded-full border-2 border-slate-200"></div>
                         </div>
-                        <div className="flex flex-col">
-                          <div className="text-[13px] font-medium text-slate-800 flex items-center gap-1">
-                            Ad strength <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
+                          <div className="flex flex-col">
+                            <div className="text-[13px] font-medium text-slate-800 flex items-center gap-1">
+                              Ad strength <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
+                            </div>
+                            <div className={`text-[13px] font-medium ${adStrength === 'Incomplete' ? 'text-slate-500' : 'text-blue-600'}`}>{adStrength}</div>
                           </div>
-                          <div className="text-[13px] text-slate-500">Incomplete</div>
-                        </div>
                       </div>
 
                       <div className="flex flex-col gap-1.5 pl-6 border-l border-blue-100">
@@ -195,6 +297,8 @@ export default function GoogleAdsKeywordsAndAdsStep({ onNext }: KeywordsAndAdsSt
                          </div>
                          <input 
                            type="text" 
+                           value={finalUrl}
+                           onChange={(e) => setFinalUrl(e.target.value)}
                            placeholder="Final URL"
                            className="block w-full px-3 py-2 border border-slate-300 rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-blue-500"
                          />
@@ -213,12 +317,12 @@ export default function GoogleAdsKeywordsAndAdsStep({ onNext }: KeywordsAndAdsSt
                            <span>www.example.com</span>
                            <span>/</span>
                            <div className="relative w-full max-w-[120px]">
-                             <input type="text" className="w-full border border-slate-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                             <input type="text" value={path1} onChange={(e) => setPath1(e.target.value)} className="w-full border border-slate-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
                              <span className="absolute right-2 top-2 text-[10px] text-slate-400">0/15</span>
                            </div>
                            <span>/</span>
                            <div className="relative w-full max-w-[120px]">
-                             <input type="text" className="w-full border border-slate-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                             <input type="text" value={path2} onChange={(e) => setPath2(e.target.value)} className="w-full border border-slate-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
                              <span className="absolute right-2 top-2 text-[10px] text-slate-400">0/15</span>
                            </div>
                          </div>
@@ -240,29 +344,36 @@ export default function GoogleAdsKeywordsAndAdsStep({ onNext }: KeywordsAndAdsSt
                       {/* Headlines Sub-panel */}
                       <div className="bg-white border border-slate-200 rounded-md p-4">
                          <div className="flex justify-between items-center mb-3">
-                           <div className="flex items-center gap-2">
-                             <span className="text-slate-500 font-serif font-bold text-[16px] leading-none italic">Tт</span>
-                             <span className="text-[14px] font-medium text-slate-800">Headlines</span>
-                             <span className="text-[11px] text-slate-500">0/15</span>
-                             <a href="#" className="text-[12px] text-blue-600 hover:underline ml-2">View ideas</a>
-                           </div>
-                           <ChevronUp className="w-4 h-4 text-slate-500" />
-                         </div>
-                         <div className="flex flex-col gap-1">
-                           {[...Array(8)].map((_, i) => (
-                             <div key={i}>
-                               <input
-                                 type="text"
-                                 placeholder="Headline"
-                                 className="block w-full px-3 py-2 border border-slate-300 rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-blue-500"
-                               />
-                               <div className="flex justify-between text-[10px] text-slate-400 mt-0.5 px-0.5">
-                                 {i < 3 ? <span className="text-slate-500">Required</span> : <span />}
-                                 <span>0 / 30</span>
-                               </div>
+                             <div className="flex items-center gap-2">
+                               <span className="text-slate-500 font-serif font-bold text-[16px] leading-none italic">T</span>
+                               <span className="text-[14px] font-medium text-slate-800">Headlines</span>
+                               <span className={`text-[11px] ${hasMinHeadlines ? 'text-blue-600' : 'text-slate-500'}`}>{filledHeadlinesCount}/15</span>
+                               <a href="#" className="text-[12px] text-blue-600 hover:underline ml-2">View ideas</a>
                              </div>
-                           ))}
-                         </div>
+                             <ChevronUp className="w-4 h-4 text-slate-500" />
+                           </div>
+                           <div className="flex flex-col gap-1">
+                             {[...Array(8)].map((_, i) => (
+                               <div key={i}>
+                                 <input
+                                   type="text"
+                                   value={headlines[i]}
+                                   maxLength={30}
+                                   onChange={(e) => {
+                                     const newH = [...headlines];
+                                     newH[i] = e.target.value;
+                                     setHeadlines(newH);
+                                   }}
+                                   placeholder="Headline"
+                                   className="block w-full px-3 py-2 border border-slate-300 rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                 />
+                                 <div className="flex justify-between text-[10px] text-slate-400 mt-0.5 px-0.5">
+                                   {i < 3 ? <span className={headlines[i] ? "text-slate-500" : "text-[#c5221f]"}>Required</span> : <span />}
+                                   <span className={headlines[i].length > 30 ? "text-[#c5221f]" : "text-slate-400"}>{headlines[i].length} / 30</span>
+                                 </div>
+                               </div>
+                             ))}
+                           </div>
                          <button className="text-[13px] text-blue-600 font-medium flex items-center gap-1 hover:underline mt-3">
                            <Plus className="w-4 h-4" /> Headline
                          </button>
@@ -272,24 +383,31 @@ export default function GoogleAdsKeywordsAndAdsStep({ onNext }: KeywordsAndAdsSt
                       <div className="bg-white border border-slate-200 rounded-md p-4">
                          <div className="flex justify-between items-center mb-3">
                            <div className="flex items-center gap-2">
-                             <span className="text-slate-500 font-serif font-bold text-[16px] leading-none italic">Tт</span>
+                             <span className="text-slate-500 font-serif font-bold text-[16px] leading-none italic">T</span>
                              <span className="text-[14px] font-medium text-slate-800">Descriptions</span>
-                             <span className="text-[11px] text-slate-500">0/4</span>
+                             <span className={`text-[11px] ${hasMinDescriptions ? 'text-blue-600' : 'text-slate-500'}`}>{filledDescriptionsCount}/4</span>
                              <a href="#" className="text-[12px] text-blue-600 hover:underline ml-2">View ideas</a>
                            </div>
                            <ChevronUp className="w-4 h-4 text-slate-500" />
                          </div>
                          <div className="flex flex-col gap-1">
-                           {[0, 1].map((i) => (
+                           {[0, 1, 2, 3].map((i) => (
                              <div key={i}>
                                <input
                                  type="text"
+                                 value={descriptions[i]}
+                                 maxLength={90}
+                                 onChange={(e) => {
+                                   const newD = [...descriptions];
+                                   newD[i] = e.target.value;
+                                   setDescriptions(newD);
+                                 }}
                                  placeholder="Description"
                                  className="block w-full px-3 py-2 border border-slate-300 rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-blue-500"
                                />
-                               <div className="flex justify-between text-[10px] mt-0.5 px-0.5">
-                                 <span className="text-slate-500">Required</span>
-                                 <span className="text-slate-400">0 / 90</span>
+                               <div className="flex justify-between text-[10px] text-slate-400 mt-0.5 px-0.5">
+                                 {i < 2 ? <span className={descriptions[i] ? "text-slate-500" : "text-[#c5221f]"}>Required</span> : <span />}
+                                 <span className={descriptions[i].length > 90 ? "text-[#c5221f]" : "text-slate-400"}>{descriptions[i].length} / 90</span>
                                </div>
                              </div>
                            ))}

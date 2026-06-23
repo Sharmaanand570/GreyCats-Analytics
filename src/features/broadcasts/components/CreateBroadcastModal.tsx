@@ -32,7 +32,7 @@ import { toast } from 'sonner';
 import { creativeApi } from '@/api/creativeApi';
 import { useCreateBroadcast, useCreateBroadcastCsv, useTemplates, useIntegrations, useSyncTemplates } from '../hooks/useBroadcasts';
 import { useTelegramTargets } from '@/features/blog/hooks/useBlogPosts';
-import type { BroadcastChannel, BroadcastIntegration } from '../api/types';
+import type { BroadcastChannel, BroadcastIntegration, TemplateParamComponent } from '../api/types';
 import { 
   Select, 
   SelectContent, 
@@ -71,6 +71,10 @@ export function CreateBroadcastModal({ isOpen, onClose, clientId, fixedChannel }
   const [error, setError] = useState<string | null>(null);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [showProviderManager, setShowProviderManager] = useState(false);
+  // WhatsApp dynamic template params
+  const [headerMediaUrl, setHeaderMediaUrl] = useState('');
+  const [bodyVarValues, setBodyVarValues] = useState<string[]>([]);
+  const [urlButtonValues, setUrlButtonValues] = useState<string[]>([]);
 
   const { data: templates } = useTemplates();
   const { data: integrations } = useIntegrations(clientId);
@@ -87,6 +91,27 @@ export function CreateBroadcastModal({ isOpen, onClose, clientId, fixedChannel }
   const filteredTemplates = templates?.filter(t => t.channel === channel && t.status === 'APPROVED') || [];
   const filteredIntegrations = (integrations as BroadcastIntegration[])?.filter(i => i.type === channel) || [];
   const selectedTemplate = templates?.find(t => t.id === templateId);
+
+  // WhatsApp template components analysis
+  const templateComponents = isWhatsapp && selectedTemplate?.components ? selectedTemplate.components : [];
+  const headerComponent = templateComponents.find(c => c.type === 'HEADER');
+  const headerFormat = headerComponent?.format; // 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT' | undefined
+  const hasMediaHeader = headerFormat === 'IMAGE' || headerFormat === 'VIDEO' || headerFormat === 'DOCUMENT';
+  const bodyComponent = templateComponents.find(c => c.type === 'BODY');
+  const bodyVarCount = bodyComponent?.text
+    ? Array.from(new Set(Array.from(bodyComponent.text.matchAll(/\{\{(\d+)\}\}/g)).map(m => Number(m[1])))).length
+    : (isWhatsapp && selectedTemplate ? Array.from(new Set(Array.from(selectedTemplate.content.matchAll(/\{\{(\d+)\}\}/g)).map(m => Number(m[1])))).length : 0);
+  const urlButtons = templateComponents
+    .find(c => c.type === 'BUTTONS')
+    ?.buttons?.filter(b => b.type === 'URL' && b.url?.includes('{{1}}')) || [];
+
+  // Reset WhatsApp dynamic fields when template changes
+  useEffect(() => {
+    setHeaderMediaUrl('');
+    setBodyVarValues(Array(bodyVarCount).fill(''));
+    setUrlButtonValues(Array(urlButtons.length).fill(''));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templateId]);
 
   const templateParams = isWhatsapp && selectedTemplate 
     ? Array.from(selectedTemplate.content.matchAll(/\{\{(\d+)\}\}/g)).map(m => m[1]) 
@@ -114,6 +139,9 @@ export function CreateBroadcastModal({ isOpen, onClose, clientId, fixedChannel }
     setStep(fixedChannel ? 'config' : 'channel');
     setShowTemplateManager(false);
     setShowProviderManager(false);
+    setHeaderMediaUrl('');
+    setBodyVarValues([]);
+    setUrlButtonValues([]);
   }, [fixedChannel]);
 
   useEffect(() => {
@@ -141,6 +169,10 @@ export function CreateBroadcastModal({ isOpen, onClose, clientId, fixedChannel }
       if (!isTelegram && !templateId) { setError('Message template is required'); return; }
       if (isTelegram && !integrationId) { setError('Telegram bot is required'); return; }
       if (isTelegram && !message.trim()) { setError('Message content is required'); return; }
+      // WhatsApp dynamic params validation
+      if (isWhatsapp && hasMediaHeader && !headerMediaUrl.trim()) {
+        setError(`A public ${headerFormat?.toLowerCase()} URL is required for this template's header.`); return;
+      }
       setStep('audience');
     } else if (step === 'audience') {
       if (recipientMode === 'manual') {
@@ -179,6 +211,34 @@ export function CreateBroadcastModal({ isOpen, onClose, clientId, fixedChannel }
       }
 
       try {
+        // Build templateParams for WhatsApp advanced templates
+        const builtTemplateParams: TemplateParamComponent[] = [];
+        if (isWhatsapp && selectedTemplate?.components) {
+          if (hasMediaHeader && headerMediaUrl.trim()) {
+            const mediaType = headerFormat === 'VIDEO' ? 'video' : headerFormat === 'DOCUMENT' ? 'document' : 'image';
+            builtTemplateParams.push({
+              type: 'header',
+              parameters: [{ type: mediaType as any, [mediaType]: { link: headerMediaUrl.trim() } } as any],
+            });
+          }
+          if (bodyVarCount > 0 && bodyVarValues.some(v => v.trim())) {
+            builtTemplateParams.push({
+              type: 'body',
+              parameters: bodyVarValues.map(v => ({ type: 'text' as const, text: v.trim() })),
+            });
+          }
+          urlButtons.forEach((_, i) => {
+            if (urlButtonValues[i]?.trim()) {
+              builtTemplateParams.push({
+                type: 'button',
+                sub_type: 'url',
+                index: String(i),
+                parameters: [{ type: 'text', text: urlButtonValues[i].trim() }],
+              });
+            }
+          });
+        }
+
         await createManual.mutateAsync({
           name: name.trim(),
           channel,
@@ -188,6 +248,7 @@ export function CreateBroadcastModal({ isOpen, onClose, clientId, fixedChannel }
             ? { message: message.trim() }
             : { templateId: templateId!, ...(isEmail ? { subject: subject.trim() } : {}) }),
           recipients,
+          ...(builtTemplateParams.length > 0 ? { templateParams: builtTemplateParams } : {}),
         });
         onClose();
         resetForm();
@@ -551,6 +612,72 @@ export function CreateBroadcastModal({ isOpen, onClose, clientId, fixedChannel }
                   </div>
                 )}
               </div>
+
+              {isWhatsapp && selectedTemplate?.components && (
+                <div className="space-y-4 animate-in fade-in duration-500">
+                  {/* Image/Video/Document Header */}
+                  {hasMediaHeader && (
+                    <div className="space-y-2 p-4 rounded-xl border border-zinc-200 bg-zinc-50/50 shadow-sm">
+                      <label className="text-xs font-semibold text-zinc-600 flex items-center gap-1.5">
+                        <Upload className="w-3.5 h-3.5" />
+                        {headerFormat === 'IMAGE' ? 'Header Image' : headerFormat === 'VIDEO' ? 'Header Video' : 'Header Document'} URL
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        placeholder={`Paste public ${headerFormat?.toLowerCase()} URL (e.g. https://example.com/image.jpg)`}
+                        value={headerMediaUrl}
+                        onChange={e => setHeaderMediaUrl(e.target.value)}
+                        className="h-10 rounded-lg border-zinc-200 bg-white focus:ring-1 focus:ring-zinc-900 focus:border-zinc-900 text-sm font-medium transition-all shadow-sm"
+                      />
+                      <p className="text-[10px] text-zinc-500 px-1">Must be a publicly accessible URL. Meta will fetch this at send time.</p>
+                    </div>
+                  )}
+
+                  {/* Body Variables */}
+                  {bodyVarCount > 0 && (
+                    <div className="space-y-3 p-4 rounded-xl border border-zinc-200 bg-zinc-50/50 shadow-sm">
+                      <h4 className="text-xs font-semibold text-zinc-600">Body Variables</h4>
+                      {Array.from({ length: bodyVarCount }, (_, i) => (
+                        <div key={i} className="flex items-center gap-3">
+                          <span className="text-xs font-mono w-10 text-zinc-500 shrink-0">{`{{${i + 1}}}`}</span>
+                          <Input
+                            placeholder={`Value for {{${i + 1}}}`}
+                            value={bodyVarValues[i] || ''}
+                            onChange={e => {
+                              const next = [...bodyVarValues];
+                              next[i] = e.target.value;
+                              setBodyVarValues(next);
+                            }}
+                            className="h-9 rounded-lg border-zinc-200 bg-white focus:ring-1 focus:ring-zinc-900 focus:border-zinc-900 text-sm flex-1"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Dynamic URL Buttons */}
+                  {urlButtons.length > 0 && (
+                    <div className="space-y-3 p-4 rounded-xl border border-zinc-200 bg-zinc-50/50 shadow-sm">
+                      <h4 className="text-xs font-semibold text-zinc-600">Dynamic Button URL Suffix</h4>
+                      {urlButtons.map((btn, i) => (
+                        <div key={i} className="flex items-center gap-3">
+                          <span className="text-xs text-zinc-500 shrink-0 max-w-[120px] truncate" title={btn.text}>{btn.text}</span>
+                          <Input
+                            placeholder="e.g. promo_code_123"
+                            value={urlButtonValues[i] || ''}
+                            onChange={e => {
+                              const next = [...urlButtonValues];
+                              next[i] = e.target.value;
+                              setUrlButtonValues(next);
+                            }}
+                            className="h-9 rounded-lg border-zinc-200 bg-white focus:ring-1 focus:ring-zinc-900 focus:border-zinc-900 text-sm flex-1"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {isTelegram && (
                 <div className="space-y-2 animate-in fade-in duration-500">

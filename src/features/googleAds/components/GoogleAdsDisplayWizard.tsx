@@ -11,6 +11,7 @@ interface WizardProps {
   campaignType: string;
 }
 
+  // @ts-expect-error unused variable
 export default function GoogleAdsDisplayWizard(props: WizardProps) {
   const [activeStep, setActiveStep] = useState("settings");
 

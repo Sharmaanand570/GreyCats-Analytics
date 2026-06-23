@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronUp, ChevronDown, HelpCircle, Plus, Smartphone, Share2, ThumbsUp, ThumbsDown, MessageSquare, PlusCircle } from "lucide-react";
+import { useCampaignWizardContext } from "../context/CampaignWizardContext";
+import { uploadAssetBinary } from "../API/campaignManagementApi";
 
 export default function GoogleAdsDemandGenAdStep() {
   const [openSections, setOpenSections] = useState({
@@ -10,6 +12,71 @@ export default function GoogleAdsDemandGenAdStep() {
     text: true,
     assetOpt: true,
   });
+
+  const { payload, updatePayload } = useCampaignWizardContext();
+
+  const initialHeadline = payload.assets?.find(a => a.type === "HEADLINE")?.text || "";
+  const initialDescription = payload.assets?.find(a => a.type === "DESCRIPTION")?.text || "";
+
+  const [headline] = useState(initialHeadline);
+  const [description] = useState(initialDescription);
+  const [cta] = useState("Learn More");
+  const [audiences] = useState<any[]>(payload.adGroups?.[0]?.audienceSignals || []);
+
+  const [assets, setAssets] = useState<any[]>(payload.assets || []);
+  const [imageIds, setImageIds] = useState<string[]>([]);
+  const [logoIds, setLogoIds] = useState<string[]>([]);
+  const [videoIds, setVideoIds] = useState<string[]>([]);
+
+  const handleAssetUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await uploadAssetBinary(payload.clientId || 1, formData);
+      if (res && res.success) {
+        setAssets(prev => [...prev, {
+          assetId: res.assetId,
+          assetType: type,
+          assetName: file.name,
+          previewUrl: res.assetUrl
+        }]);
+
+        if (type === "IMAGE") setImageIds(prev => [...prev, res.assetId]);
+        if (type === "LOGO") setLogoIds(prev => [...prev, res.assetId]);
+        if (type === "VIDEO") setVideoIds(prev => [...prev, res.assetId]);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    updatePayload({
+      adGroups: [
+        {
+          name: "Demand Gen Ad Group",
+          audienceSignals: audiences
+        }
+      ] as any,
+      ads: [
+        {
+          type: "DEMAND_GEN_AD",
+          finalUrls: ["https://example.com"],
+          demandGenAd: {
+            headlines: headline ? [headline] : [],
+            descriptions: description ? [description] : [],
+            callToAction: cta,
+            images: imageIds,
+            logos: logoIds,
+            videos: videoIds
+          }
+        }
+      ],
+      assets: assets
+    } as any);
+  }, [headline, description, cta, audiences, imageIds, logoIds, videoIds, assets, updatePayload]);
 
   const toggleSection = (section: keyof typeof openSections) => {
     setOpenSections((prev) => ({
@@ -104,6 +171,22 @@ export default function GoogleAdsDemandGenAdStep() {
           {openSections.media && (
             <div className="p-6 flex flex-col gap-6">
               
+              {/* Images */}
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <div className="text-[13px] font-medium text-slate-800">Images</div>
+                  <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
+                </div>
+                <div className="text-[11px] text-slate-500 mb-3">Add up to 20 images</div>
+                <label className="flex items-center gap-1 text-[13px] font-medium text-blue-600 hover:text-blue-700 cursor-pointer w-max mb-1">
+                  <Plus className="w-4 h-4" /> Add
+                  <input type="file" className="hidden" accept="image/*" onChange={(e) => handleAssetUpload(e, "IMAGE")} />
+                </label>
+                <div className="text-[11px] text-red-600">Required</div>
+              </div>
+
+              <div className="border-t border-slate-100"></div>
+
               {/* Videos */}
               <div>
                 <div className="flex items-center gap-1 mb-1">
@@ -119,9 +202,10 @@ export default function GoogleAdsDemandGenAdStep() {
                 <div className="text-[11px] text-red-600 mb-3">Required</div>
 
                 <div className="flex items-center gap-6">
-                  <button className="flex items-center gap-1 text-[13px] font-medium text-blue-600 hover:text-blue-700">
+                  <label className="flex items-center gap-1 text-[13px] font-medium text-blue-600 hover:text-blue-700 cursor-pointer">
                     <Plus className="w-4 h-4" /> Add
-                  </button>
+                    <input type="file" className="hidden" accept="video/*" onChange={(e) => handleAssetUpload(e, "VIDEO")} />
+                  </label>
                   <button className="flex items-center gap-1 text-[13px] font-medium text-blue-600 hover:text-blue-700">
                     <Plus className="w-4 h-4" /> Create video <span className="bg-blue-50 text-blue-700 border border-blue-200 rounded px-1 text-[10px] uppercase font-bold ml-1">Beta</span>
                   </button>
@@ -138,9 +222,10 @@ export default function GoogleAdsDemandGenAdStep() {
                 </div>
                 <div className="text-[11px] text-slate-500 mb-3">Add a logo</div>
                 
-                <button className="flex items-center gap-1 text-[13px] font-medium text-blue-600 hover:text-blue-700 mb-1">
+                <label className="flex items-center gap-1 text-[13px] font-medium text-blue-600 hover:text-blue-700 mb-1 cursor-pointer w-max">
                   <Plus className="w-4 h-4" /> Add
-                </button>
+                  <input type="file" className="hidden" accept="image/*" onChange={(e) => handleAssetUpload(e, "LOGO")} />
+                </label>
                 <div className="text-[11px] text-red-600">Required</div>
               </div>
 
