@@ -7,6 +7,9 @@
       "Bash(node -e \"const pkg = require\\(''./node_modules/react-icons/package.json''\\); console.log\\(''react-icons version:'', pkg.version\\)\")",
       "Bash(node -e \":*)",
       "Bash(node -e \"const {SiGoogleads} = require\\(''./node_modules/react-icons/si/index.js''\\); console.log\\(''SiGoogleads:'', typeof SiGoogleads\\);\")"
+    ],
+    "additionalDirectories": [
+      "c:\\greycats\\greycats-analytics\\Greycats-Analysis--main\\src\\services\\googleAds"
     ]
   }
 }
