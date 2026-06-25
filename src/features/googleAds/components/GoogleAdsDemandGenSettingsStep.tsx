@@ -1,12 +1,38 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronUp, ChevronDown, TriangleAlert } from "lucide-react";
+import { useCampaignWizardContext } from "../context/CampaignWizardContext";
 
 interface DemandGenSettingsProps {
   campaignGoal: string;
   onCampaignGoalChange: (goal: string) => void;
 }
 
+const GOAL_FOCUS: Record<string, "CONVERSIONS" | "CONVERSION_VALUE" | "CLICKS"> = {
+  conversions: "CONVERSIONS",
+  conversion_value: "CONVERSION_VALUE",
+  clicks: "CLICKS",
+  youtube: "CONVERSIONS",
+};
+
 export default function GoogleAdsDemandGenSettingsStep({ campaignGoal, onCampaignGoalChange }: DemandGenSettingsProps) {
+  const { payload, updatePayload } = useCampaignWizardContext();
+  const [campaignName, setCampaignName] = useState(payload.name || "Demand Gen - 2026-06-22");
+  const [budgetAmount, setBudgetAmount] = useState(payload.budgetAmount ? String(payload.budgetAmount) : "");
+  const [setTargetEnabled, setSetTargetEnabled] = useState(!!payload.targetCpa);
+  const [targetAmount, setTargetAmount] = useState(payload.targetCpa ? String(payload.targetCpa) : "");
+  const [onlyNewCustomers, setOnlyNewCustomers] = useState(!!payload.onlyNewCustomers);
+
+  useEffect(() => {
+    updatePayload({
+      name: campaignName,
+      budgetAmount: parseFloat(budgetAmount) || 0,
+      budgetType: "DAILY",
+      biddingFocus: GOAL_FOCUS[campaignGoal] || "CONVERSIONS",
+      targetCpa: setTargetEnabled ? parseFloat(targetAmount) || undefined : undefined,
+      onlyNewCustomers,
+    });
+  }, [campaignName, budgetAmount, campaignGoal, setTargetEnabled, targetAmount, onlyNewCustomers, updatePayload]);
+
   const [openSections, setOpenSections] = useState({
     viewThrough: true,
     targetCpa: true,
@@ -36,12 +62,13 @@ export default function GoogleAdsDemandGenSettingsStep({ campaignGoal, onCampaig
            <ChevronUp className="w-5 h-5 text-slate-500" />
         </div>
         <div className="p-6">
-           <input 
-             type="text" 
-             defaultValue="Demand Gen - 2026-06-22"
+           <input
+             type="text"
+             value={campaignName}
+             onChange={(e) => setCampaignName(e.target.value)}
              className="w-full border border-slate-300 rounded px-3 py-2 text-[13px] text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
            />
-           <div className="text-[11px] text-slate-400 text-right mt-1">23 / 250</div>
+           <div className="text-[11px] text-slate-400 text-right mt-1">{campaignName.length} / 250</div>
         </div>
       </div>
 
@@ -285,11 +312,29 @@ export default function GoogleAdsDemandGenSettingsStep({ campaignGoal, onCampaig
                 }
               </div>
               <label className="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" className="w-4 h-4 rounded text-blue-600" />
+                <input
+                  type="checkbox"
+                  checked={setTargetEnabled}
+                  onChange={(e) => setSetTargetEnabled(e.target.checked)}
+                  className="w-4 h-4 rounded text-blue-600"
+                />
                 <span className="text-[13px] text-slate-800">
                   {campaignGoal === 'clicks' ? 'Set a target cost per click (optional)' : 'Set a target cost per action (optional)'}
                 </span>
               </label>
+              {setTargetEnabled && (
+                <div className="mt-3 ml-7 flex items-center border border-slate-300 rounded overflow-hidden w-[180px]">
+                  <span className="px-3 text-slate-500 bg-slate-50 border-r border-slate-200">₹</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={targetAmount}
+                    onChange={(e) => setTargetAmount(e.target.value)}
+                    placeholder={campaignGoal === 'clicks' ? 'Target CPC' : 'Target CPA'}
+                    className="px-3 py-2 w-full outline-none text-[13px]"
+                  />
+                </div>
+              )}
             </div>
             <div className="w-[200px] shrink-0 border-l border-slate-200 pl-6 text-[12px] text-slate-500 leading-relaxed">
               {campaignGoal === 'clicks'
@@ -321,11 +366,17 @@ export default function GoogleAdsDemandGenSettingsStep({ campaignGoal, onCampaig
                     </select>
                   </div>
                   <div className="flex flex-col relative">
-                    <div className="flex items-center border border-red-500 rounded overflow-hidden shadow-sm">
+                    <div className={`flex items-center border rounded overflow-hidden shadow-sm ${budgetAmount ? 'border-slate-300' : 'border-red-500'}`}>
                       <span className="px-3 text-slate-500 bg-slate-50 border-r border-slate-200">₹</span>
-                      <input type="text" className="px-3 py-2 w-[160px] outline-none text-[13px]" />
+                      <input
+                        type="number"
+                        min="0"
+                        value={budgetAmount}
+                        onChange={(e) => setBudgetAmount(e.target.value)}
+                        className="px-3 py-2 w-[160px] outline-none text-[13px]"
+                      />
                     </div>
-                    <div className="text-[11px] text-red-500 absolute -bottom-5">Required</div>
+                    {!budgetAmount && <div className="text-[11px] text-red-500 absolute -bottom-5">Required</div>}
                   </div>
                 </div>
               </div>
@@ -355,7 +406,12 @@ export default function GoogleAdsDemandGenSettingsStep({ campaignGoal, onCampaig
           <div className="p-6 flex gap-8">
             <div className="flex-1">
               <label className="flex items-start gap-3 cursor-pointer">
-                <input type="checkbox" className="mt-1 w-4 h-4 rounded text-blue-600" />
+                <input
+                  type="checkbox"
+                  checked={onlyNewCustomers}
+                  onChange={(e) => setOnlyNewCustomers(e.target.checked)}
+                  className="mt-1 w-4 h-4 rounded text-blue-600"
+                />
                 <div>
                   <div className="text-[13px] font-medium text-slate-800">Only bid for new customers</div>
                   <div className="text-[12px] text-slate-500">Your campaign will be limited to only new customers, regardless of your bid strategy</div>

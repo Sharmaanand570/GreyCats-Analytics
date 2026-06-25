@@ -64,6 +64,14 @@ export interface CreateCampaignPayload {
   biddingFocus?: "CONVERSIONS" | "CONVERSION_VALUE" | "CLICKS" | "IMPRESSION_SHARE";
   targetCpa?: number;
   targetRoas?: number;
+  targetCpv?: number;
+  targetCpm?: number;
+  maxCpcBidLimit?: number;
+  targetImpressionShare?: {
+    location: "ANYWHERE_ON_PAGE" | "TOP_OF_PAGE" | "ABSOLUTE_TOP_OF_PAGE";
+    locationFractionMicros: number;
+    cpcBidCeilingMicros?: number;
+  };
   biddingStrategyId?: string;
   onlyNewCustomers?: boolean;
   networks?: {
@@ -73,11 +81,30 @@ export interface CreateCampaignPayload {
   locations?: {
     type: "ALL" | "US_CA" | "OTHER";
     specificLocations?: string[];
+    /** Google geo target constant IDs (criterion IDs) to target. Sent on publish. */
+    geoTargetConstantIds?: string[];
+    /** Geo target constant IDs to exclude. */
+    excludedGeoTargetConstantIds?: string[];
+    /** Display names keyed by geo id, for re-rendering selected chips. */
+    geoTargetNames?: Record<string, string>;
+    preset?: "PRESENCE_OR_INTEREST" | "PRESENCE_ONLY";
   };
   languages?: string[];
   euPolitical?: boolean;
   startDate?: string;
   endDate?: string;
+  adSchedule?: any[];
+  devices?: { type: string; bidModifier?: number }[];
+  trackingUrlTemplate?: string;
+  finalUrlSuffix?: string;
+  assetExtensions?: {
+    sitelinks?: { text: string; description1?: string; description2?: string; finalUrl: string }[];
+    callouts?: { text: string }[];
+    structuredSnippets?: { header: string; values: string[] }[];
+    calls?: { countryCode: string; phoneNumber: string; conversionAction?: string }[];
+  };
+  merchantId?: string;
+  salesCountry?: string;
   objective?: string;
   // Previously UI Only - Now Part of the Published Payload
   appSubtype?: "installs" | "engagement" | "prereg";
@@ -91,6 +118,30 @@ export interface CreateCampaignPayload {
   localGoal?: "contact" | "directions";
   sharedBudgetId?: string;
   finalUrlExpansion?: boolean;
+  // Campaign Settings: More Settings
+  adRotation?: "OPTIMIZE" | "DO_NOT_OPTIMIZE";
+  dynamicSearchAds?: {
+    domain: string;
+    language: string;
+    targetingSource: "WEBSITE" | "FEED" | "BOTH";
+  };
+  brandRestrictions?: string[]; // brand names to restrict broad match on
+  // Campaign Settings: Keywords & ACA
+  broadMatchEnabled?: boolean;
+  automaticallyCreatedAssets?: {
+    textEnabled: boolean;
+    finalUrlExpansionEnabled: boolean;
+    excludedUrls?: string[];
+  };
+  // Bidding: Customer Acquisition
+  customerAcquisitionAudienceId?: string;
+  // Phase 1: Ways to reach your goal
+  reachGoalDetails?: {
+    website?: string;
+    phone?: string;
+    app?: string;
+    store?: string;
+  };
 }
 
 export interface CampaignMetrics {
@@ -302,6 +353,8 @@ export interface Ad {
   policyTopics?: string[];
   responsiveSearchAd?: ResponsiveSearchAdInfo;
   videoAd?: any;
+  trackingUrlTemplate?: string;
+  finalUrlSuffix?: string;
   metrics: AdMetrics;
 }
 

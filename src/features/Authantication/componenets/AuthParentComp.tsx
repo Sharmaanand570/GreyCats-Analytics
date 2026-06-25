@@ -32,7 +32,7 @@ function AuthParentComp(): React.JSX.Element | null {
     // Pages that should redirect already-logged-in users away (auth-only pages)
     const authRedirectPaths = ["/auth/login", "/auth/signup", "/signup", "//signup", "/auth/forgot-password"];
 
-    const isPublic = allPublicPaths.includes(location.pathname);
+    const isPublic = allPublicPaths.includes(location.pathname) || location.pathname.startsWith("/docs");
     const isAuthOnlyPage = authRedirectPaths.includes(location.pathname);
 
     if (!authed && !isPublic) {

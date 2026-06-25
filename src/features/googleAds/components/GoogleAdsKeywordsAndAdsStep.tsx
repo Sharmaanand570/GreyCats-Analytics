@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
-import { ChevronUp, ChevronDown, Link, List, HelpCircle, Image as ImageIcon, Plus, CheckCircle2, MessageSquareText, Search, Phone, TriangleAlert, Pencil } from "lucide-react";
+import { ChevronUp, ChevronDown, Link, List, HelpCircle, Image as ImageIcon, Plus, CheckCircle2, MessageSquareText, Search, Phone, TriangleAlert, Pencil, Pin, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { useCampaignWizardContext } from "../context/CampaignWizardContext";
+import { useKeywordIdeas } from "../hooks/useCampaignLookups";
 
 interface KeywordsAndAdsStepProps {
   onNext: () => void;
@@ -19,15 +21,60 @@ export default function GoogleAdsKeywordsAndAdsStep({ onNext }: KeywordsAndAdsSt
   const [isCreatingAd, setIsCreatingAd] = useState(false);
   const [adGroupName, setAdGroupName] = useState(payload.adGroups?.[0]?.name || "Ad Group 1");
   const [headlines, setHeadlines] = useState<string[]>(Array.from({ length: 8 }, (_, i) => initialHeadlines[i] || ""));
+  const [headlinePins, setHeadlinePins] = useState<string[]>(Array.from({ length: 8 }, (_, i) => rsa?.headlines?.[i]?.pinnedField || "UNSPECIFIED"));
   const [descriptions, setDescriptions] = useState<string[]>(Array.from({ length: 4 }, (_, i) => initialDescriptions[i] || ""));
+  const [descriptionPins, setDescriptionPins] = useState<string[]>(Array.from({ length: 4 }, (_, i) => rsa?.descriptions?.[i]?.pinnedField || "UNSPECIFIED"));
   const [finalUrl, setFinalUrl] = useState(payload.ads?.[0]?.finalUrls?.[0] || "");
   const [path1, setPath1] = useState(rsa?.path1 || "");
   const [path2, setPath2] = useState(rsa?.path2 || "");
+  const [adTrackingTemplate, setAdTrackingTemplate] = useState<string>(payload.ads?.[0]?.trackingUrlTemplate || "");
+  const [adFinalUrlSuffix, setAdFinalUrlSuffix] = useState<string>(payload.ads?.[0]?.finalUrlSuffix || "");
   const [keywordsText, setKeywordsText] = useState(posKeywords.map(k => k.text).join("\n"));
   const [negativeKeywordsText, setNegativeKeywordsText] = useState(negKeywords.map(k => k.text).join("\n"));
   const [keywordMatchType, setKeywordMatchType] = useState<"BROAD" | "PHRASE" | "EXACT">(
     (posKeywords[0]?.matchType as any) || "BROAD"
   );
+
+  // Keyword suggestion inputs (Google Ads keyword ideas)
+  const [kwSeedUrl, setKwSeedUrl] = useState("");
+  const [kwSeedProducts, setKwSeedProducts] = useState("");
+  const keywordIdeas = useKeywordIdeas();
+
+  const handleGetKeywordSuggestions = () => {
+    if (!kwSeedUrl.trim() && !kwSeedProducts.trim()) {
+      toast.error("Enter a URL or products/services to get suggestions");
+      return;
+    }
+    keywordIdeas.mutate(
+      {
+        payload: {
+          url: kwSeedUrl.trim() || undefined,
+          description: kwSeedProducts.trim() || undefined,
+        },
+        params: { clientId: payload.clientId || 1 },
+      },
+      {
+        onSuccess: (ideas) => {
+          if (!ideas.length) {
+            toast.info("No keyword ideas found for that input");
+            return;
+          }
+          const existing = new Set(
+            keywordsText.split(/[\n,]+/).map((k) => k.trim().toLowerCase()).filter(Boolean)
+          );
+          const additions = ideas
+            .map((i) => i.text.trim())
+            .filter((t) => t && !existing.has(t.toLowerCase()));
+          if (!additions.length) {
+            toast.info("Those keyword ideas are already in your list");
+            return;
+          }
+          setKeywordsText((prev) => (prev.trim() ? `${prev.trim()}\n${additions.join("\n")}` : additions.join("\n")));
+          toast.success(`Added ${additions.length} keyword idea${additions.length === 1 ? "" : "s"}`);
+        },
+      }
+    );
+  };
 
   // Validation
   const filledHeadlinesCount = headlines.filter(h => h.trim().length > 0).length;
@@ -65,16 +112,18 @@ export default function GoogleAdsKeywordsAndAdsStep({ onNext }: KeywordsAndAdsSt
         {
           type: "RESPONSIVE_SEARCH_AD",
           finalUrls: finalUrl ? [finalUrl] : [],
+          trackingUrlTemplate: adTrackingTemplate || undefined,
+          finalUrlSuffix: adFinalUrlSuffix || undefined,
           responsiveSearchAd: {
-            headlines: headlines.filter(h => h.trim().length > 0).map(text => ({ text, assetId: "" })) as any,
-            descriptions: descriptions.filter(d => d.trim().length > 0).map(text => ({ text, assetId: "" })) as any,
+            headlines: headlines.filter(h => h.trim().length > 0).map((text, i) => ({ text, assetId: "", pinnedField: headlinePins[i] || "UNSPECIFIED" })) as any,
+            descriptions: descriptions.filter(d => d.trim().length > 0).map((text, i) => ({ text, assetId: "", pinnedField: descriptionPins[i] || "UNSPECIFIED" })) as any,
             path1,
             path2
           }
         }
       ]
     });
-  }, [keywordsText, negativeKeywordsText, keywordMatchType, headlines, descriptions, finalUrl, path1, path2, adGroupName, updatePayload]);
+  }, [keywordsText, negativeKeywordsText, keywordMatchType, headlines, headlinePins, descriptions, descriptionPins, finalUrl, path1, path2, adGroupName, adTrackingTemplate, adFinalUrlSuffix, updatePayload]);
   
   return (
     <div className="flex flex-col h-full w-full max-w-[1200px]">
@@ -132,9 +181,11 @@ export default function GoogleAdsKeywordsAndAdsStep({ onNext }: KeywordsAndAdsSt
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <Link className="h-4 w-4 text-slate-400" />
                       </div>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         placeholder="Final URL"
+                        value={kwSeedUrl}
+                        onChange={(e) => setKwSeedUrl(e.target.value)}
                         className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-md text-[13px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
@@ -142,17 +193,24 @@ export default function GoogleAdsKeywordsAndAdsStep({ onNext }: KeywordsAndAdsSt
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <List className="h-4 w-4 text-slate-400" />
                       </div>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         placeholder="Enter products or services to advertise"
+                        value={kwSeedProducts}
+                        onChange={(e) => setKwSeedProducts(e.target.value)}
                         className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-md text-[13px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
                   </div>
-                  
+
                   <div className="mt-3">
-                    <button className="text-[13px] text-slate-400 font-medium cursor-not-allowed">
-                      Get keyword suggestions
+                    <button
+                      onClick={handleGetKeywordSuggestions}
+                      disabled={keywordIdeas.isPending || (!kwSeedUrl.trim() && !kwSeedProducts.trim())}
+                      className="text-[13px] font-medium text-blue-600 hover:underline disabled:text-slate-400 disabled:no-underline disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+                    >
+                      {keywordIdeas.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      {keywordIdeas.isPending ? "Getting suggestions…" : "Get keyword suggestions"}
                     </button>
                   </div>
                 </div>
@@ -355,18 +413,34 @@ export default function GoogleAdsKeywordsAndAdsStep({ onNext }: KeywordsAndAdsSt
                            <div className="flex flex-col gap-1">
                              {[...Array(8)].map((_, i) => (
                                <div key={i}>
-                                 <input
-                                   type="text"
-                                   value={headlines[i]}
-                                   maxLength={30}
-                                   onChange={(e) => {
-                                     const newH = [...headlines];
-                                     newH[i] = e.target.value;
-                                     setHeadlines(newH);
-                                   }}
-                                   placeholder="Headline"
-                                   className="block w-full px-3 py-2 border border-slate-300 rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                 />
+                                 <div className="relative">
+                                   <input
+                                     type="text"
+                                     value={headlines[i]}
+                                     maxLength={30}
+                                     onChange={(e) => {
+                                       const newH = [...headlines];
+                                       newH[i] = e.target.value;
+                                       setHeadlines(newH);
+                                     }}
+                                     placeholder="Headline"
+                                     className="block w-full pl-3 pr-8 py-2 border border-slate-300 rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                   />
+                                   <button 
+                                     className="absolute right-2 top-2 p-0.5 hover:bg-slate-100 rounded text-slate-400 focus:outline-none"
+                                     onClick={(e) => {
+                                       e.preventDefault();
+                                       const newPins = [...headlinePins];
+                                       const cur = newPins[i] || "UNSPECIFIED";
+                                       newPins[i] = cur === "UNSPECIFIED" ? "POSITION_1" : (cur === "POSITION_1" ? "POSITION_2" : (cur === "POSITION_2" ? "POSITION_3" : "UNSPECIFIED"));
+                                       setHeadlinePins(newPins);
+                                     }}
+                                     title={`Pin position: ${headlinePins[i] || 'Unpinned'}`}
+                                   >
+                                     <Pin className={`w-3.5 h-3.5 ${headlinePins[i] && headlinePins[i] !== "UNSPECIFIED" ? 'text-blue-600 fill-blue-600' : ''}`} />
+                                     {headlinePins[i] && headlinePins[i] !== "UNSPECIFIED" ? <span className="absolute -bottom-1 -right-1 text-[9px] bg-blue-100 text-blue-700 rounded-full w-3 h-3 flex items-center justify-center font-bold">{headlinePins[i].replace("POSITION_", "")}</span> : null}
+                                   </button>
+                                 </div>
                                  <div className="flex justify-between text-[10px] text-slate-400 mt-0.5 px-0.5">
                                    {i < 3 ? <span className={headlines[i] ? "text-slate-500" : "text-[#c5221f]"}>Required</span> : <span />}
                                    <span className={headlines[i].length > 30 ? "text-[#c5221f]" : "text-slate-400"}>{headlines[i].length} / 30</span>
@@ -393,18 +467,34 @@ export default function GoogleAdsKeywordsAndAdsStep({ onNext }: KeywordsAndAdsSt
                          <div className="flex flex-col gap-1">
                            {[0, 1, 2, 3].map((i) => (
                              <div key={i}>
-                               <input
-                                 type="text"
-                                 value={descriptions[i]}
-                                 maxLength={90}
-                                 onChange={(e) => {
-                                   const newD = [...descriptions];
-                                   newD[i] = e.target.value;
-                                   setDescriptions(newD);
-                                 }}
-                                 placeholder="Description"
-                                 className="block w-full px-3 py-2 border border-slate-300 rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-blue-500"
-                               />
+                               <div className="relative">
+                                  <input
+                                    type="text"
+                                    value={descriptions[i]}
+                                    maxLength={90}
+                                    onChange={(e) => {
+                                      const newD = [...descriptions];
+                                      newD[i] = e.target.value;
+                                      setDescriptions(newD);
+                                    }}
+                                    placeholder="Description"
+                                    className="block w-full pl-3 pr-8 py-2 border border-slate-300 rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  />
+                                  <button 
+                                    className="absolute right-2 top-2 p-0.5 hover:bg-slate-100 rounded text-slate-400 focus:outline-none"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      const newPins = [...descriptionPins];
+                                      const cur = newPins[i] || "UNSPECIFIED";
+                                      newPins[i] = cur === "UNSPECIFIED" ? "POSITION_1" : (cur === "POSITION_1" ? "POSITION_2" : "UNSPECIFIED");
+                                      setDescriptionPins(newPins);
+                                    }}
+                                    title={`Pin position: ${descriptionPins[i] || 'Unpinned'}`}
+                                  >
+                                    <Pin className={`w-3.5 h-3.5 ${descriptionPins[i] && descriptionPins[i] !== "UNSPECIFIED" ? 'text-blue-600 fill-blue-600' : ''}`} />
+                                    {descriptionPins[i] && descriptionPins[i] !== "UNSPECIFIED" ? <span className="absolute -bottom-1 -right-1 text-[9px] bg-blue-100 text-blue-700 rounded-full w-3 h-3 flex items-center justify-center font-bold">{descriptionPins[i].replace("POSITION_", "")}</span> : null}
+                                  </button>
+                                </div>
                                <div className="flex justify-between text-[10px] text-slate-400 mt-0.5 px-0.5">
                                  {i < 2 ? <span className={descriptions[i] ? "text-slate-500" : "text-[#c5221f]"}>Required</span> : <span />}
                                  <span className={descriptions[i].length > 90 ? "text-[#c5221f]" : "text-slate-400"}>{descriptions[i].length} / 90</span>
@@ -415,6 +505,36 @@ export default function GoogleAdsKeywordsAndAdsStep({ onNext }: KeywordsAndAdsSt
                          <button className="text-[13px] text-blue-600 font-medium flex items-center gap-1 hover:underline mt-3">
                            <Plus className="w-4 h-4" /> Description
                          </button>
+                      </div>
+
+                      {/* Ad URL Options Sub-panel */}
+                      <div className="bg-white border border-slate-200 rounded-md p-4">
+                        <div className="flex justify-between items-center mb-3">
+                          <h3 className="text-[14px] font-medium text-slate-800">Ad URL options</h3>
+                          <ChevronUp className="w-4 h-4 text-slate-500" />
+                        </div>
+                        <div className="flex flex-col gap-4">
+                          <div>
+                            <label className="text-[12px] font-medium text-slate-700 mb-1.5 block">Tracking template</label>
+                            <input
+                              type="text"
+                              value={adTrackingTemplate}
+                              onChange={(e) => setAdTrackingTemplate(e.target.value)}
+                              placeholder="e.g. https://www.tracking.com/?url={lpurl}&id=5"
+                              className="w-full border border-slate-300 rounded px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[12px] font-medium text-slate-700 mb-1.5 block">Final URL suffix</label>
+                            <input
+                              type="text"
+                              value={adFinalUrlSuffix}
+                              onChange={(e) => setAdFinalUrlSuffix(e.target.value)}
+                              placeholder="e.g. param1=value1&param2=value2"
+                              className="w-full border border-slate-300 rounded px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
+                        </div>
                       </div>
 
                       {/* Images Sub-panel */}

@@ -36,6 +36,7 @@ export default function GoogleAdsDashboardPage() {
   
   const [activeTab, setActiveTab] = useState<"overview" | "campaigns" | "audiences" | "assets" | "asset-groups" | "recommendations" | "conversions" | "reports" | "accounts" | "shared-library" | "shared-library-bid-strategies" | "shared-library-budgets" | "shared-library-placement-exclusions" | "billing" | "labels" | "change-history">("overview");
   const [currentView, setCurrentView] = useState<"dashboard" | "create">("dashboard");
+  const [draftIdToResume, setDraftIdToResume] = useState<string | null>(null);
 
   // If splat contains 'campaigns/', we should just render the detail page without the dashboard sidebar
   if (splat && splat.startsWith("campaigns/")) {
@@ -47,6 +48,12 @@ export default function GoogleAdsDashboardPage() {
   }
 
   const handleCreateCampaign = () => {
+    setDraftIdToResume(null);
+    setCurrentView("create");
+  };
+
+  const handleResumeDraft = (draftId: string) => {
+    setDraftIdToResume(draftId);
     setCurrentView("create");
   };
 
@@ -270,7 +277,7 @@ export default function GoogleAdsDashboardPage() {
               </div>
 
               <div className="flex-1 p-8 w-full mx-auto min-w-0 overflow-auto">
-                {activeTab === "overview" && <GoogleAdsOverview onCreateCampaign={handleCreateCampaign} />}
+                {activeTab === "overview" && <GoogleAdsOverview onCreateCampaign={handleCreateCampaign} onResumeDraft={handleResumeDraft} />}
                 {activeTab === "campaigns" && (
                    <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden h-[800px]">
                      <LiveCampaignsTable clientId={numericClientId} baseRoute={`/data-sources/google-ads/${numericClientId}`} />
@@ -353,11 +360,11 @@ export default function GoogleAdsDashboardPage() {
                 )}
               </div>
             </>
-          ) : (
-            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-              <GoogleAdsCreateCampaign onCancel={() => setCurrentView("dashboard")} />
-            </div>
-          )}
+        ) : (
+          <div className="flex-1 overflow-y-auto">
+            <GoogleAdsCreateCampaign onCancel={() => setCurrentView("dashboard")} initialDraftId={draftIdToResume} />
+          </div>
+        )}
           
         </main>
       </div>

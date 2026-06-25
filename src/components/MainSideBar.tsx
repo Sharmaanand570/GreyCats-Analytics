@@ -198,6 +198,9 @@ function MainSideBar(): React.JSX.Element {
     if (itemPath === '/seo-report') {
       return pathname.startsWith('/seo-report');
     }
+    if (itemPath === '/docs/general') {
+      return pathname.startsWith('/docs');
+    }
     if (itemPath === '/admin/dashboard') {
       return pathname.startsWith('/admin');
     }
@@ -329,7 +332,7 @@ function MainSideBar(): React.JSX.Element {
       isCollapsible: true,
       items: [
         { label: "Meta Ads", path: "/data-sources/meta-ads", icon: <Megaphone />, isComingSoon: true},
-        { label: "Google Ads", path: "/data-sources/google-ads", icon: <SiGoogleads className="w-[18px] h-[18px]" />, isComingSoon: true },
+        { label: "Google Ads", path: "/data-sources/google-ads", icon: <SiGoogleads className="w-[18px] h-[18px]" />, isComingSoon: false },
       ],
     }] : []),
     {
@@ -341,6 +344,7 @@ function MainSideBar(): React.JSX.Element {
           : []),
         { label: "Account Setup", path: "/account-setup", icon: <Settings /> },
         { label: "Billing", path: "/billing", icon: <CreditCard /> },
+        { label: "Documentation", path: "/docs/general", icon: <HelpCircle /> },
         { label: "Logout", path: "logout", icon: <LogOut /> },
       ],
     },

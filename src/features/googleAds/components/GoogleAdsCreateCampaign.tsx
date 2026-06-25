@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Tag, Users, MousePointerClick, Smartphone, 
   Volume2, MapPin, Settings, CheckCircle2, 
@@ -16,9 +16,10 @@ import GoogleAdsAppWizard from "./GoogleAdsAppWizard";
 import { CampaignWizardProvider, useCampaignWizardContext } from "../context/CampaignWizardContext";
 interface CreateCampaignProps {
   onCancel: () => void;
+  initialDraftId?: string | null;
 }
 
-function GoogleAdsCreateCampaignInner({ onCancel }: CreateCampaignProps) {
+function GoogleAdsCreateCampaignInner({ onCancel, initialDraftId }: CreateCampaignProps) {
   const [selectedObjective, setSelectedObjective] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [merchantCenterStatus, setMerchantCenterStatus] = useState<"no_account" | "linked">("no_account");
@@ -44,9 +45,26 @@ function GoogleAdsCreateCampaignInner({ onCancel }: CreateCampaignProps) {
     leads: true,
     messages: true,
   });
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
 
-  const { updatePayload, loadDraft } = useCampaignWizardContext();
+  const { updatePayload, loadDraft, payload } = useCampaignWizardContext();
   const selectedLocalDraftId = null;
+
+  useEffect(() => {
+    if (initialDraftId) {
+      loadDraft(initialDraftId).then(() => {
+        setWizardMode(true);
+      });
+    }
+  }, [initialDraftId]);
+
+  // Sync objective/type with payload
+  useEffect(() => {
+    if (payload.type) {
+      setCustomCampaignType(payload.type.toLowerCase());
+    }
+  }, [payload.type]);
 
   const conversionGoalsList = selectedObjective === "sales"
     ? [
@@ -1783,6 +1801,8 @@ function GoogleAdsCreateCampaignInner({ onCancel }: CreateCampaignProps) {
                         </div>
                         <input 
                           type="text" 
+                          value={websiteUrl}
+                          onChange={e => setWebsiteUrl(e.target.value)}
                           placeholder="Your business's website"
                           className="w-full border border-slate-300 rounded px-3 py-2 pl-9 text-[13px] text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                         />
@@ -1816,6 +1836,8 @@ function GoogleAdsCreateCampaignInner({ onCancel }: CreateCampaignProps) {
                           <div className="relative">
                             <input 
                               type="text" 
+                              value={phoneNumber}
+                              onChange={e => setPhoneNumber(e.target.value)}
                               placeholder="Phone number"
                               className="w-full border border-slate-300 rounded px-3 py-2 text-[13px] text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                             />
@@ -2142,7 +2164,15 @@ function GoogleAdsCreateCampaignInner({ onCancel }: CreateCampaignProps) {
               if (resumeDraft && selectedLocalDraftId) {
                 loadDraft(selectedLocalDraftId);
               } else {
-                updatePayload({ type: customCampaignType.toUpperCase() as any, objective: selectedObjective || undefined });
+                updatePayload({
+                  type: customCampaignType.toUpperCase() as any,
+                  objective: selectedObjective || undefined,
+                  reachGoals,
+                  reachGoalDetails: {
+                    website: reachGoals.website ? websiteUrl : undefined,
+                    phone: reachGoals.phone ? phoneNumber : undefined,
+                  },
+                });
               }
               setWizardMode(true);
             } else {

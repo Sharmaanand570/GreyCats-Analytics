@@ -19,13 +19,15 @@ import {
   Trash2,
   Users,
   UserPlus,
-  RefreshCcw
+  RefreshCcw,
+  XCircle
 } from 'lucide-react';
 import { SiTelegram, SiWhatsapp } from 'react-icons/si';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -33,7 +35,7 @@ import { useBroadcasts } from '@/features/broadcasts/hooks/useBroadcasts';
 import { CreateBroadcastModal } from '@/features/broadcasts/components/CreateBroadcastModal';
 import { TemplateManager } from '@/features/broadcasts/components/TemplateManager';
 import { ProviderManager } from '@/features/broadcasts/components/ProviderManager';
-import { useIntegrations, useTemplates } from '@/features/broadcasts/hooks/useBroadcasts';
+import { useIntegrations, useTemplates, useWhatsAppQuota, useBroadcastDetail } from '@/features/broadcasts/hooks/useBroadcasts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { useClientContext } from '@/context/ClientContext';
@@ -42,6 +44,7 @@ import { useTelegramTargets } from '@/features/blog/hooks/useBlogPosts';
 import { useCreateClient, useDeleteClient, useClient, useAllClients } from '../hooks/useClients';
 import { getProfileImageUrl } from '@/utils/imageUtils';
 import type { ClientWithIntegrations } from '@/types/client.types';
+
 
 const statusConfig = {
   PENDING: {
@@ -417,6 +420,8 @@ function StepWorkspace({
   const { data: templates } = useTemplates();
   const { data: telegramTargets = [] } = useTelegramTargets(client.id);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedBroadcastId, setSelectedBroadcastId] = useState<number | null>(null);
+  const { data: broadcastDetail, isLoading: isDetailLoading } = useBroadcastDetail(selectedBroadcastId);
   const [searchQuery, setSearchQuery] = useState('');
 
 
@@ -433,6 +438,11 @@ function StepWorkspace({
   const hasChannelIntegrations = channel.toUpperCase() === 'TELEGRAM'
     ? (telegramTargets && telegramTargets.length > 0)
     : integrations?.some(i => i.type.toUpperCase() === channel.toUpperCase());
+
+  // Only fetch WhatsApp quota if WhatsApp integration exists
+  const isWhatsApp = channel.toUpperCase() === 'WHATSAPP';
+  const hasWhatsAppIntegration = isWhatsApp && hasChannelIntegrations;
+  const { data: whatsappQuota } = useWhatsAppQuota(!!hasWhatsAppIntegration);
 
   const hasChannelTemplates = templates?.some(t => t.channel.toUpperCase() === channel.toUpperCase());
   
@@ -571,41 +581,62 @@ function StepWorkspace({
             <TabsContent value="campaigns" className="space-y-8 focus-visible:outline-none">
               {(totalCampaigns > 0 || isLoading) && (
                 <>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                <div className={cn("bg-white p-6 rounded-[28px] border shadow-sm transition-all duration-500 hover:shadow-xl", theme.borderColor, theme.glowShadow)}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center", theme.lightBg)}>
-                      <BarChart3 className={cn("w-5 h-5", theme.iconColor)} />
+                  <div className={cn("grid grid-cols-1 gap-6 mb-10", whatsappQuota ? "md:grid-cols-4" : "md:grid-cols-3")}>
+                    <div className={cn("bg-white p-6 rounded-[28px] border shadow-sm transition-all duration-500 hover:shadow-xl", theme.borderColor, theme.glowShadow)}>
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center", theme.lightBg)}>
+                          <BarChart3 className={cn("w-5 h-5", theme.iconColor)} />
+                        </div>
+                        <p className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Total Campaigns</p>
+                      </div>
+                      <p className="text-4xl font-extrabold text-zinc-900 tracking-tight">{filteredBroadcasts?.length || 0}</p>
                     </div>
-                    <p className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Total Campaigns</p>
-                  </div>
-                  <p className="text-4xl font-extrabold text-zinc-900 tracking-tight">{filteredBroadcasts?.length || 0}</p>
-                </div>
-                <div className={cn("bg-white p-6 rounded-[28px] border shadow-sm transition-all duration-500 hover:shadow-xl", theme.borderColor, theme.glowShadow)}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center", theme.lightBg)}>
-                      <CheckCircle2 className={cn("w-5 h-5", theme.iconColor)} />
+                    <div className={cn("bg-white p-6 rounded-[28px] border shadow-sm transition-all duration-500 hover:shadow-xl", theme.borderColor, theme.glowShadow)}>
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center", theme.lightBg)}>
+                          <CheckCircle2 className={cn("w-5 h-5", theme.iconColor)} />
+                        </div>
+                        <p className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Messages Sent</p>
+                      </div>
+                      <p className="text-4xl font-extrabold text-zinc-900 tracking-tight">
+                        {filteredBroadcasts?.reduce((acc, b) => acc + b.sentCount, 0).toLocaleString() || 0}
+                      </p>
                     </div>
-                    <p className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Messages Sent</p>
-                  </div>
-                  <p className="text-4xl font-extrabold text-zinc-900 tracking-tight">
-                    {filteredBroadcasts?.reduce((acc, b) => acc + b.sentCount, 0).toLocaleString() || 0}
-                  </p>
-                </div>
-                <div className={cn("bg-white p-6 rounded-[28px] border shadow-sm transition-all duration-500 hover:shadow-xl", theme.borderColor, theme.glowShadow)}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center", theme.lightBg)}>
-                      <AlertCircle className={cn("w-5 h-5", theme.iconColor)} />
+                    <div className={cn("bg-white p-6 rounded-[28px] border shadow-sm transition-all duration-500 hover:shadow-xl", theme.borderColor, theme.glowShadow)}>
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center", theme.lightBg)}>
+                          <AlertCircle className={cn("w-5 h-5", theme.iconColor)} />
+                        </div>
+                        <p className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Failures</p>
+                      </div>
+                      <p className="text-4xl font-extrabold text-zinc-900 tracking-tight">
+                        {filteredBroadcasts?.reduce((acc, b) => acc + b.failedCount, 0).toLocaleString() || 0}
+                      </p>
                     </div>
-                    <p className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Failures</p>
+                    {whatsappQuota && (
+                      <div className="bg-white p-6 rounded-[28px] border border-green-200/60 shadow-sm transition-all duration-500 hover:shadow-xl hover:shadow-green-500/10 hover:border-green-400/40">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-10 h-10 rounded-2xl flex items-center justify-center bg-green-50">
+                            <SiWhatsapp className="w-5 h-5 text-[#128C7E]" />
+                          </div>
+                          <p className="text-sm font-bold text-zinc-500 uppercase tracking-wider">WA Quota</p>
+                        </div>
+                        <p className="text-4xl font-extrabold text-zinc-900 tracking-tight tabular-nums">
+                          {whatsappQuota.remaining.toLocaleString()}
+                        </p>
+                        <p className="text-xs text-zinc-400 font-semibold mt-1">
+                          / {whatsappQuota.limit.toLocaleString()} left today
+                        </p>
+                        <div className="mt-3 h-1.5 w-full bg-zinc-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-green-500 rounded-full transition-all duration-700"
+                            style={{ width: `${Math.min((whatsappQuota.sentLast24h / whatsappQuota.limit) * 100, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-4xl font-extrabold text-zinc-900 tracking-tight">
-                    {filteredBroadcasts?.reduce((acc, b) => acc + b.failedCount, 0).toLocaleString() || 0}
-                  </p>
-                </div>
-              </div>
-
-              </>
+                </>
               )}
 
               <div className="bg-white rounded-2xl border border-zinc-200/60 shadow-sm overflow-hidden min-h-[500px]">
@@ -786,13 +817,26 @@ function StepWorkspace({
                         </tr>
                       ) : (
                         filteredBroadcasts?.map((b) => {
-                          const cfg = statusConfig[b.status as keyof typeof statusConfig] || statusConfig.PENDING;
-                          const progress = b.totalCount > 0 ? (b.sentCount / b.totalCount) * 100 : 0;
+                          const processedCount = b.sentCount + (b.failedCount || 0);
+                          const progress = b.totalCount > 0 ? (processedCount / b.totalCount) * 100 : 0;
+                          
+                          let displayStatus = b.status;
+                          let customLabel = null;
+                          if (b.status === 'FAILED' && b.sentCount > 0) {
+                            displayStatus = 'FAILED';
+                            customLabel = 'Partial Success';
+                          }
+                          const cfg = statusConfig[displayStatus as keyof typeof statusConfig] || statusConfig.PENDING;
+                          const finalLabel = customLabel || cfg.label;
                           const chanCfg = channelTableConfig[b.channel.toUpperCase() as keyof typeof channelTableConfig] || channelTableConfig.SMS;
                           const ChanIcon = chanCfg.icon;
                           
                           return (
-                            <tr key={b.id} className="border-b border-zinc-100/80 hover:bg-zinc-50/20 transition-colors group">
+                            <tr 
+                              key={b.id} 
+                              onClick={() => setSelectedBroadcastId(b.id)}
+                              className="border-b border-zinc-100/80 hover:bg-zinc-50/20 transition-colors group cursor-pointer"
+                            >
                               <td className="px-6 py-4">
                                 <div className="flex flex-col">
                                   <span className={cn("font-bold text-sm text-zinc-900 mb-0.5 tracking-tight transition-colors", theme.hoverColor)}>{b.name}</span>
@@ -810,14 +854,20 @@ function StepWorkspace({
                               <td className="px-6 py-4">
                                 <div className={cn("inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-semibold tracking-tight", cfg.color)}>
                                   {cfg.icon}
-                                  {cfg.label}
+                                  {finalLabel}
                                 </div>
                               </td>
                               <td className="px-6 py-4 min-w-[180px]">
                                 <div className="flex flex-col gap-1.5">
-                                  <div className="flex items-center justify-between text-[10px] font-bold text-zinc-400 tabular-nums">
-                                    <span>{b.sentCount} / {b.totalCount}</span>
-                                    <span>{Math.round(progress)}%</span>
+                                  <div className="flex items-center justify-between text-[10px] font-bold tabular-nums">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-zinc-600">{b.sentCount} Sent</span>
+                                      {b.failedCount > 0 && (
+                                        <span className="text-red-500">({b.failedCount} Failed)</span>
+                                      )}
+                                      <span className="text-zinc-400">/ {b.totalCount} Total</span>
+                                    </div>
+                                    <span className="text-zinc-400">{Math.round(progress)}%</span>
                                   </div>
                                   <div className="w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
                                     <div 
@@ -864,6 +914,89 @@ function StepWorkspace({
         clientId={client.id}
         fixedChannel={channel.toUpperCase() as any}
       />
+
+      <Dialog open={!!selectedBroadcastId} onOpenChange={(open) => !open && setSelectedBroadcastId(null)}>
+        <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="px-6 py-4 border-b border-zinc-100 bg-zinc-50/50">
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <span className="font-bold text-zinc-900">{broadcastDetail?.name ?? '...'}</span>
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-zinc-200/50 text-zinc-600 border border-zinc-200">
+                {broadcastDetail?.channel}
+              </span>
+            </DialogTitle>
+            <DialogDescription>
+              Detailed recipient delivery status and error logs.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto p-6 bg-white">
+            {isDetailLoading ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <Loader2 className="w-8 h-8 text-zinc-300 animate-spin" />
+                <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Loading Recipient Data...</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-100">
+                    <p className="text-xs font-medium text-zinc-500 mb-1">Total Recipients</p>
+                    <p className="text-xl font-bold text-zinc-900">{broadcastDetail?.totalCount ?? '—'}</p>
+                  </div>
+                  <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                    <p className="text-xs font-medium text-emerald-600 mb-1">Successfully Sent</p>
+                    <p className="text-xl font-bold text-emerald-700">{broadcastDetail?.sentCount ?? '—'}</p>
+                  </div>
+                  <div className="p-3 bg-red-50 rounded-xl border border-red-100">
+                    <p className="text-xs font-medium text-red-600 mb-1">Failed</p>
+                    <p className="text-xl font-bold text-red-700">{broadcastDetail?.failedCount ?? 0}</p>
+                  </div>
+                </div>
+
+                <h4 className="font-bold text-sm text-zinc-900 mb-3 border-b border-zinc-100 pb-2">Recipient Details</h4>
+                
+                {!broadcastDetail?.recipients || broadcastDetail.recipients.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-sm font-medium text-zinc-400">No recipient details available for this campaign.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {broadcastDetail.recipients.map((recip) => (
+                      <div key={recip.id} className="flex flex-col p-3 rounded-lg border border-zinc-100 hover:border-zinc-200 transition-colors bg-zinc-50/30">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-sm text-zinc-700">{recip.to}</span>
+                          <div className="flex items-center gap-1.5">
+                            {recip.status === 'COMPLETED' ? (
+                              <>
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                <span className="text-[10px] font-bold text-emerald-600 tracking-wide uppercase">Delivered</span>
+                              </>
+                            ) : recip.status === 'FAILED' ? (
+                              <>
+                                <XCircle className="w-3.5 h-3.5 text-red-500" />
+                                <span className="text-[10px] font-bold text-red-600 tracking-wide uppercase">Failed</span>
+                              </>
+                            ) : (
+                              <>
+                                <Clock className="w-3.5 h-3.5 text-amber-500" />
+                                <span className="text-[10px] font-bold text-amber-600 tracking-wide uppercase">{recip.status}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        {recip.error && (
+                          <div className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded border border-red-100 break-all font-mono">
+                            {recip.error}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

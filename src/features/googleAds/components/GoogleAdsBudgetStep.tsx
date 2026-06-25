@@ -136,6 +136,24 @@ export default function GoogleAdsBudgetStep({ onNext, onBudgetTypeChange }: Goog
                     </label>
                   </div>
                 )}
+                
+                {/* Warnings */}
+                {budgetType === 'daily' && parseFloat(budgetAmount) > 0 && payload.targetCpa && parseFloat(budgetAmount) < payload.targetCpa && (
+                  <div className="mt-4 bg-amber-50 border border-amber-200 rounded p-4 flex gap-3 ml-7">
+                    <div className="text-[13px] text-amber-800 leading-relaxed">
+                      <span className="font-semibold block mb-1">Budget is lower than your target CPA</span>
+                      Your daily budget is lower than your target CPA (₹{payload.targetCpa}). This may prevent your campaign from spending its budget and limit your conversions. Consider increasing your budget or lowering your target CPA.
+                    </div>
+                  </div>
+                )}
+                {budgetType === 'daily' && parseFloat(budgetAmount) > 0 && payload.maxCpcBidLimit && parseFloat(budgetAmount) < (payload.maxCpcBidLimit / 1000000) && (
+                  <div className="mt-4 bg-amber-50 border border-amber-200 rounded p-4 flex gap-3 ml-7">
+                    <div className="text-[13px] text-amber-800 leading-relaxed">
+                      <span className="font-semibold block mb-1">Budget is lower than your max CPC bid</span>
+                      Your daily budget is lower than your maximum CPC bid limit. Your ads may not show often. Consider increasing your budget or lowering your max CPC.
+                    </div>
+                  </div>
+                )}
               </div>
             </label>
 

@@ -12,13 +12,50 @@ import {
   Tooltip,
   ResponsiveContainer
 } from "recharts";
+import FeedbackModal from "./FeedbackModal";
+import { DraftsManager } from "../context/DraftsManager";
+
 
 interface OverviewProps {
   onCreateCampaign?: () => void;
+  onResumeDraft?: (draftId: string) => void;
 }
 
-export default function GoogleAdsOverview({ onCreateCampaign }: OverviewProps = {}) {
+export default function GoogleAdsOverview({ onCreateCampaign, onResumeDraft }: OverviewProps = {}) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+
+  // Generate CSV data from chartData
+  const handleDownload = () => {
+    const headers = ["Date,Clicks,Impressions\n"];
+    const csvContent = chartData.reduce((acc, row) => {
+      return acc + `${row.name},${row.clicks},${row.impressions}\n`;
+    }, headers[0]);
+    
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "campaign-overview.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleResumeDraftClick = async () => {
+    setIsDropdownOpen(false);
+    try {
+      const drafts = await DraftsManager.listDrafts();
+      if (drafts.length > 0 && onResumeDraft) {
+        // Resume the most recently updated draft
+        onResumeDraft(drafts[0].id);
+      } else {
+        alert("No recent drafts found.");
+      }
+    } catch (err) {
+      console.error("Failed to resume draft:", err);
+    }
+  };
 
   const chartData = [
     { name: "Jun 1, 2026", clicks: 1900, impressions: 8000 },
@@ -51,7 +88,10 @@ export default function GoogleAdsOverview({ onCreateCampaign }: OverviewProps = 
                 <Plus className="w-5 h-5 text-slate-500" />
                 New campaign
               </button>
-              <button className="flex items-center gap-4 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors w-full text-left border-t border-slate-100">
+              <button 
+                onClick={handleResumeDraftClick}
+                className="flex items-center gap-4 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors w-full text-left border-t border-slate-100"
+              >
                 <Folder className="w-5 h-5 text-slate-500" />
                 Resume campaign draft
               </button>
@@ -60,8 +100,8 @@ export default function GoogleAdsOverview({ onCreateCampaign }: OverviewProps = 
         </div>
         
         <div className="flex items-center gap-6 text-slate-500 text-xs">
-          <button className="flex flex-col items-center hover:text-slate-900 gap-1"><Download className="w-5 h-5"/>Download</button>
-          <button className="flex flex-col items-center hover:text-slate-900 gap-1"><MessageSquare className="w-5 h-5"/>Feedback</button>
+          <button onClick={handleDownload} className="flex flex-col items-center hover:text-slate-900 gap-1"><Download className="w-5 h-5"/>Download</button>
+          <button onClick={() => setIsFeedbackOpen(true)} className="flex flex-col items-center hover:text-slate-900 gap-1"><MessageSquare className="w-5 h-5"/>Feedback</button>
         </div>
       </div>
 
@@ -213,6 +253,7 @@ export default function GoogleAdsOverview({ onCreateCampaign }: OverviewProps = 
           </div>
         </div>
       </div>
+      <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
     </div>
   );
 }

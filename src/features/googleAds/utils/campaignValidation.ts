@@ -68,6 +68,23 @@ export function validateCampaignPayload(payload: CampaignWizardState): Validatio
     // For MVP, we check basic counts
     if (logos.length < 1) errors.push({ path: "assets.logos", message: "At least 1 Logo is required." });
     if (images.length < 1) errors.push({ path: "assets.images", message: "At least 1 Image is required." });
+    
+    if (payload.merchantId && !payload.salesCountry) {
+      errors.push({ path: "salesCountry", message: "Sales Country is required when using Merchant Center." });
+    }
+  }
+
+  // Shopping Specific
+  if (type === "SHOPPING") {
+    if (!payload.merchantId) {
+      errors.push({ path: "merchantId", message: "Merchant Center account is required for Shopping campaigns." });
+    }
+    if (!payload.salesCountry) {
+      errors.push({ path: "salesCountry", message: "Sales Country is required for Shopping campaigns." });
+    }
+    if (!payload.adGroups || payload.adGroups.length === 0) {
+      errors.push({ path: "adGroups", message: "At least one Ad Group is required." });
+    }
   }
 
   return {

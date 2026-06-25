@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
   // @ts-expect-error unused variable
 import { ChevronDown, ChevronUp, HelpCircle, AlertCircle, Info } from "lucide-react";
 import { useCampaignWizardContext } from "../context/CampaignWizardContext";
+import { useAudiencesList } from "../hooks/useCampaignLookups";
 import { UnifiedBiddingConfiguration } from "./bidding/UnifiedBiddingConfiguration";
 import type { BiddingConfigValue } from "./bidding/UnifiedBiddingConfiguration";
 
@@ -18,27 +19,38 @@ export default function GoogleAdsBiddingStep({ onNext, activeSubStep, onSubStepC
 
   const configValue: Partial<BiddingConfigValue> = {
     type: payload.biddingStrategyId ? "MAXIMIZE_CONVERSIONS" : 
-          (payload.targetCpa ? "TARGET_CPA" : "MAXIMIZE_CONVERSIONS"),
+          (payload.targetRoas ? "TARGET_ROAS" : (payload.targetCpa ? "TARGET_CPA" : "MAXIMIZE_CONVERSIONS")),
     portfolioStrategyId: payload.biddingStrategyId || null,
     targetCpa: payload.targetCpa ? payload.targetCpa * 1000000 : undefined,
+    targetRoas: payload.targetRoas ? payload.targetRoas : undefined,
   };
 
   const handleConfigChange = (newVal: Partial<BiddingConfigValue>) => {
     updatePayload({
       biddingStrategyId: newVal.portfolioStrategyId || undefined,
-      biddingFocus: (newVal.type === "TARGET_CPA" || newVal.type === "MAXIMIZE_CONVERSIONS") ? "CONVERSIONS" : "CONVERSION_VALUE",
+      biddingFocus: (newVal.type === "TARGET_CPA" || newVal.type === "MAXIMIZE_CONVERSIONS") ? "CONVERSIONS" : 
+                    (newVal.type === "TARGET_IMPRESSION_SHARE" ? "IMPRESSION_SHARE" : 
+                    (newVal.type === "MAXIMIZE_CLICKS" ? "CLICKS" : "CONVERSION_VALUE")),
       targetCpa: newVal.targetCpa ? newVal.targetCpa / 1000000 : undefined,
+      targetRoas: newVal.targetRoas ? newVal.targetRoas : undefined,
+      maxCpcBidLimit: newVal.type === "MAXIMIZE_CLICKS" ? newVal.targetImpressionShare?.cpcBidCeilingMicros : undefined, // re-using the UI field temporarily if it exists, actually wait we need to get it directly if CLICKS
+      targetImpressionShare: newVal.type === "TARGET_IMPRESSION_SHARE" ? newVal.targetImpressionShare : undefined,
     });
   };
 
   const [onlyNewCustomers, setOnlyNewCustomers] = useState(!!payload.onlyNewCustomers);
+  const [audienceId, setAudienceId] = useState<string>(payload.customerAcquisitionAudienceId || "");
+
+  const { data: audiencesData } = useAudiencesList(payload.clientId || 1);
+  const audiences = audiencesData?.audiences ?? [];
 
   // Sync to context when local state changes
   useEffect(() => {
     updatePayload({
       onlyNewCustomers: onlyNewCustomers,
+      customerAcquisitionAudienceId: audienceId || undefined,
     });
-  }, [onlyNewCustomers, updatePayload]);
+  }, [onlyNewCustomers, audienceId, updatePayload]);
 
   // Intersection Observer for scroll spy
   useEffect(() => {
@@ -86,7 +98,7 @@ export default function GoogleAdsBiddingStep({ onNext, activeSubStep, onSubStepC
           </div>
         </div>
 
-        {!isSearch && (
+        {(
           <div
             id="panel-customer-acquisition"
             onClick={() => onSubStepChange?.('customer-acquisition')}
@@ -115,12 +127,27 @@ export default function GoogleAdsBiddingStep({ onNext, activeSubStep, onSubStepC
                   {onlyNewCustomers && (
                     <div className="mt-4 bg-[#fce8e6] border border-[#f8dedc] rounded p-4 flex gap-3 ml-7">
                       <AlertCircle className="w-5 h-5 text-[#c5221f] shrink-0 mt-0.5" />
-                      <div>
+                      <div className="flex-1">
                         <div className="text-[13px] font-medium text-[#c5221f] mb-2">This campaign will not run</div>
                         <div className="text-[12px] text-[#c5221f] leading-relaxed mb-3">
                           To fix this campaign, you can either include an audience segment with at least 1,000 active members in at least one network, or turn off this setting until you have added an eligible audience segment.
                         </div>
-                        <button className="text-[13px] font-medium text-[#c5221f] hover:underline">Define existing customer list</button>
+                        <div className="flex flex-col gap-2 mt-4 max-w-[400px]">
+                          <label className="text-[12px] font-medium text-slate-800">Select existing customer list</label>
+                          <select
+                            value={audienceId}
+                            onChange={(e) => setAudienceId(e.target.value)}
+                            className="border border-slate-300 rounded px-3 py-2 text-[13px] text-slate-800 bg-white w-full"
+                          >
+                            <option value="">Select an audience...</option>
+                            {audiences.map((a) => (
+                              <option key={a.audienceId} value={a.audienceId}>{a.audienceName}</option>
+                            ))}
+                          </select>
+                          {audiences.length === 0 && (
+                            <span className="text-[11px] text-slate-500">No customer lists found for this account.</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}

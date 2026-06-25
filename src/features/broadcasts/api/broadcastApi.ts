@@ -5,7 +5,8 @@ import type {
   BroadcastTemplate,
   BroadcastIntegration,
   CreateTemplateRequest,
-  CreateIntegrationRequest
+  CreateIntegrationRequest,
+  WhatsAppQuota
 } from './types';
 
 // Tolerate both wrapped ({ success, x }) and unwrapped (x) backend response shapes.
@@ -97,6 +98,15 @@ export const getBroadcastStatus = async (id: number): Promise<Broadcast> => {
 export const listTemplates = async (): Promise<BroadcastTemplate[]> => {
   const response = await api.get('/broadcasts/templates');
   return pickList<BroadcastTemplate>(response.data, 'templates');
+};
+
+/**
+ * Get WhatsApp daily quota and usage.
+ * GET /broadcasts/quota
+ */
+export const getWhatsAppQuota = async (): Promise<WhatsAppQuota> => {
+  const response = await api.get('/broadcasts/quota');
+  return pickOne<WhatsAppQuota>(response.data, 'quota');
 };
 
 /**

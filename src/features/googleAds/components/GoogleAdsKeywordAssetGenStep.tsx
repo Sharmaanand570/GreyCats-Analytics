@@ -1,17 +1,53 @@
 import { useState } from "react";
-import { ChevronUp, Link } from "lucide-react";
+import { ChevronUp, Link, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { useCampaignWizardContext } from "../context/CampaignWizardContext";
+import { useKeywordIdeas } from "../hooks/useCampaignLookups";
 
 interface KeywordAssetGenStepProps {
   onNext: () => void;
 }
 
 export default function GoogleAdsKeywordAssetGenStep({ onNext }: KeywordAssetGenStepProps) {
-  const [finalUrl, setFinalUrl] = useState("");
+  const { payload, updatePayload } = useCampaignWizardContext();
+  const [finalUrl, setFinalUrl] = useState(payload.ads?.[0]?.finalUrls?.[0] || "");
+  const keywordIdeas = useKeywordIdeas();
 
   const handleGenerate = () => {
-    if (finalUrl) {
-      onNext();
-    }
+    if (!finalUrl.trim()) return;
+    keywordIdeas.mutate(
+      {
+        payload: { url: finalUrl.trim() },
+        params: { clientId: payload.clientId || 1 },
+      },
+      {
+        onSuccess: (ideas) => {
+          // Seed the next step: persist the URL onto the ad and the ideas as broad keywords.
+          const existing = (payload.keywords ?? []).filter((k: any) => !k.negative);
+          const existingText = new Set(existing.map((k: any) => k.text.trim().toLowerCase()));
+          const newKeywords = ideas
+            .map((i) => i.text.trim())
+            .filter((t) => t && !existingText.has(t.toLowerCase()))
+            .map((text) => ({ text, matchType: "BROAD", negative: false }));
+
+          updatePayload({
+            keywords: [...(payload.keywords ?? []), ...newKeywords] as any,
+            ads: [
+              {
+                ...(payload.ads?.[0] ?? { type: "RESPONSIVE_SEARCH_AD" }),
+                finalUrls: [finalUrl.trim()],
+              },
+            ] as any,
+          });
+          if (newKeywords.length) {
+            toast.success(`Generated ${newKeywords.length} keyword idea${newKeywords.length === 1 ? "" : "s"}`);
+          } else {
+            toast.info("No new keyword ideas — continuing");
+          }
+          onNext();
+        },
+      }
+    );
   };
 
   return (
@@ -69,16 +105,17 @@ export default function GoogleAdsKeywordAssetGenStep({ onNext }: KeywordAssetGen
         >
           Skip
         </button>
-        <button 
+        <button
           onClick={handleGenerate}
-          disabled={!finalUrl}
-          className={`px-6 py-2 rounded-md font-medium text-sm transition-colors ${
-            finalUrl 
-              ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+          disabled={!finalUrl || keywordIdeas.isPending}
+          className={`px-6 py-2 rounded-md font-medium text-sm transition-colors inline-flex items-center gap-2 ${
+            finalUrl && !keywordIdeas.isPending
+              ? 'bg-blue-600 hover:bg-blue-700 text-white'
               : 'bg-slate-100 text-slate-400 cursor-not-allowed'
           }`}
         >
-          Generate
+          {keywordIdeas.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+          {keywordIdeas.isPending ? "Generating…" : "Generate"}
         </button>
       </div>
     </div>

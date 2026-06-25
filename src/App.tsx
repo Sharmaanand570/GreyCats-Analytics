@@ -88,6 +88,7 @@ const SeoReporterPage = lazy(() => import("./features/seo-reporter/pages/SeoRepo
 const SocialMediaSchedulerPage = lazy(() => import("./pages/SocialMediaSchedulerPage"));
 const BlogSchedulerPage = lazy(() => import("./pages/BlogSchedulerPage"));
 const BroadcastPage = lazy(() => import("./pages/BroadcastPage"));
+const DocumentationPage = lazy(() => import("./pages/DocumentationPage"));
 
 // Multi-Client Pages
 const ClientsPage = lazy(() => import("./pages/ClientsPage"));
@@ -240,6 +241,12 @@ function App() {
 
             {/* 404 catch-all for protected area — outside sidebar */}
             <Route path="404" element={<NotFoundPage />} />
+
+            {/* Documentation — standalone, no sidebar */}
+            <Route path="docs">
+              <Route index element={<Navigate to="getting-started" replace />} />
+              <Route path=":topicId" element={<DocumentationPage />} />
+            </Route>
 
             {/* Admin Routes */}
             <Route element={<RoleGuard allowedRoles={["ADMIN", "SUPER_ADMIN"]} />}>

@@ -9,6 +9,7 @@ import GoogleAdsAIMaxStep from "./GoogleAdsAIMaxStep";
 import GoogleAdsKeywordAssetGenStep from "./GoogleAdsKeywordAssetGenStep";
 import GoogleAdsKeywordsAndAdsStep from "./GoogleAdsKeywordsAndAdsStep";
 import GoogleAdsVideoSettingsStep from "./GoogleAdsVideoSettingsStep";
+import GoogleAdsAssetExtensionsStep from "./GoogleAdsAssetExtensionsStep";
 import { useCampaignWizardContext } from "../context/CampaignWizardContext";
 import { publishCompleteCampaign } from "../API/campaignManagementApi";
 import { validateCampaignPayload } from "../utils/campaignValidation";
@@ -72,8 +73,9 @@ export default function GoogleAdsCampaignWizard({ campaignType, onCancel }: Wiza
     { id: 3, name: "AI Max", component: GoogleAdsAIMaxStep },
     { id: 4, name: "Keyword and asset generation", component: GoogleAdsKeywordAssetGenStep },
     { id: 5, name: "Keywords and ads", component: GoogleAdsKeywordsAndAdsStep },
-    { id: 6, name: "Budget", component: GoogleAdsBudgetStep },
-    { id: 7, name: "Review", component: GoogleAdsSummaryStep },
+    { id: 6, name: "Asset extensions", component: GoogleAdsAssetExtensionsStep },
+    { id: 7, name: "Budget", component: GoogleAdsBudgetStep },
+    { id: 8, name: "Review", component: GoogleAdsSummaryStep },
   ] : campaignType === "Video" ? [
     { id: 1, name: "Campaign settings", component: GoogleAdsVideoSettingsStep },
     { id: 2, name: "Ad group", component: GoogleAdsAssetGroupStep },
@@ -84,8 +86,9 @@ export default function GoogleAdsCampaignWizard({ campaignType, onCancel }: Wiza
     { id: 1, name: "Bidding", component: GoogleAdsBiddingStep },
     { id: 2, name: "Campaign settings", component: GoogleAdsCampaignSettingsStep },
     { id: 3, name: "Asset group", component: GoogleAdsAssetGroupStep },
-    { id: 4, name: "Budget", component: GoogleAdsBudgetStep },
-    { id: 5, name: "Summary", component: GoogleAdsSummaryStep },
+    { id: 4, name: "Asset extensions", component: GoogleAdsAssetExtensionsStep },
+    { id: 5, name: "Budget", component: GoogleAdsBudgetStep },
+    { id: 6, name: "Summary", component: GoogleAdsSummaryStep },
   ];
   
   const CurrentStepComponent = steps.find(s => s.id === currentStep)?.component || steps[0].component;
@@ -353,16 +356,13 @@ export default function GoogleAdsCampaignWizard({ campaignType, onCancel }: Wiza
                activeSubStep={activeSubStep}
                onSubStepChange={setActiveSubStep}
                campaignType={campaignType}
-               onNavigateToStep={(stepId: number, subStepId: string) => {
-                 setCurrentStep(stepId);
-                 setActiveSubStep(subStepId);
-                 setTimeout(() => {
-                   const element = document.getElementById(`panel-${subStepId}`);
-                   if (element) {
-                     element.scrollIntoView({ behavior: "smooth", block: "start" });
-                   }
-                 }, 100);
-               }}
+                onNavigateToStep={(stepId: number) => {
+                  setCurrentStep(stepId);
+                  if (stepId === 1) setActiveSubStep("bidding");
+                  if (stepId === 2) setActiveSubStep("networks");
+                  if (stepId === 5) setActiveSubStep("keywords");
+                  if (stepId === 7) setActiveSubStep("budget");
+                }}
              />
            )}
         </div>

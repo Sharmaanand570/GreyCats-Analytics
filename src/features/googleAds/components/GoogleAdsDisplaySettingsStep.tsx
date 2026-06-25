@@ -1,15 +1,44 @@
-import { useState } from "react";
-import { ChevronUp, ChevronDown, Info, Search, X, Settings } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ChevronUp, ChevronDown, Info, Settings } from "lucide-react";
+import { useCampaignWizardContext } from "../context/CampaignWizardContext";
+import LocationSelector, { type SelectedGeo } from "./LocationSelector";
+import LanguageMultiSelect from "./LanguageMultiSelect";
 
 interface SettingsStepProps {
   onNext: () => void;
 }
 
 export default function GoogleAdsDisplaySettingsStep({ onNext }: SettingsStepProps) {
+  const { payload, updatePayload } = useCampaignWizardContext();
   const [expandedSection, setExpandedSection] = useState<string | null>("locations");
-  const [locationSelection, setLocationSelection] = useState("all");
-  const [euPoliticalSelection, setEuPoliticalSelection] = useState<string | null>(null);
-  
+  const [locationSelection, setLocationSelection] = useState(payload.locations?.type === "OTHER" ? "other" : "all");
+  const [selectedGeos, setSelectedGeos] = useState<SelectedGeo[]>(() => {
+    const loc = payload.locations;
+    if (!loc) return [];
+    const names = loc.geoTargetNames || {};
+    return [
+      ...(loc.geoTargetConstantIds || []).map((id) => ({ id, name: names[id] || id, excluded: false })),
+      ...(loc.excludedGeoTargetConstantIds || []).map((id) => ({ id, name: names[id] || id, excluded: true })),
+    ];
+  });
+  const [languages, setLanguages] = useState<string[]>(payload.languages || ["English"]);
+  const [euPoliticalSelection, setEuPoliticalSelection] = useState<string | null>(
+    payload.euPolitical === undefined ? null : payload.euPolitical ? "yes" : "no"
+  );
+
+  useEffect(() => {
+    updatePayload({
+      locations: {
+        type: locationSelection === "other" ? "OTHER" : "ALL",
+        geoTargetConstantIds: selectedGeos.filter((g) => !g.excluded).map((g) => g.id),
+        excludedGeoTargetConstantIds: selectedGeos.filter((g) => g.excluded).map((g) => g.id),
+        geoTargetNames: Object.fromEntries(selectedGeos.map((g) => [g.id, g.name])),
+      },
+      languages,
+      euPolitical: euPoliticalSelection === "yes",
+    });
+  }, [locationSelection, selectedGeos, languages, euPoliticalSelection, updatePayload]);
+
   const toggleSection = (section: string) => {
     if (expandedSection === section) setExpandedSection(null);
     else setExpandedSection(section);
@@ -39,40 +68,31 @@ export default function GoogleAdsDisplaySettingsStep({ onNext }: SettingsStepPro
               </div>
               <div className="flex flex-col gap-3 ml-2">
                 <label className="flex items-center gap-3 cursor-pointer">
-                  <input 
-                    type="radio" 
-                    name="location" 
+                  <input
+                    type="radio"
+                    name="location"
                     checked={locationSelection === "all"}
                     onChange={() => setLocationSelection("all")}
-                    className="w-4 h-4 text-blue-600 border-slate-300" 
+                    className="w-4 h-4 text-blue-600 border-slate-300"
                   />
                   <span className="text-[13px] text-slate-800">All countries and territories</span>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
-                  <input 
-                    type="radio" 
-                    name="location" 
-                    checked={locationSelection === "india"}
-                    onChange={() => setLocationSelection("india")}
-                    className="w-4 h-4 text-blue-600 border-slate-300" 
-                  />
-                  <span className="text-[13px] text-slate-800">India</span>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input 
-                    type="radio" 
-                    name="location" 
+                  <input
+                    type="radio"
+                    name="location"
                     checked={locationSelection === "other"}
                     onChange={() => setLocationSelection("other")}
-                    className="w-4 h-4 text-blue-600 border-slate-300" 
+                    className="w-4 h-4 text-blue-600 border-slate-300"
                   />
                   <span className="text-[13px] text-slate-800">Enter another location</span>
                 </label>
               </div>
-              <div className="mt-4 flex items-center gap-2 text-[13px] text-blue-600 font-medium cursor-pointer">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><polyline points="20 6 9 17 4 12"/></svg>
-                Location options
-              </div>
+              {locationSelection === "other" && (
+                <div className="mt-4 ml-2">
+                  <LocationSelector value={selectedGeos} onChange={setSelectedGeos} />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -94,19 +114,7 @@ export default function GoogleAdsDisplaySettingsStep({ onNext }: SettingsStepPro
               <div className="flex items-center gap-1 text-[13px] text-slate-800 mb-3">
                 Select the languages your customers speak. <Info className="w-3.5 h-3.5 text-slate-500" />
               </div>
-              <div className="relative max-w-[400px]">
-                <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                <input 
-                  type="text" 
-                  placeholder="Start typing or select a language"
-                  className="w-full border border-slate-300 rounded px-3 py-2 pl-9 text-[13px] text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-              <div className="mt-4 flex gap-2">
-                <div className="border border-slate-300 rounded-full px-3 py-1 flex items-center gap-2 text-[13px] text-slate-800 bg-white">
-                  English <X className="w-3.5 h-3.5 text-slate-500 cursor-pointer hover:text-slate-800" />
-                </div>
-              </div>
+              <LanguageMultiSelect value={languages} onChange={setLanguages} />
             </div>
           )}
         </div>

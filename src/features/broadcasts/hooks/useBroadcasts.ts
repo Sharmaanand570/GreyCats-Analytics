@@ -16,10 +16,11 @@ import {
   createIntegration,
   deleteIntegration,
   deleteAdminIntegration,
-  syncTemplates,
   registerWhatsAppPin,
   requestWhatsAppCode,
-  verifyWhatsAppCode
+  verifyWhatsAppCode,
+  getWhatsAppQuota,
+  syncTemplates
 } from '../api/broadcastApi';
 import type { 
   CreateBroadcastPayload, 
@@ -57,6 +58,28 @@ export const useAdminBroadcasts = () => {
       const hasActive = query?.state?.data?.some(b => b.status === 'PROCESSING' || b.status === 'RUNNING');
       return hasActive ? 5000 : 60000;
     }
+  });
+};
+
+export const useWhatsAppQuota = (enabled: boolean = true) => {
+  return useQuery({
+    queryKey: ['whatsapp-quota'],
+    queryFn: getWhatsAppQuota,
+    enabled: enabled,
+    retry: false, // Don't retry if it returns 404 (no integration)
+  });
+};
+
+/**
+ * Fetch a single campaign with the full recipients array.
+ * Only runs when a campaignId is provided (lazy / on-demand).
+ */
+export const useBroadcastDetail = (campaignId: number | null) => {
+  return useQuery({
+    queryKey: ['broadcast-detail', campaignId],
+    queryFn: () => getBroadcastStatus(campaignId!),
+    enabled: campaignId !== null,
+    staleTime: 30_000, // Cache for 30s to avoid re-fetching on every re-render
   });
 };
 

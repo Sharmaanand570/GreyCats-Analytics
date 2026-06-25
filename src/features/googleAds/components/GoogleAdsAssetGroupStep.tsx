@@ -32,7 +32,9 @@ export default function GoogleAdsAssetGroupStep({ onNext, activeSubStep, onSubSt
   const [fullPreviewTab, setFullPreviewTab] = useState<'All' | 'Search' | 'Display' | 'YouTube' | 'Discover' | 'Gmail'>('Display');
 
   const [assetGroupName, setAssetGroupName] = useState(payload.adGroups?.[0]?.name || "Asset Group 1");
-  const [audienceSignals] = useState<any[]>(payload.adGroups?.[0]?.audienceSignals || []);
+  const [audienceSignals] = useState<any>(payload.adGroups?.[0]?.audienceSignals || {});
+  const [searchThemes, setSearchThemes] = useState<string[]>((payload.adGroups?.[0] as any)?.searchThemes || (payload.adGroups?.[0]?.audienceSignals as any)?.searchThemes || []);
+  const [currentSearchTheme, setCurrentSearchTheme] = useState("");
   const [assets, setAssets] = useState<any[]>(payload.assets || []);
 
   // Text Assets
@@ -109,7 +111,10 @@ export default function GoogleAdsAssetGroupStep({ onNext, activeSubStep, onSubSt
     updatePayload({
       adGroups: [{ 
         name: assetGroupName,
-        audienceSignals: audienceSignals
+        audienceSignals: {
+          ...audienceSignals,
+          searchThemes: searchThemes.length > 0 ? searchThemes : undefined
+        }
       }] as any,
       assets: [...assets, ...textAssets] as any,
       ads: [
@@ -119,7 +124,7 @@ export default function GoogleAdsAssetGroupStep({ onNext, activeSubStep, onSubSt
         } as any
       ]
     });
-  }, [assetGroupName, audienceSignals, assets, headlines, longHeadlines, descriptions, businessName, finalUrl, updatePayload]);
+  }, [assetGroupName, audienceSignals, searchThemes, assets, headlines, longHeadlines, descriptions, businessName, finalUrl, updatePayload]);
 
   const getPanelClass = (id: string) => {
     return `asset-panel-section bg-white border shadow-sm rounded-md overflow-hidden transition-all duration-200 ${activeSubStep === id ? 'border-blue-500 shadow-md ring-1 ring-blue-500' : 'border-slate-200'}`;
@@ -1349,10 +1354,32 @@ export default function GoogleAdsAssetGroupStep({ onNext, activeSubStep, onSubSt
               <span className="text-[13px] text-slate-800">What are some words or phrases people use when searching for your products or services?</span>
               <HelpCircle className="w-3.5 h-3.5 text-slate-500" />
             </div>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {searchThemes.map((theme, idx) => (
+                <div key={idx} className="flex items-center gap-1 bg-slate-100 text-slate-800 text-[13px] px-3 py-1.5 rounded-full border border-slate-200">
+                  <span>{theme}</span>
+                  <button onClick={() => setSearchThemes(searchThemes.filter(t => t !== theme))} className="text-slate-400 hover:text-slate-600">
+                    <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              ))}
+            </div>
             <input 
               type="text" 
-              placeholder="Add search themes (up to 50)"
-              className="w-full border border-slate-300 rounded-md px-3 py-2 text-[13px] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              value={currentSearchTheme}
+              onChange={(e) => setCurrentSearchTheme(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && currentSearchTheme.trim()) {
+                  e.preventDefault();
+                  if (searchThemes.length < 25 && !searchThemes.includes(currentSearchTheme.trim())) {
+                    setSearchThemes([...searchThemes, currentSearchTheme.trim()]);
+                  }
+                  setCurrentSearchTheme("");
+                }
+              }}
+              placeholder={searchThemes.length >= 25 ? "Max 25 themes reached" : "Add search themes (up to 25) and press Enter"}
+              disabled={searchThemes.length >= 25}
+              className="w-full border border-slate-300 rounded-md px-3 py-2 text-[13px] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:cursor-not-allowed"
             />
           </div>
         </div>

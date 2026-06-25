@@ -1,16 +1,38 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronUp, ChevronDown, CheckCircle2, HelpCircle } from "lucide-react";
+import { useCampaignWizardContext } from "../context/CampaignWizardContext";
 
 interface BudgetStepProps {
   onNext: () => void;
 }
 
+const FOCUS_MAP: Record<string, "CONVERSIONS" | "CONVERSION_VALUE" | "CLICKS" | "IMPRESSION_SHARE"> = {
+  conversions: "CONVERSIONS",
+  conversion_value: "CONVERSION_VALUE",
+  clicks: "CLICKS",
+  impressions: "IMPRESSION_SHARE",
+};
+
 export default function GoogleAdsDisplayBudgetStep({ onNext }: BudgetStepProps) {
+  const { payload, updatePayload } = useCampaignWizardContext();
   const [expandedSection, setExpandedSection] = useState<string | null>("budget");
-  const [focusOn, setFocusOn] = useState("conversions");
+  const [budgetAmount, setBudgetAmount] = useState(payload.budgetAmount ? String(payload.budgetAmount) : "");
+  const [focusOn, setFocusOn] = useState(
+    Object.entries(FOCUS_MAP).find(([, v]) => v === payload.biddingFocus)?.[0] || "conversions"
+  );
   const [howToGet, setHowToGet] = useState("auto");
-  const [setTarget, setSetTarget] = useState(false);
-  
+  const [setTarget, setSetTarget] = useState(!!payload.targetCpa);
+  const [targetCpa, setTargetCpa] = useState(payload.targetCpa ? String(payload.targetCpa) : "");
+
+  useEffect(() => {
+    updatePayload({
+      budgetAmount: parseFloat(budgetAmount) || 0,
+      budgetType: "DAILY",
+      biddingFocus: FOCUS_MAP[focusOn],
+      targetCpa: setTarget ? parseFloat(targetCpa) || undefined : undefined,
+    });
+  }, [budgetAmount, focusOn, setTarget, targetCpa, updatePayload]);
+
   const toggleSection = (section: string) => {
     if (expandedSection === section) setExpandedSection(null);
     else setExpandedSection(section);
@@ -43,8 +65,11 @@ export default function GoogleAdsDisplayBudgetStep({ onNext }: BudgetStepProps) 
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <span className="text-slate-500 text-[13px]">₹</span>
                   </div>
-                  <input 
-                    type="text" 
+                  <input
+                    type="number"
+                    min="0"
+                    value={budgetAmount}
+                    onChange={(e) => setBudgetAmount(e.target.value)}
                     className="w-[180px] border border-slate-300 rounded px-3 py-2 pl-7 text-[13px] text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
@@ -114,14 +139,30 @@ export default function GoogleAdsDisplayBudgetStep({ onNext }: BudgetStepProps) 
                 </div>
 
                 <label className="flex items-center gap-3 cursor-pointer mt-2 w-max">
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     checked={setTarget}
                     onChange={(e) => setSetTarget(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-600" 
+                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-600"
                   />
                   <span className="text-[13px] text-slate-800">Set a target cost per action</span>
                 </label>
+
+                {setTarget && (
+                  <div className="relative w-[180px] ml-7">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className="text-slate-500 text-[13px]">₹</span>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      value={targetCpa}
+                      onChange={(e) => setTargetCpa(e.target.value)}
+                      placeholder="Target CPA"
+                      className="w-full border border-slate-300 rounded px-3 py-2 pl-7 text-[13px] text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                )}
 
                 <div className="bg-[#e6f4ea] rounded-md p-4 mt-2 flex gap-3">
                   <CheckCircle2 className="w-5 h-5 text-green-700 shrink-0 mt-0.5" />

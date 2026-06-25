@@ -10,9 +10,10 @@ import {
   BarChart3,
   Search,
   ShieldCheck,
-  Activity
+  Activity,
+  XCircle
 } from 'lucide-react';
-import { useAdminBroadcasts, useAdminTemplates } from '@/features/broadcasts/hooks/useBroadcasts';
+import { useAdminBroadcasts, useAdminTemplates, useBroadcastDetail } from '@/features/broadcasts/hooks/useBroadcasts';
 import { useUserStore } from '@/utils/useUserStore';
 import { CreateBroadcastModal } from '@/features/broadcasts/components/CreateBroadcastModal';
 import { TemplateManager } from '@/features/broadcasts/components/TemplateManager';
@@ -23,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { StatsCard } from '../components/StatsCard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -57,6 +59,8 @@ export default function AdminBroadcastPage() {
   const { data: broadcasts, isLoading: broadcastsLoading } = useAdminBroadcasts();
   const { data: templates } = useAdminTemplates();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedBroadcastId, setSelectedBroadcastId] = useState<number | null>(null);
+  const { data: broadcastDetail, isLoading: isDetailLoading } = useBroadcastDetail(selectedBroadcastId);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Role check - ensure only admins access this
@@ -188,12 +192,25 @@ export default function AdminBroadcastPage() {
                       </TableRow>
                     ) : (
                       filteredBroadcasts?.map((b) => {
-                        const Config = statusConfig[b.status as keyof typeof statusConfig];
+                        const processedCount = b.sentCount + (b.failedCount || 0);
+                        const progress = b.recipientCount ? Math.round((processedCount / b.recipientCount) * 100) : 0;
+
+                        let displayStatus = b.status;
+                        let customLabel = null;
+                        if (b.status === 'FAILED' && b.sentCount > 0) {
+                          displayStatus = 'FAILED';
+                          customLabel = 'Partial Success';
+                        }
+                        const Config = statusConfig[displayStatus as keyof typeof statusConfig] || statusConfig.PENDING;
                         const StatusIcon = Config.icon;
-                        const progress = b.recipientCount ? Math.round((b.sentCount / b.recipientCount) * 100) : 0;
+                        const finalLabel = customLabel || b.status;
 
                         return (
-                          <TableRow key={b.id} className="group hover:bg-gray-50/50 dark:hover:bg-white/[0.02] border-gray-100 dark:border-white/5 transition-all">
+                          <TableRow 
+                            key={b.id} 
+                            onClick={() => setSelectedBroadcastId(b.id)}
+                            className="group hover:bg-gray-50/50 dark:hover:bg-white/[0.02] border-gray-100 dark:border-white/5 transition-all cursor-pointer"
+                          >
                             <TableCell className="pl-8 py-6">
                               <div className="flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-xl bg-blue-500/5 flex items-center justify-center border border-blue-500/10">
@@ -227,14 +244,20 @@ export default function AdminBroadcastPage() {
                                 "mx-auto flex items-center justify-center gap-1.5 px-3 py-1 rounded-full border shadow-none font-bold text-[10px] uppercase tracking-widest w-fit",
                                 Config.color
                               )}>
-                                <StatusIcon className={cn("w-3 h-3", b.status === 'RUNNING' && "animate-spin")} />
-                                {b.status}
+                                <StatusIcon className={cn("w-3 h-3", displayStatus === 'RUNNING' && "animate-spin")} />
+                                {finalLabel}
                               </Badge>
                             </TableCell>
                             <TableCell>
                               <div className="space-y-2 max-w-[120px]">
                                 <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
-                                  <span>{b.sentCount} / {b.recipientCount}</span>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-gray-900 dark:text-white">{b.sentCount}</span>
+                                    {b.failedCount > 0 && (
+                                      <span className="text-red-500">({b.failedCount})</span>
+                                    )}
+                                    <span className="text-gray-400">/ {b.recipientCount}</span>
+                                  </div>
                                   <span className="text-blue-500">{progress}%</span>
                                 </div>
                                 <div className="h-1.5 w-full bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden">
@@ -276,6 +299,89 @@ export default function AdminBroadcastPage() {
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
       />
+
+      <Dialog open={!!selectedBroadcastId} onOpenChange={(open) => !open && setSelectedBroadcastId(null)}>
+        <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="px-6 py-4 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5">
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <span className="font-bold text-gray-900 dark:text-white">{broadcastDetail?.name ?? '...'}</span>
+              <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-gray-200/50 dark:bg-white/10 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-white/10">
+                {broadcastDetail?.channel}
+              </span>
+            </DialogTitle>
+            <DialogDescription>
+              Detailed recipient delivery status and error logs.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto p-6 bg-white dark:bg-gray-900">
+            {isDetailLoading ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <Loader2 className="w-8 h-8 text-gray-200 dark:text-gray-700 animate-spin" />
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading Recipient Data...</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5">
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Total Recipients</p>
+                    <p className="text-xl font-bold text-gray-900 dark:text-white">{broadcastDetail?.recipientCount || broadcastDetail?.totalCount || '—'}</p>
+                  </div>
+                  <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl border border-emerald-100 dark:border-emerald-500/20">
+                    <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 mb-1">Successfully Sent</p>
+                    <p className="text-xl font-bold text-emerald-700 dark:text-emerald-500">{broadcastDetail?.sentCount ?? '—'}</p>
+                  </div>
+                  <div className="p-3 bg-red-50 dark:bg-red-500/10 rounded-xl border border-red-100 dark:border-red-500/20">
+                    <p className="text-xs font-medium text-red-600 dark:text-red-400 mb-1">Failed</p>
+                    <p className="text-xl font-bold text-red-700 dark:text-red-500">{broadcastDetail?.failedCount ?? 0}</p>
+                  </div>
+                </div>
+
+                <h4 className="font-bold text-[10px] uppercase tracking-widest text-gray-900 dark:text-white mb-3 border-b border-gray-100 dark:border-white/5 pb-2">Recipient Details</h4>
+                
+                {!broadcastDetail?.recipients || broadcastDetail.recipients.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-sm font-medium text-gray-400">No recipient details available for this campaign.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {broadcastDetail.recipients.map((recip) => (
+                      <div key={recip.id} className="flex flex-col p-3 rounded-lg border border-gray-100 dark:border-white/5 hover:border-gray-200 dark:hover:border-white/10 transition-colors bg-gray-50/30 dark:bg-white/[0.02]">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-sm text-gray-700 dark:text-gray-300">{recip.to}</span>
+                          <div className="flex items-center gap-1.5">
+                            {recip.status === 'COMPLETED' ? (
+                              <>
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 tracking-wide uppercase">Delivered</span>
+                              </>
+                            ) : recip.status === 'FAILED' ? (
+                              <>
+                                <XCircle className="w-3.5 h-3.5 text-red-500" />
+                                <span className="text-[10px] font-bold text-red-600 dark:text-red-400 tracking-wide uppercase">Failed</span>
+                              </>
+                            ) : (
+                              <>
+                                <Clock className="w-3.5 h-3.5 text-amber-500" />
+                                <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 tracking-wide uppercase">{recip.status}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        {recip.error && (
+                          <div className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 p-2 rounded border border-red-100 dark:border-red-500/20 break-all font-mono">
+                            {recip.error}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

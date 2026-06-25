@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { ChevronUp, ChevronDown, Info, Plus } from "lucide-react";
 
+import { useCampaignWizardContext } from "../context/CampaignWizardContext";
+
 interface SettingsStepProps {
   onNext: () => void;
 }
@@ -13,14 +15,69 @@ export default function GoogleAdsShoppingSettingsStep({ onNext }: SettingsStepPr
     dates: true,
     urlOptions: true,
     networks: true,
+    merchantCenter: true,
   });
+
+  const { payload, updatePayload } = useCampaignWizardContext();
 
   const toggleSection = (section: keyof typeof expanded) => {
     setExpanded((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
+  const handleMerchantIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    updatePayload({ merchantId: e.target.value });
+  };
+
+  const handleSalesCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    updatePayload({ salesCountry: e.target.value });
+  };
+
   return (
     <div className="flex flex-col gap-4 max-w-[1000px]">
+
+      {/* Merchant Center */}
+      <div className="bg-white border border-slate-200 rounded-md overflow-hidden">
+        <div 
+          onClick={() => toggleSection("merchantCenter")}
+          className="flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-slate-50"
+        >
+          <h3 className="text-[14px] font-medium text-slate-800">Merchant Center account</h3>
+          {expanded.merchantCenter ? <ChevronUp className="w-5 h-5 text-slate-500" /> : <ChevronDown className="w-5 h-5 text-slate-500" />}
+        </div>
+        {expanded.merchantCenter && (
+          <div className="p-6 border-t border-slate-200 bg-white">
+            <div className="flex flex-col gap-4 max-w-[400px]">
+              <div>
+                <label className="text-[13px] text-slate-800 block mb-1">Select a Merchant Center account</label>
+                <input 
+                  type="text" 
+                  value={payload.merchantId || ""}
+                  onChange={handleMerchantIdChange}
+                  placeholder="e.g. 123456789"
+                  className="w-full border border-slate-300 rounded px-3 py-2 text-[13px] text-slate-800 outline-none focus:ring-1 focus:ring-blue-500" 
+                />
+              </div>
+              <div>
+                <label className="text-[13px] text-slate-800 block mb-1">Country of sale</label>
+                <select 
+                  value={payload.salesCountry || "IN"}
+                  onChange={handleSalesCountryChange}
+                  className="w-full border border-slate-300 rounded px-3 py-2 text-[13px] text-slate-800 outline-none bg-white"
+                >
+                  <option value="IN">India</option>
+                  <option value="US">United States</option>
+                  <option value="UK">United Kingdom</option>
+                  <option value="CA">Canada</option>
+                  <option value="AU">Australia</option>
+                </select>
+              </div>
+            </div>
+            <div className="text-[12px] text-slate-500 mt-4">
+              Products from this account will be used in your campaign. <a href="#" className="text-blue-600 hover:underline">Learn more</a>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Locations */}
       <div className="bg-white border border-slate-200 rounded-md overflow-hidden">

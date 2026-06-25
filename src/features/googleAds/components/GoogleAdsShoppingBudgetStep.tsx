@@ -1,11 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronUp, ChevronDown, Info } from "lucide-react";
+import { useCampaignWizardContext } from "../context/CampaignWizardContext";
 
 interface BudgetStepProps {
   onNext: () => void;
 }
 
 export default function GoogleAdsShoppingBudgetStep({ onNext }: BudgetStepProps) {
+  const { payload, updatePayload } = useCampaignWizardContext();
+  const [budgetAmount, setBudgetAmount] = useState(payload.budgetAmount ? String(payload.budgetAmount) : "");
+  const [onlyNewCustomers, setOnlyNewCustomers] = useState(!!payload.onlyNewCustomers);
+
+  useEffect(() => {
+    updatePayload({
+      budgetAmount: parseFloat(budgetAmount) || 0,
+      budgetType: "DAILY",
+      biddingFocus: "CLICKS", // Shopping default: Manual CPC
+      onlyNewCustomers,
+    });
+  }, [budgetAmount, onlyNewCustomers, updatePayload]);
+
   const [expanded, setExpanded] = useState({
     budget: true,
     bidding: true,
@@ -58,7 +72,13 @@ export default function GoogleAdsShoppingBudgetStep({ onNext }: BudgetStepProps)
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                           <span className="text-slate-500 text-[13px]">₹</span>
                         </div>
-                        <input type="text" className="w-full border border-slate-300 rounded px-3 py-2 pl-7 text-[13px] focus:ring-2 focus:ring-blue-500 outline-none" />
+                        <input
+                          type="number"
+                          min="0"
+                          value={budgetAmount}
+                          onChange={(e) => setBudgetAmount(e.target.value)}
+                          className="w-full border border-slate-300 rounded px-3 py-2 pl-7 text-[13px] focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
                       </div>
                     </div>
                   </label>
@@ -123,7 +143,12 @@ export default function GoogleAdsShoppingBudgetStep({ onNext }: BudgetStepProps)
             <div className="p-6 border-t border-slate-200 flex gap-8 bg-white">
               <div className="flex-1 flex flex-col gap-2">
                 <label className="flex items-start gap-3 cursor-pointer">
-                  <input type="checkbox" className="mt-1 w-4 h-4 rounded-sm text-blue-600" />
+                  <input
+                    type="checkbox"
+                    checked={onlyNewCustomers}
+                    onChange={(e) => setOnlyNewCustomers(e.target.checked)}
+                    className="mt-1 w-4 h-4 rounded-sm text-blue-600"
+                  />
                   <div>
                     <div className="text-[13px] text-slate-800">Only bid for new customers</div>
                     <div className="text-[12px] text-slate-500 mt-1">Your campaign will be limited to only new customers, regardless of your bid strategy</div>

@@ -140,15 +140,15 @@ export const removeCampaign = async (clientId: number, campaignId: string): Prom
 
 import type { PublishCompleteCampaignPayload, PublishTransactionResponse } from "../types/googleAds.types";
 
-/** POST /api/google-ads/:clientId/campaigns/publish */
+/** POST /api/google-ads/publish */
 export const publishCompleteCampaign = async (
   clientId: number,
   payload: PublishCompleteCampaignPayload
 ): Promise<PublishTransactionResponse> => {
   try {
     const res = await api.post<PublishTransactionResponse>(
-      `/google-ads/${clientId}/campaigns/publish`,
-      payload
+      `/google-ads/publish`,
+      { ...payload, clientId }
     );
     return res.data;
   } catch (e: any) {
@@ -156,14 +156,14 @@ export const publishCompleteCampaign = async (
   }
 };
 
-/** GET /api/google-ads/:clientId/campaigns/publish/:operationId/status */
+/** GET /api/google-ads/publish/operation/:operationId */
 export const getPublishOperationStatus = async (
-  clientId: number,
+  _clientId: number,
   operationId: string
 ): Promise<PublishTransactionResponse> => {
   try {
     const res = await api.get<PublishTransactionResponse>(
-      `/google-ads/${clientId}/campaigns/publish/${operationId}/status`
+      `/google-ads/publish/operation/${operationId}`
     );
     return res.data;
   } catch (e: any) {
@@ -175,9 +175,8 @@ export const getPublishOperationStatus = async (
  * Returns the SSE endpoint URL for streaming publish progress.
  * Use new EventSource(getPublishProgressStreamUrl(...)) in components.
  */
-export const getPublishProgressStreamUrl = (clientId: number, operationId: string) => {
-  // Assuming the api base url is /api. Adjust if config has custom REACT_APP_API_URL etc.
-  return `/api/google-ads/${clientId}/campaigns/publish/${operationId}/stream`;
+export const getPublishProgressStreamUrl = (_clientId: number, operationId: string) => {
+  return `/api/google-ads/publish/stream/${operationId}`;
 };
 
 export const duplicateCampaign = async (clientId: number, campaignId: string): Promise<{ success: boolean; newCampaignId: string }> => {

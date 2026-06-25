@@ -24,9 +24,14 @@ export default function GoogleAdsVideoSettingsStep({ onNext, activeSubStep = "na
   const [finalUrl] = useState(payload.ads?.[0]?.finalUrls?.[0] || "https://example.com");
   const [headline] = useState(initialHeadline);
 
+  const [targetCpv, setTargetCpv] = useState<number | undefined>(payload.targetCpv);
+  const [targetCpm, setTargetCpm] = useState<number | undefined>(payload.targetCpm);
+
   useEffect(() => {
     updatePayload({
       campaignName,
+      targetCpv,
+      targetCpm,
       ads: [
         {
           type: "VIDEO_AD",
@@ -40,7 +45,7 @@ export default function GoogleAdsVideoSettingsStep({ onNext, activeSubStep = "na
         }
       ]
     } as any);
-  }, [campaignName, videoId, videoFormat, cta, finalUrl, headline, updatePayload]);
+  }, [campaignName, videoId, videoFormat, cta, finalUrl, headline, targetCpv, targetCpm, updatePayload]);
 
   // Sync sidebar content sub-step with open accordion
   useEffect(() => {
@@ -872,18 +877,36 @@ export default function GoogleAdsVideoSettingsStep({ onNext, activeSubStep = "na
           <div className="p-6">
              <div className="flex gap-8">
                <div className="flex-1">
-                 <label className="text-[13px] text-slate-700 block mb-2">TrueView target CPV bid</label>
+                 <label className="text-[13px] text-slate-700 block mb-2">
+                   {(payload.biddingFocus as any) === 'AWARENESS' ? 'Target CPM bid' : 'TrueView target CPV bid'}
+                 </label>
                  <div className="flex flex-col gap-1">
                    <div className="border border-slate-300 rounded flex items-center w-[140px] bg-white focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent">
                      <span className="text-[14px] text-slate-700 pl-3 pr-1">₹</span>
-                     <input type="text" className="w-full outline-none text-[13px] py-2 pr-3" />
+                     <input 
+                       type="number" 
+                       value={(payload.biddingFocus as any) === 'AWARENESS' ? (targetCpm || "") : (targetCpv || "")}
+                       onChange={(e) => {
+                         const val = parseFloat(e.target.value) || undefined;
+                         if ((payload.biddingFocus as any) === 'AWARENESS') {
+                           setTargetCpm(val);
+                         } else {
+                           setTargetCpv(val);
+                         }
+                       }}
+                       className="w-full outline-none text-[13px] py-2 pr-3" 
+                     />
                    </div>
                    <span className="text-[11px] text-red-500 mt-1">Required</span>
                  </div>
                </div>
                
                <div className="flex-1 text-[12px] text-slate-600 leading-relaxed pt-6">
-                 With TrueView target CPV (cost-per-view), you set the average amount you're willing to pay for views for this campaign. From the TrueView target CPV you set, we'll optimize bids to help get as many TrueView views as possible. Some TrueView views may cost more or less than your target.
+                 {(payload.biddingFocus as any) === 'AWARENESS' ? (
+                   "With Target CPM (cost-per-thousand impressions), you set the average amount you're willing to pay for every thousand times your ad is shown. We'll optimize bids to help get as many impressions as possible."
+                 ) : (
+                   "With TrueView target CPV (cost-per-view), you set the average amount you're willing to pay for views for this campaign. From the TrueView target CPV you set, we'll optimize bids to help get as many TrueView views as possible. Some TrueView views may cost more or less than your target."
+                 )}
                </div>
              </div>
           </div>

@@ -9,6 +9,13 @@ export interface BroadcastOwner {
   fullName: string;
 }
 
+export interface WhatsAppQuota {
+  tier: string;
+  limit: number;
+  sentLast24h: number;
+  remaining: number;
+}
+
 export interface Broadcast {
   id: number;
   name: string;
@@ -27,6 +34,12 @@ export interface Broadcast {
   createdAt: string;
   updatedAt: string;
   user?: BroadcastOwner; // Only present on admin endpoints
+  recipients?: Array<{
+    id: number;
+    to: string;
+    status: BroadcastStatus;
+    error: string | null;
+  }>;
 }
 
 export type WhatsAppTemplateCategory = 'UTILITY' | 'MARKETING';

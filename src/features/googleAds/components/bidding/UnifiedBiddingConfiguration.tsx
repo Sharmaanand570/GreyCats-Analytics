@@ -29,8 +29,9 @@ export function UnifiedBiddingConfiguration({ clientId, value, onChange, hidePor
   // Usually the UI asks "What do you want to focus on?"
   // Options: Conversions, Conversion value, Impression Share
   
-  const [biddingFocus, setBiddingFocus] = useState<"Conversions" | "Conversion value" | "Impression share">(() => {
+  const [biddingFocus, setBiddingFocus] = useState<"Conversions" | "Conversion value" | "Clicks" | "Impression share">(() => {
     if (value.type === "TARGET_ROAS" || value.type === "MAXIMIZE_CONVERSION_VALUE") return "Conversion value";
+    if (value.type === "MAXIMIZE_CLICKS") return "Clicks";
     if (value.type === "TARGET_IMPRESSION_SHARE") return "Impression share";
     return "Conversions";
   });
@@ -39,14 +40,15 @@ export function UnifiedBiddingConfiguration({ clientId, value, onChange, hidePor
   
   // Is it constrained?
   const [hasTarget, setHasTarget] = useState<boolean>(() => {
-    return value.type === "TARGET_CPA" || value.type === "TARGET_ROAS";
+    return value.type === "TARGET_CPA" || value.type === "TARGET_ROAS" || (value.type === "MAXIMIZE_CLICKS" && !!value.targetImpressionShare?.cpcBidCeilingMicros);
   });
 
-  const handleFocusChange = (focus: "Conversions" | "Conversion value" | "Impression share") => {
+  const handleFocusChange = (focus: "Conversions" | "Conversion value" | "Clicks" | "Impression share") => {
     setBiddingFocus(focus);
     setHasTarget(false);
     if (focus === "Conversions") onChange({ ...value, type: "MAXIMIZE_CONVERSIONS", portfolioStrategyId: null });
     if (focus === "Conversion value") onChange({ ...value, type: "MAXIMIZE_CONVERSION_VALUE", portfolioStrategyId: null });
+    if (focus === "Clicks") onChange({ ...value, type: "MAXIMIZE_CLICKS", portfolioStrategyId: null, targetImpressionShare: { location: "ANYWHERE_ON_PAGE", locationFractionMicros: 1000000, cpcBidCeilingMicros: undefined } });
     if (focus === "Impression share") onChange({ ...value, type: "TARGET_IMPRESSION_SHARE", portfolioStrategyId: null, targetImpressionShare: { location: "ANYWHERE_ON_PAGE", locationFractionMicros: 1000000 } });
   };
 
@@ -55,9 +57,11 @@ export function UnifiedBiddingConfiguration({ clientId, value, onChange, hidePor
     if (checked) {
       if (biddingFocus === "Conversions") onChange({ ...value, type: "TARGET_CPA" });
       if (biddingFocus === "Conversion value") onChange({ ...value, type: "TARGET_ROAS" });
+      if (biddingFocus === "Clicks") onChange({ ...value, type: "MAXIMIZE_CLICKS", targetImpressionShare: { ...(value.targetImpressionShare || { location: "ANYWHERE_ON_PAGE", locationFractionMicros: 1000000 }), cpcBidCeilingMicros: 1000000 } }); // default 1
     } else {
       if (biddingFocus === "Conversions") onChange({ ...value, type: "MAXIMIZE_CONVERSIONS" });
       if (biddingFocus === "Conversion value") onChange({ ...value, type: "MAXIMIZE_CONVERSION_VALUE" });
+      if (biddingFocus === "Clicks") onChange({ ...value, type: "MAXIMIZE_CLICKS", targetImpressionShare: { ...(value.targetImpressionShare || { location: "ANYWHERE_ON_PAGE", locationFractionMicros: 1000000 }), cpcBidCeilingMicros: undefined } });
     }
   };
 
@@ -127,7 +131,7 @@ export function UnifiedBiddingConfiguration({ clientId, value, onChange, hidePor
             
             {isBiddingDropdownOpen && (
               <div className="absolute top-full mt-1 left-0 w-full bg-white border border-slate-200 shadow-lg rounded z-10 py-1">
-                {(["Conversions", "Conversion value", "Impression share"] as const).map(opt => (
+                {(["Conversions", "Conversion value", "Clicks", "Impression share"] as const).map(opt => (
                   <div
                     key={opt}
                     className={`px-4 py-2 text-[13px] cursor-pointer hover:bg-slate-100 ${biddingFocus === opt ? "bg-slate-50 font-medium" : ""}`}
@@ -140,7 +144,7 @@ export function UnifiedBiddingConfiguration({ clientId, value, onChange, hidePor
             )}
           </div>
 
-          {(biddingFocus === "Conversions" || biddingFocus === "Conversion value") && (
+          {(biddingFocus === "Conversions" || biddingFocus === "Conversion value" || biddingFocus === "Clicks") && (
             <div className="flex flex-col gap-3 mt-2">
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
@@ -152,7 +156,9 @@ export function UnifiedBiddingConfiguration({ clientId, value, onChange, hidePor
                 <span className="text-[13px] text-slate-800">
                   {biddingFocus === "Conversions"
                     ? "Set a target cost per action (optional)"
-                    : "Set a target return on ad spend (optional)"}
+                    : biddingFocus === "Conversion value" 
+                    ? "Set a target return on ad spend (optional)"
+                    : "Set a maximum cost per click bid limit (optional)"}
                 </span>
               </label>
 
@@ -186,6 +192,23 @@ export function UnifiedBiddingConfiguration({ clientId, value, onChange, hidePor
                       onChange={(e) => onChange({ ...value, targetRoas: Number(e.target.value) / 100 })}
                     />
                     <span className="pr-3 text-[13px] text-slate-600 font-medium bg-slate-50 py-1.5 border-l border-slate-200 pl-2">%</span>
+                  </div>
+                </div>
+              )}
+
+              {hasTarget && biddingFocus === "Clicks" && (
+                <div className="pl-7">
+                  <div className="flex items-center gap-1 mb-2">
+                    <span className="text-[13px] text-slate-800">Maximum CPC bid limit</span>
+                  </div>
+                  <div className="border border-slate-300 rounded-sm flex items-center w-[120px] bg-white focus-within:ring-2 focus-within:ring-blue-500 overflow-hidden">
+                    <span className="pl-3 text-[13px] text-slate-600 font-medium bg-slate-50 py-1.5 border-r border-slate-200 pr-2">₹</span>
+                    <input 
+                      type="number" 
+                      className="w-full outline-none text-[13px] px-2 py-1.5" 
+                      value={value.targetImpressionShare?.cpcBidCeilingMicros ? (value.targetImpressionShare.cpcBidCeilingMicros / 1000000) : ""}
+                      onChange={(e) => onChange({ ...value, targetImpressionShare: { ...(value.targetImpressionShare || { location: "ANYWHERE_ON_PAGE", locationFractionMicros: 1000000 }), cpcBidCeilingMicros: Number(e.target.value) * 1000000 } })}
+                    />
                   </div>
                 </div>
               )}

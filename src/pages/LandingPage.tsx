@@ -989,8 +989,8 @@ export default function LandingPage() {
                 {isAuth ? "Go to Dashboard" : "Start for free"}
               </button>
             </Link>
-            <Link to="/contact">
-              <button className="inline-flex items-center justify-center rounded-lg text-[15px] font-medium transition-all duration-200 ease-in-out h-11 px-6 bg-white text-[#18181b] border border-[#e4e4e7] hover:bg-[#f4f4f5]">Contact us</button>
+            <Link to="/docs/getting-started">
+              <button className="inline-flex items-center justify-center rounded-lg text-[15px] font-medium transition-all duration-200 ease-in-out h-11 px-6 bg-white text-[#18181b] border border-[#e4e4e7] hover:bg-[#f4f4f5]">Documentation</button>
             </Link>
           </div>
         </div>
